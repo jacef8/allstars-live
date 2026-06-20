@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>All-Stars Live</title>
+<style>
+  :root{ --bg:#0b1220; --bg2:#0f172a; --card:#16223c; --line:#27375c; --chalk:#F8FAFC; --slate:#94A3B8; --gold:#FBBF24; }
+  *{box-sizing:border-box;margin:0;}
+  body{min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:24px;
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--chalk);
+    background:radial-gradient(130% 70% at 50% -8%, #16244a 0%, var(--bg2) 46%, var(--bg) 100%);}
+  .wrap{width:100%;max-width:380px;text-align:center;}
+  h1{font-size:22px;font-weight:800;letter-spacing:.3px;}
+  p{color:var(--slate);font-size:14px;margin:8px 0 20px;line-height:1.5;}
+  a.card{display:block;text-decoration:none;color:var(--chalk);background:var(--card);border:1px solid var(--line);
+    border-radius:12px;padding:15px 16px;margin:10px 0;text-align:left;transition:transform .1s,border-color .15s;}
+  a.card:hover{transform:translateY(-1px);border-color:var(--gold);}
+  a.card b{display:block;font-size:16px;font-weight:700;}
+  a.card span{font-size:13px;color:var(--slate);}
+  .tag{color:var(--gold);font-weight:800;letter-spacing:.18em;font-size:12px;}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="tag">ALL-STARS LIVE</div>
+    <h1>Page not found</h1>
+    <p>That link didn't match a page. Here's what's available:</p>
+    <a class="card" href="/viewer.html"><b>📺 Live Viewer</b><span>Follow the game in real time — for fans</span></a>
+    <a class="card" href="/scoring-controller.html"><b>🎛️ Scoring Controller</b><span>The scorekeeper's console</span></a>
+    <a class="card" href="/broadcast-overlay.html"><b>🟢 Broadcast Overlay</b><span>Scorebug for OBS / streaming</span></a>
+  </div>
+</body>
+</html>

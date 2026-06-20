@@ -1,0 +1,16 @@
+{
+  "name": "allstars-live",
+  "version": "1.0.0",
+  "description": "All-Stars Live — broadcast scorekeeping. WebSocket relay (server.js) + web scoring/viewer UI.",
+  "main": "reference/web-scoring/server.js",
+  "scripts": {
+    "start": "node reference/web-scoring/server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "ws": "^8.18.0",
+    "firebase-admin": "^12.7.0"
+  }
+}

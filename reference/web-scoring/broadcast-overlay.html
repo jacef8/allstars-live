@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Liberty League — Broadcast Overlay</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@500;600;700&family=Barlow:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    /* ---- TIMING (broadcast-paced — tune these freely) ---- */
+    --t-intro: 1.0s;       /* scorebug rises into place */
+    --t-score: 0.75s;      /* run total rolls up */
+    --t-pip:   0.55s;      /* a ball/strike pip lights */
+    --t-base:  0.6s;       /* a base lights as a runner arrives */
+    --t-base-stagger: 0.16s;
+    --t-big-in:  0.85s;    /* big-play banner eases in */
+    --t-big-hold: 4.0s;    /* big-play banner HOLDS so it can be read */
+    --t-big-out: 0.7s;     /* big-play banner eases out */
+    --t-sweep: 1.3s;       /* gold light sweep when a run scores */
+    --ease: cubic-bezier(.16,1,.3,1);     /* smooth settle, no bounce */
+    --ease-soft: cubic-bezier(.4,0,.2,1);
+
+    /* ---- COLOR ---- */
+    --chrome-1:#121821; --chrome-2:#0a0e15; --chrome-edge:#2b3543;
+    --chalk:#F6F8FB; --muted:#9aa7b8; --dim:#5c6878;
+    --gold:#F4B233; --live:#FF453A;
+    --away:#F4B233; --away-ink:#231a05;
+    --home:#27B7A6; --home-ink:#05221e;
+
+    --disp:"Saira Condensed", system-ui, sans-serif;
+    --body:"Barlow", system-ui, sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html,body{height:100%;background:transparent;font-family:var(--body);overflow:hidden;}
+  body.preview{background:#05070b;}
+
+  /* ---------- preview stage (HIDDEN in OBS) ---------- */
+  #scaler{position:absolute;top:0;left:0;transform-origin:top left;}
+  #stage{position:relative;width:1280px;height:720px;}
+  body.preview #stage{
+    background:
+      radial-gradient(120% 80% at 50% 12%, #16321f 0%, #0c1f15 42%, #070d0a 100%);
+  }
+  .stageNote{position:absolute;top:20px;left:24px;font-family:var(--disp);letter-spacing:.18em;
+    font-size:13px;color:#5d6b62;display:none;}
+  body.preview .stageNote{display:block;}
+  /* once a controller is feeding state, drop the demo buttons — you only run the controller */
+  body.linked #panel{display:none;}
+  #linkTag{position:absolute;top:18px;right:24px;display:none;align-items:center;gap:7px;
+    font-family:var(--disp);letter-spacing:.14em;font-size:12px;color:#7fe0b0;}
+  body.preview.linked #linkTag{display:flex;}
+  #linkTag .d{width:8px;height:8px;border-radius:50%;background:#2fd27f;animation:livepulse 1.6s ease-in-out infinite;}
+  #waitTag{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);display:none;text-align:center;
+    font-family:var(--disp);letter-spacing:.06em;color:#48566a;}
+  body.preview:not(.linked) #waitTag{display:block;}
+  #waitTag b{display:block;font-size:22px;color:#6b7c92;margin-bottom:6px;letter-spacing:.04em;}
+  body.preview #stage::after{ /* faint field suggestion */
+    content:"";position:absolute;left:50%;bottom:96px;width:560px;height:560px;transform:translateX(-50%) rotate(45deg);
+    border:2px solid rgba(255,255,255,.05);border-radius:24px;}
+
+  /* ---------- SCOREBUG ---------- */
+  #bug{
+    position:absolute;left:40px;bottom:44px;display:flex;align-items:stretch;height:74px;
+    border-radius:11px;overflow:hidden;
+    box-shadow:0 18px 40px -12px rgba(0,0,0,.7), 0 0 0 1px rgba(0,0,0,.5);
+    opacity:0;transform:translateY(26px);
+  }
+  #bug.in{animation:bugIn var(--t-intro) var(--ease) forwards;}
+  @keyframes bugIn{to{opacity:1;transform:translateY(0);}}
+
+  /* team blades */
+  .teams{display:flex;flex-direction:column;background:linear-gradient(180deg,var(--chrome-1),var(--chrome-2));}
+  .team{position:relative;display:flex;align-items:center;height:37px;padding:0 16px 0 0;min-width:182px;}
+  .team .chev{width:9px;align-self:stretch;margin-right:13px;clip-path:polygon(0 0,100% 0,60% 100%,0 100%);}
+  .team .abbr{font-family:var(--disp);font-weight:600;font-size:21px;letter-spacing:.06em;color:var(--muted);}
+  .team.bat .abbr{color:var(--chalk);}
+  .team .runs{margin-left:auto;font-family:var(--disp);font-weight:700;font-size:27px;line-height:1;
+    color:var(--muted);font-variant-numeric:tabular-nums;overflow:hidden;height:30px;display:flex;align-items:center;}
+  .team.bat .runs{color:var(--chalk);}
+  .team.bat::before{content:"";position:absolute;left:0;top:0;bottom:0;width:100%;
+    background:linear-gradient(90deg,rgba(255,255,255,.05),transparent 60%);}
+  .team:first-child{border-bottom:1px solid rgba(0,0,0,.5);}
+  /* batting indicator: a small lit dot */
+  .team .live-bat{position:absolute;right:8px;top:50%;width:5px;height:5px;border-radius:50%;
+    transform:translateY(-50%);opacity:0;transition:opacity .4s var(--ease-soft);}
+  .team.bat .live-bat{opacity:.9;}
+
+  .runs .digit{animation:none;}
+  .runs.roll .digit{animation:scoreRoll var(--t-score) var(--ease) both;}
+  @keyframes scoreRoll{0%{transform:translateY(70%);opacity:0;}55%{opacity:1;}100%{transform:translateY(0);opacity:1;}}
+
+  /* center module */
+  .center{display:flex;align-items:center;gap:18px;padding:0 20px;
+    background:linear-gradient(180deg,#1b2430,#0e151e);border-left:1px solid var(--chrome-edge);position:relative;}
+  .center::after{content:"";position:absolute;inset:0;pointer-events:none;
+    background:linear-gradient(90deg,transparent, rgba(244,178,51,0) );}
+  .center.sweep::after{animation:sweep var(--t-sweep) var(--ease-soft);}
+  @keyframes sweep{0%{background:linear-gradient(100deg,transparent 0%,rgba(244,178,51,.0) 40%);}
+    35%{background:linear-gradient(100deg,transparent 30%,rgba(244,178,51,.28) 50%,transparent 70%);}
+    100%{background:linear-gradient(100deg,transparent 100%,rgba(244,178,51,0) 130%);}}
+
+  .inning{display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:34px;}
+  .inning .half{font-family:var(--disp);font-weight:600;font-size:11px;letter-spacing:.14em;color:var(--muted);
+    display:flex;align-items:center;gap:4px;}
+  .inning .half .arrow{font-size:9px;line-height:1;transition:transform .5s var(--ease);}
+  .inning.bottom .half .arrow{transform:rotate(180deg);}
+  .inning .num{font-family:var(--disp);font-weight:700;font-size:25px;line-height:.9;color:var(--chalk);}
+
+  /* base diamond */
+  .bases{width:44px;height:40px;position:relative;}
+  .bases .b{position:absolute;width:13px;height:13px;border-radius:2px;transform:rotate(45deg);
+    border:1.6px solid var(--dim);background:transparent;transition:background var(--t-base) var(--ease),
+      border-color var(--t-base) var(--ease);}
+  .bases .b.on{background:var(--gold);border-color:var(--gold);}
+  .bases .b.pop{animation:basePop var(--t-base) var(--ease);}
+  @keyframes basePop{0%{transform:rotate(45deg) scale(.45);}60%{transform:rotate(45deg) scale(1.18);}100%{transform:rotate(45deg) scale(1);}}
+  .bases .b2{top:0;left:50%;margin-left:-6.5px;}
+  .bases .b1{top:50%;right:0;margin-top:-6.5px;}
+  .bases .b3{top:50%;left:0;margin-top:-6.5px;}
+
+  /* count + outs */
+  .count{display:flex;flex-direction:column;gap:6px;}
+  .countrow{display:flex;align-items:center;gap:7px;}
+  .countrow .lab{font-family:var(--disp);font-weight:600;font-size:11px;letter-spacing:.1em;color:var(--dim);width:12px;}
+  .pip{width:9px;height:9px;border-radius:50%;border:1.5px solid var(--dim);background:transparent;
+    transition:background var(--t-pip) var(--ease),border-color var(--t-pip) var(--ease);}
+  .pip.on{background:var(--chalk);border-color:var(--chalk);}
+  .pip.out.on{background:var(--live);border-color:var(--live);}
+  .pip.just{animation:pipPop var(--t-pip) var(--ease);}
+  @keyframes pipPop{0%{transform:scale(.4);}60%{transform:scale(1.35);}100%{transform:scale(1);}}
+
+  /* live tag */
+  .livetag{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+    padding:0 15px;background:linear-gradient(180deg,rgba(255,69,58,.16),rgba(255,69,58,.05));
+    border-left:1px solid var(--chrome-edge);}
+  .livetag .dot{width:8px;height:8px;border-radius:50%;background:var(--live);animation:livepulse 1.6s ease-in-out infinite;}
+  .livetag .txt{font-family:var(--disp);font-weight:700;font-size:11px;letter-spacing:.16em;color:var(--live);}
+  @keyframes livepulse{0%,100%{opacity:1;}50%{opacity:.3;}}
+
+  /* ---------- BIG PLAY banner ---------- */
+  #big{
+    position:absolute;left:40px;bottom:130px;min-width:430px;max-width:720px;
+    border-radius:10px;overflow:hidden;
+    background:linear-gradient(180deg,#161d27,#0b1119);
+    box-shadow:0 20px 44px -14px rgba(0,0,0,.75), 0 0 0 1px rgba(0,0,0,.5);
+    opacity:0;transform:translateY(22px) scale(.985);pointer-events:none;
+  }
+  #big.show{animation:bigIn var(--t-big-in) var(--ease) forwards;}
+  #big.hide{animation:bigOut var(--t-big-out) var(--ease-soft) forwards;}
+  @keyframes bigIn{to{opacity:1;transform:translateY(0) scale(1);}}
+  @keyframes bigOut{to{opacity:0;transform:translateY(14px) scale(.99);}}
+  #big .accent{height:5px;width:0;background:var(--gold);}
+  #big.show .accent{animation:wipe var(--t-big-in) var(--ease) forwards;animation-delay:.12s;}
+  @keyframes wipe{to{width:100%;}}
+  #big .inner{display:flex;align-items:center;gap:18px;padding:15px 22px 17px;}
+  #big .kicker{font-family:var(--disp);font-weight:600;font-size:13px;letter-spacing:.2em;color:var(--gold);
+    text-transform:uppercase;margin-bottom:3px;opacity:0;}
+  #big.show .kicker{animation:fadeUp .6s var(--ease) both;animation-delay:.22s;}
+  #big .head{font-family:var(--disp);font-weight:700;font-size:38px;line-height:.92;letter-spacing:.01em;color:var(--chalk);
+    text-transform:uppercase;opacity:0;}
+  #big.show .head{animation:fadeUp .7s var(--ease) both;animation-delay:.3s;}
+  #big .sub{font-family:var(--body);font-weight:600;font-size:16px;color:var(--muted);margin-top:5px;opacity:0;}
+  #big.show .sub{animation:fadeUp .7s var(--ease) both;animation-delay:.42s;}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(9px);}to{opacity:1;transform:translateY(0);}}
+
+  /* ---------- preview controls (HIDDEN in OBS) ---------- */
+  #panel{position:fixed;top:0;left:0;right:0;display:none;flex-wrap:wrap;gap:7px;
+    padding:11px 14px;background:rgba(8,11,16,.92);border-bottom:1px solid #1d2530;z-index:50;}
+  body.preview #panel{display:flex;}
+  #panel button{font-family:var(--body);font-weight:600;font-size:13px;color:#dfe6ef;cursor:pointer;
+    background:#1a2230;border:1px solid #2b3543;border-radius:8px;padding:8px 12px;transition:transform .08s,background .15s;}
+  #panel button:hover{background:#222c3c;}
+  #panel button:active{transform:scale(.95);}
+  #panel .sep{width:1px;align-self:stretch;background:#2b3543;margin:0 4px;}
+  #panel .grp{font-family:var(--disp);letter-spacing:.12em;font-size:11px;color:#5c6878;align-self:center;margin:0 2px 0 6px;}
+  #hideBtn{margin-left:auto;background:#2a2009;border-color:#5a4a1a;color:var(--gold);}
+</style>
+</head>
+<body class="preview">
+
+  <div id="panel">
+    <span class="grp">COUNT</span>
+    <button data-cmd="ball">Ball</button>
+    <button data-cmd="strike">Strike</button>
+    <button data-cmd="foul">Foul</button>
+    <button data-cmd="newbatter">New batter</button>
+    <span class="sep"></span>
+    <span class="grp">PLAYS</span>
+    <button data-cmd="single">Single</button>
+    <button data-cmd="double">Double</button>
+    <button data-cmd="triple">Triple</button>
+    <button data-cmd="hr">Home run</button>
+    <button data-cmd="out">Out</button>
+    <button data-cmd="dp">Double play</button>
+    <span class="sep"></span>
+    <span class="grp">GAME</span>
+    <button data-cmd="halfflip">Flip half</button>
+    <button data-cmd="reset">Reset</button>
+    <button id="hideBtn" data-cmd="hide">Hide UI (OBS view)</button>
+  </div>
+
+  <div id="scaler">
+    <div id="stage">
+      <div class="stageNote">PREVIEW STAGE · hidden in OBS</div>
+      <div id="linkTag"><span class="d"></span>LINKED · LIVE FROM SCOREKEEPER</div>
+      <div id="waitTag"><b>WAITING FOR SCOREKEEPER</b>Open the controller in another tab to drive this — or use the demo buttons above</div>
+
+      <!-- BIG PLAY -->
+      <div id="big">
+        <div class="accent"></div>
+        <div class="inner">
+          <div>
+            <div class="kicker" id="big-kicker">Blountstown Tigers</div>
+            <div class="head" id="big-head">DOUBLE</div>
+            <div class="sub" id="big-sub">Shuler — 2 RBI</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SCOREBUG -->
+      <div id="bug">
+        <div class="teams">
+          <div class="team" id="team-away">
+            <span class="chev" style="background:var(--away)"></span>
+            <span class="abbr">BLT</span>
+            <span class="runs" id="runs-away"><span class="digit">0</span></span>
+            <span class="live-bat" style="background:var(--away)"></span>
+          </div>
+          <div class="team" id="team-home">
+            <span class="chev" style="background:var(--home)"></span>
+            <span class="abbr">BRI</span>
+            <span class="runs" id="runs-home"><span class="digit">0</span></span>
+            <span class="live-bat" style="background:var(--home)"></span>
+          </div>
+        </div>
+
+        <div class="center" id="center">
+          <div class="inning" id="inning">
+            <div class="half"><span class="arrow">▲</span><span id="half-txt">TOP</span></div>
+            <div class="num" id="inning-num">1</div>
+          </div>
+
+          <div class="bases" id="bases">
+            <div class="b b2" id="b2"></div>
+            <div class="b b1" id="b1"></div>
+            <div class="b b3" id="b3"></div>
+          </div>
+
+          <div class="count">
+            <div class="countrow" id="balls">
+              <span class="lab">B</span>
+              <span class="pip"></span><span class="pip"></span><span class="pip"></span>
+            </div>
+            <div class="countrow" id="strikes">
+              <span class="lab">S</span>
+              <span class="pip"></span><span class="pip"></span>
+            </div>
+            <div class="countrow" id="outs">
+              <span class="lab">O</span>
+              <span class="pip out"></span><span class="pip out"></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="livetag"><span class="dot"></span><span class="txt">LIVE</span></div>
+      </div>
+
+    </div>
+  </div>
+
+<script>
+const TEAMS={
+  away:{abbr:"BLT",name:"Blountstown Tigers"},
+  home:{abbr:"BRI",name:"Bristol Bulldogs"}
+};
+const G={away:0,home:0,inning:1,half:"T",balls:0,strikes:0,outs:0,bases:{1:false,2:false,3:false}};
+const $=s=>document.querySelector(s);
+
+/* ---- scale the 1280x720 stage to fit the viewport ---- */
+function fit(){
+  const s=Math.min(innerWidth/1280, innerHeight/720);
+  $("#scaler").style.transform=`scale(${s})`;
+  $("#scaler").style.left=((innerWidth-1280*s)/2)+"px";
+  $("#scaler").style.top=((innerHeight-720*s)/2)+"px";
+}
+addEventListener("resize",fit);
+
+/* ---- atomic animated updates (DOM is persistent; we touch only what changed) ---- */
+function battingKey(){return G.half==="T"?"away":"home";}
+
+function paintBatting(){
+  $("#team-away").classList.toggle("bat",G.half==="T");
+  $("#team-home").classList.toggle("bat",G.half==="B");
+}
+function rollScore(team){
+  const wrap=$(`#runs-${team}`);
+  wrap.innerHTML=`<span class="digit">${G[team]}</span>`;
+  wrap.classList.remove("roll"); void wrap.offsetWidth; wrap.classList.add("roll");
+}
+function sweep(){
+  const c=$("#center"); c.classList.remove("sweep"); void c.offsetWidth; c.classList.add("sweep");
+}
+function paintCount(changed){ // changed: 'b' | 's' | null
+  const fill=(rowId,n)=>{
+    const pips=[...$(`#${rowId}`).querySelectorAll(".pip")];
+    pips.forEach((p,i)=>{
+      const wasOn=p.classList.contains("on"), on=i<n;
+      p.classList.toggle("on",on);
+      if(on&&!wasOn){p.classList.remove("just"); void p.offsetWidth; p.classList.add("just");}
+    });
+  };
+  fill("balls",G.balls); fill("strikes",G.strikes);
+}
+function paintOuts(){
+  const pips=[...$("#outs").querySelectorAll(".pip")];
+  pips.forEach((p,i)=>{
+    const wasOn=p.classList.contains("on"), on=i<G.outs;
+    p.classList.toggle("on",on);
+    if(on&&!wasOn){p.classList.remove("just"); void p.offsetWidth; p.classList.add("just");}
+  });
+}
+function paintBases(){
+  [1,2,3].forEach((b,idx)=>{
+    const el=$(`#b${b}`), on=!!G.bases[b], wasOn=el.classList.contains("on");
+    el.classList.toggle("on",on);
+    if(on&&!wasOn){
+      // stagger the pops so a multi-base advance reads as motion
+      setTimeout(()=>{el.classList.remove("pop"); void el.offsetWidth; el.classList.add("pop");}, idx*parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--t-base-stagger'))*1000);
+    }
+  });
+}
+function paintInning(){
+  $("#half-txt").textContent=G.half==="T"?"TOP":"BOT";
+  $("#inning").classList.toggle("bottom",G.half==="B");
+  $("#inning-num").textContent=G.inning;
+}
+
+/* ---- big play banner: ease in, HOLD, ease out ---- */
+let bigTimer=null;
+function bigPlay(kicker,head,sub){
+  const el=$("#big");
+  $("#big-kicker").textContent=kicker;
+  $("#big-head").textContent=head;
+  $("#big-sub").textContent=sub||"";
+  clearTimeout(bigTimer);
+  el.classList.remove("hide","show"); void el.offsetWidth; el.classList.add("show");
+  const hold=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--t-big-hold'))*1000;
+  const inMs=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--t-big-in'))*1000;
+  bigTimer=setTimeout(()=>{el.classList.remove("show");el.classList.add("hide");}, inMs+hold);
+}
+
+/* ---- play handlers (demo) ---- */
+function advance(n){ // move all runners n bases, count runs that score
+  let runs=0; const nb={1:false,2:false,3:false};
+  for(let b=3;b>=1;b--){ if(G.bases[b]){ const d=b+n; if(d>=4)runs++; else nb[d]=true; } }
+  G.bases=nb; return runs;
+}
+function score(team,r){ if(r>0){ G[team]+=r; rollScore(team); sweep(); } }
+function resetCount(){ G.balls=0; G.strikes=0; paintCount(); }
+
+const CMD={
+  ball(){ G.balls++; if(G.balls>=4){ const k=battingKey(); let runs=0;
+      if(G.bases[1]){ if(G.bases[2]){ if(G.bases[3]) runs++; G.bases[3]=true; } G.bases[2]=true; }
+      G.bases[1]=true; if(runs)score(k,runs); paintBases(); resetCount();
+      bigPlay(TEAMS[k].name,"WALK", runs?"Forced in":"Ball four"); }
+    else paintCount("b"); },
+  strike(){ G.strikes++; if(G.strikes>=3){ const k=battingKey(); G.outs++; paintOuts(); resetCount(); bigPlay(TEAMS[k].name,"STRIKEOUT","Sit down"); checkInning(); } else paintCount("s"); },
+  foul(){ if(G.strikes<2){ G.strikes++; paintCount("s"); } },
+  newbatter(){ resetCount(); },
+  single(){ const k=battingKey(); const r=advance(1); G.bases[1]=true; score(k,r); paintBases(); resetCount(); bigPlay(TEAMS[k].name,"SINGLE", r?`${r} run${r>1?"s":""} score`:"Runner aboard"); },
+  double(){ const k=battingKey(); const r=advance(2); G.bases[2]=true; score(k,r); paintBases(); resetCount(); bigPlay(TEAMS[k].name,"DOUBLE", r?`${r} run${r>1?"s":""} score`:"Stand-up double"); },
+  triple(){ const k=battingKey(); const r=advance(3); G.bases[3]=true; score(k,r); paintBases(); resetCount(); bigPlay(TEAMS[k].name,"TRIPLE", r?`${r} run${r>1?"s":""} score`:"Into the gap"); },
+  hr(){ const k=battingKey(); const r=advance(4)+1; G.bases={1:false,2:false,3:false}; score(k,r); paintBases(); resetCount(); bigPlay(TEAMS[k].name,"HOME RUN", `${r} run${r>1?"s":""} · gone`); },
+  out(){ const k=battingKey(); G.outs++; paintOuts(); resetCount(); bigPlay(TEAMS[k].name,"OUT","Retired"); checkInning(); },
+  dp(){ const k=battingKey(); G.outs+=2; if(G.bases[1])G.bases[1]=false; paintOuts(); paintBases(); resetCount(); bigPlay(TEAMS[k].name,"DOUBLE PLAY","Two down"); checkInning(); },
+  halfflip(){ flipHalf(); },
+  reset(){ Object.assign(G,{away:0,home:0,inning:1,half:"T",balls:0,strikes:0,outs:0,bases:{1:false,2:false,3:false}}); rollScore("away");rollScore("home");paintAll(); },
+  hide(){ document.body.classList.toggle("preview"); }
+};
+function checkInning(){ if(G.outs>=3){ setTimeout(flipHalf, 900); } }
+function flipHalf(){
+  G.half=G.half==="T"?"B":"T"; if(G.half==="T")G.inning++;
+  G.outs=0; G.balls=0; G.strikes=0; G.bases={1:false,2:false,3:false};
+  paintAll();
+}
+function paintAll(){ paintBatting(); paintInning(); paintCount(); paintOuts(); paintBases(); }
+
+document.addEventListener("click",e=>{
+  const b=e.target.closest("[data-cmd]"); if(!b)return;
+  const fn=CMD[b.dataset.cmd]; if(fn)fn();
+});
+
+/* expose a tiny API so the scorekeeper controller / backend can drive this later:
+   window.OVERLAY.set(stateObj)  or  window.OVERLAY.cmd("double")  */
+window.OVERLAY={ cmd:(name)=>CMD[name]&&CMD[name](), state:()=>JSON.parse(JSON.stringify(G)) };
+
+/* ===== LINK RECEIVER — overlay only listens; the controller is the source of truth ===== */
+let lastEvent=0, linked=false;
+function setTeams(t){
+  if(!t)return;
+  TEAMS.away.name=t.away.name; TEAMS.home.name=t.home.name;
+  $("#team-away .abbr").textContent=t.away.short;
+  $("#team-home .abbr").textContent=t.home.short;
+  $("#team-away .chev").style.background=t.away.color;
+  $("#team-home .chev").style.background=t.home.color;
+  $("#team-away .live-bat").style.background=t.away.color;
+  $("#team-home .live-bat").style.background=t.home.color;
+  document.documentElement.style.setProperty('--away',t.away.color);
+  document.documentElement.style.setProperty('--home',t.home.color);
+}
+function applyState(s){
+  if(!linked){ linked=true; document.body.classList.add("linked"); }
+  setTeams(s.teams);
+  const awayUp=s.away>G.away, homeUp=s.home>G.home;
+  G.away=s.away; G.home=s.home; G.inning=s.inning; G.half=s.half;
+  G.balls=s.balls; G.strikes=s.strikes; G.outs=s.outs;
+  G.bases={1:!!s.bases[1],2:!!s.bases[2],3:!!s.bases[3]};
+  paintBatting(); paintInning();
+  if(awayUp) rollScore("away"); else $("#runs-away").innerHTML=`<span class="digit">${G.away}</span>`;
+  if(homeUp) rollScore("home"); else $("#runs-home").innerHTML=`<span class="digit">${G.home}</span>`;
+  if(awayUp||homeUp) sweep();
+  paintCount(); paintOuts(); paintBases();
+  if(s.event && s.event.id>lastEvent){ lastEvent=s.event.id;
+    const tn=TEAMS[s.event.team]?TEAMS[s.event.team].name:""; bigPlay(tn, s.event.head, s.event.sub); }
+}
+(function receiver(){
+  function handle(raw){ try{const m=JSON.parse(raw); if(m&&m.type==="state")applyState(m);}catch(e){} }
+  try{ const bc=new BroadcastChannel("liberty-league"); bc.onmessage=e=>handle(e.data); }catch(e){}
+  addEventListener("storage",e=>{ if(e.key==="liberty-league-msg"&&e.newValue)handle(e.newValue); });
+  try{ const last=localStorage.getItem("liberty-league-msg"); if(last)handle(last); }catch(e){}
+  const wsUrl=new URLSearchParams(location.search).get("ws");
+  if(wsUrl){ try{const ws=new WebSocket(wsUrl); ws.onmessage=e=>handle(e.data);}catch(e){} }
+})();
+
+/* boot */
+if(/[?&#]obs/.test(location.href)) document.body.classList.remove("preview");
+fit();
+paintAll();
+requestAnimationFrame(()=>{ $("#bug").classList.add("in"); });
+</script>
+</body>
+</html>

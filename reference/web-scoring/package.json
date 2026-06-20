@@ -1,0 +1,13 @@
+{
+  "name": "liberty-league-relay",
+  "version": "1.0.0",
+  "description": "Live relay linking the scorekeeper controller to the broadcast overlay.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0",
+    "firebase-admin": "^12.7.0"
+  }
+}

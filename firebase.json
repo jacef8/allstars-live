@@ -1,0 +1,15 @@
+{
+  "hosting": {
+    "public": "reference/web-scoring",
+    "cleanUrls": true,
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**",
+      "server.js",
+      "package.json",
+      "package-lock.json"
+    ],
+    "rewrites": []
+  }
+}

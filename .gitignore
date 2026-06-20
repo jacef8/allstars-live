@@ -1,0 +1,42 @@
+# ── Dependencies ────────────────────────────────
+node_modules/
+
+# ── Secrets / environment ───────────────────────
+.env
+.env.*
+*.jks
+*.keystore
+serviceAccountKey.json
+firebase-service-account*.json
+# Machine-specific Android SDK path
+local.properties
+
+# ── Android / Gradle ────────────────────────────
+.gradle/
+build/
+/captures
+.externalNativeBuild
+.cxx
+*.apk
+*.aab
+
+# ── IDE / editors ───────────────────────────────
+.idea/
+*.iml
+.vscode/
+
+# ── Firebase ────────────────────────────────────
+.firebase/
+firebase-debug.log
+database-debug.log
+
+# ── Logs ────────────────────────────────────────
+*.log
+npm-debug.log*
+
+# ── OS ──────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── Local agent-mode / session artifacts ────────
+.claude/settings.local.json
