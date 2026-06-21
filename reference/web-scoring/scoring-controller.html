@@ -621,11 +621,14 @@ function chip(c){const a=contact===c;return `<button data-act="contact" data-arg
 
 function actionArea(){
   if(mode==="teams"){
-    const cards=DB.teams.map(t=>{const rec=`${t.record.w}-${t.record.l}${t.record.t?"-"+t.record.t:""}`;
-      return `<button data-act="opent" data-arg="${t.id}" style="display:flex;align-items:center;gap:12px;background:${T.surface};border:1px solid ${T.line};border-left:5px solid ${t.color};border-radius:10px;padding:13px 14px;text-align:left;width:100%">
-        <div style="flex:1;min-width:0"><div style="font-family:${MONO};font-size:18px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.name}</div>
-          <div style="font-size:11px;color:${T.sage};margin-top:2px">${t.players.length} players &middot; ${rec}</div></div>
-        <span style="color:${t.color};font-weight:800;font-size:13px;letter-spacing:.5px">MANAGE &rsaquo;</span></button>`;}).join("")
+    const sorted=DB.teams.slice().sort((a,b)=>(b.fav?1:0)-(a.fav?1:0));
+    const cards=sorted.map(t=>{const rec=`${t.record.w}-${t.record.l}${t.record.t?"-"+t.record.t:""}`;
+      return `<div style="display:flex;align-items:center;gap:4px;background:${T.surface};border:1px solid ${T.line};border-left:5px solid ${t.color};border-radius:10px;padding:8px 12px">
+        <button data-act="favteam" data-arg="${t.id}" style="background:none;border:none;color:${t.fav?T.clay:T.sageDim};font-size:22px;line-height:1;padding:2px 6px;cursor:pointer">${t.fav?"★":"☆"}</button>
+        <button data-act="opent" data-arg="${t.id}" style="flex:1;min-width:0;text-align:left;background:none;border:none;padding:4px 2px">
+          <div style="font-family:${MONO};font-size:18px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.name}</div>
+          <div style="font-size:11px;color:${T.sage};margin-top:2px">${t.players.length} players &middot; ${rec}</div></button>
+        <span style="color:${t.color};font-weight:800;font-size:13px;letter-spacing:.5px">MANAGE &rsaquo;</span></div>`;}).join("")
       ||`<div style="color:${T.sage};font-size:13px;text-align:center;padding:22px 8px;border:1px dashed ${T.line};border-radius:10px">No teams yet — create one to start tracking rosters &amp; season stats.</div>`;
     return `<div style="display:flex;flex-direction:column;gap:14px">
         <div><div style="font-family:${MONO};font-size:23px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:${T.ink}">Teams</div>
@@ -657,6 +660,9 @@ function actionArea(){
           <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.sageDim}">Scoreboard abbr</div>
           <input value="${(t.short||"").replace(/"/g,"&quot;")}" oninput="edTeamAbbr(this.value)" maxlength="6" placeholder="TIGERS" style="${cell};width:128px;text-align:center;font-family:${MONO};font-weight:800;letter-spacing:.5px;text-transform:uppercase">
           <span style="font-size:11px;color:${T.sageDim}">up to 6 chars</span></div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.sageDim};width:100%;margin-bottom:2px">Team color</div>
+          ${["#2E6BE6","#0EA5E9","#12A150","#E08A12","#E2574C","#EC4899","#8B5CF6","#0F172A"].map(c=>`<button data-act="teamcolor" data-arg="${c}" style="width:32px;height:32px;border-radius:8px;background:${c};border:3px solid ${t.color.toLowerCase()===c.toLowerCase()?T.ink:"transparent"};box-shadow:0 0 0 1px ${T.line}"></button>`).join("")}</div>
         <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.sageDim};margin:2px 2px -2px">Roster — tap to edit #/name</div>
         <div style="display:flex;flex-direction:column;gap:6px">${roster}</div>
         <button data-act="addteamp" style="${ghost}">+ Add player</button>
@@ -1052,6 +1058,8 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="confirm-yes"){const r=confirmAct&&confirmAct.run;confirmAct=null;if(r)r();else render();}
   else if(act==="newgame"){mode="newgame";render();}
   else if(act==="opent"){openTeamId=arg;mode="team";render();}
+  else if(act==="favteam"){const t=teamById(arg);if(t){t.fav=!t.fav;saveDB();}render();}
+  else if(act==="teamcolor"){const t=teamById(openTeamId);if(t){t.color=arg;saveDB();}render();}
   else if(act==="newteam"){const t=newTeam("");openTeamId=t.id;mode="team";render();}
   else if(act==="teamsback"){mode="teams";render();}
   else if(act==="addteamp"){const t=teamById(openTeamId);if(t)teamAddPlayer(t);render();}
