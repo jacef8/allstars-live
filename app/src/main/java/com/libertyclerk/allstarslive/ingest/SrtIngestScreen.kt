@@ -4,6 +4,7 @@ import android.view.SurfaceHolder
 import android.view.SurfaceView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -55,10 +56,15 @@ fun SrtIngestScreen() {
         onDispose { source.stop() }
     }
 
-    Box(Modifier.fillMaxSize().background(Color.Black)) {
+    // Render the video at its true aspect ratio (letterboxed, centered) so the
+    // 16:9 camera isn't stretched to the ~16:10 screen.
+    val videoAspect = if (stats.widthPx > 0 && stats.heightPx > 0)
+        stats.widthPx.toFloat() / stats.heightPx else 16f / 9f
+
+    Box(Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
 
         AndroidView(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxWidth().aspectRatio(videoAspect),
             factory = { ctx ->
                 SurfaceView(ctx).apply {
                     holder.addCallback(object : SurfaceHolder.Callback {
