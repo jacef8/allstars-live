@@ -90,8 +90,42 @@ const OPP={short:"OPP",name:"Opponent",color:"#E2574C"};
 function teamData(side){return side===G.ourSide?OUR:OPP;}
 const TEAMS={get away(){return teamData("away");},get home(){return teamData("home");}};
 
-/* ===== roster (index = player id) — generic placeholders; edit #/name in the Lineup ===== */
-let ROSTER=Array.from({length:12},(_,i)=>({num:String(i+1),name:"Player "+(i+1),first:""}));
+/* ===== active roster (index = player id within the current team / quick game) ===== */
+function genericRoster(){return Array.from({length:12},(_,i)=>({id:"g"+i,num:String(i+1),name:"Player "+(i+1),first:""}));}
+let ROSTER=genericRoster();
+
+/* ====================== persistent team DB (browser localStorage) ======================
+   Teams, rosters, and FULL-BOX season stats (batting / pitching / fielding) persist
+   across games & reloads. The native app will swap this for an on-device database. */
+const DB_KEY="allstars-scorer-db";
+function loadDB(){try{const r=localStorage.getItem(DB_KEY);if(r){const d=JSON.parse(r);if(d&&d.teams)return d;}}catch(e){}return {teams:[],seq:1};}
+function saveDB(){try{localStorage.setItem(DB_KEY,JSON.stringify(DB));}catch(e){}}
+let DB=loadDB(), curTeamId=null, openTeamId=null;
+const curTeam=()=>DB.teams.find(t=>t.id===curTeamId)||null;
+const teamById=id=>DB.teams.find(t=>t.id===id)||null;
+function nextId(p){return p+(DB.seq++);}
+function newTeam(name){name=(name||"").trim()||"New Team";
+  const t={id:nextId("t"),name,short:name.slice(0,3).toUpperCase(),color:"#2E6BE6",
+    players:Array.from({length:9},(_,i)=>({id:nextId("p"),num:String(i+1),name:"Player "+(i+1),first:""})),
+    season:{},record:{w:0,l:0,t:0}};
+  DB.teams.push(t);saveDB();return t;}
+function teamAddPlayer(t){if(t.players.length>=20)return;t.players.push({id:nextId("p"),num:"",name:"Player "+(t.players.length+1),first:""});saveDB();}
+function teamRemovePlayer(t,pid){if(t.players.length<=9)return;t.players=t.players.filter(p=>p.id!==pid);saveDB();}
+/* Make a saved team the active "our" team for a game. */
+function selectTeam(id){const t=teamById(id);if(!t)return;curTeamId=id;ROSTER=t.players;
+  OUR.name=t.name;OUR.short=t.short||t.name.slice(0,3).toUpperCase();OUR.color=t.color||OUR.color;}
+/* Season accumulation row, keyed by player id (full box). */
+function seasonRow(t,pid){if(!t.season[pid])t.season[pid]={bat:{ab:0,r:0,h:0,rbi:0,bb:0,k:0},pitch:{ip:0,k:0,bb:0,h:0,r:0},field:{po:0,a:0,e:0}};return t.season[pid];}
+const ourRuns=()=>G.ourSide==="home"?G.home:G.away, oppRuns=()=>G.ourSide==="home"?G.away:G.home;
+/* Roll this game's batting box into the current team's season totals (once per game). */
+function rollupSeason(){const t=curTeam();if(!t)return;
+  Object.keys(G.stats).forEach(key=>{const s=G.stats[key];if(s.team!=="our")return;
+    const idx=+String(key).replace(/^o/,"");const p=ROSTER[idx];if(!p)return;
+    const r=seasonRow(t,p.id).bat;r.ab+=s.ab||0;r.r+=s.r||0;r.h+=s.h||0;r.rbi+=s.rbi||0;r.bb+=s.bb||0;r.k+=s.k||0;});
+  saveDB();}
+window.teamPNum=function(id,v){const t=teamById(openTeamId);if(!t)return;const p=t.players.find(p=>p.id===id);if(p){p.num=v;saveDB();}};
+window.teamPName=function(id,v){const t=teamById(openTeamId);if(!t)return;const p=t.players.find(p=>p.id===id);if(p){p.name=v;saveDB();}};
+window.edTeamName=function(v){const t=teamById(openTeamId);if(!t)return;const s=(v||"").trim();t.name=s||"New Team";t.short=(s||"NEW").slice(0,3).toUpperCase();saveDB();};
 const POSLIST=["P","C","1B","2B","3B","SS","LF","CF","RF"];
 const POSFULL={P:"Pitcher",C:"Catcher","1B":"First base","2B":"Second base","3B":"Third base",SS:"Shortstop",LF:"Left field",CF:"Center field",RF:"Right field"};
 const DESTNAME={1:"1st",2:"2nd",3:"3rd",4:"SCORED"};
@@ -227,7 +261,7 @@ const initGame=()=>({inning:1,half:"T",away:0,home:0,outs:0,balls:0,strikes:0,
   final:false,     // set true by "End Game" so the viewer shows the Final summary
   lineup:{ order:[0,1,2,3,4,5,6,7,8],   // batting order: 9-12 entries (slots 10+ = extra hitters)
            pos:{P:0,C:1,"1B":2,"2B":3,"3B":4,SS:5,LF:6,CF:7,RF:8} }});
-let G=initGame(),hist=[],mode="newgame",tap=null,contact=null,result=null,plan=null,toast=null,toastTimer=null,curResults=[],showAll=false,showZones=false,editSlot=null;
+let G=initGame(),hist=[],mode="teams",tap=null,contact=null,result=null,plan=null,toast=null,toastTimer=null,curResults=[],showAll=false,showZones=false,editSlot=null;
 
 const battingKey=()=>G.half==="T"?"away":"home";
 const ptr=()=>battingKey()==="away"?G.awayPtr:G.homePtr;
@@ -284,7 +318,9 @@ const capReached=()=>G.runCap>0&&G.halfRuns>=G.runCap;
 /* Manual half-inning close — for ending early or when a 3rd out wasn't entered as outs. */
 function endInning(){snapshot();doFlip();resetUI();flash("Inning ended");render();broadcast();}
 /* Mark the game final (toggle) so the viewer shows its Final summary. Undoable. */
-function endGame(){snapshot();G.final=!G.final;resetUI();flash(G.final?"Game ended":"Game resumed");render();broadcast();}
+function endGame(){snapshot();G.final=!G.final;
+  if(G.final&&curTeam()&&!G.rolledUp){rollupSeason();const t=curTeam(),o=ourRuns(),p=oppRuns();if(o>p)t.record.w++;else if(o<p)t.record.l++;else t.record.t++;saveDB();G.rolledUp=true;}
+  resetUI();flash(G.final?(curTeam()?"Game ended · season stats saved":"Game ended"):"Game resumed");render();broadcast();}
 /* New Game: reset scores/innings/in-play state but keep the chosen rules, side, and lineup. */
 function startNewGame(){
   const keep={runCap:G.runCap,oppBatters:G.oppBatters,ourSide:G.ourSide,lineup:JSON.parse(JSON.stringify(G.lineup))};
@@ -579,6 +615,45 @@ function pitchBtn(act,label,icon){return `<button data-act="${act}" style="backg
 function chip(c){const a=contact===c;return `<button data-act="contact" data-arg="${c}" style="background:${a?T.clay:T.surface};border:1px solid ${a?T.clay:T.line};color:${a?"#FFFFFF":T.chalk};border-radius:8px;padding:12px 6px;font-family:${MONO};font-size:14px;font-weight:800;letter-spacing:.5px;text-transform:uppercase">${c}</button>`;}
 
 function actionArea(){
+  if(mode==="teams"){
+    const cards=DB.teams.map(t=>{const rec=`${t.record.w}-${t.record.l}${t.record.t?"-"+t.record.t:""}`;
+      return `<button data-act="opent" data-arg="${t.id}" style="display:flex;align-items:center;gap:12px;background:${T.surface};border:1px solid ${T.line};border-left:5px solid ${t.color};border-radius:10px;padding:13px 14px;text-align:left;width:100%">
+        <div style="flex:1;min-width:0"><div style="font-family:${MONO};font-size:18px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.name}</div>
+          <div style="font-size:11px;color:${T.sage};margin-top:2px">${t.players.length} players &middot; ${rec}</div></div>
+        <span style="color:${t.color};font-weight:800;font-size:13px;letter-spacing:.5px">MANAGE &rsaquo;</span></button>`;}).join("")
+      ||`<div style="color:${T.sage};font-size:13px;text-align:center;padding:22px 8px;border:1px dashed ${T.line};border-radius:10px">No teams yet — create one to start tracking rosters &amp; season stats.</div>`;
+    return `<div style="display:flex;flex-direction:column;gap:14px">
+        <div><div style="font-family:${MONO};font-size:23px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:${T.ink}">Teams</div>
+          <div style="font-size:12px;color:${T.sage};margin-top:3px">Manage a team's roster &amp; season stats, or jump into a quick game.</div></div>
+        <div style="display:flex;flex-direction:column;gap:8px">${cards}</div>
+        <button data-act="newteam" style="${bigBtn(OUR.color)}">${IC('<path d="M12 5v14M5 12h14"/>')} New team</button>
+        <button data-act="quickgame" style="${ghost};display:flex;align-items:center;justify-content:center;gap:7px">Quick game (no stats)</button>
+      </div>`;
+  }
+  if(mode==="team"){
+    const t=teamById(openTeamId); if(!t){mode="teams";return actionArea();}
+    const cell=`background:${T.surface2};border:1px solid ${T.line};color:${T.ink};border-radius:7px;padding:8px 8px;font-weight:700;outline:none`;
+    const roster=t.players.map(p=>`<div style="display:flex;align-items:center;gap:6px;background:${T.surface};border:1px solid ${T.line};border-radius:9px;padding:6px 8px">
+        <input value="${(p.num||"").replace(/"/g,"&quot;")}" oninput="teamPNum('${p.id}',this.value)" inputmode="numeric" maxlength="3" style="${cell};width:46px;text-align:center;font-family:${MONO};font-weight:800">
+        <input value="${(p.name||"").replace(/"/g,"&quot;")}" oninput="teamPName('${p.id}',this.value)" placeholder="Player name" style="${cell};flex:1;min-width:0">
+        <button data-act="rmteamp" data-arg="${p.id}" style="background:none;border:1px solid ${T.line};color:${T.out};border-radius:7px;padding:8px 10px;font-weight:800"${t.players.length<=9?" disabled":""}>&times;</button></div>`).join("");
+    const sRows=t.players.map(p=>{const s=(t.season[p.id]||{}).bat||{};const ab=s.ab||0,h=s.h||0;const avg=ab?(h/ab).toFixed(3).replace(/^0/,""):"—";
+      return `<tr style="border-top:1px solid ${T.line}"><td style="text-align:left;padding:6px 6px;font-weight:700;white-space:nowrap">#${p.num} ${p.name}</td><td style="padding:6px 4px">${ab}</td><td style="padding:6px 4px">${s.r||0}</td><td style="padding:6px 4px">${h}</td><td style="padding:6px 4px">${s.rbi||0}</td><td style="padding:6px 4px">${s.bb||0}</td><td style="padding:6px 4px">${s.k||0}</td><td style="padding:6px 4px;font-weight:800">${avg}</td></tr>`;}).join("");
+    const statTable=`<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-family:${MONO};font-size:12px;color:${T.chalk};text-align:center">
+        <thead><tr style="color:${T.sageDim};font-size:10px;letter-spacing:.5px"><th style="text-align:left;padding:0 6px 4px">SEASON · BATTING</th><th>AB</th><th>R</th><th>H</th><th>RBI</th><th>BB</th><th>K</th><th>AVG</th></tr></thead>
+        <tbody>${sRows}</tbody></table>
+      <div style="font-size:11px;color:${T.sageDim};margin-top:8px;padding:0 4px">Pitching &amp; fielding season stats are stored too — they fill in as in-game tracking expands.</div></div>`;
+    return `<div style="display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <button data-act="teamsback" style="${ghost};padding:9px 11px">&lsaquo; Teams</button>
+          <input value="${(t.name||"").replace(/"/g,"&quot;")}" oninput="edTeamName(this.value)" style="${cell};flex:1;font-family:${MONO};font-size:18px;font-weight:800;background:${T.surface};border-left:5px solid ${t.color}"></div>
+        <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.sageDim};margin:2px 2px -2px">Roster — tap to edit #/name</div>
+        <div style="display:flex;flex-direction:column;gap:6px">${roster}</div>
+        <button data-act="addteamp" style="${ghost}">+ Add player</button>
+        ${statTable}
+        <button data-act="startteam" style="${bigBtn(t.color)}">${IC('<path d="M8 5l11 7-11 7z" fill="currentColor" stroke="none"/>')} Start game with ${t.short}</button>
+      </div>`;
+  }
   if(mode==="newgame"){
     const lbl=`font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.sageDim};margin:0 2px 7px`;
     const inpSm=`width:80px;flex:none;background:${T.surface2};border:1px solid ${T.line};color:${T.ink};border-radius:9px;padding:11px 8px;font-family:${MONO};font-size:19px;font-weight:800;text-align:center;outline:none`;
@@ -587,9 +662,12 @@ function actionArea(){
     return `<div style="display:flex;flex-direction:column;gap:15px">
         <div><div style="font-family:${MONO};font-size:23px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:${T.ink}">New Game</div>
           <div style="font-size:12px;color:${T.sage};margin-top:3px">${OUR.name} — set the matchup &amp; rules, then build your lineup.</div></div>
-        <div><div style="${lbl}">Your team</div>
+        ${curTeam()?`<div style="display:flex;align-items:center;justify-content:space-between;background:${T.surface};border:1px solid ${T.line};border-left:5px solid ${OUR.color};border-radius:10px;padding:11px 14px">
+            <div><div style="${lbl};margin:0 0 2px">Your team</div><div style="font-family:${MONO};font-size:18px;font-weight:800;color:${T.ink}">${OUR.name}</div></div>
+            <button data-act="teamsback" style="${ghost};padding:8px 11px">Change</button></div>`
+          :`<div><div style="${lbl}">Your team</div>
           <input type="text" value="${(OUR.name||"").replace(/"/g,"&quot;")}" placeholder="Your team name" oninput="ngOurName(this.value)"
-            style="width:100%;background:${T.surface};border:1px solid ${T.line};color:${T.ink};border-radius:10px;padding:14px 16px;font-family:${SANS};font-size:16px;font-weight:700;outline:none;box-shadow:0 2px 6px rgba(15,30,60,.07)"></div>
+            style="width:100%;background:${T.surface};border:1px solid ${T.line};color:${T.ink};border-radius:10px;padding:14px 16px;font-family:${SANS};font-size:16px;font-weight:700;outline:none;box-shadow:0 2px 6px rgba(15,30,60,.07)"></div>`}
         <div><div style="${lbl}">Opponent</div>
           <input type="text" value="${(OPP.name||"").replace(/"/g,"&quot;")}" placeholder="Opponent name" oninput="ngOppName(this.value)"
             style="width:100%;background:${T.surface};border:1px solid ${T.line};color:${T.ink};border-radius:10px;padding:14px 16px;font-family:${SANS};font-size:16px;font-weight:700;outline:none;box-shadow:0 2px 6px rgba(15,30,60,.07)"></div>
@@ -817,7 +895,7 @@ function setupLineupDrag(){
   });
 }
 function render(){
-  const menu=(mode==="newgame"||mode==="lineup"||mode==="pickplayer"||mode==="pickpos"||mode==="editplayer");
+  const menu=(mode==="teams"||mode==="team"||mode==="newgame"||mode==="lineup"||mode==="pickplayer"||mode==="pickpos"||mode==="editplayer");
   if(menu){
     const scroll=mode!=="lineup";
     document.getElementById("app").innerHTML=`<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px;${scroll?"overflow-y:auto;-webkit-overflow-scrolling:touch":""}">${actionArea()}</div>`;
@@ -911,6 +989,13 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="endinning")endInning();
   else if(act==="endgame")endGame();
   else if(act==="newgame"){mode="newgame";render();}
+  else if(act==="opent"){openTeamId=arg;mode="team";render();}
+  else if(act==="newteam"){const t=newTeam("");openTeamId=t.id;mode="team";render();}
+  else if(act==="teamsback"){mode="teams";render();}
+  else if(act==="addteamp"){const t=teamById(openTeamId);if(t)teamAddPlayer(t);render();}
+  else if(act==="rmteamp"){const t=teamById(openTeamId);if(t)teamRemovePlayer(t,arg);render();}
+  else if(act==="startteam"){selectTeam(openTeamId);G=initGame();hist=[];resetUI();mode="newgame";render();broadcast();}
+  else if(act==="quickgame"){curTeamId=null;ROSTER=genericRoster();OUR.name="Your Team";OUR.short="HOME";OUR.color="#2E6BE6";G=initGame();hist=[];resetUI();mode="newgame";render();broadcast();}
   else if(act==="ng-side"){G.ourSide=arg;render();broadcast();}
   else if(act==="ng-start")startNewGame();
   else if(act==="addbatter"){addBatter();render();}
