@@ -576,7 +576,8 @@ function chip(c){const a=contact===c;return `<button data-act="contact" data-arg
 function actionArea(){
   if(mode==="newgame"){
     const lbl=`font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.sageDim};margin:0 2px 7px`;
-    const inp=`width:100%;background:${T.surface};border:1px solid ${T.line};color:${T.ink};border-radius:10px;padding:14px 16px;font-family:${MONO};font-size:16px;font-weight:800;outline:none;box-shadow:0 2px 6px rgba(15,30,60,.07)`;
+    const inpSm=`width:80px;flex:none;background:${T.surface2};border:1px solid ${T.line};color:${T.ink};border-radius:9px;padding:11px 8px;font-family:${MONO};font-size:19px;font-weight:800;text-align:center;outline:none`;
+    const rowCard=`display:flex;align-items:center;justify-content:space-between;gap:12px;background:${T.surface};border:1px solid ${T.line};border-radius:10px;padding:10px 14px;box-shadow:0 2px 6px rgba(15,30,60,.07)`;
     const sideBtn=(s,lbl2)=>{const on=G.ourSide===s;return `<button data-act="ng-side" data-arg="${s}" style="flex:1;padding:14px;border-radius:10px;font-family:${MONO};font-weight:800;font-size:15px;text-transform:uppercase;letter-spacing:.5px;border:2px solid ${on?OUR.color:T.line};background:${on?OUR.color:T.surface};color:${on?"#FFFFFF":T.ink}">${lbl2}</button>`;};
     return `<div style="display:flex;flex-direction:column;gap:15px">
         <div><div style="font-family:${MONO};font-size:23px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:${T.ink}">New Game</div>
@@ -586,10 +587,14 @@ function actionArea(){
             style="width:100%;background:${T.surface};border:1px solid ${T.line};color:${T.ink};border-radius:10px;padding:14px 16px;font-family:${SANS};font-size:16px;font-weight:700;outline:none;box-shadow:0 2px 6px rgba(15,30,60,.07)"></div>
         <div><div style="${lbl}">Is ${OUR.name} home or away?</div>
           <div style="display:flex;gap:8px">${sideBtn("home","Home")}${sideBtn("away","Away")}</div></div>
-        <div><div style="${lbl}">Run cap — runs per half-inning (0 = no cap)</div>
-          <input type="number" inputmode="numeric" min="0" max="30" value="${G.runCap}" oninput="ngRunCap(this.value)" style="${inp}"></div>
-        <div><div style="${lbl}">Opponent batting order — number of batters</div>
-          <input type="number" inputmode="numeric" min="1" max="15" value="${G.oppBatters}" oninput="ngOppBatters(this.value)" style="${inp}"></div>
+        <div style="${rowCard}">
+          <div><div style="font-weight:800;color:${T.ink};font-size:14px">Run cap</div>
+            <div style="color:${T.sage};font-size:11px;margin-top:1px">Per half-inning · 0 = no cap</div></div>
+          <input type="number" inputmode="numeric" min="0" max="30" value="${G.runCap}" oninput="ngRunCap(this.value)" style="${inpSm}"></div>
+        <div style="${rowCard}">
+          <div><div style="font-weight:800;color:${T.ink};font-size:14px">Opponent batting order</div>
+            <div style="color:${T.sage};font-size:11px;margin-top:1px">Number of batters</div></div>
+          <input type="number" inputmode="numeric" min="1" max="15" value="${G.oppBatters}" oninput="ngOppBatters(this.value)" style="${inpSm}"></div>
         <button data-act="ng-start" style="${bigBtn(OUR.color)};margin-top:4px">Start game &rarr;</button>
       </div>`;
   }
