@@ -10,7 +10,7 @@
 <style>
   :root{
     --bg:#0b1220; --bg2:#0f172a; --card:#16223c; --card2:#1c2b49; --line:#27375c; --line-soft:#1d2a47;
-    --chalk:#F8FAFC; --slate:#94A3B8; --slate-dim:#64748B;
+    --chalk:#F8FAFC; --slate:#BAC6DA; --slate-dim:#8E9BB2;
     --gold:#FBBF24; --gold-deep:#F59E0B; --amber-ink:#241803;
     --hit:#34D399; --out:#F87171; --walk:#60A5FA; --run:#FBBF24;
     --live:#22C55E; --warn:#EAB308; --dead:#EF4444;
@@ -26,7 +26,7 @@
   .num{font-variant-numeric:tabular-nums;letter-spacing:-.01em;}
   ::-webkit-scrollbar{width:0;height:0;}
 
-  #app{max-width:430px;min-height:100dvh;margin:0 auto;display:flex;flex-direction:column;gap:12px;
+  #app{max-width:430px;height:100dvh;overflow:hidden;margin:0 auto;display:flex;flex-direction:column;gap:12px;
     padding:12px 12px calc(14px + env(safe-area-inset-bottom));position:relative;}
 
   /* ---------------- TOP BAR ---------------- */
@@ -58,8 +58,8 @@
 
   /* ---------------- SCOREBUG ---------------- */
   .scorebug{position:relative;border-radius:18px;overflow:hidden;flex-shrink:0;
-    background:linear-gradient(180deg,#1d2c4d 0%,#101a30 100%);
-    border:1px solid var(--line);box-shadow:0 12px 34px -10px rgba(0,0,0,.7), inset 0 1px 0 rgba(255,255,255,.05);}
+    background:linear-gradient(180deg,#2a3c63 0%,#1a2742 100%);
+    border:1px solid #3a4d72;box-shadow:0 12px 34px -10px rgba(0,0,0,.7), inset 0 1px 0 rgba(255,255,255,.06);}
   .scorebug::after{content:"";position:absolute;inset:0;pointer-events:none;opacity:0;}
   .scorebug.sweep::after{animation:sweep 1.3s var(--ease-soft);}
   @keyframes sweep{0%{opacity:1;background:linear-gradient(100deg,transparent 0%,rgba(251,191,36,0) 38%);}
@@ -84,7 +84,7 @@
   @keyframes scoreRoll{0%{transform:translateY(72%);opacity:0;}55%{opacity:1;}100%{transform:translateY(0);opacity:1;}}
 
   .midbar{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 16px;
-    background:linear-gradient(180deg,#16233f,#0e1830);border-top:1px solid var(--line);}
+    background:linear-gradient(180deg,#1f2e4e,#16213c);border-top:1px solid #3a4d72;}
   .inning{display:flex;flex-direction:column;align-items:center;min-width:46px;}
   .inning .half{display:flex;align-items:center;gap:5px;font-family:var(--disp);font-weight:700;font-size:12px;
     letter-spacing:.12em;color:var(--slate);}
@@ -145,8 +145,8 @@
   .dot-empty{color:var(--slate-dim);opacity:.5;}
 
   /* ---------------- PLAY-BY-PLAY ---------------- */
-  .pbp{flex:1 1 auto;min-height:160px;}
-  #feed{list-style:none;display:flex;flex-direction:column;gap:8px;padding:10px 12px 13px;}
+  .pbp{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;overflow:hidden;}
+  #feed{list-style:none;display:flex;flex-direction:column;gap:8px;padding:10px 12px 13px;flex:1;min-height:0;overflow-y:auto;}
   .feed-item{display:flex;align-items:center;gap:11px;background:var(--card2);border:1px solid var(--line-soft);
     border-left:4px solid var(--slate-dim);border-radius:11px;padding:9px 12px;
     opacity:0;transform:translateY(-10px);transition:opacity .45s var(--ease),transform .45s var(--ease);}
@@ -233,6 +233,27 @@
   @keyframes bhead{0%{opacity:0;transform:translateY(10px);}100%{opacity:1;transform:translateY(0);}}
 
   #confetti{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:55;}
+  /* waiting / pre-game empty state */
+  #waiting{position:fixed;inset:0;z-index:40;display:none;align-items:center;justify-content:center;padding:24px;
+    background:radial-gradient(120% 80% at 50% 22%, rgba(11,18,32,.74), rgba(11,18,32,.95));}
+  .wait-card{max-width:320px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:13px;}
+  .wait-dot{width:14px;height:14px;border-radius:50%;background:var(--live);box-shadow:0 0 14px var(--live);
+    animation:pulse 1.5s ease-in-out infinite;}
+  .wait-title{font-family:var(--disp);font-weight:800;font-size:22px;letter-spacing:.3px;color:var(--chalk);}
+  .wait-sub{font-size:13px;color:var(--slate);line-height:1.5;}
+
+  /* per-event flash on the scorebug (every action gets a colored pulse) */
+  .scorebug.flash::after{content:"";position:absolute;inset:0;pointer-events:none;border-radius:18px;z-index:6;
+    box-shadow:0 0 0 3px var(--flashc,var(--gold)) inset, 0 0 26px -2px var(--flashc,var(--gold)) inset;
+    animation:bugflash .62s var(--ease) forwards;}
+  @keyframes bugflash{0%{opacity:.95;}100%{opacity:0;}}
+
+  /* audio announcer toggle */
+  #sndbtn{position:fixed;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));z-index:40;
+    display:flex;align-items:center;gap:7px;background:var(--card);border:1px solid var(--line);
+    color:var(--slate);border-radius:999px;padding:9px 14px;font-family:var(--disp);font-weight:700;
+    font-size:13px;letter-spacing:.04em;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.45);}
+  #sndbtn.on{border-color:var(--live);color:var(--live);}
 </style>
 </head>
 <body>
@@ -242,6 +263,12 @@
     <div class="lastchip neutral" id="lastchip">Waiting for first pitch…</div>
     <div class="demo-badge" id="demoBadge" hidden>DEMO</div>
   </div>
+
+  <div id="waiting"><div class="wait-card">
+    <div class="wait-dot"></div>
+    <div class="wait-title" id="wait-title">Waiting for the game to start…</div>
+    <div class="wait-sub" id="wait-sub">Connected to the relay — the scoreboard appears on the first pitch.</div>
+  </div></div>
 
   <div id="final"><div class="final-card">
     <div class="ft">★ FINAL ★</div>
@@ -336,16 +363,31 @@ const $=id=>document.getElementById(id);
    The play info rides inside state.event (no separate "play" message).
 ============================================================ */
 
-let prev=null, lastEventId=0, demo=false, gotReal=false;
+let prev=null, lastEventId=0, lastPitchSeq=-1, demo=false, gotReal=false;
+let gotState=false, connState="disconnected";
 const line={away:{}, home:{}};       // observed runs per inning
 let awayInn=1, homeInn=1, maxInn=1, feedCount=0;
 
 /* ---------- connection indicator ---------- */
 function setConn(state){
+  connState=state;
   const c=$("conn");
   c.className="conn "+(state==="demo"?"live":state);
   $("clabel").textContent = state==="live"?"LIVE" : state==="demo"?"LIVE" :
     state==="reconnecting"?"RECONNECTING" : "OFFLINE";
+  updateWaiting();
+}
+/* Pre-game empty state: shown once a relay is reached but before any game state. */
+function updateWaiting(){
+  const w=$("waiting"); if(!w) return;
+  const show = (connState==="live"||connState==="reconnecting") && !gotState && !demo;
+  w.style.display = show ? "flex" : "none";
+  if(show){
+    $("wait-title").textContent = connState==="live" ? "Waiting for the game to start…" : "Connecting…";
+    $("wait-sub").textContent = connState==="live"
+      ? "Connected to the relay — the scoreboard appears on the first pitch."
+      : "Reaching the live relay…";
+  }
 }
 
 /* ---------- teams / scores ---------- */
@@ -420,7 +462,7 @@ function updateLine(p,s){
   renderLine(s);
 }
 function renderLine(s){
-  const cols=[]; for(let i=1;i<=Math.max(maxInn, s.inning||1);i++) cols.push(i);
+  const cols=[]; for(let i=1;i<=Math.max(maxInn, s.inning||1, s.regInnings||0);i++) cols.push(i);
   const tot=(s.box&&s.box.totals)||{away:{r:s.away,h:0,e:0},home:{r:s.home,h:0,e:0}};
   $("lineHead").innerHTML =
     `<th class="lbl"></th>` +
@@ -571,8 +613,10 @@ function chipForEvent(ev,rd){
 ============================================================ */
 function applyState(s){
   setConn(demo?"demo":"live");
+  gotState=true; updateWaiting();
   const p=prev;
   renderTeams(s);
+  if(s.teams) document.title = `${s.teams.away.short} vs ${s.teams.home.short} — Live`;
   setScore("away",s.away, !!p && s.away>p.away);
   setScore("home",s.home, !!p && s.home>p.home);
   setInning(s);
@@ -589,20 +633,59 @@ function applyState(s){
   if(s.event && s.event.id>lastEventId){
     lastEventId=s.event.id;
     const rd = p ? (s[s.event.team]-p[s.event.team]) : 0;
+    const cat=catOf(s.event.head,rd);
     addFeed(s.event,s,rd);
     maybeBanner(s.event,rd,s);
     updateHighlights(s.event,rd,s);
-    setChip(chipForEvent(s.event,rd), catOf(s.event.head,rd));
+    setChip(chipForEvent(s.event,rd), cat);
+    flashBug(cat); speak(narrate(s.event,s,rd));
     if(scored>0) sweepScorebug();
+  } else if(s.pitch && s.seq!==lastPitchSeq){
+    // Authoritative pitch from the controller — catches fouls (incl. foul on 2 strikes).
+    lastPitchSeq=s.seq;
+    if(s.pitch==="ball"){ setChip("Ball "+s.balls,"ball"); flashBug("ball"); speak("Ball"); }
+    else if(s.pitch==="strike"){ setChip("Strike "+s.strikes,"strike"); flashBug("strike"); speak("Strike"); }
+    else if(s.pitch==="foul"){ setChip("Foul ball","strike"); flashBug("strike"); speak("Foul ball"); }
   } else if(p){
-    if(s.balls>p.balls) setChip("Ball "+s.balls,"ball");
-    else if(s.strikes>p.strikes) setChip("Strike "+s.strikes,"strike");
-    else if(s.outs>p.outs) setChip("Out "+s.outs,"out");
-    else if((p.balls>0||p.strikes>0)&&s.balls===0&&s.strikes===0) setChip("New batter","neutral");
+    if(s.outs>p.outs){ setChip("Out "+s.outs,"out"); flashBug("out"); speak("Out"); }
+    else if((p.balls>0||p.strikes>0)&&s.balls===0&&s.strikes===0){ setChip("New batter","neutral"); flashBug("neutral"); }
   }
   prev=JSON.parse(JSON.stringify(s));
 }
 function handle(raw){ try{ const m=JSON.parse(raw); if(m&&m.type==="state") applyState(m); }catch(e){} }
+
+/* ---------- per-event flash + spoken play-by-play ---------- */
+const FLASHC={hit:"var(--hit)",hr:"var(--run)",run:"var(--run)",out:"var(--out)",
+  strike:"var(--gold-deep)",ball:"var(--walk)",walk:"var(--walk)",neutral:"var(--slate)"};
+function flashBug(cat){ const sb=$("scorebug"); if(!sb)return;
+  sb.style.setProperty("--flashc",FLASHC[cat]||"var(--gold)");
+  sb.classList.remove("flash"); void sb.offsetWidth; sb.classList.add("flash"); }
+
+let soundOn=false; const _synth=window.speechSynthesis; let _voice=null;
+function pickVoice(){ if(!_synth)return; const vs=_synth.getVoices(); if(!vs.length)return;
+  // Prefer natural-sounding US English voices, in order.
+  const pref=["Google US English","Microsoft Aria","Microsoft Jenny","Microsoft Guy","Samantha","Microsoft David","Microsoft Zira","Daniel"];
+  _voice = pref.map(n=>vs.find(v=>v.name.indexOf(n)>=0)).find(Boolean)
+        || vs.find(v=>/en[-_]US/i.test(v.lang)) || vs.find(v=>/^en/i.test(v.lang)) || vs[0];
+}
+if(_synth){ pickVoice(); _synth.onvoiceschanged=pickVoice; }
+function speak(t){ if(!soundOn||!_synth||!t)return; try{ _synth.cancel();
+  const u=new SpeechSynthesisUtterance(t); if(_voice)u.voice=_voice; u.rate=1.0; u.pitch=1.0; _synth.speak(u); }catch(e){} }
+function narrate(ev,s,rd){
+  const b=s.batter&&s.batter.name?s.batter.name:"";
+  let line=b?(b+", "+(ev.head||"").toLowerCase()):(ev.head||"").toLowerCase();
+  if(ev.sub) line+=" "+ev.sub;
+  if(rd>0) line+=". "+rd+(rd===1?" run scores":" runs score");
+  return line;
+}
+(function addSoundToggle(){
+  const b=document.createElement("button"); b.id="sndbtn";
+  b.innerHTML='<span id="sndic">🔇</span> Audio off';
+  b.onclick=()=>{ soundOn=!soundOn;
+    b.className=soundOn?"on":""; b.innerHTML=(soundOn?'🔊':'🔇')+' Audio '+(soundOn?'on':'off');
+    if(soundOn) speak("Audio on"); else if(_synth) _synth.cancel(); };
+  document.body.appendChild(b);
+})();
 
 /* ============================================================
    Transports — WebSocket relay (primary) + same-origin BroadcastChannel/localStorage

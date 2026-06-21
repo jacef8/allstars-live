@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>All-Stars Live — GameCast</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@500;600;700;800&family=Barlow:wght@500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0B0E13; --surface:#1B212B; --surface2:#262E3A; --line:#41506A;
+    --ink:#EAEDF2; --sage:#B6C2D6; --sageDim:#8E9BB2;
+    --navy:#1D3A66; --lime:#A3E635; --safe:#3FB950; --out:#F0513A; --amber:#E0A33A; --live:#FF3B5C;
+    --mono:"Saira Condensed",system-ui,-apple-system,sans-serif;
+    --sans:"Barlow",system-ui,-apple-system,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;}
+  body{font-family:var(--sans);color:var(--ink);
+    background:
+      radial-gradient(42% 38% at 8% 2%, rgba(29,58,102,.55), transparent 70%),
+      radial-gradient(60% 55% at 96% 102%, rgba(163,230,53,.08), transparent 70%),
+      linear-gradient(180deg,#12161D,#0B0E13);}
+  .num{font-variant-numeric:tabular-nums;}
+  ::-webkit-scrollbar{width:0;height:0;}
+
+  /* ===== 60 / 40 layout: video left, scoreboard right (landscape); stacked (portrait) ===== */
+  #gc{display:flex;height:100dvh;padding:10px;gap:10px;}
+  #video{flex:0 0 60%;min-width:0;position:relative;border-radius:16px;overflow:hidden;
+    border:2px solid var(--navy);background:#05070A;display:flex;align-items:center;justify-content:center;
+    box-shadow:0 14px 34px rgba(0,0,0,.5);}
+  #video iframe{position:absolute;inset:0;width:100%;height:100%;border:0;}
+  #board{flex:1;min-width:0;display:flex;flex-direction:column;gap:10px;overflow-y:auto;}
+  @media (orientation:portrait), (max-width:760px){
+    #gc{flex-direction:column;}
+    #video{flex:0 0 46%;}
+    #board{flex:1;}
+  }
+
+  /* video placeholder */
+  .vph{display:flex;flex-direction:column;align-items:center;gap:12px;color:var(--sageDim);text-align:center;padding:20px;}
+  .vph .play{width:74px;height:74px;border-radius:50%;border:2px solid var(--line);display:flex;align-items:center;justify-content:center;}
+  .vph .play svg{margin-left:5px;}
+  .livebadge{position:absolute;top:12px;left:12px;display:flex;align-items:center;gap:7px;
+    background:rgba(8,11,16,.7);border:1px solid var(--line);border-radius:999px;padding:6px 12px;
+    font-family:var(--mono);font-weight:800;font-size:13px;letter-spacing:.14em;}
+  .livebadge .dot{width:9px;height:9px;border-radius:50%;background:var(--sageDim);}
+  .livebadge.live .dot{background:var(--live);box-shadow:0 0 10px var(--live);animation:pulse 1.5s infinite;}
+  .livebadge.live{color:#fff;}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+  /* cards */
+  .card{background:var(--surface);border:2px solid var(--line);border-radius:14px;padding:12px 14px;}
+  .hdr{display:flex;align-items:center;justify-content:space-between;}
+  .brand{font-family:var(--mono);font-weight:800;font-size:20px;letter-spacing:.06em;}
+  .brand span{color:var(--lime);}
+
+  /* teams + score */
+  .teamrow{display:flex;align-items:center;gap:12px;padding:9px 4px;}
+  .teamrow + .teamrow{border-top:1px solid var(--line);}
+  .tbar{width:7px;align-self:stretch;border-radius:3px;}
+  .tname{flex:1;min-width:0;font-family:var(--mono);font-weight:800;font-size:26px;letter-spacing:.02em;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .tscore{font-family:var(--mono);font-weight:800;font-size:40px;line-height:.9;}
+  .teamrow.batting .atbat{font-family:var(--mono);font-weight:800;font-size:11px;letter-spacing:.12em;color:var(--lime);}
+
+  /* state row */
+  .state{display:flex;align-items:center;justify-content:space-between;gap:10px;}
+  .inn{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-weight:800;font-size:30px;}
+  .inn .arrow{color:var(--lime);font-size:20px;}
+  .bso{display:flex;flex-direction:column;gap:6px;}
+  .bso .lab{font-family:var(--mono);font-size:12px;font-weight:700;letter-spacing:.1em;color:var(--sage);width:18px;}
+  .bso .r{display:flex;align-items:center;gap:8px;}
+  .pip{width:14px;height:14px;border-radius:50%;border:2px solid var(--sageDim);}
+  .pip.on.b{background:var(--ink);border-color:var(--ink);}
+  .pip.on.s{background:var(--amber);border-color:var(--amber);}
+  .pip.on.o{background:var(--out);border-color:var(--out);}
+
+  /* bases diamond */
+  .diamond{width:84px;height:84px;position:relative;flex:none;}
+  .base{position:absolute;width:26px;height:26px;background:var(--surface2);border:2px solid var(--line);
+    transform:rotate(45deg);}
+  .base.on{background:var(--lime);border-color:var(--lime);box-shadow:0 0 12px rgba(163,230,53,.5);}
+  .b2{top:0;left:29px;} .b3{top:29px;left:0;} .b1{top:29px;left:58px;}
+
+  /* last play */
+  .lastplay{display:flex;flex-direction:column;gap:3px;}
+  .lp-head{font-family:var(--mono);font-weight:800;font-size:24px;letter-spacing:.03em;color:var(--lime);}
+  .lp-sub{font-size:14px;color:var(--sage);}
+  .lp-none{font-size:14px;color:var(--sageDim);font-style:italic;}
+
+  .batter{display:flex;align-items:center;gap:10px;}
+  .ab{font-family:var(--mono);font-weight:800;font-size:12px;letter-spacing:.12em;color:var(--bg);
+    background:var(--lime);border-radius:7px;padding:6px 9px;}
+  .batter .who{font-family:var(--mono);font-weight:800;font-size:19px;}
+  .batter .sub{font-size:13px;color:var(--sage);}
+</style>
+</head>
+<body>
+<div id="gc">
+  <div id="video">
+    <div class="livebadge" id="livebadge"><span class="dot"></span><span id="livetxt">OFFLINE</span></div>
+    <div class="vph" id="vph">
+      <div class="play"><svg width="30" height="30" viewBox="0 0 24 24" fill="var(--sage)"><path d="M8 5l11 7-11 7z"/></svg></div>
+      <div style="font-family:var(--mono);font-weight:800;font-size:18px;letter-spacing:.08em;color:var(--sage)">LIVE VIDEO</div>
+      <div style="font-size:13px;max-width:280px">The broadcast appears here. Open with <b>?yt=VIDEO_ID</b> to embed the YouTube live stream.</div>
+    </div>
+  </div>
+
+  <div id="board">
+    <div class="card hdr">
+      <div class="brand">ALL-STARS <span>LIVE</span></div>
+      <div style="font-family:var(--mono);font-weight:700;font-size:13px;letter-spacing:.12em;color:var(--sage)" id="gcdate">GAMECAST</div>
+    </div>
+
+    <div class="card" id="teams">
+      <div class="teamrow" id="row-away">
+        <div class="tbar" id="bar-away"></div>
+        <div class="tname" id="name-away">AWAY</div>
+        <div class="atbat" id="ab-away"></div>
+        <div class="tscore num" id="score-away">0</div>
+      </div>
+      <div class="teamrow" id="row-home">
+        <div class="tbar" id="bar-home"></div>
+        <div class="tname" id="name-home">HOME</div>
+        <div class="atbat" id="ab-home"></div>
+        <div class="tscore num" id="score-home">0</div>
+      </div>
+    </div>
+
+    <div class="card state">
+      <div class="inn"><span class="arrow" id="arrow">▲</span><span id="inning">1st</span></div>
+      <div class="diamond">
+        <div class="base b2" id="base2"></div>
+        <div class="base b3" id="base3"></div>
+        <div class="base b1" id="base1"></div>
+      </div>
+      <div class="bso">
+        <div class="r"><span class="lab">B</span><span class="pip b" id="b1"></span><span class="pip b" id="b2p"></span><span class="pip b" id="b3p"></span></div>
+        <div class="r"><span class="lab">S</span><span class="pip s" id="s1"></span><span class="pip s" id="s2"></span></div>
+        <div class="r"><span class="lab">O</span><span class="pip o" id="o1"></span><span class="pip o" id="o2"></span><span class="pip o" id="o3"></span></div>
+      </div>
+    </div>
+
+    <div class="card lastplay" id="lastplaycard">
+      <div style="font-family:var(--mono);font-size:12px;font-weight:700;letter-spacing:.12em;color:var(--sageDim)">LAST PLAY</div>
+      <div class="lp-none" id="lp-none">Waiting for the first pitch…</div>
+      <div class="lp-head" id="lp-head" style="display:none"></div>
+      <div class="lp-sub" id="lp-sub" style="display:none"></div>
+    </div>
+
+    <div class="card batter" id="battercard" style="display:none">
+      <span class="ab">AB</span>
+      <div><div class="who" id="bat-who">—</div><div class="sub" id="bat-sub"></div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ---- GameCast viewer: subscribe to the controller's live state (same relay) ---- */
+const $=id=>document.getElementById(id);
+const ORD=n=>{const s=["th","st","nd","rd"],v=n%100;return n+(s[(v-20)%10]||s[v]||s[0]);};
+
+function setConn(live){
+  const lb=$("livebadge"); lb.className="livebadge"+(live?" live":"");
+  $("livetxt").textContent=live?"LIVE":"OFFLINE";
+}
+
+function render(s){
+  if(!s||s.type!=="state")return;
+  const aw=s.teams.away, hm=s.teams.home, batting=s.half==="T"?"away":"home";
+  $("bar-away").style.background=aw.color; $("bar-home").style.background=hm.color;
+  $("name-away").textContent=aw.short||aw.name||"AWAY"; $("name-home").textContent=hm.short||hm.name||"HOME";
+  $("score-away").textContent=s.away; $("score-home").textContent=s.home;
+  $("ab-away").textContent=batting==="away"?"AT BAT":""; $("ab-home").textContent=batting==="home"?"AT BAT":"";
+  $("row-away").classList.toggle("batting",batting==="away"); $("row-home").classList.toggle("batting",batting==="home");
+
+  $("arrow").textContent=s.half==="T"?"▲":"▼";
+  $("inning").textContent=ORD(s.inning);
+
+  const pip=(id,on)=>{const e=$(id);e.classList.toggle("on",!!on);};
+  pip("b1",s.balls>=1);pip("b2p",s.balls>=2);pip("b3p",s.balls>=3);
+  pip("s1",s.strikes>=1);pip("s2",s.strikes>=2);
+  pip("o1",s.outs>=1);pip("o2",s.outs>=2);pip("o3",s.outs>=3);
+
+  $("base1").classList.toggle("on",!!s.bases[1]);
+  $("base2").classList.toggle("on",!!s.bases[2]);
+  $("base3").classList.toggle("on",!!s.bases[3]);
+
+  if(s.event&&s.event.head){
+    $("lp-none").style.display="none";
+    $("lp-head").style.display=""; $("lp-head").textContent=s.event.head;
+    $("lp-sub").style.display=s.event.sub?"":"none"; $("lp-sub").textContent=s.event.sub||"";
+  }
+  if(s.batter&&s.batter.name){
+    $("battercard").style.display="";
+    $("bat-who").textContent=(s.batter.num?("#"+s.batter.num+" "):"")+s.batter.name;
+    const t=s.batter.team==="away"?aw:hm; $("bat-sub").textContent=(t.short||t.name||"")+" batting";
+  }
+}
+
+function handle(raw){ try{ render(typeof raw==="string"?JSON.parse(raw):raw); }catch(e){} }
+
+/* Same transports as the controller: BroadcastChannel + localStorage (same-origin) + ws relay. */
+try{ const bc=new BroadcastChannel("liberty-league"); bc.onmessage=e=>{ setConn(true); handle(e.data); }; }catch(e){}
+addEventListener("storage",e=>{ if(e.key==="liberty-league-msg"&&e.newValue){ setConn(true); handle(e.newValue); } });
+try{ const last=localStorage.getItem("liberty-league-msg"); if(last){ setConn(true); handle(last); } }catch(e){}
+
+const q=new URLSearchParams(location.search);
+const wsUrl=q.get("server")||q.get("ws");
+if(wsUrl){ (function connect(){ let ws; try{ws=new WebSocket(wsUrl);}catch(e){ return setTimeout(connect,2000); }
+  ws.onopen=()=>setConn(true); ws.onmessage=e=>{ setConn(true); handle(e.data); };
+  ws.onclose=()=>{ setConn(false); setTimeout(connect,2000); }; ws.onerror=()=>{ try{ws.close()}catch(e){} };
+})(); }
+
+/* Optional YouTube embed: ?yt=VIDEO_ID */
+const yt=q.get("yt");
+if(yt){ $("vph").style.display="none";
+  const f=document.createElement("iframe"); f.allow="autoplay; encrypted-media; picture-in-picture";
+  f.allowFullscreen=true; f.src="https://www.youtube.com/embed/"+encodeURIComponent(yt)+"?autoplay=1&playsinline=1";
+  $("video").appendChild(f);
+}
+</script>
+</body>
+</html>

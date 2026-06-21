@@ -6,7 +6,7 @@ phones. Two pieces get deployed:
 | Piece | What it is | Hosted on |
 |------|------------|-----------|
 | **Relay** (`reference/web-scoring/server.js`) | A WebSocket server that passes the scorekeeper's taps to every viewer, and (optionally) saves state to Firebase for crash recovery | **Railway** |
-| **Web pages** (`viewer.html`, `scoring-controller.html`, `broadcast-overlay.html`) | The fan viewer, the scorekeeper console, and the OBS overlay | **Firebase Hosting** |
+| **Web pages** (`setup.html`, `scoring-controller.html`, `watch.html`, `viewer.html`, `broadcast-overlay.html`) | Game setup, the scorekeeper console, the fan landing page + viewer, and the OBS overlay | **Firebase Hosting** |
 
 The flow at game time:
 
@@ -120,51 +120,99 @@ The repo already contains `firebase.json` (public dir = `reference/web-scoring`)
 
 Your pages are now at:
 
-- Fan viewer: `https://allstars-live.web.app/viewer.html`
+- Fan landing (and site root): `https://allstars-live.web.app/` → `watch.html`
+- Game setup: `https://allstars-live.web.app/setup.html`
 - Scorekeeper: `https://allstars-live.web.app/scoring-controller.html`
+- Fan viewer: `https://allstars-live.web.app/viewer.html`
 - OBS overlay: `https://allstars-live.web.app/broadcast-overlay.html`
 
-(Any unknown path falls back to the friendly `404.html` hub.)
+The site **root** (`/`) serves the fan landing page (`watch.html`). Any unknown path
+falls back to the friendly `404.html` hub.
 
 ---
 
 ## 4. Wire the pages to the relay
 
-Append `?server=<your wss URL>` to the controller and `?ws=` (or `?server=`) to the
-viewer/overlay. Using the example URLs above:
+The relay URL is `wss://<your-app>.up.railway.app`. You only ever type it **once** —
+into the game-setup page; everything else is generated from there.
 
-**Scorekeeper (you):**
+**Scorekeeper — start here every game:**
 ```
-https://allstars-live.web.app/scoring-controller.html?server=wss://allstars-live-production.up.railway.app
+https://allstars-live.web.app/setup.html
 ```
+Fill in the teams and rules, paste the relay URL into the **Relay server URL** field
+(it's remembered for next time), and tap **Start Game**. That hands off to the
+scoring controller with everything baked into the URL — you never edit a query string
+by hand. (Bookmark `setup.html`; that's your one entry point.)
 
-**Fans (share this one):**
-```
-https://allstars-live.web.app/viewer.html?ws=wss://allstars-live-production.up.railway.app
-```
+**Fans:** don't share a URL manually — use the controller's **Share** button
+(see [Sharing the game](#sharing-the-game)). It points fans at the landing page
+`watch.html`, with the relay and team names already filled in.
 
 **OBS overlay (browser source):**
 ```
 https://allstars-live.web.app/broadcast-overlay.html?ws=wss://allstars-live-production.up.railway.app&obs
 ```
 
-> The viewer accepts **both** `?server=` and `?ws=` — they mean the same thing.
-> Open it with neither and it runs a built-in **demo** so you can preview the UI.
+> The viewer and overlay accept **both** `?server=` and `?ws=` — they mean the same thing.
+> Open the viewer with neither and it runs a built-in **demo** so you can preview the UI.
 
 ---
 
-## 5. Share the viewer with fans
+## 5. Sharing the game
 
-The fan URL is long, so make it easy to open:
+Once a game is set up, the **scoring controller has a Share button** in its top
+toolbar (next to the connection dot). Tap it and you get three ways to get fans
+watching — no copy-pasting long URLs at the field:
 
-- **QR code:** paste the full viewer URL into any QR generator (e.g. qr-code-generator.com),
-  print it, and tape it at the concession stand / dugout fence. Fans scan → watching.
-- **Short link:** make a memorable redirect (Bitly, or a TinyURL like `tinyurl.com/lca-live`)
-  that points to the viewer URL.
-- **Text/group chat:** drop the link in the team's group chat before first pitch.
+- **QR code** — a QR appears in the modal. Fans point their phone camera at it and tap
+  the link. The QR library is bundled locally (`lib/qrcode.min.js`), so it renders even
+  if the field Wi-Fi is flaky.
+- **Text a fan** — on phones that support it, this opens the native share sheet
+  (Messages, WhatsApp, AirDrop, etc.) pre-filled with *"Watch All-Stars Live — Follow the
+  game live:"* and the link. On devices without it, the button copies the link instead.
+- **Copy link** — copies the link to paste into the team group chat, a tournament page,
+  or anywhere.
 
-Fans just open it — no install, no login. The connection dot shows **LIVE** when they're
-receiving, **RECONNECTING** if the network blips (it auto-recovers).
+### What fans get
+
+All three share the **landing page**, not the raw viewer:
+
+```
+https://allstars-live.web.app/watch.html?ws=wss://<your-app>.up.railway.app&home=LIB&homeName=Liberty+County&away=VIS&awayName=Visitors
+```
+
+`watch.html` shows the matchup ("Visitors vs Liberty County"), a pulsing **● LIVE**
+badge, and a big **Watch Now** button that opens the live viewer — a friendlier first
+impression than dropping a fan straight into a scoreboard. The relay URL rides along, so
+the viewer connects automatically.
+
+> The controller builds this link for you from the current game (relay + team names), so
+> you normally never type it. **The Share button is the workflow** — QR at the
+> concession stand / dugout fence, "Text a fan" to the team chat.
+
+### Customizing the team names in the link
+
+The team names come from the four query params, so you can hand-craft a link if you ever
+need to (e.g. for a flyer printed before setup):
+
+| Param | Meaning | Example |
+|-------|---------|---------|
+| `ws` | Relay URL (required for live data) | `wss://allstars-live-production.up.railway.app` |
+| `home` | Home abbreviation (≤3 chars) | `LIB` |
+| `homeName` | Home full name (URL-encode spaces as `+` or `%20`) | `Liberty+County` |
+| `away` | Away abbreviation | `VIS` |
+| `awayName` | Away full name | `Visitors` |
+
+Only `ws` is needed for the viewer to work; the team params just pre-fill the landing
+page. The shortest possible fan link is just `watch.html?ws=wss://…`.
+
+> **Tip:** the bare site root also works — `https://allstars-live.web.app/` serves the
+> landing page (via the `firebase.json` rewrite). Add `?ws=…&home=…` to personalize it.
+
+Fans just open it — no install, no login. On the viewer, the connection dot shows
+**LIVE** when receiving, **RECONNECTING** if the network blips (it auto-recovers), and a
+**"Waiting for the game to start…"** card before the first pitch.
 
 ---
 

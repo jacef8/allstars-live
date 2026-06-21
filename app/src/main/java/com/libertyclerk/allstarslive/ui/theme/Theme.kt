@@ -7,15 +7,16 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
-// Liberty County AAA All-Stars — broadcast scorer runs dark by default
-// (it lives on top of live video), so we lean on the dark scheme.
+// Liberty County AAA All-Stars — broadcast scorer runs dark by default (it lives
+// on top of live video). Deep-navy + gold palette matches the web controller/viewer.
 private val DarkColors = darkColorScheme(
-    primary = Color(0xFF4F9CFF),
-    onPrimary = Color.White,
-    background = Color(0xFF0B0B0D),
-    surface = Color(0xFF15161A),
-    onBackground = Color(0xFFEDEDED),
-    onSurface = Color(0xFFEDEDED),
+    primary = Color(0xFFFBBF24),       // amber/gold — active tabs & primary buttons
+    onPrimary = Color(0xFF241803),
+    secondary = Color(0xFF5B97FF),     // accent blue (our team color)
+    background = Color(0xFF0B1220),    // deep navy
+    surface = Color(0xFF16223C),
+    onBackground = Color(0xFFF6F9FC),
+    onSurface = Color(0xFFF6F9FC),
 )
 
 private val LightColors = lightColorScheme(

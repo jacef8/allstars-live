@@ -81,6 +81,8 @@ dependencies {
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
+    // Bottom-nav tab icons (Scoreboard / Videocam / People / Settings).
+    implementation("androidx.compose.material:material-icons-extended")
     // (libVLC removed — its Android build has no SRT module. SRT ingest is the
     //  native libsrt route under app/src/main/cpp.)
 

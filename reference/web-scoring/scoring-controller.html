@@ -9,29 +9,29 @@
 <link href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@500;600;700;800&family=Barlow:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
   :root{
-    /* Bright, sunlight-readable palette — high contrast for outdoor daylight use. */
-    --field:#EEF2F8; --ink:#0E1726; --surface:#FFFFFF; --surface2:#E7EDF5; --line:#C9D4E2;
-    --clay:#E08A12; --chalk:#0E1726; --grass:#2E7D4F; --grassLt:#3E9D67;
-    --safe:#12A150; --out:#E11D2E; --sage:#5B6878; --sageDim:#93A0B2; --amber:#C2740B;
-    --live:#E11D48;
+    /* GroundLink-style dark theme: charcoal base, navy + lime-green accents. */
+    --field:#10141A; --ink:#EAEDF2; --surface:#1B212B; --surface2:#262E3A; --line:#41506A;
+    --clay:#C97B3C; --chalk:#EAEDF2; --grass:#1F5C3A; --grassLt:#2C7D4E;
+    --safe:#3FB950; --out:#F0513A; --sage:#B6C2D6; --sageDim:#8E9BB2; --amber:#E0A33A;
+    --live:#FF3B5C; --navy:#1D3A66; --lime:#A3E635;
     --mono:"Saira Condensed",system-ui,-apple-system,sans-serif;
     --sans:"Barlow",system-ui,-apple-system,sans-serif;
     --ease:cubic-bezier(.16,1,.3,1); --ease-soft:cubic-bezier(.4,0,.2,1);
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;scrollbar-width:none;}
   *::-webkit-scrollbar{width:0;height:0;display:none;}
-  html,body{margin:0;background:#E3E9F1;font-family:var(--sans);}
+  html,body{margin:0;background:#0B0E13;font-family:var(--sans);}
   button{font-family:var(--sans);cursor:pointer;
     transition:transform .12s var(--ease-soft), filter .15s ease, box-shadow .18s ease, background .15s ease;}
-  button:active{transform:scale(.94);filter:brightness(1.12) drop-shadow(0 0 7px rgba(251,191,36,.28));}
+  button:active{transform:scale(.94);filter:brightness(1.14) drop-shadow(0 0 7px rgba(163,230,53,.32));}
   button:disabled{opacity:.4;filter:none;cursor:default;}
   #wrap{height:100dvh;display:flex;justify-content:center;
     background:
-      radial-gradient(38% 34% at 10% 6%, rgba(46,107,230,.13), transparent 70%),
-      radial-gradient(42% 38% at 92% 2%, rgba(18,161,80,.10), transparent 70%),
-      radial-gradient(55% 50% at 85% 102%, rgba(224,138,18,.09), transparent 70%),
-      linear-gradient(180deg, #F6F8FC 0%, #E2E9F3 100%);
-    background-attachment:fixed;
+      radial-gradient(42% 38% at 8% 2%, rgba(29,58,102,.55), transparent 70%),
+      radial-gradient(46% 40% at 98% 0%, rgba(29,58,102,.30), transparent 72%),
+      radial-gradient(60% 55% at 92% 104%, rgba(163,230,53,.10), transparent 70%),
+      radial-gradient(55% 50% at -5% 102%, rgba(163,230,53,.05), transparent 70%),
+      linear-gradient(180deg, #12161D 0%, #0B0E13 100%);
     padding:10px;overflow:hidden;}
   #app{width:100%;max-width:400px;height:100%;display:flex;flex-direction:column;gap:8px;color:var(--chalk);}
   .num{font-family:var(--mono);font-variant-numeric:tabular-nums;}
@@ -63,17 +63,59 @@
   /* gentle fade when the action screen changes — smooth, not janky */
   .screen-in{animation:screenIn .28s var(--ease) both;}
   @keyframes screenIn{0%{opacity:0;transform:translateY(7px);}100%{opacity:1;transform:translateY(0);}}
+
+  /* Branded splash / intro — fades out on load */
+  #splash{position:fixed;inset:0;z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;
+    background:radial-gradient(60% 48% at 50% 38%, rgba(29,58,102,.55), transparent 70%), linear-gradient(180deg,#12161D,#0B0E13);
+    animation:splashOut .55s var(--ease-soft) 1.3s forwards;}
+  #splash .sp-logo{font-family:var(--mono);font-weight:800;font-size:clamp(46px,13vw,72px);line-height:.88;letter-spacing:2px;text-align:center;color:#EAEDF2;animation:spPop .7s var(--ease) both;}
+  #splash .sp-logo span{color:var(--lime);}
+  #splash .sp-bar{width:56px;height:4px;border-radius:2px;background:var(--lime);box-shadow:0 0 14px rgba(163,230,53,.6);animation:spPop .7s var(--ease) .1s both;}
+  #splash .sp-sub{font-size:12px;font-weight:700;letter-spacing:5px;color:var(--sage);animation:spPop .7s var(--ease) .18s both;}
+  @keyframes splashOut{to{opacity:0;visibility:hidden;}}
+  @keyframes spPop{0%{transform:translateY(12px);opacity:0;}60%{opacity:1;}100%{transform:translateY(0);opacity:1;}}
+
+  /* Tablet in landscape: use the width — wider column so the field is big and the
+     event picker can sit as a side panel (no scrolling). Phones/portrait stay narrow. */
+  @media (min-width:760px) and (orientation:landscape){ #app{max-width:920px;} }
 </style>
 </head>
 <body>
-<div id="wrap"><div id="app"></div></div>
+<div id="splash"><div class="sp-logo">ALL-STARS<br><span>LIVE</span></div><div class="sp-bar"></div></div>
+<div id="wrap"><div id="app">
+  <div id="toolbar" style="flex-shrink:0"></div>
+  <div id="content" style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px"></div>
+</div></div>
+
+<!-- Share / QR modal: fans scan to open the live viewer -->
+<div id="qrmodal" style="display:none;position:fixed;inset:0;z-index:200;background:rgba(8,11,16,.84);align-items:center;justify-content:center;padding:20px">
+  <div style="max-width:330px;width:100%;background:#1B212B;border:1px solid #333C49;border-radius:18px;padding:20px;text-align:center;box-shadow:0 24px 60px rgba(0,0,0,.6)">
+    <div style="font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:20px;letter-spacing:.5px;color:#EAEDF2">WATCH LIVE</div>
+    <div style="font-size:12px;color:#9BA6B4;margin:3px 0 14px">Fans scan this to follow the game</div>
+    <div id="qrbox" style="background:#fff;border-radius:12px;padding:12px;width:244px;height:244px;margin:0 auto;display:flex;align-items:center;justify-content:center;color:#677281;font-size:12px"></div>
+    <div id="qrurl" style="font-size:11px;color:#9BA6B4;word-break:break-all;margin:12px 4px 14px"></div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <button data-act="navshare" id="navShareBtn" style="display:none;align-items:center;justify-content:center;gap:7px;background:#A3E635;border:none;color:#0B0E13;border-radius:10px;padding:13px;font-family:'Barlow',sans-serif;font-size:15px;font-weight:800;cursor:pointer">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0B0E13" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><path d="M16 6l-4-4-4 4"/><path d="M12 2v13"/></svg>
+        <span>Text a fan</span></button>
+      <div style="display:flex;gap:8px">
+        <button data-act="copyshare" style="flex:1;background:#262E3A;border:1px solid #333C49;color:#EAEDF2;border-radius:10px;padding:12px;font-family:'Barlow',sans-serif;font-size:14px;font-weight:700;cursor:pointer">Copy link</button>
+        <button data-act="closeshare" style="flex:1;background:#1B212B;border:1px solid #333C49;color:#9BA6B4;border-radius:10px;padding:12px;font-family:'Barlow',sans-serif;font-size:14px;font-weight:700;cursor:pointer">Done</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Bundled locally so the QR renders even on spotty field internet. -->
+<script src="lib/qrcode.min.js"></script>
 <script>
 /* ----------------------------------------------------------------------
    Field-as-input baseball scoring controller — interaction prototype
 ---------------------------------------------------------------------- */
-const T={field:"#EEF2F8",ink:"#0E1726",surface:"#FFFFFF",surface2:"#E7EDF5",line:"#C9D4E2",
-  clay:"#E08A12",chalk:"#0E1726",grass:"#2E7D4F",grassLt:"#3E9D67",safe:"#12A150",
-  out:"#E11D2E",sage:"#5B6878",sageDim:"#93A0B2",amber:"#C2740B",live:"#E11D48"};
+const T={field:"#10141A",ink:"#EAEDF2",surface:"#1B212B",surface2:"#262E3A",line:"#41506A",
+  clay:"#C97B3C",chalk:"#EAEDF2",grass:"#1F5C3A",grassLt:"#2C7D4E",safe:"#3FB950",
+  out:"#F0513A",sage:"#B6C2D6",sageDim:"#8E9BB2",amber:"#E0A33A",live:"#FF3B5C",
+  navy:"#1D3A66",lime:"#A3E635"};
 const FIELDLINE="#F4F8FC";  // white chalk for the field graphic (stays light on the green diamond)
 const MONO="'Saira Condensed',system-ui,-apple-system,sans-serif";  // condensed display — scoreboard numbers & headers
 const SANS="'Barlow',system-ui,-apple-system,sans-serif";           // body / UI text
@@ -257,6 +299,7 @@ function fullCatalog(pos){
 const initGame=()=>({inning:1,half:"T",away:0,home:0,outs:0,balls:0,strikes:0,
   bases:{1:null,2:null,3:null},awayPtr:0,homePtr:0,
   ourSide:"home",
+  innings:6,       // regulation innings (from game setup) — drives the viewer line-score width
   runCap:5,        // runs allowed per half-inning (tournament rule); 0 = no cap
   halfRuns:0,      // runs scored so far in the current half-inning
   oppBatters:9,    // opponent's batting-order size (continuous order support)
@@ -331,9 +374,9 @@ function endGame(){snapshot();G.final=true;
   resetUI();mode="summary";render();broadcast();}
 /* New Game: reset scores/innings/in-play state but keep the chosen rules, side, and lineup. */
 function startNewGame(){
-  const keep={runCap:G.runCap,oppBatters:G.oppBatters,ourSide:G.ourSide,lineup:JSON.parse(JSON.stringify(G.lineup))};
+  const keep={runCap:G.runCap,oppBatters:G.oppBatters,ourSide:G.ourSide,innings:G.innings,lineup:JSON.parse(JSON.stringify(G.lineup))};
   G=initGame();
-  G.runCap=keep.runCap; G.oppBatters=keep.oppBatters; G.ourSide=keep.ourSide; G.lineup=keep.lineup;
+  G.runCap=keep.runCap; G.oppBatters=keep.oppBatters; G.ourSide=keep.ourSide; G.innings=keep.innings; G.lineup=keep.lineup;
   const ot=oppTeamId&&teamById(oppTeamId);
   G.oppLineup = ot ? ot.players.map(p=>({num:p.num,name:p.name})) : Array.from({length:Math.max(1,G.oppBatters)},(_,i)=>({num:String(i+1),name:""}));
   if(ot) G.oppBatters=G.oppLineup.length;
@@ -393,14 +436,26 @@ function applyPlanInline(kind){
 const LINK=(()=>{
   let bc=null; try{bc=new BroadcastChannel("liberty-league");}catch(e){}
   // Relay URL is configurable: ?server=wss://allstars.up.railway.app  (alias: ?ws=)
-  let ws=null; const q=new URLSearchParams(location.search); const wsUrl=q.get("server")||q.get("ws");
-  (function connect(){ if(!wsUrl)return; try{ws=new WebSocket(wsUrl);ws.onclose=()=>setTimeout(connect,2000);}catch(e){} })();
-  return {send(obj){ const msg=JSON.stringify(obj);
-    if(bc)try{bc.postMessage(msg)}catch(e){}
-    try{localStorage.setItem("liberty-league-msg",msg)}catch(e){}
-    if(ws&&ws.readyState===1)try{ws.send(msg)}catch(e){} }};
+  let ws=null, connected=false; const q=new URLSearchParams(location.search); const wsUrl=q.get("server")||q.get("ws");
+  function setConn(v){ if(connected===v)return; connected=v; if(window.onLinkChange)window.onLinkChange(); }
+  (function connect(){ if(!wsUrl)return;
+    try{ ws=new WebSocket(wsUrl);
+      ws.onopen=()=>setConn(true);
+      ws.onclose=()=>{ setConn(false); setTimeout(connect,2000); };
+      ws.onerror=()=>{ try{ws.close()}catch(e){} };
+    }catch(e){ setTimeout(connect,2000); }
+  })();
+  return {
+    send(obj){ const msg=JSON.stringify(obj);
+      if(bc)try{bc.postMessage(msg)}catch(e){}
+      try{localStorage.setItem("liberty-league-msg",msg)}catch(e){}
+      if(ws&&ws.readyState===1)try{ws.send(msg)}catch(e){} },
+    connected:()=>connected,
+    hasRelay:()=>!!wsUrl,
+    viewerWsUrl:()=>wsUrl||"",
+  };
 })();
-let _seq=0,_event=null,_eventId=0;
+let _seq=0,_event=null,_eventId=0,_pitch=null;
 const PLAYHEAD={single:"SINGLE",double:"DOUBLE",triple:"TRIPLE",hr:"HOME RUN",error:"REACHED ON ERROR",
   fc:"FIELDER'S CHOICE",out1:"GROUND OUT",flyout:"FLY OUT",lineout:"LINE OUT",popout:"POP OUT",
   dp:"DOUBLE PLAY",sacfly:"SAC FLY",sacbunt:"SAC BUNT",walk:"WALK",hbp:"HIT BY PITCH",strikeout:"STRIKEOUT"};
@@ -424,13 +479,13 @@ function broadcast(){
     bases:{1:!!G.bases[1],2:!!G.bases[2],3:!!G.bases[3]},
     teams:{away:{short:TEAMS.away.short,name:TEAMS.away.name,color:TEAMS.away.color},
            home:{short:TEAMS.home.short,name:TEAMS.home.name,color:TEAMS.home.color}},
-    batter:{num:b.num,name:b.name,team:k}, event:_event,
-    box:buildBox(), line:G.line, maxInning:G.inning, final:G.final });
-  _event=null;
+    batter:{num:b.num,name:b.name,team:k}, event:_event, pitch:_pitch,
+    box:buildBox(), line:G.line, maxInning:G.inning, regInnings:(G.innings||6), final:G.final });
+  _event=null; _pitch=null;
 }
 
 function pitch(type){
-  snapshot();const k0=battingKey(),bn=batter().name;
+  snapshot();const k0=battingKey(),bn=batter().name;_pitch=type;
   if(type==="ball"){G.balls++;if(G.balls>=4){applyPlanInline("walk");flash("Walk");bcastEvent("walk","Ball four · "+bn,k0);}}
   else if(type==="strike"){G.strikes++;if(G.strikes>=3){G.outs++;creditBatter("strikeout",0);nextBatter();flipIfNeeded();flash("Strikeout");bcastEvent("strikeout",bn,k0);}}
   else if(type==="foul"){if(G.strikes<2)G.strikes++;}
@@ -550,11 +605,6 @@ function diamondSVG(){
   const marker=tap?`<g><circle cx="${tap.x}" cy="${tap.y}" r="9" fill="none" stroke="${FIELDLINE}" stroke-width="3"/><circle cx="${tap.x}" cy="${tap.y}" r="9" fill="none" stroke="${T.clay}" stroke-width="1.5"/>
       <circle cx="${tap.x}" cy="${tap.y}" r="3" fill="${T.clay}"/></g>`:"";
   const ballFly="";
-  // Defensive alignment: 9 fielders as numbered dots (team color + jersey # when we're fielding).
-  const FPOS={P:[150,201],C:[150,261],"1B":[206,176],"2B":[182,151],SS:[118,151],"3B":[94,176],LF:[77,95],CF:[150,72],RF:[223,95]};
-  const onDef=fielding();
-  const fieldersSVG=inRunners?"":Object.keys(FPOS).map(pos=>{const[x,y]=FPOS[pos];const pl=onDef?playerAtPos(pos):null;const lbl=onDef?(pl&&pl.num?pl.num:pos):pos;const fill=onDef?OUR.color:"#64748B";
-    return `<g><circle cx="${x}" cy="${y}" r="9" fill="${fill}" stroke="#fff" stroke-width="1.5" opacity="0.96"/><text x="${x}" y="${y+3.2}" font-size="9" font-family="${MONO}" font-weight="800" text-anchor="middle" fill="#fff">${lbl}</text></g>`;}).join("");
   const zoneSVG=showZones?zonesOverlay():"";
   const banner=armed?`<div style="position:absolute;inset:0;display:flex;align-items:flex-start;justify-content:center;pointer-events:none;padding-top:8px">
       <span style="background:${T.clay};color:#FFFFFF;font-size:11px;font-weight:800;padding:4px 10px;border-radius:999px;letter-spacing:.3px">Tap where the ball went</span></div>`:"";
@@ -571,7 +621,6 @@ function diamondSVG(){
       <line x1="150" y1="250" x2="8" y2="108" stroke="${FIELDLINE}" stroke-width="1.2" opacity="0.7"/>
       <circle cx="150" cy="190" r="9" fill="${T.clay}" opacity="0.95"/>
       <rect x="147" y="188" width="6" height="3" fill="${FIELDLINE}" opacity="0.9"/>
-      ${fieldersSVG}
       ${arrowSVG}
       ${baseSq("1")}${baseSq("2")}${baseSq("3")}
       <polygon points="150,245 156,250 156,256 144,256 144,250" fill="${FIELDLINE}"/>
@@ -636,33 +685,61 @@ const ICN={
   inning:IC(`<path d="M5 5v14l8-7z"/><path d="M15 5v14"/><path d="M19 5v14"/>`),
 };
 // Flat, bordered buttons (GroundLink style): solid fill, 1px border, no gradients.
-const bigBtn=(bg,extra="")=>`background:${bg};border:1px solid rgba(0,0,0,.16);color:#FFFFFF;border-radius:10px;padding:16px;font-family:${MONO};font-size:18px;font-weight:800;letter-spacing:1px;text-transform:uppercase;display:flex;align-items:center;justify-content:center;gap:10px;${extra}`;
+const bigBtn=(bg,extra="",fg="#FFFFFF")=>`background:${bg};border:1px solid rgba(0,0,0,.16);color:${fg};border-radius:10px;padding:16px;font-family:${MONO};font-size:18px;font-weight:800;letter-spacing:1px;text-transform:uppercase;display:flex;align-items:center;justify-content:center;gap:10px;${extra}`;
 const ghost=`background:${T.surface};border:1px solid ${T.line};color:${T.sage};border-radius:8px;padding:11px;font-family:${MONO};font-size:14px;font-weight:700;letter-spacing:.5px;text-transform:uppercase`;
-function pitchBtn(act,label,icon){return `<button data-act="${act}" style="background:${T.surface};border:1px solid ${T.line};color:${T.chalk};border-radius:9px;padding:13px 8px;font-family:${MONO};font-size:16px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;display:flex;flex-direction:column;align-items:center;gap:6px">${icon?`<span style="color:${T.sage}">${icon}</span>`:""}${label}</button>`;}
+/* GameChanger-style pitch button: round icon badge + label beneath. accent=primary (lime). */
+function pitchBtn(act,label,icon,accent){
+  const bg=accent?T.lime:T.surface, bd=accent?T.lime:"#3F6CA8", txt=accent?T.field:T.ink;
+  const circ=accent?"rgba(0,0,0,.16)":T.surface2, ic=accent?T.field:T.lime;
+  return `<button data-act="${act}" style="background:${bg};border:2px solid ${bd};color:${txt};border-radius:13px;padding:12px 4px;display:flex;flex-direction:column;align-items:center;gap:7px;font-family:${SANS};font-size:13px;font-weight:800;line-height:1.05;text-align:center;letter-spacing:.2px">
+    <span style="width:44px;height:44px;border-radius:50%;background:${circ};display:flex;align-items:center;justify-content:center;color:${ic}">${icon}</span>${label}</button>`;
+}
 function chip(c){const a=contact===c;return `<button data-act="contact" data-arg="${c}" style="background:${a?T.clay:T.surface};border:1px solid ${a?T.clay:T.line};color:${a?"#FFFFFF":T.chalk};border-radius:8px;padding:12px 6px;font-family:${MONO};font-size:14px;font-weight:800;letter-spacing:.5px;text-transform:uppercase">${c}</button>`;}
 
 function actionArea(){
   if(mode==="home"){
     const PLAY='<path d="M8 5l11 7-11 7z" fill="currentColor" stroke="none"/>';
-    return `<div style="display:flex;flex-direction:column;gap:16px">
-        <div style="border-radius:18px;padding:30px 22px;text-align:center;color:#fff;background:linear-gradient(135deg,#2E6BE6,#7C3AED 55%,#0EA5E9);box-shadow:0 12px 30px rgba(46,107,230,.35)">
-          <div style="font-family:${MONO};font-size:34px;font-weight:800;letter-spacing:1.5px;line-height:1">ALL-STARS LIVE</div>
-          <div style="font-size:12px;font-weight:700;opacity:.92;letter-spacing:2px;margin-top:7px">BROADCAST SCOREKEEPER</div></div>
-        ${gameActive?`<button data-act="resume" style="${bigBtn(T.safe)};font-size:18px;padding:18px">${IC(PLAY)} Resume game &middot; ${OUR.short} vs ${OPP.short}</button>`:""}
-        <button data-act="newgamestart" style="${bigBtn(OUR.color)};font-size:22px;padding:24px">${IC(PLAY)} New Game</button>
-        <button data-act="gototeams" style="${ghost};padding:20px;font-size:16px;display:flex;align-items:center;justify-content:center;gap:9px">${IC('<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>')} Teams &amp; Rosters</button>
+    const GEAR='<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>';
+
+    // Favorite-team cards: quick "Start" + manage, with record at a glance.
+    const favs=DB.teams.filter(t=>t.fav), list=favs.length?favs:DB.teams;
+    const card=t=>{const rec=`${t.record.w}-${t.record.l}${t.record.t?"-"+t.record.t:""}`;const games=t.record.w+t.record.l+t.record.t;
+      return `<div style="position:relative;background:${T.surface};border:2px solid ${t.color};border-left:7px solid ${t.color};border-radius:14px;padding:14px;box-shadow:0 0 0 1px rgba(0,0,0,.35), 0 8px 20px rgba(0,0,0,.4)">
+          <button data-act="favteam" data-arg="${t.id}" style="position:absolute;top:9px;right:11px;background:none;border:none;color:${t.fav?T.amber:T.sageDim};font-size:24px;line-height:1;padding:0;cursor:pointer">${t.fav?"★":"☆"}</button>
+          <div style="font-family:${MONO};font-size:23px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:30px">${t.name}</div>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:6px;font-family:${MONO};font-size:15px;color:${T.sage}">
+            <span style="font-weight:800;color:${t.color}">${rec}</span><span style="opacity:.45">·</span><span>${games} game${games===1?"":"s"}</span><span style="opacity:.45">·</span><span>${t.players.length} players</span></div>
+          <div style="display:flex;gap:8px;margin-top:14px">
+            <button data-act="homestart" data-arg="${t.id}" style="flex:1;background:${t.color};color:#fff;border:none;border-radius:9px;padding:13px;font-family:${MONO};font-weight:800;font-size:17px;letter-spacing:.8px;display:flex;align-items:center;justify-content:center;gap:8px">${IC(PLAY)} START</button>
+            <button data-act="opent" data-arg="${t.id}" style="background:${T.surface2};border:1px solid ${T.line};color:${T.sage};border-radius:9px;padding:11px 14px;display:flex;align-items:center">${IC(GEAR)}</button>
+          </div></div>`;};
+    const teamsBlock = DB.teams.length
+      ? `<div style="display:flex;align-items:center;justify-content:space-between;margin:4px 2px -2px">
+            <span style="font-size:13px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:${T.sageDim}">${favs.length?"★ Your teams":"Teams"}</span>
+            <button data-act="gototeams" style="background:none;border:none;color:${T.lime};font-weight:800;font-size:14px;letter-spacing:.4px;cursor:pointer">All teams &rsaquo;</button></div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px">${list.map(card).join("")}</div>`
+      : `<button data-act="gototeams" style="text-align:center;color:${T.sage};font-size:15px;padding:22px;border:1px dashed ${T.line};border-radius:12px;background:none;width:100%;cursor:pointer">No teams yet — <span style="color:${T.lime};font-weight:800">create one</span> to track rosters, records &amp; season stats.</button>`;
+
+    return `<div style="display:flex;flex-direction:column;gap:14px">
+        <div style="position:relative;border-radius:16px;padding:26px 22px;text-align:center;overflow:hidden;background:linear-gradient(135deg,${T.navy},#101B30 78%);border:2px solid ${T.lime};box-shadow:0 0 0 1px rgba(0,0,0,.4), 0 14px 34px rgba(0,0,0,.5)">
+          <div style="position:absolute;left:0;top:0;bottom:0;width:7px;background:${T.lime};box-shadow:0 0 18px rgba(163,230,53,.7)"></div>
+          <div style="font-family:${MONO};font-size:40px;font-weight:800;letter-spacing:1.5px;line-height:1;color:#fff">ALL-STARS <span style="color:${T.lime}">LIVE</span></div></div>
+        ${gameActive?`<button data-act="resume" style="${bigBtn(T.safe)};font-size:17px;padding:16px;display:flex;align-items:center;justify-content:center;gap:8px">${IC(PLAY)} Resume &middot; ${OUR.short} vs ${OPP.short}</button>`:""}
+        <button data-act="newgamestart" style="${bigBtn(T.lime,"font-size:24px;padding:24px;box-shadow:0 8px 22px rgba(163,230,53,.22)",T.field)}">${IC(PLAY)} New Game</button>
+        ${teamsBlock}
+        <button data-act="gototeams" style="${ghost};padding:17px;font-size:17px;border:2px solid #3F6CA8;color:${T.ink};display:flex;align-items:center;justify-content:center;gap:9px">${IC('<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>')} Manage teams &amp; rosters</button>
       </div>`;
   }
   if(mode==="teams"){
     const sorted=DB.teams.slice().sort((a,b)=>(b.fav?1:0)-(a.fav?1:0));
     const cards=sorted.map(t=>{const rec=`${t.record.w}-${t.record.l}${t.record.t?"-"+t.record.t:""}`;
-      return `<div style="display:flex;align-items:center;gap:4px;background:${t.color}1f;border:1px solid ${t.color}55;border-left:6px solid ${t.color};border-radius:12px;padding:9px 12px">
-        <button data-act="favteam" data-arg="${t.id}" style="background:none;border:none;color:${t.fav?T.clay:T.sageDim};font-size:22px;line-height:1;padding:2px 6px;cursor:pointer">${t.fav?"★":"☆"}</button>
+      return `<div style="display:flex;align-items:center;gap:8px;background:${T.surface};border:2px solid ${t.color};border-left:7px solid ${t.color};border-radius:12px;padding:11px 13px;box-shadow:0 6px 16px rgba(0,0,0,.35)">
+        <button data-act="favteam" data-arg="${t.id}" style="background:none;border:none;color:${t.fav?T.amber:T.sageDim};font-size:25px;line-height:1;padding:2px 4px;cursor:pointer">${t.fav?"★":"☆"}</button>
         <button data-act="opent" data-arg="${t.id}" style="flex:1;min-width:0;text-align:left;background:none;border:none;padding:4px 2px">
-          <div style="font-family:${MONO};font-size:18px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.name}</div>
-          <div style="font-size:11px;color:${T.sage};margin-top:2px">${t.players.length} players &middot; ${rec}</div></button>
-        <span style="color:${t.color};font-weight:800;font-size:13px;letter-spacing:.5px">MANAGE &rsaquo;</span></div>`;}).join("")
-      ||`<div style="color:${T.sage};font-size:13px;text-align:center;padding:22px 8px;border:1px dashed ${T.line};border-radius:10px">No teams yet — create one to start tracking rosters &amp; season stats.</div>`;
+          <div style="font-family:${MONO};font-size:22px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.name}</div>
+          <div style="font-family:${MONO};font-size:14px;color:${T.sage};margin-top:3px"><span style="color:${t.color};font-weight:800">${rec}</span> &middot; ${t.players.length} players</div></button>
+        <span style="color:${t.color};font-weight:800;font-size:15px;letter-spacing:.5px">MANAGE &rsaquo;</span></div>`;}).join("")
+      ||`<div style="color:${T.sage};font-size:15px;text-align:center;padding:24px 8px;border:1px dashed ${T.line};border-radius:12px">No teams yet — create one to start tracking rosters &amp; season stats.</div>`;
     return `<div style="display:flex;flex-direction:column;gap:14px">
         <div style="display:flex;align-items:center;gap:10px">
           <button data-act="gohome" style="${ghost};padding:9px 11px">&lsaquo; Home</button>
@@ -840,10 +917,9 @@ function actionArea(){
   }
   if(mode==="idle"){
     const halfLabel=`${G.half==="T"?"Top":"Bot"} ${ordinal(G.inning)}`;
-    const flatBtn=`background:${T.surface};border:1px solid ${T.line};color:${T.chalk};border-radius:10px;padding:11px;font-size:14px;font-weight:800;display:flex;align-items:center;justify-content:center;gap:8px;letter-spacing:.3px;text-transform:uppercase`;
-    return `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
-        ${pitchBtn("ball","Ball",ICN.ball)}${pitchBtn("strike","Strike",ICN.strike)}${pitchBtn("foul","Foul",ICN.foul)}</div>
-      <button data-act="inplay" style="${bigBtn(T.clay)}">${ICN.inplay} Ball in Play</button>
+    const flatBtn=`background:${T.surface};border:2px solid #3F6CA8;color:${T.chalk};border-radius:10px;padding:11px;font-size:14px;font-weight:800;display:flex;align-items:center;justify-content:center;gap:8px;letter-spacing:.3px;text-transform:uppercase`;
+    return `<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
+        ${pitchBtn("ball","Ball",ICN.ball)}${pitchBtn("strike","Strike",ICN.strike)}${pitchBtn("foul","Foul",ICN.foul)}${pitchBtn("inplay","In Play",ICN.inplay,true)}</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
         <button data-act="walk" style="${flatBtn}"><span style="color:${T.sage}">${ICN.walk}</span>Walk</button>
         <button data-act="hbp" style="${flatBtn}"><span style="color:${T.sage}">${ICN.hbp}</span>HBP</button></div>
@@ -1010,34 +1086,47 @@ function setupLineupDrag(){
     });
   });
 }
+/* Tablet-in-landscape = wide enough for a side panel instead of a bottom sheet. */
+function isWide(){return window.innerWidth>=760 && window.innerWidth>window.innerHeight;}
 function render(){
+  renderToolbar();
   const menu=(mode==="home"||mode==="teams"||mode==="team"||mode==="pickteam"||mode==="newgame"||mode==="lineup"||mode==="pickplayer"||mode==="pickpos"||mode==="editplayer"||mode==="summary");
   if(menu){
     const scroll=mode!=="lineup";
-    document.getElementById("app").innerHTML=`<div class="${mode!==_lastMode?"screen-in":""}" style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px;${scroll?"overflow-y:auto;-webkit-overflow-scrolling:touch":""}">${actionArea()}</div>`;
+    document.getElementById("content").innerHTML=`<div class="${mode!==_lastMode?"screen-in":""}" style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px;${scroll?"overflow-y:auto;-webkit-overflow-scrolling:touch":""}">${actionArea()}</div>`;
     _lastMode=mode;
     if(mode==="lineup")setupLineupDrag();
     return;
   }
   const playing=!(mode==="idle"||mode==="locate");
   const toastEl=toast?`<div style="position:absolute;bottom:12px;left:50%;transform:translateX(-50%);background:${T.ink};color:#FFFFFF;font-family:${MONO};font-weight:700;font-size:13px;padding:6px 14px;border-radius:999px;white-space:nowrap;z-index:5;box-shadow:0 4px 14px rgba(15,30,60,.3)">${toast}</div>`:"";
-  const stepScreen=(mode==="contact"||mode==="result"||mode==="runners"||mode==="errpos"||mode==="dppick"||mode==="outpos");
-  const fieldStyle=mode==="runners"?"flex:0 0 auto;height:min(28vh,200px);min-height:130px"
-    :stepScreen?"flex:0 0 auto;height:min(48vh,320px);min-height:190px":"flex:1;min-height:0";
-  const actionStyle=mode==="runners"?"flex:1 1 auto;min-height:0;display:flex;flex-direction:column;gap:8px"
-    :stepScreen?"flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch":"flex-shrink:0";
+  // GameChanger model: the field stays the big hero, and the pick-an-event steps
+  // appear as a bottom-sheet MODAL over it (no inline scrolling to choose).
+  const pickerModal=(mode==="contact"||mode==="result"||mode==="errpos"||mode==="dppick"||mode==="outpos");
+  const fieldStyle=mode==="runners"?"flex:0 0 auto;height:min(30vh,210px);min-height:140px":"flex:1;min-height:0";
+  const actionStyle=mode==="runners"?"flex:1 1 auto;min-height:0;display:flex;flex-direction:column;gap:8px":"flex-shrink:0";
+  // Responsive event picker: bottom-sheet on phone/portrait, SIDE panel on tablet/landscape
+  // (more room, no scroll) — the first step toward the operator split-screen.
+  const wide=isWide();
+  const sheetWrap=wide
+    ? `position:fixed;inset:0;z-index:50;display:flex;justify-content:flex-end;background:rgba(8,11,16,.5)`
+    : `position:fixed;left:0;right:0;bottom:0;z-index:50;display:flex;justify-content:center;background:rgba(8,11,16,.55)`;
+  const sheetCard=wide
+    ? `width:min(440px,46vw);height:100%;border:2px solid ${T.lime};border-right:none;border-radius:18px 0 0 18px;box-shadow:-16px 0 48px rgba(0,0,0,.6)`
+    : `width:100%;max-width:420px;max-height:78vh;border:2px solid ${T.lime};border-bottom:none;border-radius:18px 18px 0 0;box-shadow:0 -16px 48px rgba(0,0,0,.6)`;
   const footer=playing?"":`<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-shrink:0">
       <button data-act="undo" style="background:transparent;border:1px solid ${T.line};color:${hist.length?T.chalk:T.sageDim};border-radius:8px;padding:7px 11px;font-size:13px;font-weight:600">↶ Undo</button>
       ${mode==="idle"?`<button data-act="home" style="background:${T.surface};border:1px solid ${T.line};color:${T.chalk};border-radius:8px;padding:7px 12px;font-size:13px;font-weight:700">⌂ Home</button>
       <button data-act="lineup" style="background:${T.surface2};border:1px solid ${T.line};color:${T.chalk};border-radius:8px;padding:7px 13px;font-size:13px;font-weight:700">Lineup</button>
       <button data-act="endgame" style="background:transparent;border:1px solid ${T.out};color:${T.out};border-radius:8px;padding:7px 12px;font-size:13px;font-weight:700">End game</button>`:""}</div>`;
-  document.getElementById("app").innerHTML=`
+  document.getElementById("content").innerHTML=`
     ${mode==="idle"?statusBar():""}
     ${playing?"":batterCard()}
-    <div style="${fieldStyle};display:flex;align-items:center;justify-content:center;position:relative">
-      ${diamondSVG()}${toastEl}</div>
-    <div id="action-area" style="display:flex;flex-direction:column;gap:8px;${actionStyle}">${actionArea()}</div>
-    ${footer}${confirmOverlay()}`;
+    <div style="${fieldStyle};display:flex;align-items:center;justify-content:center;position:relative">${diamondSVG()}${toastEl}</div>
+    ${pickerModal?"":`<div id="action-area" style="display:flex;flex-direction:column;gap:8px;${actionStyle}">${actionArea()}</div>`}
+    ${footer}${confirmOverlay()}
+    ${pickerModal?`<div style="${sheetWrap}">
+        <div id="action-area" style="${sheetCard};overflow-y:auto;-webkit-overflow-scrolling:touch;background:${T.surface};padding:16px;display:flex;flex-direction:column;gap:8px">${actionArea()}</div></div>`:""}`;
   animateStatusBar();
   if(mode!==_lastMode){ const a=document.getElementById("action-area"); if(a)a.classList.add("screen-in"); _lastMode=mode; }
 }
@@ -1119,6 +1208,7 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="newgame"){mode="newgame";render();}
   else if(act==="gohome"){mode="home";render();}
   else if(act==="newgamestart"){mode="newgame";render();}
+  else if(act==="homestart"){selectTeam(arg);G=initGame();hist=[];resetUI();mode="newgame";render();broadcast();}
   else if(act==="gototeams"){mode="teams";render();}
   else if(act==="opent"){openTeamId=arg;mode="team";render();}
   else if(act==="favteam"){const t=teamById(arg);if(t){t.fav=!t.fav;saveDB();}render();}
@@ -1139,10 +1229,101 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="ng-start")startNewGame();
   else if(act==="addbatter"){addBatter();render();}
   else if(act==="rembatter"){removeBatter();render();}
+  else if(act==="share")openShare();
   else if(act==="undo")undo();
 });
 
+/* ===== top toolbar: game info chip · Share/QR · relay connection dot ===== */
+function renderToolbar(){
+  const tb=document.getElementById("toolbar"); if(!tb)return;
+  const inGame=!["home","teams","team","pickteam"].includes(mode);
+  const chip=inGame
+    ? `${OUR.short||"US"} <span style="color:${T.sageDim};font-weight:600">vs</span> ${OPP.short||"OPP"}`
+    : `ALL-STARS <span style="color:${T.lime}">LIVE</span>`;
+  const conn=LINK.connected(), hasRelay=LINK.hasRelay();
+  const dot = !hasRelay ? {c:T.sageDim,l:"LOCAL"} : conn ? {c:T.safe,l:"LIVE"} : {c:T.out,l:"OFFLINE"};
+  tb.innerHTML=`<div style="display:flex;align-items:center;gap:8px;padding:4px 2px 2px">
+    <div style="flex:1;min-width:0;font-family:${MONO};font-weight:700;font-size:16px;letter-spacing:.5px;color:${T.chalk};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${chip}</div>
+    <button data-act="share" style="display:flex;align-items:center;gap:7px;background:${T.surface2};border:1px solid ${T.line};color:${T.chalk};border-radius:10px;padding:9px 15px;font-size:15px;font-weight:800">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="${T.lime}" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="19" r="2.6"/><path d="M8.3 10.8 15.7 6.4M8.3 13.2l7.4 4.4"/></svg>Share</button>
+    <div title="${dot.l}" style="display:flex;align-items:center;gap:5px;background:${T.surface};border:1px solid ${T.line};border-radius:999px;padding:5px 9px">
+      <span class="${conn?'livedot':''}" style="width:8px;height:8px;border-radius:50%;background:${dot.c};${conn?`box-shadow:0 0 7px ${dot.c}`:""}"></span>
+      <span style="font-family:${MONO};font-size:10px;font-weight:700;letter-spacing:1px;color:${dot.c}">${dot.l}</span></div>
+  </div>`;
+}
+window.onLinkChange=renderToolbar;   // relay open/close → repaint the dot
+
+/* ===== fan share: the watch.html landing page (relay WS + team names baked in) ===== */
+function shareUrl(){
+  const ws=LINK.viewerWsUrl();
+  const u=new URL("watch.html", location.href);
+  if(ws) u.searchParams.set("ws", ws);
+  const homeT=G.ourSide==="home"?OUR:OPP, awayT=G.ourSide==="home"?OPP:OUR;   // map our/opp -> home/away
+  u.searchParams.set("home", homeT.short); u.searchParams.set("homeName", homeT.name);
+  u.searchParams.set("away", awayT.short); u.searchParams.set("awayName", awayT.name);
+  return u.href;
+}
+function openShare(){
+  const url=shareUrl();
+  document.getElementById("qrurl").textContent=url;
+  const box=document.getElementById("qrbox"); box.innerHTML="";
+  if(window.QRCode){
+    try{ new QRCode(box,{text:url,width:220,height:220,colorDark:"#10141A",colorLight:"#FFFFFF",correctLevel:QRCode.CorrectLevel.M}); }
+    catch(e){ box.textContent="Couldn't render QR — copy the link below."; }
+  } else { box.textContent="QR library didn't load — copy the link below."; }
+  // Native share sheet (SMS/messaging) only on devices that support it.
+  const nb=document.getElementById("navShareBtn"); if(nb) nb.style.display = navigator.share ? "flex" : "none";
+  document.getElementById("qrmodal").style.display="flex";
+}
+function closeShare(){ document.getElementById("qrmodal").style.display="none"; }
+document.getElementById("qrmodal").addEventListener("click",e=>{
+  if(e.target.id==="qrmodal"){ closeShare(); return; }      // tap backdrop to close
+  const a=e.target.closest("[data-act]"); if(!a)return;
+  if(a.dataset.act==="closeshare") closeShare();
+  else if(a.dataset.act==="navshare"){
+    if(navigator.share){
+      navigator.share({title:"Watch All-Stars Live",text:"Follow the game live:",url:shareUrl()}).catch(()=>{});
+    }else{   // graceful fallback: copy to clipboard
+      if(navigator.clipboard) navigator.clipboard.writeText(shareUrl()).catch(()=>{});
+      const lbl=a.querySelector("span"); if(lbl){ lbl.textContent="Link copied!"; setTimeout(()=>{lbl.textContent="Text a fan";},1300); }
+    }
+  }
+  else if(a.dataset.act==="copyshare"){
+    if(navigator.clipboard) navigator.clipboard.writeText(shareUrl()).catch(()=>{});
+    a.textContent="Copied!"; setTimeout(()=>{a.textContent="Copy link";},1300);
+  }
+});
+
+/* ===== apply game setup passed from setup.html (?home=&away=&our=&innings=&runcap=&batters=) ===== */
+function clampInt(v,min,max,def){ const n=parseInt(v,10); return isNaN(n)?def:Math.max(min,Math.min(max,n)); }
+function applySetupParams(){
+  const q=new URLSearchParams(location.search);
+  if(!q.has("home")&&!q.has("away")&&!q.has("our")) return false;   // no setup → normal New Game home
+  const homeName=(q.get("homeName")||q.get("home")||"Home").trim();
+  const awayName=(q.get("awayName")||q.get("away")||"Away").trim();
+  const homeShort=(q.get("home")||homeName).slice(0,3).toUpperCase();
+  const awayShort=(q.get("away")||awayName).slice(0,3).toUpperCase();
+  const our=q.get("our")==="away"?"away":"home";
+  if(our==="home"){ OUR.name=homeName;OUR.short=homeShort; OPP.name=awayName;OPP.short=awayShort; }
+  else            { OUR.name=awayName;OUR.short=awayShort; OPP.name=homeName;OPP.short=homeShort; }
+  const batters=clampInt(q.get("batters"),9,12,9);
+  ROSTER=genericRoster();
+  G=initGame();
+  G.ourSide=our;
+  G.runCap=clampInt(q.get("runcap"),0,30,5);
+  G.innings=clampInt(q.get("innings"),1,15,6);
+  G.lineup.order=Array.from({length:batters},(_,i)=>i);            // our continuous batting order
+  G.oppBatters=batters;
+  G.oppLineup=Array.from({length:batters},(_,i)=>({num:String(i+1),name:""}));
+  curTeamId=null; oppTeamId=null; gameActive=true; hist=[]; resetUI(); mode="lineup";
+  return true;
+}
+
+applySetupParams();
 render();broadcast();
+setTimeout(function(){var s=document.getElementById("splash");if(s)s.remove();},2000);
+// Re-render on rotate/resize so the event picker swaps between bottom-sheet and side panel.
+let _rsz; window.addEventListener("resize",function(){clearTimeout(_rsz);_rsz=setTimeout(render,150);});
 </script>
 </body>
 </html>

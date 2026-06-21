@@ -10,6 +10,7 @@ import android.net.wifi.WifiNetworkSpecifier
 import android.os.Build
 import android.util.Log
 import android.view.Surface
+import com.libertyclerk.allstarslive.gl.VideoCompositor
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -32,8 +33,12 @@ class SrtVideoSource(private val context: Context) : VideoSource {
     override val stats: StateFlow<VideoStats> = _stats
 
     private var decoder: MediaCodecVideoDecoder? = null
+    private var compositor: VideoCompositor? = null
     private var nativeHandle: Long = 0L
     @Volatile private var firstFrameSeen = false
+
+    /** The GL compositor, once started — for overlay/recording control from the UI. */
+    val videoCompositor: VideoCompositor? get() = compositor
 
     private val cm by lazy {
         context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
@@ -55,10 +60,17 @@ class SrtVideoSource(private val context: Context) : VideoSource {
         firstFrameSeen = false
         pendingUrl = url
 
+        // Insert the GL compositor between the decoder and the display: the decoder
+        // renders into the compositor's SurfaceTexture, the compositor draws the
+        // video (+ scorebug) to this preview surface and, when recording, the encoder.
+        val comp = VideoCompositor().also { it.start(surface) }
+        compositor = comp
+
         decoder = MediaCodecVideoDecoder(
             mimeType = MediaFormat.MIMETYPE_VIDEO_AVC,
-            surface = surface,
+            surface = comp.inputSurface,
             onStats = { fps, latencyMs, frames, w, h ->
+                comp.setVideoSize(w, h)
                 _stats.value = _stats.value.copy(
                     state = IngestState.PLAYING,
                     fps = fps,
@@ -70,12 +82,13 @@ class SrtVideoSource(private val context: Context) : VideoSource {
             },
         ).also { it.start() }
 
-        val ssid = wifiSsid.trim()
-        if (ssid.isNotEmpty() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            joinCameraWifi(ssid, wifiPassphrase)
-        } else {
-            useExistingWifi()
-        }
+        // One-tablet reality: the Mevo app brings up the camera's Wi-Fi (you must
+        // open it to press Go Live on SRT anyway), so we SHARE that connection
+        // rather than seizing it. Grabbing it exclusively via WifiNetworkSpecifier
+        // collides with the Mevo app ("already in use by another client"). The
+        // specifier path [joinCameraWifi] is kept for a future app-only camera that
+        // needs no companion app, but the default is to bind whatever Wi-Fi is up.
+        useExistingWifi()
     }
 
     /**
@@ -83,12 +96,14 @@ class SrtVideoSource(private val context: Context) : VideoSource {
      * dialog the first time per SSID; after that it keeps the network up *for this
      * app* (bound, internet-less, never auto-dropped) until [stop].
      */
+    @Suppress("unused") // kept for a future app-only camera; see start()
     @androidx.annotation.RequiresApi(Build.VERSION_CODES.Q)
-    private fun joinCameraWifi(ssid: String, passphrase: String) {
+    private fun joinCameraWifi(ssid: String, passphrase: String, openFallback: Boolean = true) {
+        val secured = passphrase.isNotEmpty()
         _stats.value = VideoStats(state = IngestState.CONNECTING, message = "joining $ssid…")
         val spec = WifiNetworkSpecifier.Builder()
             .setSsid(ssid)
-            .apply { if (passphrase.isNotEmpty()) setWpa2Passphrase(passphrase) }
+            .apply { if (secured) setWpa2Passphrase(passphrase) }
             .build()
         val req = NetworkRequest.Builder()
             .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
@@ -98,10 +113,21 @@ class SrtVideoSource(private val context: Context) : VideoSource {
         val cb = object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) = beginSrt(network)
             override fun onUnavailable() {
-                if (nativeHandle == 0L) _stats.value = _stats.value.copy(
-                    state = IngestState.ERROR,
-                    message = "Couldn't join \"$ssid\" — check the camera Wi-Fi name & password",
-                )
+                if (nativeHandle != 0L) return
+                // The Mevo hotspot is WPA2 when configured via the Mevo app, but OPEN
+                // when the camera is just powered on with its button. If the secured
+                // join fails, retry as open so the app-free workflow still connects.
+                if (secured && openFallback) {
+                    Log.i(TAG, "secured join failed; retrying \"$ssid\" as open")
+                    netCallback = null
+                    runCatching { cm.unregisterNetworkCallback(this) }
+                    joinCameraWifi(ssid, "", openFallback = false)
+                } else {
+                    _stats.value = _stats.value.copy(
+                        state = IngestState.ERROR,
+                        message = "Couldn't join \"$ssid\" — make sure the camera is on",
+                    )
+                }
             }
         }
         netCallback = cb
@@ -180,6 +206,8 @@ class SrtVideoSource(private val context: Context) : VideoSource {
         if (handle != 0L) nativeStop(handle)
         decoder?.stop()
         decoder = null
+        compositor?.release()
+        compositor = null
         netCallback?.let { runCatching { cm.unregisterNetworkCallback(it) } }
         netCallback = null
         runCatching { cm.bindProcessToNetwork(null) }   // restore normal routing (cellular)

@@ -170,12 +170,13 @@ fun SrtIngestScreen() {
  * Connecting a camera, step by step. Mevo-specific for now; when Camera Profiles
  * land this list comes from the active profile so each camera shows its own steps.
  */
+// Generic, camera-agnostic steps — NOT specific to any one camera/app. Different
+// hardware starts its stream differently; per-camera instructions come later with
+// camera profiles. Keep this wording universal.
 private val CAMERA_STEPS = listOf(
-    "Power on the camera and wait until it shows it's ready.",
-    "On your phone, open the Mevo app and connect to the camera.",
-    "In the Mevo app, tap Go Live to start the SRT broadcast — the camera only sends video while it's live.",
-    "Check the camera Wi-Fi name, password, and SRT address in the fields below are correct.",
-    "Tap Connect. The app joins the camera's Wi-Fi for you — if the tablet asks to connect to it, tap Connect/Allow.",
+    "Power on your camera and start its live stream (SRT). Some cameras need their own app or a button to begin streaming.",
+    "Connect this tablet to the camera's Wi-Fi network.",
+    "Tap Connect to pull in the live feed.",
 )
 
 @Composable
