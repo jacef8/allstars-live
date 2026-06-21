@@ -266,7 +266,9 @@ const initGame=()=>({inning:1,half:"T",away:0,home:0,outs:0,balls:0,strikes:0,
   final:false,     // set true by "End Game" so the viewer shows the Final summary
   lineup:{ order:[0,1,2,3,4,5,6,7,8],   // batting order: 9-12 entries (slots 10+ = extra hitters)
            pos:{P:0,C:1,"1B":2,"2B":3,"3B":4,SS:5,LF:6,CF:7,RF:8} }});
-let G=initGame(),hist=[],mode="teams",tap=null,contact=null,result=null,plan=null,toast=null,toastTimer=null,curResults=[],showAll=false,showZones=false,editSlot=null,confirmAct=null,gameActive=false;
+let G=initGame(),hist=[],mode="teams",tap=null,contact=null,result=null,plan=null,toast=null,toastTimer=null,curResults=[],showAll=false,showZones=false,editSlot=null,confirmAct=null,gameActive=false,lineupTab="us";
+window.oppPNum=function(i,v){if(G.oppLineup&&G.oppLineup[i])G.oppLineup[i].num=v;};
+window.oppPName=function(i,v){if(G.oppLineup&&G.oppLineup[i])G.oppLineup[i].name=v;};
 
 const battingKey=()=>G.half==="T"?"away":"home";
 const ptr=()=>battingKey()==="away"?G.awayPtr:G.homePtr;
@@ -282,7 +284,8 @@ function batter(){
   const k=battingKey();
   if(k===G.ourSide){ const ri=G.lineup.order[ptr()%ourOrderLen()],p=ROSTER[ri];
     return {num:p.num,name:p.name,first:p.first,bats:p.bats||"R",pos:posOfPlayer(ri),ri,ours:true}; }
-  const spot=ptr()%Math.max(1,G.oppBatters)+1; return {num:String(spot),name:"",bats:"",spot,opp:true};
+  const ol=G.oppLineup||[]; const len=Math.max(1,ol.length||G.oppBatters); const i=ptr()%len; const e=ol[i]||{};
+  return {num:e.num||String(i+1),name:e.name||"",bats:"",spot:i+1,opp:true};
 }
 const batterLabel=()=>"#"+batter().num;
 function flash(msg){toast=msg;clearTimeout(toastTimer);toastTimer=setTimeout(()=>{toast=null;render();},1900);}
@@ -331,7 +334,10 @@ function startNewGame(){
   const keep={runCap:G.runCap,oppBatters:G.oppBatters,ourSide:G.ourSide,lineup:JSON.parse(JSON.stringify(G.lineup))};
   G=initGame();
   G.runCap=keep.runCap; G.oppBatters=keep.oppBatters; G.ourSide=keep.ourSide; G.lineup=keep.lineup;
-  hist=[]; resetUI(); mode="lineup"; render(); broadcast();
+  const ot=oppTeamId&&teamById(oppTeamId);
+  G.oppLineup = ot ? ot.players.map(p=>({num:p.num,name:p.name})) : Array.from({length:Math.max(1,G.oppBatters)},(_,i)=>({num:String(i+1),name:""}));
+  if(ot) G.oppBatters=G.oppLineup.length;
+  lineupTab="us"; hist=[]; resetUI(); mode="lineup"; render(); broadcast();
 }
 /* Opponent name from the New Game text field (no re-render, so typing keeps focus). */
 window.ngOurName=function(v){const s=(v||"").trim(); OUR.name=s||"Your Team"; OUR.short=(s||"YOU").slice(0,3).toUpperCase();};
@@ -442,10 +448,20 @@ function chooseResult(r){
     if(onBase>1){mode="dppick";render();return;}
     plan=buildPlan("dp",G.bases,batterLabel(),batter().name,null,batterKeyOf(batter()));mode="runners";render();return;
   }
+  // From the full catalog ("something else"), let the user pick the actual fielder for fielder-dependent outs.
+  if(showAll&&["out1","flyout","lineout","popout","sacfly"].includes(r.kind)){result=Object.assign({},r);mode="outpos";render();return;}
   result=r;const movers=buildPlan(r.kind,G.bases,batterLabel(),batter().name,null,batterKeyOf(batter()));plan=movers;
   const noRunners=!G.bases[1]&&!G.bases[2]&&!G.bases[3];
   const auto=r.kind==="hr"||(["out1","flyout","popout","lineout"].includes(r.kind)&&noRunners);
   if(auto){commit(r,movers);}else{mode="runners";render();}
+}
+function setOutFielder(pos){
+  const n=POSNUM[pos];
+  const note={out1:(pos==="1B"?"3U":n+"-3"),flyout:"F"+n,lineout:"L"+n,popout:"P"+n,sacfly:"SF"+n}[result.kind]||result.note;
+  result=Object.assign({},result,{note,fielder:n});
+  const movers=buildPlan(result.kind,G.bases,batterLabel(),batter().name,null,batterKeyOf(batter()));plan=movers;
+  const noRunners=!G.bases[1]&&!G.bases[2]&&!G.bases[3];
+  if(noRunners&&["out1","flyout","popout","lineout"].includes(result.kind))commit(result,movers); else {mode="runners";render();}
 }
 function setDpOut(base){
   plan=buildPlan("dp",G.bases,batterLabel(),batter().name,{dpOut:+base},batterKeyOf(batter()));mode="runners";render();
@@ -710,6 +726,22 @@ function actionArea(){
       </div>`;
   }
   if(mode==="lineup"){
+    const tabBtn=(id,lbl)=>`<button data-act="lutab" data-arg="${id}" style="flex:1;padding:10px;border-radius:9px;font-family:${MONO};font-weight:800;font-size:14px;text-transform:uppercase;letter-spacing:.5px;border:1px solid ${lineupTab===id?OUR.color:T.line};background:${lineupTab===id?OUR.color:T.surface};color:${lineupTab===id?"#fff":T.ink}">${lbl}</button>`;
+    const luToggle=`<div style="display:flex;gap:8px;flex-shrink:0">${tabBtn("us",OUR.short||"US")}${tabBtn("opp",OPP.short||"OPP")}</div>`;
+    if(lineupTab==="opp"){
+      if(!G.oppLineup)G.oppLineup=Array.from({length:Math.max(1,G.oppBatters)},(_,i)=>({num:String(i+1),name:""}));
+      const orows=G.oppLineup.map((e,i)=>`<div style="display:flex;align-items:center;gap:6px;background:${T.surface};border:1px solid ${T.line};border-radius:9px;padding:6px 8px">
+          <span style="font-family:${MONO};font-size:13px;font-weight:700;color:${T.sageDim};width:16px;text-align:center">${i+1}</span>
+          <input value="${(e.num||"").replace(/"/g,"&quot;")}" oninput="oppPNum(${i},this.value)" inputmode="numeric" maxlength="3" style="width:46px;text-align:center;font-family:${MONO};font-weight:800;background:${T.surface2};border:1px solid ${T.line};color:${T.ink};border-radius:7px;padding:8px 4px;outline:none">
+          <input value="${(e.name||"").replace(/"/g,"&quot;")}" oninput="oppPName(${i},this.value)" placeholder="Opponent hitter" style="flex:1;min-width:0;background:${T.surface2};border:1px solid ${T.line};color:${T.ink};border-radius:7px;padding:8px 10px;font-weight:700;outline:none">
+          <button data-act="opprem" data-arg="${i}" style="background:none;border:1px solid ${T.line};color:${T.out};border-radius:7px;padding:8px 10px;font-weight:800"${G.oppLineup.length<=1?" disabled":""}>&times;</button></div>`).join("");
+      return `<div style="flex-shrink:0"><div style="font-family:${MONO};font-size:20px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:${T.ink}">Lineups</div>
+          <div style="font-size:11px;color:${T.sage};margin-top:2px">${OPP.name} &middot; batting order (names show on the bug)</div></div>
+        ${luToggle}
+        <div style="flex:1 1 auto;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:6px">${orows}</div>
+        <button data-act="oppadd" style="${ghost};flex-shrink:0">+ Add hitter</button>
+        <button data-act="lineupdone" style="${bigBtn(OUR.color)}flex-shrink:0">Done</button>`;
+    }
     const rows=G.lineup.order.map((ri,slot)=>{const p=ROSTER[ri],pos=posOfPlayer(ri)||"—",isP=pos==="P";
       return `<div data-row data-ri="${ri}" style="display:flex;align-items:center;gap:6px;background:${T.surface};border:1px solid ${T.line};border-radius:9px;padding:8px 8px">
         <span data-drag style="cursor:grab;color:${T.sageDim};display:flex;align-items:center;padding:4px 2px;touch-action:none">${IC('<path d="M4 7h16M4 12h16M4 17h16"/>')}</span>
@@ -719,9 +751,9 @@ function actionArea(){
     const bench=benchIdx().map(ri=>`<span style="font-family:${MONO};font-size:12px;color:${T.sage};background:${T.surface};border:1px solid ${T.line};border-radius:6px;padding:3px 8px;white-space:nowrap">#${ROSTER[ri].num} ${ROSTER[ri].name}</span>`).join(" ");
     const pit=playerAtPos("P");
     const n=G.lineup.order.length;
-    return `<div style="flex-shrink:0">
-        <div style="font-family:${MONO};font-size:20px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:${T.ink}">Lineup</div>
+    return `<div style="flex-shrink:0"><div style="font-family:${MONO};font-size:20px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:${T.ink}">Lineups</div>
         <div style="font-size:11px;color:${T.sage};margin-top:2px">${OUR.name} &middot; batting ${n}${n>9?" (continuous)":""} &middot; drag &#9776; to reorder, tap a name to edit</div></div>
+      ${luToggle}
       <button data-act="newgame" style="${ghost};flex-shrink:0;display:flex;align-items:center;justify-content:center;gap:7px;color:${T.sage}">&#9881; Game setup &amp; rules</button>
       <div style="flex-shrink:0;display:flex;align-items:center;justify-content:space-between;background:${T.surface2};border:1px solid ${T.line};border-radius:9px;padding:9px 12px">
         <span style="font-size:12px;color:${T.sage}">Pitcher</span>
@@ -825,6 +857,13 @@ function actionArea(){
     const order=["P","C","1B","2B","3B","SS","LF","CF","RF"];
     const cells=order.map(p=>{const sel=p===tap.pos;return `<button data-act="errpos" data-arg="${p}" style="display:flex;flex-direction:column;align-items:center;gap:2px;background:${sel?T.surface2:T.surface};border:1px solid ${sel?T.clay:T.line};color:${T.chalk};border-radius:9px;padding:13px 4px;font-size:15px;font-weight:800">${p}<span style="font-size:10px;color:${T.sage};font-weight:600">${POSNUM[p]}</span></button>`;}).join("");
     return step("Error charged to which fielder?","Defaults to where the ball went — tap another fielder if the error was elsewhere.",
+      `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">${cells}</div>
+       <button data-act="back-result" style="${ghost};margin-top:10px;width:100%">Back</button>`);
+  }
+  if(mode==="outpos"){
+    const order=["P","C","1B","2B","3B","SS","LF","CF","RF"];
+    const cells=order.map(p=>`<button data-act="outpos" data-arg="${p}" style="display:flex;flex-direction:column;align-items:center;gap:2px;background:${T.surface};border:1px solid ${T.line};color:${T.chalk};border-radius:9px;padding:13px 4px;font-size:15px;font-weight:800">${p}<span style="font-size:10px;color:${T.sage};font-weight:600">${POSNUM[p]}</span></button>`).join("");
+    return step("Which fielder made the play?",(result?result.label+" — ":"")+"tap the position that fielded it.",
       `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">${cells}</div>
        <button data-act="back-result" style="${ghost};margin-top:10px;width:100%">Back</button>`);
   }
@@ -965,7 +1004,7 @@ function render(){
   }
   const playing=!(mode==="idle"||mode==="locate");
   const toastEl=toast?`<div style="position:absolute;bottom:12px;left:50%;transform:translateX(-50%);background:${T.ink};color:#FFFFFF;font-family:${MONO};font-weight:700;font-size:13px;padding:6px 14px;border-radius:999px;white-space:nowrap;z-index:5;box-shadow:0 4px 14px rgba(15,30,60,.3)">${toast}</div>`:"";
-  const stepScreen=(mode==="contact"||mode==="result"||mode==="runners"||mode==="errpos"||mode==="dppick");
+  const stepScreen=(mode==="contact"||mode==="result"||mode==="runners"||mode==="errpos"||mode==="dppick"||mode==="outpos");
   const fieldStyle=mode==="runners"?"flex:0 0 auto;height:min(28vh,200px);min-height:130px"
     :stepScreen?"flex:0 0 auto;height:min(48vh,320px);min-height:190px":"flex:1;min-height:0";
   const actionStyle=mode==="runners"?"flex:1 1 auto;min-height:0;display:flex;flex-direction:column;gap:8px"
@@ -1031,6 +1070,7 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="contact")chooseContact(arg);
   else if(act==="result")chooseResult(curResults[+arg]);
   else if(act==="errpos")setErrorFielder(arg);
+  else if(act==="outpos")setOutFielder(arg);
   else if(act==="dpout")setDpOut(arg);
   else if(act==="showall"){showAll=!showAll;render();}
   else if(act==="back-contact"){mode="contact";render();}
@@ -1040,6 +1080,9 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="zones"){showZones=!showZones;render();}
   else if(act==="lineup"){mode="lineup";render();}
   else if(act==="lineupdone"){gameActive=true;mode="idle";render();broadcast();}
+  else if(act==="lutab"){lineupTab=arg;render();}
+  else if(act==="oppadd"){if(!G.oppLineup)G.oppLineup=[];G.oppLineup.push({num:String(G.oppLineup.length+1),name:""});G.oppBatters=G.oppLineup.length;render();}
+  else if(act==="opprem"){if(G.oppLineup&&G.oppLineup.length>1){G.oppLineup.splice(+arg,1);G.oppBatters=G.oppLineup.length;render();broadcast();}}
   else if(act==="home"){mode="teams";render();}
   else if(act==="resume"){mode="idle";render();}
   else if(act==="resumegame"){G.final=false;mode="idle";render();broadcast();}
