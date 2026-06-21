@@ -26,8 +26,8 @@
   button:disabled{opacity:.4;filter:none;cursor:default;}
   #wrap{height:100dvh;display:flex;justify-content:center;
     background:
-      repeating-linear-gradient(135deg, rgba(46,107,230,.04) 0 1px, transparent 1px 24px),
-      radial-gradient(120% 75% at 50% -12%, #FFFFFF 0%, var(--field) 55%, #D7DFEA 100%);
+      repeating-linear-gradient(135deg, rgba(46,107,230,.055) 0 2px, transparent 2px 18px),
+      radial-gradient(130% 85% at 50% -15%, #FFFFFF 0%, #E8EEF6 55%, #D3DCEA 100%);
     padding:10px;overflow:hidden;}
   #app{width:100%;max-width:400px;height:100%;display:flex;flex-direction:column;gap:8px;color:var(--chalk);}
   .num{font-family:var(--mono);font-variant-numeric:tabular-nums;}
@@ -85,25 +85,13 @@ const ZONEMETA={ // overlay covers OUTFIELD zones only — infield stays plain
 const MARKERID=c=>"ah"+c.replace("#","");
 const BASE={H:[150,250],1:[214,186],2:[150,122],3:[86,186]};
 /* ===== our team + opponent (our team can be home or away; see G.ourSide) ===== */
-const OUR={short:"LCA",name:"Liberty County All-Stars",color:"#2E6BE6"};
+const OUR={short:"HOME",name:"Your Team",color:"#2E6BE6"};   // generic; set in New Game
 const OPP={short:"OPP",name:"Opponent",color:"#E2574C"};
 function teamData(side){return side===G.ourSide?OUR:OPP;}
 const TEAMS={get away(){return teamData("away");},get home(){return teamData("home");}};
 
-/* ===== roster (index = player id) ===== */
-const ROSTER=[
-  {num:"8",  name:"Ford",        first:"Jax"},
-  {num:"00", name:"Hill",        first:"Hayden"},
-  {num:"1",  name:"Kirkpatrick", first:"TJ"},
-  {num:"2",  name:"Brock",       first:"Cade"},
-  {num:"3",  name:"Stoutamire",  first:"Reid"},
-  {num:"7",  name:"Reece",       first:"Mason"},
-  {num:"9",  name:"Grant",       first:"Kai"},
-  {num:"10", name:"Byler",       first:"Cooper"},
-  {num:"11", name:"Wahlquist",   first:"Parker"},
-  {num:"15", name:"Murphy",      first:"Max"},
-  {num:"27", name:"Brown",       first:"Timothy"},
-  {num:"37", name:"Schaeffer",   first:"Kaiden"}];
+/* ===== roster (index = player id) — generic placeholders; edit #/name in the Lineup ===== */
+let ROSTER=Array.from({length:12},(_,i)=>({num:String(i+1),name:"Player "+(i+1),first:""}));
 const POSLIST=["P","C","1B","2B","3B","SS","LF","CF","RF"];
 const POSFULL={P:"Pitcher",C:"Catcher","1B":"First base","2B":"Second base","3B":"Third base",SS:"Shortstop",LF:"Left field",CF:"Center field",RF:"Right field"};
 const DESTNAME={1:"1st",2:"2nd",3:"3rd",4:"SCORED"};
@@ -305,6 +293,9 @@ function startNewGame(){
   hist=[]; resetUI(); mode="lineup"; render(); broadcast();
 }
 /* Opponent name from the New Game text field (no re-render, so typing keeps focus). */
+window.ngOurName=function(v){const s=(v||"").trim(); OUR.name=s||"Your Team"; OUR.short=(s||"YOU").slice(0,3).toUpperCase();};
+window.edName=function(v){const ri=G.lineup.order[editSlot]; if(ROSTER[ri])ROSTER[ri].name=v;};
+window.edNum=function(v){const ri=G.lineup.order[editSlot]; if(ROSTER[ri])ROSTER[ri].num=v;};
 window.ngOppName=function(v){const s=(v||"").trim(); OPP.name=s||"Opponent"; OPP.short=(s||"OPP").slice(0,3).toUpperCase();};
 window.ngRunCap=function(v){const n=parseInt(v,10); G.runCap=(isNaN(n)||n<0)?0:Math.min(n,30);};        // 0 = no cap
 window.ngOppBatters=function(v){const n=parseInt(v,10); G.oppBatters=(isNaN(n)||n<1)?9:Math.min(n,15);};
@@ -596,6 +587,9 @@ function actionArea(){
     return `<div style="display:flex;flex-direction:column;gap:15px">
         <div><div style="font-family:${MONO};font-size:23px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:${T.ink}">New Game</div>
           <div style="font-size:12px;color:${T.sage};margin-top:3px">${OUR.name} — set the matchup &amp; rules, then build your lineup.</div></div>
+        <div><div style="${lbl}">Your team</div>
+          <input type="text" value="${(OUR.name||"").replace(/"/g,"&quot;")}" placeholder="Your team name" oninput="ngOurName(this.value)"
+            style="width:100%;background:${T.surface};border:1px solid ${T.line};color:${T.ink};border-radius:10px;padding:14px 16px;font-family:${SANS};font-size:16px;font-weight:700;outline:none;box-shadow:0 2px 6px rgba(15,30,60,.07)"></div>
         <div><div style="${lbl}">Opponent</div>
           <input type="text" value="${(OPP.name||"").replace(/"/g,"&quot;")}" placeholder="Opponent name" oninput="ngOppName(this.value)"
             style="width:100%;background:${T.surface};border:1px solid ${T.line};color:${T.ink};border-radius:10px;padding:14px 16px;font-family:${SANS};font-size:16px;font-weight:700;outline:none;box-shadow:0 2px 6px rgba(15,30,60,.07)"></div>
@@ -614,22 +608,22 @@ function actionArea(){
   }
   if(mode==="lineup"){
     const rows=G.lineup.order.map((ri,slot)=>{const p=ROSTER[ri],pos=posOfPlayer(ri)||"—",isP=pos==="P";
-      return `<div style="display:flex;align-items:center;gap:8px;background:${T.surface};border:1px solid ${T.line};border-radius:9px;padding:8px 10px">
-        <span style="font-family:${MONO};font-size:13px;font-weight:700;color:${T.sageDim};width:15px">${slot+1}</span>
-        <button data-act="pickplayer" data-arg="${slot}" style="flex:1;min-width:0;text-align:left;background:transparent;border:none;color:${T.chalk};font-size:15px;font-weight:700;display:flex;align-items:center;gap:8px;overflow:hidden"><span style="font-family:${MONO};color:${OUR.color};min-width:32px">#${p.num}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.name}</span></button>
-        <button data-act="pickpos" data-arg="${slot}" style="background:${isP?OUR.color:T.surface2};border:1px solid ${isP?OUR.color:T.line};color:${isP?"#08111f":T.chalk};border-radius:7px;padding:6px 9px;font-family:${MONO};font-size:13px;font-weight:800;min-width:42px">${pos}</button></div>`;}).join("");
+      return `<div data-row data-ri="${ri}" style="display:flex;align-items:center;gap:6px;background:${T.surface};border:1px solid ${T.line};border-radius:9px;padding:8px 8px;touch-action:none">
+        <span data-drag style="cursor:grab;color:${T.sageDim};display:flex;align-items:center;padding:2px;touch-action:none">${IC('<path d="M4 7h16M4 12h16M4 17h16"/>')}</span>
+        <span style="font-family:${MONO};font-size:13px;font-weight:700;color:${T.sageDim};width:14px;text-align:center">${slot+1}</span>
+        <button data-act="editplayer" data-arg="${slot}" style="flex:1;min-width:0;text-align:left;background:transparent;border:none;color:${T.chalk};font-size:15px;font-weight:700;display:flex;align-items:center;gap:8px;overflow:hidden"><span style="font-family:${MONO};color:${OUR.color};min-width:30px">#${p.num}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.name}</span></button>
+        <button data-act="pickpos" data-arg="${slot}" style="background:${isP?OUR.color:T.surface2};border:1px solid ${isP?OUR.color:T.line};color:${isP?"#FFFFFF":T.chalk};border-radius:7px;padding:6px 9px;font-family:${MONO};font-size:13px;font-weight:800;min-width:42px">${pos}</button></div>`;}).join("");
     const bench=benchIdx().map(ri=>`<span style="font-family:${MONO};font-size:12px;color:${T.sage};background:${T.surface};border:1px solid ${T.line};border-radius:6px;padding:3px 8px;white-space:nowrap">#${ROSTER[ri].num} ${ROSTER[ri].name}</span>`).join(" ");
     const pit=playerAtPos("P");
     const n=G.lineup.order.length;
-    return `<div style="flex-shrink:0;display:flex;align-items:center;justify-content:space-between">
-        <div><div style="font-family:${MONO};font-size:19px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:${T.chalk}">Lineup</div>
-          <div style="font-size:11px;color:${T.sage};margin-top:2px">${OUR.name} &middot; batting ${n}${n>9?" (continuous)":""}</div></div>
-        <button data-act="sideflip" style="${ghost};padding:8px 11px">We're ${G.ourSide==="home"?"HOME":"AWAY"}</button></div>
+    return `<div style="flex-shrink:0">
+        <div style="font-family:${MONO};font-size:20px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:${T.ink}">Lineup</div>
+        <div style="font-size:11px;color:${T.sage};margin-top:2px">${OUR.name} &middot; batting ${n}${n>9?" (continuous)":""} &middot; drag &#9776; to reorder, tap a name to edit</div></div>
       <button data-act="newgame" style="${ghost};flex-shrink:0;display:flex;align-items:center;justify-content:center;gap:7px;color:${T.sage}">&#9881; Game setup &amp; rules</button>
       <div style="flex-shrink:0;display:flex;align-items:center;justify-content:space-between;background:${T.surface2};border:1px solid ${T.line};border-radius:9px;padding:9px 12px">
         <span style="font-size:12px;color:${T.sage}">Pitcher</span>
         <button data-act="pickpitch" style="background:transparent;border:none;color:${T.chalk};font-size:15px;font-weight:700;display:flex;align-items:center;gap:8px"><span style="font-family:${MONO};color:${OUR.color}">#${pit.num}</span>${pit.name}<span style="font-size:11px;color:${OUR.color};font-weight:700;margin-left:4px">CHANGE</span></button></div>
-      <div style="flex:1 1 auto;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:6px">${rows}</div>
+      <div id="lineup-list" style="flex:1 1 auto;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:6px">${rows}</div>
       <div style="flex-shrink:0;display:flex;gap:8px">
         <button data-act="addbatter" style="${ghost};flex:1" ${n>=12?"disabled":""}>+ Add batter (EH)</button>
         <button data-act="rembatter" style="${ghost};flex:1" ${n<=9?"disabled":""}>&minus; Remove last</button></div>
@@ -654,6 +648,20 @@ function actionArea(){
       return `<button data-act="setpos" data-arg="${p}" style="display:flex;flex-direction:column;gap:3px;align-items:center;background:${sel?OUR.color:T.surface};border:1px solid ${sel?OUR.color:T.line};color:${sel?"#08111f":T.chalk};border-radius:9px;padding:11px 4px;font-family:${MONO};font-weight:800;font-size:15px">${p}<span style="font-size:9px;font-weight:600;color:${sel?"#08111f":T.sage};max-width:46px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${who?who.name:"—"}</span></button>`;}).join("");
     return step(`${ROSTER[ri].name} — position`,"Tap a spot. It swaps with whoever's there now.",
       `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">${cells}</div><button data-act="backlineup" style="${ghost};margin-top:8px;width:100%">Back</button>`);
+  }
+  if(mode==="editplayer"){
+    const ri=G.lineup.order[editSlot],p=ROSTER[ri]||{num:"",name:""};
+    const fld=`background:${T.surface};border:1px solid ${T.line};color:${T.ink};border-radius:10px;padding:14px 16px;font-family:${SANS};font-size:16px;font-weight:700;outline:none;width:100%`;
+    const lb=`font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.sageDim};margin:0 2px 6px`;
+    return step("Edit player",`Batting ${editSlot+1} &middot; set number &amp; name.`,
+      `<div style="display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;gap:10px">
+          <div style="flex:none;width:92px"><div style="${lb}">Number</div>
+            <input type="text" inputmode="numeric" maxlength="3" value="${(p.num||"").replace(/"/g,"&quot;")}" oninput="edNum(this.value)" style="${fld};text-align:center;font-family:${MONO};font-weight:800"></div>
+          <div style="flex:1"><div style="${lb}">Name</div>
+            <input type="text" value="${(p.name||"").replace(/"/g,"&quot;")}" placeholder="Player name" oninput="edName(this.value)" style="${fld}"></div></div>
+        <button data-act="backlineup" style="${bigBtn(OUR.color)}">Done</button>
+      </div>`);
   }
   if(mode==="idle"){
     const halfLabel=`${G.half==="T"?"Top":"Bot"} ${ordinal(G.inning)}`;
@@ -779,11 +787,41 @@ function step(title,hint,inner){
       <div style="font-size:11px;color:${T.sage};margin-top:3px">${hint}</div></div>${inner}</div>`;
 }
 
+/* ---- drag-to-reorder the batting order (pointer-based; works on touch & mouse) ---- */
+function setupLineupDrag(){
+  const list=document.getElementById("lineup-list"); if(!list)return;
+  list.querySelectorAll('[data-drag]').forEach(handle=>{
+    handle.addEventListener('pointerdown',e=>{
+      e.preventDefault();
+      const row=handle.closest('[data-row]'); if(!row)return;
+      row.style.opacity='0.55'; row.style.boxShadow='0 6px 16px rgba(15,30,60,.25)';
+      document.body.style.userSelect='none';
+      const move=ev=>{
+        const rows=[...list.querySelectorAll('[data-row]')];
+        for(const r of rows){ if(r===row)continue;
+          const b=r.getBoundingClientRect();
+          if(ev.clientY < b.top + b.height/2){ list.insertBefore(row,r); return; } }
+        list.appendChild(row);
+      };
+      const up=()=>{
+        window.removeEventListener('pointermove',move);
+        window.removeEventListener('pointerup',up);
+        document.body.style.userSelect='';
+        row.style.opacity=''; row.style.boxShadow='';
+        G.lineup.order=[...list.querySelectorAll('[data-row]')].map(r=>+r.dataset.ri);  // commit new batting order
+        render(); broadcast();
+      };
+      window.addEventListener('pointermove',move);
+      window.addEventListener('pointerup',up);
+    });
+  });
+}
 function render(){
-  const menu=(mode==="newgame"||mode==="lineup"||mode==="pickplayer"||mode==="pickpos");
+  const menu=(mode==="newgame"||mode==="lineup"||mode==="pickplayer"||mode==="pickpos"||mode==="editplayer");
   if(menu){
     const scroll=mode!=="lineup";
     document.getElementById("app").innerHTML=`<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px;${scroll?"overflow-y:auto;-webkit-overflow-scrolling:touch":""}">${actionArea()}</div>`;
+    if(mode==="lineup")setupLineupDrag();
     return;
   }
   const playing=!(mode==="idle"||mode==="locate");
@@ -865,6 +903,7 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="sideflip"){G.ourSide=G.ourSide==="home"?"away":"home";render();broadcast();}
   else if(act==="pickplayer"){editSlot=+arg;mode="pickplayer";render();}
   else if(act==="pickpos"){editSlot=+arg;mode="pickpos";render();}
+  else if(act==="editplayer"){editSlot=+arg;mode="editplayer";render();}
   else if(act==="pickpitch"){editSlot=-1;mode="pickplayer";render();}
   else if(act==="setplayer"){const ri=+arg;if(editSlot===-1)makePitcher(ri);else assignSlot(editSlot,ri);mode="lineup";render();broadcast();}
   else if(act==="setpos"){assignPos(G.lineup.order[editSlot],arg);mode="lineup";render();broadcast();}
