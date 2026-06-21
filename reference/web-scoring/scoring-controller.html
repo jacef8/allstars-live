@@ -301,6 +301,8 @@ function startNewGame(){
 }
 /* Opponent name from the New Game text field (no re-render, so typing keeps focus). */
 window.ngOppName=function(v){const s=(v||"").trim(); OPP.name=s||"Opponent"; OPP.short=(s||"OPP").slice(0,3).toUpperCase();};
+window.ngRunCap=function(v){const n=parseInt(v,10); G.runCap=(isNaN(n)||n<0)?0:Math.min(n,30);};        // 0 = no cap
+window.ngOppBatters=function(v){const n=parseInt(v,10); G.oppBatters=(isNaN(n)||n<1)?9:Math.min(n,15);};
 
 /* ===== per-batter box-score stats (both teams) ===== */
 const batterKeyOf=b=>b.ours?("o"+b.ri):("p"+b.spot);
@@ -574,9 +576,8 @@ function chip(c){const a=contact===c;return `<button data-act="contact" data-arg
 function actionArea(){
   if(mode==="newgame"){
     const lbl=`font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.sageDim};margin:0 2px 7px`;
-    const fieldBtn=`width:100%;text-align:left;background:${T.surface};border:1px solid ${T.line};color:${T.ink};border-radius:10px;padding:14px 16px;font-family:${MONO};font-size:16px;font-weight:800;display:flex;align-items:center;justify-content:space-between;box-shadow:0 2px 6px rgba(15,30,60,.07)`;
+    const inp=`width:100%;background:${T.surface};border:1px solid ${T.line};color:${T.ink};border-radius:10px;padding:14px 16px;font-family:${MONO};font-size:16px;font-weight:800;outline:none;box-shadow:0 2px 6px rgba(15,30,60,.07)`;
     const sideBtn=(s,lbl2)=>{const on=G.ourSide===s;return `<button data-act="ng-side" data-arg="${s}" style="flex:1;padding:14px;border-radius:10px;font-family:${MONO};font-weight:800;font-size:15px;text-transform:uppercase;letter-spacing:.5px;border:2px solid ${on?OUR.color:T.line};background:${on?OUR.color:T.surface};color:${on?"#FFFFFF":T.ink}">${lbl2}</button>`;};
-    const capTxt=G.runCap>0?`${G.runCap} runs / inning`:"No cap";
     return `<div style="display:flex;flex-direction:column;gap:15px">
         <div><div style="font-family:${MONO};font-size:23px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:${T.ink}">New Game</div>
           <div style="font-size:12px;color:${T.sage};margin-top:3px">${OUR.name} — set the matchup &amp; rules, then build your lineup.</div></div>
@@ -585,10 +586,10 @@ function actionArea(){
             style="width:100%;background:${T.surface};border:1px solid ${T.line};color:${T.ink};border-radius:10px;padding:14px 16px;font-family:${SANS};font-size:16px;font-weight:700;outline:none;box-shadow:0 2px 6px rgba(15,30,60,.07)"></div>
         <div><div style="${lbl}">Is ${OUR.name} home or away?</div>
           <div style="display:flex;gap:8px">${sideBtn("home","Home")}${sideBtn("away","Away")}</div></div>
-        <div><div style="${lbl}">Run cap (per half-inning)</div>
-          <button data-act="ng-runcap" style="${fieldBtn}">${capTxt}<span style="color:${OUR.color};font-size:12px;font-weight:800">CHANGE</span></button></div>
-        <div><div style="${lbl}">Opponent batting order</div>
-          <button data-act="ng-oppbatters" style="${fieldBtn}">${G.oppBatters} batters<span style="color:${OUR.color};font-size:12px;font-weight:800">CHANGE</span></button></div>
+        <div><div style="${lbl}">Run cap — runs per half-inning (0 = no cap)</div>
+          <input type="number" inputmode="numeric" min="0" max="30" value="${G.runCap}" oninput="ngRunCap(this.value)" style="${inp}"></div>
+        <div><div style="${lbl}">Opponent batting order — number of batters</div>
+          <input type="number" inputmode="numeric" min="1" max="15" value="${G.oppBatters}" oninput="ngOppBatters(this.value)" style="${inp}"></div>
         <button data-act="ng-start" style="${bigBtn(OUR.color)};margin-top:4px">Start game &rarr;</button>
       </div>`;
   }
@@ -853,8 +854,6 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="endgame")endGame();
   else if(act==="newgame"){mode="newgame";render();}
   else if(act==="ng-side"){G.ourSide=arg;render();broadcast();}
-  else if(act==="ng-runcap"){const o=[0,3,4,5,6,7],i=o.indexOf(G.runCap);G.runCap=o[(i+1)%o.length];render();}
-  else if(act==="ng-oppbatters"){G.oppBatters=G.oppBatters>=12?9:G.oppBatters+1;render();}
   else if(act==="ng-start")startNewGame();
   else if(act==="addbatter"){addBatter();render();}
   else if(act==="rembatter"){removeBatter();render();}
