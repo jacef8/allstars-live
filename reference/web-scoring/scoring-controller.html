@@ -4,6 +4,9 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
 <title>Scoring Controller</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@500;600;700;800&family=Barlow:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
   :root{
     /* Bright, sunlight-readable palette — high contrast for outdoor daylight use. */
@@ -11,8 +14,8 @@
     --clay:#E08A12; --chalk:#0E1726; --grass:#2E7D4F; --grassLt:#3E9D67;
     --safe:#12A150; --out:#E11D2E; --sage:#5B6878; --sageDim:#93A0B2; --amber:#C2740B;
     --live:#E11D48;
-    --mono:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
-    --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    --mono:"Saira Condensed",system-ui,-apple-system,sans-serif;
+    --sans:"Barlow",system-ui,-apple-system,sans-serif;
     --ease:cubic-bezier(.16,1,.3,1); --ease-soft:cubic-bezier(.4,0,.2,1);
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
@@ -66,8 +69,8 @@ const T={field:"#EEF2F8",ink:"#0E1726",surface:"#FFFFFF",surface2:"#E7EDF5",line
   clay:"#E08A12",chalk:"#0E1726",grass:"#2E7D4F",grassLt:"#3E9D67",safe:"#12A150",
   out:"#E11D2E",sage:"#5B6878",sageDim:"#93A0B2",amber:"#C2740B",live:"#E11D48"};
 const FIELDLINE="#F4F8FC";  // white chalk for the field graphic (stays light on the green diamond)
-const MONO="system-ui,-apple-system,'Segoe UI',Roboto,sans-serif";
-const SANS="system-ui,-apple-system,'Segoe UI',Roboto,sans-serif";
+const MONO="'Saira Condensed',system-ui,-apple-system,sans-serif";  // condensed display — scoreboard numbers & headers
+const SANS="'Barlow',system-ui,-apple-system,sans-serif";           // body / UI text
 const BATTER_GREEN="#3BE85A";
 const POSNUM={P:1,C:2,"1B":3,"2B":4,"3B":5,SS:6,LF:7,CF:8,RF:9};
 const RUNCOLORS=["#38BDF8","#F472B6","#A78BFA","#2DD4BF"];  // sky / pink / violet / teal — high contrast on the orange basepath (no yellow)
@@ -544,9 +547,6 @@ function statusBar(){
         ${pipRow("S","s",G.strikes,2,"sb-strikes")}
         ${pipRow("O","o",G.outs,3,"sb-outs")}</div>
     </div>
-    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:0 11px;background:rgba(255,69,58,.08);border-left:1px solid ${T.line}">
-      <span class="livedot" style="width:8px;height:8px;border-radius:50%;background:${T.live};box-shadow:0 0 8px ${T.live}"></span>
-      <span style="font-family:${MONO};font-size:9px;font-weight:700;color:${T.live};letter-spacing:1px">LIVE</span></div>
   </div>`;
 }
 
@@ -621,7 +621,6 @@ function actionArea(){
         <button data-act="rembatter" style="${ghost};flex:1" ${n<=9?"disabled":""}>&minus; Remove last</button></div>
       <div style="flex-shrink:0"><div style="font-size:10px;color:${T.sageDim};letter-spacing:.6px;margin:0 2px 5px">BENCH</div>
         <div style="display:flex;flex-wrap:wrap;gap:5px">${bench||`<span style="font-size:12px;color:${T.sageDim}">No bench players</span>`}</div></div>
-      <button data-act="endgame" style="flex-shrink:0;background:${G.final?T.safe:T.surface};border:1px solid ${G.final?T.safe:T.out};color:${G.final?"#FFFFFF":T.out};border-radius:10px;padding:11px;font-family:${MONO};font-size:13px;font-weight:800;letter-spacing:.5px;text-transform:uppercase">${G.final?"Resume Game":"End Game · show Final"}</button>
       <button data-act="lineupdone" style="${bigBtn(OUR.color)}flex-shrink:0">Done</button>`;
   }
   if(mode==="pickplayer"){
@@ -781,8 +780,8 @@ function render(){
     :stepScreen?"flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch":"flex-shrink:0";
   const footer=playing?"":`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-shrink:0">
       <button data-act="undo" style="background:transparent;border:1px solid ${T.line};color:${hist.length?T.chalk:T.sageDim};border-radius:8px;padding:7px 13px;font-size:13px;font-weight:600">↶ Undo</button>
-      ${mode==="idle"?`<button data-act="lineup" style="background:${T.surface2};border:1px solid ${T.line};color:${T.chalk};border-radius:8px;padding:7px 16px;font-size:13px;font-weight:700">Lineup</button>`:""}
-      <button data-act="zones" style="background:${showZones?T.surface2:"transparent"};border:1px solid ${T.line};color:${showZones?T.amber:T.sage};border-radius:8px;padding:7px 12px;font-size:12px;font-weight:600">Zones: ${showZones?"on":"off"}</button></div>`;
+      ${mode==="idle"?`<button data-act="lineup" style="background:${T.surface2};border:1px solid ${T.line};color:${T.chalk};border-radius:8px;padding:7px 16px;font-size:13px;font-weight:700">Lineup</button>
+      <button data-act="endgame" style="background:${G.final?T.safe:"transparent"};border:1px solid ${G.final?T.safe:T.line};color:${G.final?"#FFFFFF":T.sage};border-radius:8px;padding:7px 14px;font-size:13px;font-weight:700">${G.final?"Resume game":"End game"}</button>`:""}</div>`;
   document.getElementById("app").innerHTML=`
     ${mode==="idle"?statusBar():""}
     ${playing?"":batterCard()}
