@@ -25,7 +25,9 @@
   button:active{transform:scale(.94);filter:brightness(1.12) drop-shadow(0 0 7px rgba(251,191,36,.28));}
   button:disabled{opacity:.4;filter:none;cursor:default;}
   #wrap{height:100dvh;display:flex;justify-content:center;
-    background:radial-gradient(120% 75% at 50% -12%, #FFFFFF 0%, var(--field) 55%, #DCE3EC 100%);
+    background:
+      repeating-linear-gradient(135deg, rgba(46,107,230,.04) 0 1px, transparent 1px 24px),
+      radial-gradient(120% 75% at 50% -12%, #FFFFFF 0%, var(--field) 55%, #D7DFEA 100%);
     padding:10px;overflow:hidden;}
   #app{width:100%;max-width:400px;height:100%;display:flex;flex-direction:column;gap:8px;color:var(--chalk);}
   .num{font-family:var(--mono);font-variant-numeric:tabular-nums;}
@@ -535,7 +537,7 @@ function statusBar(){
   const pipRow=(label,cls,n,max,id)=>`<div class="bso-row" id="${id}" style="display:flex;align-items:center;gap:5px;height:11px">
       <span style="font-family:${MONO};font-size:9px;font-weight:700;color:${T.sageDim};width:9px">${label}</span>
       ${Array.from({length:max},(_,i)=>`<span class="bso-pip ${cls}${i<n?" on":""}"></span>`).join("")}</div>`;
-  return `<div style="display:flex;align-items:stretch;background:linear-gradient(180deg,#FFFFFF,#EAF0F7);border:1px solid ${T.line};border-radius:12px;overflow:hidden;flex-shrink:0;box-shadow:0 6px 18px rgba(15,30,60,.12),inset 0 1px 0 rgba(255,255,255,.7)">
+  return `<div style="display:flex;align-items:stretch;background:${T.surface};border:1px solid ${T.line};border-radius:12px;overflow:hidden;flex-shrink:0;box-shadow:0 1px 0 rgba(15,30,60,.04)">
     <div style="display:flex;flex-direction:column;justify-content:center;gap:4px;padding:9px 13px;min-width:120px;border-right:1px solid ${T.line}">
       ${tabRow("away",G.away,G.half==="T")}${tabRow("home",G.home,G.half==="B")}</div>
     <div style="display:flex;align-items:center;gap:13px;padding:0 13px;flex:1">
@@ -558,7 +560,7 @@ function batterCard(){
   const sub=b.ours
     ? `${TEAMS[k].short}${b.pos?` · ${b.pos}`:""} &middot; ${ord} in order`
     : `${TEAMS[k].name} &middot; ${ord} batter`;
-  return `<div style="display:flex;align-items:center;gap:13px;background:linear-gradient(90deg,#FFFFFF,#EEF3F9);border:1px solid ${T.line};border-left:4px solid ${c};border-radius:10px;padding:9px 14px;flex-shrink:0;box-shadow:0 3px 12px rgba(15,30,60,.12)">
+  return `<div style="display:flex;align-items:center;gap:13px;background:${T.surface};border:1px solid ${T.line};border-left:4px solid ${c};border-radius:10px;padding:9px 14px;flex-shrink:0">
     <span style="font-family:${MONO};font-size:34px;font-weight:700;color:${c};line-height:1;min-width:46px;text-align:center">${big}</span>
     <div style="flex:1;min-width:0">
       <div style="font-family:${MONO};font-size:23px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;line-height:1;color:${T.chalk};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${nameLine}</div>
@@ -568,10 +570,22 @@ function batterCard(){
   </div>`;
 }
 
-const bigBtn=(bg,extra="")=>`background:linear-gradient(180deg,${bg},${bg}cc);border:1px solid rgba(255,255,255,.35);color:#FFFFFF;border-radius:10px;padding:17px;font-family:${MONO};font-size:18px;font-weight:800;letter-spacing:1px;text-transform:uppercase;box-shadow:0 4px 12px rgba(15,30,60,.22);${extra}`;
+/* ---- minimal line icons (inherit the button's text color) ---- */
+const IC=(p)=>`<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none">${p}</svg>`;
+const ICN={
+  ball:IC(`<circle cx="12" cy="12" r="8.5"/><path d="M5.5 6.5c2.4 1.8 2.4 9.2 0 11M18.5 6.5c-2.4 1.8-2.4 9.2 0 11"/>`),
+  strike:IC(`<path d="M6 6l12 12M18 6 6 18"/>`),
+  foul:IC(`<path d="M6 3v18"/><path d="M6 4h12l-3 4 3 4H6"/>`),
+  inplay:IC(`<path d="M12 2.5 21.5 12 12 21.5 2.5 12z"/>`),
+  walk:IC(`<path d="M4 12h12"/><path d="M13 6l6 6-6 6"/>`),
+  hbp:IC(`<circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5"/><path d="M12 16.5h.01"/>`),
+  inning:IC(`<path d="M5 5v14l8-7z"/><path d="M15 5v14"/><path d="M19 5v14"/>`),
+};
+// Flat, bordered buttons (GroundLink style): solid fill, 1px border, no gradients.
+const bigBtn=(bg,extra="")=>`background:${bg};border:1px solid rgba(0,0,0,.16);color:#FFFFFF;border-radius:10px;padding:16px;font-family:${MONO};font-size:18px;font-weight:800;letter-spacing:1px;text-transform:uppercase;display:flex;align-items:center;justify-content:center;gap:10px;${extra}`;
 const ghost=`background:${T.surface};border:1px solid ${T.line};color:${T.sage};border-radius:8px;padding:11px;font-family:${MONO};font-size:14px;font-weight:700;letter-spacing:.5px;text-transform:uppercase`;
-function pitchBtn(act,label){return `<button data-act="${act}" style="background:linear-gradient(180deg,#FFFFFF,#E9EFF6);border:1px solid ${T.line};border-top-color:#FFFFFF;color:${T.chalk};border-radius:9px;padding:15px 8px;font-family:${MONO};font-size:17px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;box-shadow:0 2px 6px rgba(15,30,60,.1)">${label}</button>`;}
-function chip(c){const a=contact===c;return `<button data-act="contact" data-arg="${c}" style="background:${a?T.clay:"linear-gradient(180deg,#FFFFFF,#E9EFF6)"};border:1px solid ${a?T.clay:T.line};color:${a?"#FFFFFF":T.chalk};border-radius:8px;padding:12px 6px;font-family:${MONO};font-size:14px;font-weight:800;letter-spacing:.5px;text-transform:uppercase">${c}</button>`;}
+function pitchBtn(act,label,icon){return `<button data-act="${act}" style="background:${T.surface};border:1px solid ${T.line};color:${T.chalk};border-radius:9px;padding:13px 8px;font-family:${MONO};font-size:16px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;display:flex;flex-direction:column;align-items:center;gap:6px">${icon?`<span style="color:${T.sage}">${icon}</span>`:""}${label}</button>`;}
+function chip(c){const a=contact===c;return `<button data-act="contact" data-arg="${c}" style="background:${a?T.clay:T.surface};border:1px solid ${a?T.clay:T.line};color:${a?"#FFFFFF":T.chalk};border-radius:8px;padding:12px 6px;font-family:${MONO};font-size:14px;font-weight:800;letter-spacing:.5px;text-transform:uppercase">${c}</button>`;}
 
 function actionArea(){
   if(mode==="newgame"){
@@ -643,13 +657,14 @@ function actionArea(){
   }
   if(mode==="idle"){
     const halfLabel=`${G.half==="T"?"Top":"Bot"} ${ordinal(G.inning)}`;
+    const flatBtn=`background:${T.surface};border:1px solid ${T.line};color:${T.chalk};border-radius:10px;padding:11px;font-size:14px;font-weight:800;display:flex;align-items:center;justify-content:center;gap:8px;letter-spacing:.3px;text-transform:uppercase`;
     return `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
-        ${pitchBtn("ball","Ball")}${pitchBtn("strike","Strike")}${pitchBtn("foul","Foul")}</div>
-      <button data-act="inplay" style="${bigBtn(T.clay)}">BALL IN PLAY</button>
+        ${pitchBtn("ball","Ball",ICN.ball)}${pitchBtn("strike","Strike",ICN.strike)}${pitchBtn("foul","Foul",ICN.foul)}</div>
+      <button data-act="inplay" style="${bigBtn(T.clay)}">${ICN.inplay} Ball in Play</button>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        <button data-act="walk" style="background:${T.surface};border:1px solid ${T.line};color:${T.chalk};border-radius:10px;padding:8px;font-size:13px;font-weight:700">Walk</button>
-        <button data-act="hbp" style="background:${T.surface};border:1px solid ${T.line};color:${T.chalk};border-radius:10px;padding:8px;font-size:13px;font-weight:700">HBP</button></div>
-      <button data-act="endinning" style="display:flex;align-items:center;justify-content:center;gap:9px;background:${T.surface};border:1px solid ${T.line};border-left:4px solid ${T.amber};color:${T.chalk};border-radius:10px;padding:13px;font-size:14px;font-weight:800;letter-spacing:.4px;text-transform:uppercase">End Inning <span style="color:${T.sage};font-weight:600;font-size:11px;text-transform:none;letter-spacing:0">${halfLabel} · ${G.outs} out${G.outs===1?"":"s"}</span></button>`;
+        <button data-act="walk" style="${flatBtn}"><span style="color:${T.sage}">${ICN.walk}</span>Walk</button>
+        <button data-act="hbp" style="${flatBtn}"><span style="color:${T.sage}">${ICN.hbp}</span>HBP</button></div>
+      <button data-act="endinning" style="${flatBtn};border-left:4px solid ${T.amber}"><span style="color:${T.amber}">${ICN.inning}</span>End Inning <span style="color:${T.sage};font-weight:600;font-size:11px;text-transform:none;letter-spacing:0">${halfLabel} · ${G.outs} out${G.outs===1?"":"s"}</span></button>`;
   }
   if(mode==="locate"){
     return step("Where did it go?","Tap the field above — the fielder is set automatically.",
