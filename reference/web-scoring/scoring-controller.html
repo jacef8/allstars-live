@@ -124,7 +124,8 @@ function rollupSeason(){const t=curTeam();if(!t)return;
   saveDB();}
 window.teamPNum=function(id,v){const t=teamById(openTeamId);if(!t)return;const p=t.players.find(p=>p.id===id);if(p){p.num=v;saveDB();}};
 window.teamPName=function(id,v){const t=teamById(openTeamId);if(!t)return;const p=t.players.find(p=>p.id===id);if(p){p.name=v;saveDB();}};
-window.edTeamName=function(v){const t=teamById(openTeamId);if(!t)return;const s=(v||"").trim();t.name=s||"New Team";t.short=(s||"NEW").slice(0,3).toUpperCase();saveDB();};
+window.edTeamName=function(v){const t=teamById(openTeamId);if(!t)return;t.name=(v||"").trim()||"New Team";saveDB();};
+window.edTeamAbbr=function(v){const t=teamById(openTeamId);if(!t)return;t.short=(v||"").toUpperCase().slice(0,6)||"TM";saveDB();};
 const POSLIST=["P","C","1B","2B","3B","SS","LF","CF","RF"];
 const POSFULL={P:"Pitcher",C:"Catcher","1B":"First base","2B":"Second base","3B":"Third base",SS:"Shortstop",LF:"Left field",CF:"Center field",RF:"Right field"};
 const DESTNAME={1:"1st",2:"2nd",3:"3rd",4:"SCORED"};
@@ -260,7 +261,7 @@ const initGame=()=>({inning:1,half:"T",away:0,home:0,outs:0,balls:0,strikes:0,
   final:false,     // set true by "End Game" so the viewer shows the Final summary
   lineup:{ order:[0,1,2,3,4,5,6,7,8],   // batting order: 9-12 entries (slots 10+ = extra hitters)
            pos:{P:0,C:1,"1B":2,"2B":3,"3B":4,SS:5,LF:6,CF:7,RF:8} }});
-let G=initGame(),hist=[],mode="teams",tap=null,contact=null,result=null,plan=null,toast=null,toastTimer=null,curResults=[],showAll=false,showZones=false,editSlot=null;
+let G=initGame(),hist=[],mode="teams",tap=null,contact=null,result=null,plan=null,toast=null,toastTimer=null,curResults=[],showAll=false,showZones=false,editSlot=null,confirmAct=null;
 
 const battingKey=()=>G.half==="T"?"away":"home";
 const ptr=()=>battingKey()==="away"?G.awayPtr:G.homePtr;
@@ -554,8 +555,8 @@ function diamondSVG(){
 function statusBar(){
   const tabRow=(t,val,act)=>`<div style="display:flex;align-items:center;height:34px">
       <span style="width:5px;height:100%;background:${TEAMS[t].color};border-radius:2px;opacity:${act?1:.45}"></span>
-      <span style="font-family:${MONO};font-weight:700;font-size:19px;letter-spacing:.5px;color:${act?T.chalk:T.sage};margin-left:11px;min-width:48px">${TEAMS[t].short}</span>
-      <span class="sb-score num" id="sb-score-${t}" style="margin-left:auto;font-weight:800;font-size:32px;line-height:1;color:${act?T.chalk:T.sage}"><span class="digit">${val}</span></span>
+      <span style="font-family:${MONO};font-weight:700;font-size:19px;letter-spacing:.4px;color:${act?T.chalk:T.sage};margin-left:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${TEAMS[t].short}</span>
+      <span class="sb-score num" id="sb-score-${t}" style="margin-left:auto;padding-left:12px;font-weight:800;font-size:32px;line-height:1;color:${act?T.chalk:T.sage}"><span class="digit">${val}</span></span>
     </div>`;
   // base diamond: 2nd top, 1st right, 3rd left
   const b=G.bases,base=(x,y,on,id)=>`<rect id="${id}" class="sb-base" x="${x-7}" y="${y-7}" width="14" height="14" rx="2" transform="rotate(45 ${x} ${y})" fill="${on?T.clay:"none"}" stroke="${on?T.clay:T.sageDim}" stroke-width="2"/>`;
@@ -564,7 +565,7 @@ function statusBar(){
       <span style="font-family:${MONO};font-size:13px;font-weight:800;color:${T.sageDim};width:12px">${label}</span>
       ${Array.from({length:max},(_,i)=>`<span class="bso-pip ${cls}${i<n?" on":""}"></span>`).join("")}</div>`;
   return `<div style="display:flex;align-items:stretch;background:${T.surface};border:1px solid ${T.line};border-radius:12px;overflow:hidden;flex-shrink:0;box-shadow:0 1px 0 rgba(15,30,60,.04)">
-    <div style="display:flex;flex-direction:column;justify-content:center;gap:7px;padding:13px 18px;min-width:158px;border-right:1px solid ${T.line}">
+    <div style="display:flex;flex-direction:column;justify-content:center;gap:7px;padding:13px 16px;min-width:176px;max-width:210px;border-right:1px solid ${T.line}">
       ${tabRow("away",G.away,G.half==="T")}${tabRow("home",G.home,G.half==="B")}</div>
     <div style="display:flex;align-items:center;justify-content:space-around;padding:0 18px;flex:1;gap:10px">
       <div style="text-align:center"><div style="font-family:${MONO};font-size:13px;font-weight:700;color:${T.sage};letter-spacing:.6px">${G.half==="T"?"TOP":"BOT"}</div>
@@ -645,7 +646,11 @@ function actionArea(){
     return `<div style="display:flex;flex-direction:column;gap:12px">
         <div style="display:flex;align-items:center;gap:10px">
           <button data-act="teamsback" style="${ghost};padding:9px 11px">&lsaquo; Teams</button>
-          <input value="${(t.name||"").replace(/"/g,"&quot;")}" oninput="edTeamName(this.value)" style="${cell};flex:1;font-family:${MONO};font-size:18px;font-weight:800;background:${T.surface};border-left:5px solid ${t.color}"></div>
+          <input value="${(t.name||"").replace(/"/g,"&quot;")}" oninput="edTeamName(this.value)" placeholder="Team name" style="${cell};flex:1;font-family:${MONO};font-size:18px;font-weight:800;background:${T.surface};border-left:5px solid ${t.color}"></div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.sageDim}">Scoreboard abbr</div>
+          <input value="${(t.short||"").replace(/"/g,"&quot;")}" oninput="edTeamAbbr(this.value)" maxlength="6" placeholder="TIGERS" style="${cell};width:128px;text-align:center;font-family:${MONO};font-weight:800;letter-spacing:.5px;text-transform:uppercase">
+          <span style="font-size:11px;color:${T.sageDim}">up to 6 chars</span></div>
         <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.sageDim};margin:2px 2px -2px">Roster — tap to edit #/name</div>
         <div style="display:flex;flex-direction:column;gap:6px">${roster}</div>
         <button data-act="addteamp" style="${ghost}">+ Add player</button>
@@ -686,8 +691,8 @@ function actionArea(){
             <div style="color:${T.sage};font-size:11px;margin-top:1px">Per half-inning · 0 = no cap</div></div>
           <input type="number" inputmode="numeric" min="0" max="30" value="${G.runCap}" oninput="ngRunCap(this.value)" style="${inpSm}"></div>
         <div style="${rowCard}">
-          <div><div style="font-weight:800;color:${T.ink};font-size:14px">Opponent batting order</div>
-            <div style="color:${T.sage};font-size:11px;margin-top:1px">Number of batters</div></div>
+          <div><div style="font-weight:800;color:${T.ink};font-size:14px">Number of hitters</div>
+            <div style="color:${T.sage};font-size:11px;margin-top:1px">In the opponent's lineup</div></div>
           <input type="number" inputmode="numeric" min="1" max="15" value="${G.oppBatters}" oninput="ngOppBatters(this.value)" style="${inpSm}"></div>
         <button data-act="ng-start" style="${bigBtn(OUR.color)};margin-top:4px">Start game &rarr;</button>
       </div>`;
@@ -873,6 +878,18 @@ function step(title,hint,inner){
       <div style="font-size:11px;color:${T.sage};margin-top:3px">${hint}</div></div>${inner}</div>`;
 }
 
+/* ---- confirmation modal (set confirmAct={title,msg,yes,danger,run}) ---- */
+function confirmOverlay(){
+  if(!confirmAct)return "";
+  return `<div style="position:fixed;inset:0;background:rgba(8,12,20,.55);display:flex;align-items:center;justify-content:center;z-index:60;padding:24px">
+    <div class="screen-in" style="background:${T.surface};border:1px solid ${T.line};border-radius:14px;padding:20px;max-width:340px;width:100%;box-shadow:0 20px 50px rgba(15,30,60,.4)">
+      <div style="font-family:${MONO};font-size:20px;font-weight:800;color:${T.ink};text-transform:uppercase;letter-spacing:.4px">${confirmAct.title}</div>
+      <div style="font-size:13px;color:${T.sage};margin-top:6px;line-height:1.4">${confirmAct.msg||""}</div>
+      <div style="display:flex;gap:10px;margin-top:18px">
+        <button data-act="confirm-no" style="${ghost};flex:1;padding:13px">Cancel</button>
+        <button data-act="confirm-yes" style="${bigBtn(confirmAct.danger?T.out:OUR.color)};flex:1;padding:13px">${confirmAct.yes||"Confirm"}</button></div>
+    </div></div>`;
+}
 /* ---- drag-to-reorder the batting order (pointer-based; works on touch & mouse) ---- */
 function setupLineupDrag(){
   const list=document.getElementById("lineup-list"); if(!list)return;
@@ -906,7 +923,7 @@ function render(){
   const menu=(mode==="teams"||mode==="team"||mode==="pickteam"||mode==="newgame"||mode==="lineup"||mode==="pickplayer"||mode==="pickpos"||mode==="editplayer");
   if(menu){
     const scroll=mode!=="lineup";
-    document.getElementById("app").innerHTML=`<div class="${mode!==_lastMode?"screen-in":""}" style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px;background:repeating-linear-gradient(135deg, rgba(46,107,230,.05) 0 2px, transparent 2px 18px);${scroll?"overflow-y:auto;-webkit-overflow-scrolling:touch":""}">${actionArea()}</div>`;
+    document.getElementById("app").innerHTML=`<div class="${mode!==_lastMode?"screen-in":""}" style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px;${scroll?"overflow-y:auto;-webkit-overflow-scrolling:touch":""}">${actionArea()}</div>`;
     _lastMode=mode;
     if(mode==="lineup")setupLineupDrag();
     return;
@@ -928,7 +945,7 @@ function render(){
     <div style="${fieldStyle};display:flex;align-items:center;justify-content:center;position:relative">
       ${diamondSVG()}${toastEl}</div>
     <div id="action-area" style="display:flex;flex-direction:column;gap:8px;${actionStyle}">${actionArea()}</div>
-    ${footer}`;
+    ${footer}${confirmOverlay()}`;
   animateStatusBar();
   if(mode!==_lastMode){ const a=document.getElementById("action-area"); if(a)a.classList.add("screen-in"); _lastMode=mode; }
 }
@@ -996,7 +1013,9 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="setpos"){assignPos(G.lineup.order[editSlot],arg);mode="lineup";render();broadcast();}
   else if(act==="backlineup"){mode="lineup";render();}
   else if(act==="endinning")endInning();
-  else if(act==="endgame")endGame();
+  else if(act==="endgame"){confirmAct={title:"End game?",msg:curTeam()?"This finishes the game and saves season stats to "+OUR.name+".":"This finishes the game.",yes:"End game",danger:true,run:endGame};render();}
+  else if(act==="confirm-no"){confirmAct=null;render();}
+  else if(act==="confirm-yes"){const r=confirmAct&&confirmAct.run;confirmAct=null;if(r)r();else render();}
   else if(act==="newgame"){mode="newgame";render();}
   else if(act==="opent"){openTeamId=arg;mode="team";render();}
   else if(act==="newteam"){const t=newTeam("");openTeamId=t.id;mode="team";render();}
