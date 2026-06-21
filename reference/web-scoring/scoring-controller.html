@@ -266,7 +266,7 @@ const initGame=()=>({inning:1,half:"T",away:0,home:0,outs:0,balls:0,strikes:0,
   final:false,     // set true by "End Game" so the viewer shows the Final summary
   lineup:{ order:[0,1,2,3,4,5,6,7,8],   // batting order: 9-12 entries (slots 10+ = extra hitters)
            pos:{P:0,C:1,"1B":2,"2B":3,"3B":4,SS:5,LF:6,CF:7,RF:8} }});
-let G=initGame(),hist=[],mode="teams",tap=null,contact=null,result=null,plan=null,toast=null,toastTimer=null,curResults=[],showAll=false,showZones=false,editSlot=null,confirmAct=null,gameActive=false,lineupTab="us";
+let G=initGame(),hist=[],mode="home",tap=null,contact=null,result=null,plan=null,toast=null,toastTimer=null,curResults=[],showAll=false,showZones=false,editSlot=null,confirmAct=null,gameActive=false,lineupTab="us";
 window.oppPNum=function(i,v){if(G.oppLineup&&G.oppLineup[i])G.oppLineup[i].num=v;};
 window.oppPName=function(i,v){if(G.oppLineup&&G.oppLineup[i])G.oppLineup[i].name=v;};
 
@@ -608,7 +608,7 @@ function batterCard(){
   const sub=b.ours
     ? `${TEAMS[k].short}${b.pos?` · ${b.pos}`:""} &middot; ${ord} in order`
     : `${TEAMS[k].name} &middot; ${ord} batter`;
-  return `<div style="display:flex;align-items:center;gap:13px;background:${T.surface};border:1px solid ${T.line};border-left:4px solid ${c};border-radius:10px;padding:9px 14px;flex-shrink:0">
+  return `<div style="display:flex;align-items:center;gap:13px;background:${c}14;border:1px solid ${c}40;border-left:5px solid ${c};border-radius:10px;padding:9px 14px;flex-shrink:0">
     <span style="font-family:${MONO};font-size:34px;font-weight:700;color:${c};line-height:1;min-width:46px;text-align:center">${big}</span>
     <div style="flex:1;min-width:0">
       <div style="font-family:${MONO};font-size:23px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;line-height:1;color:${T.chalk};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${nameLine}</div>
@@ -636,10 +636,21 @@ function pitchBtn(act,label,icon){return `<button data-act="${act}" style="backg
 function chip(c){const a=contact===c;return `<button data-act="contact" data-arg="${c}" style="background:${a?T.clay:T.surface};border:1px solid ${a?T.clay:T.line};color:${a?"#FFFFFF":T.chalk};border-radius:8px;padding:12px 6px;font-family:${MONO};font-size:14px;font-weight:800;letter-spacing:.5px;text-transform:uppercase">${c}</button>`;}
 
 function actionArea(){
+  if(mode==="home"){
+    const PLAY='<path d="M8 5l11 7-11 7z" fill="currentColor" stroke="none"/>';
+    return `<div style="display:flex;flex-direction:column;gap:16px">
+        <div style="border-radius:18px;padding:30px 22px;text-align:center;color:#fff;background:linear-gradient(135deg,#2E6BE6,#7C3AED 55%,#0EA5E9);box-shadow:0 12px 30px rgba(46,107,230,.35)">
+          <div style="font-family:${MONO};font-size:34px;font-weight:800;letter-spacing:1.5px;line-height:1">ALL-STARS LIVE</div>
+          <div style="font-size:12px;font-weight:700;opacity:.92;letter-spacing:2px;margin-top:7px">BROADCAST SCOREKEEPER</div></div>
+        ${gameActive?`<button data-act="resume" style="${bigBtn(T.safe)};font-size:18px;padding:18px">${IC(PLAY)} Resume game &middot; ${OUR.short} vs ${OPP.short}</button>`:""}
+        <button data-act="newgamestart" style="${bigBtn(OUR.color)};font-size:22px;padding:24px">${IC(PLAY)} New Game</button>
+        <button data-act="gototeams" style="${ghost};padding:20px;font-size:16px;display:flex;align-items:center;justify-content:center;gap:9px">${IC('<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>')} Teams &amp; Rosters</button>
+      </div>`;
+  }
   if(mode==="teams"){
     const sorted=DB.teams.slice().sort((a,b)=>(b.fav?1:0)-(a.fav?1:0));
     const cards=sorted.map(t=>{const rec=`${t.record.w}-${t.record.l}${t.record.t?"-"+t.record.t:""}`;
-      return `<div style="display:flex;align-items:center;gap:4px;background:${T.surface};border:1px solid ${T.line};border-left:5px solid ${t.color};border-radius:10px;padding:8px 12px">
+      return `<div style="display:flex;align-items:center;gap:4px;background:${t.color}1f;border:1px solid ${t.color}55;border-left:6px solid ${t.color};border-radius:12px;padding:9px 12px">
         <button data-act="favteam" data-arg="${t.id}" style="background:none;border:none;color:${t.fav?T.clay:T.sageDim};font-size:22px;line-height:1;padding:2px 6px;cursor:pointer">${t.fav?"★":"☆"}</button>
         <button data-act="opent" data-arg="${t.id}" style="flex:1;min-width:0;text-align:left;background:none;border:none;padding:4px 2px">
           <div style="font-family:${MONO};font-size:18px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.name}</div>
@@ -647,12 +658,12 @@ function actionArea(){
         <span style="color:${t.color};font-weight:800;font-size:13px;letter-spacing:.5px">MANAGE &rsaquo;</span></div>`;}).join("")
       ||`<div style="color:${T.sage};font-size:13px;text-align:center;padding:22px 8px;border:1px dashed ${T.line};border-radius:10px">No teams yet — create one to start tracking rosters &amp; season stats.</div>`;
     return `<div style="display:flex;flex-direction:column;gap:14px">
-        <div><div style="font-family:${MONO};font-size:23px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:${T.ink}">Teams</div>
-          <div style="font-size:12px;color:${T.sage};margin-top:3px">Manage a team's roster &amp; season stats, or jump into a quick game.</div></div>
-        ${gameActive?`<button data-act="resume" style="${bigBtn(T.safe)}">${IC('<path d="M8 5l11 7-11 7z" fill="currentColor" stroke="none"/>')} Resume game &middot; ${OUR.short} vs ${OPP.short}</button>`:""}
+        <div style="display:flex;align-items:center;gap:10px">
+          <button data-act="gohome" style="${ghost};padding:9px 11px">&lsaquo; Home</button>
+          <div style="font-family:${MONO};font-size:23px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:${T.ink}">Teams</div></div>
+        <div style="font-size:12px;color:${T.sage};margin-top:-6px">Manage rosters &amp; season stats.</div>
         <div style="display:flex;flex-direction:column;gap:8px">${cards}</div>
         <button data-act="newteam" style="${bigBtn(OUR.color)}">${IC('<path d="M12 5v14M5 12h14"/>')} New team</button>
-        <button data-act="quickgame" style="${ghost};display:flex;align-items:center;justify-content:center;gap:7px">Quick game (no stats)</button>
       </div>`;
   }
   if(mode==="team"){
@@ -703,12 +714,12 @@ function actionArea(){
     const inpSm=`width:80px;flex:none;background:${T.surface2};border:1px solid ${T.line};color:${T.ink};border-radius:9px;padding:11px 8px;font-family:${MONO};font-size:19px;font-weight:800;text-align:center;outline:none`;
     const rowCard=`display:flex;align-items:center;justify-content:space-between;gap:12px;background:${T.surface};border:1px solid ${T.line};border-radius:10px;padding:10px 14px;box-shadow:0 2px 6px rgba(15,30,60,.07)`;
     const sideBtn=(s,lbl2)=>{const on=G.ourSide===s;return `<button data-act="ng-side" data-arg="${s}" style="flex:1;padding:14px;border-radius:10px;font-family:${MONO};font-weight:800;font-size:15px;text-transform:uppercase;letter-spacing:.5px;border:2px solid ${on?OUR.color:T.line};background:${on?OUR.color:T.surface};color:${on?"#FFFFFF":T.ink}">${lbl2}</button>`;};
-    const teamRow=(who,name,color,act)=>`<button data-act="${act}" style="display:flex;align-items:center;justify-content:space-between;background:${T.surface};border:1px solid ${T.line};border-left:5px solid ${color};border-radius:10px;padding:11px 14px;width:100%;text-align:left">
-        <div><div style="${lbl};margin:0 0 2px">${who}</div><div style="font-family:${MONO};font-size:18px;font-weight:800;color:${T.ink}">${name}</div></div>
+    const teamRow=(who,name,color,act)=>`<button data-act="${act}" style="display:flex;align-items:center;justify-content:space-between;background:${color}1f;border:1px solid ${color}55;border-left:6px solid ${color};border-radius:12px;padding:13px 14px;width:100%;text-align:left">
+        <div><div style="${lbl};margin:0 0 2px">${who}</div><div style="font-family:${MONO};font-size:19px;font-weight:800;color:${T.ink}">${name}</div></div>
         <span style="color:${color};font-weight:800;font-size:12px;letter-spacing:.5px">CHANGE &rsaquo;</span></button>`;
     return `<div style="display:flex;flex-direction:column;gap:14px">
         <div style="display:flex;align-items:center;gap:10px">
-          <button data-act="teamsback" style="${ghost};padding:9px 11px">&lsaquo; Teams</button>
+          <button data-act="gohome" style="${ghost};padding:9px 11px">&lsaquo; Home</button>
           <div style="font-family:${MONO};font-size:23px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:${T.ink}">New Game</div></div>
         ${teamRow("Your team",OUR.name,OUR.color,"pickour")}
         ${teamRow("Opponent",OPP.name,OPP.color,"pickopp")}
@@ -994,7 +1005,7 @@ function setupLineupDrag(){
   });
 }
 function render(){
-  const menu=(mode==="teams"||mode==="team"||mode==="pickteam"||mode==="newgame"||mode==="lineup"||mode==="pickplayer"||mode==="pickpos"||mode==="editplayer"||mode==="summary");
+  const menu=(mode==="home"||mode==="teams"||mode==="team"||mode==="pickteam"||mode==="newgame"||mode==="lineup"||mode==="pickplayer"||mode==="pickpos"||mode==="editplayer"||mode==="summary");
   if(menu){
     const scroll=mode!=="lineup";
     document.getElementById("app").innerHTML=`<div class="${mode!==_lastMode?"screen-in":""}" style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px;${scroll?"overflow-y:auto;-webkit-overflow-scrolling:touch":""}">${actionArea()}</div>`;
@@ -1100,6 +1111,9 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="confirm-no"){confirmAct=null;render();}
   else if(act==="confirm-yes"){const r=confirmAct&&confirmAct.run;confirmAct=null;if(r)r();else render();}
   else if(act==="newgame"){mode="newgame";render();}
+  else if(act==="gohome"){mode="home";render();}
+  else if(act==="newgamestart"){mode="newgame";render();}
+  else if(act==="gototeams"){mode="teams";render();}
   else if(act==="opent"){openTeamId=arg;mode="team";render();}
   else if(act==="favteam"){const t=teamById(arg);if(t){t.fav=!t.fav;saveDB();}render();}
   else if(act==="teamcolor"){const t=teamById(openTeamId);if(t){t.color=arg;saveDB();}render();}
