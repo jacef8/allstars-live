@@ -26,7 +26,12 @@
   button:active{transform:scale(.94);filter:brightness(1.12) drop-shadow(0 0 7px rgba(251,191,36,.28));}
   button:disabled{opacity:.4;filter:none;cursor:default;}
   #wrap{height:100dvh;display:flex;justify-content:center;
-    background:radial-gradient(130% 85% at 50% -15%, #FFFFFF 0%, #EAEFF6 55%, #DCE3EC 100%);
+    background:
+      radial-gradient(38% 34% at 10% 6%, rgba(46,107,230,.13), transparent 70%),
+      radial-gradient(42% 38% at 92% 2%, rgba(18,161,80,.10), transparent 70%),
+      radial-gradient(55% 50% at 85% 102%, rgba(224,138,18,.09), transparent 70%),
+      linear-gradient(180deg, #F6F8FC 0%, #E2E9F3 100%);
+    background-attachment:fixed;
     padding:10px;overflow:hidden;}
   #app{width:100%;max-width:400px;height:100%;display:flex;flex-direction:column;gap:8px;color:var(--chalk);}
   .num{font-family:var(--mono);font-variant-numeric:tabular-nums;}
@@ -261,7 +266,7 @@ const initGame=()=>({inning:1,half:"T",away:0,home:0,outs:0,balls:0,strikes:0,
   final:false,     // set true by "End Game" so the viewer shows the Final summary
   lineup:{ order:[0,1,2,3,4,5,6,7,8],   // batting order: 9-12 entries (slots 10+ = extra hitters)
            pos:{P:0,C:1,"1B":2,"2B":3,"3B":4,SS:5,LF:6,CF:7,RF:8} }});
-let G=initGame(),hist=[],mode="teams",tap=null,contact=null,result=null,plan=null,toast=null,toastTimer=null,curResults=[],showAll=false,showZones=false,editSlot=null,confirmAct=null;
+let G=initGame(),hist=[],mode="teams",tap=null,contact=null,result=null,plan=null,toast=null,toastTimer=null,curResults=[],showAll=false,showZones=false,editSlot=null,confirmAct=null,gameActive=false;
 
 const battingKey=()=>G.half==="T"?"away":"home";
 const ptr=()=>battingKey()==="away"?G.awayPtr:G.homePtr;
@@ -318,9 +323,9 @@ const capReached=()=>G.runCap>0&&G.halfRuns>=G.runCap;
 /* Manual half-inning close — for ending early or when a 3rd out wasn't entered as outs. */
 function endInning(){snapshot();doFlip();resetUI();flash("Inning ended");render();broadcast();}
 /* Mark the game final (toggle) so the viewer shows its Final summary. Undoable. */
-function endGame(){snapshot();G.final=!G.final;
-  if(G.final&&curTeam()&&!G.rolledUp){rollupSeason();const t=curTeam(),o=ourRuns(),p=oppRuns();if(o>p)t.record.w++;else if(o<p)t.record.l++;else t.record.t++;saveDB();G.rolledUp=true;}
-  resetUI();flash(G.final?(curTeam()?"Game ended · season stats saved":"Game ended"):"Game resumed");render();broadcast();}
+function endGame(){snapshot();G.final=true;
+  if(curTeam()&&!G.rolledUp){rollupSeason();const t=curTeam(),o=ourRuns(),p=oppRuns();if(o>p)t.record.w++;else if(o<p)t.record.l++;else t.record.t++;saveDB();G.rolledUp=true;}
+  resetUI();mode="summary";render();broadcast();}
 /* New Game: reset scores/innings/in-play state but keep the chosen rules, side, and lineup. */
 function startNewGame(){
   const keep={runCap:G.runCap,oppBatters:G.oppBatters,ourSide:G.ourSide,lineup:JSON.parse(JSON.stringify(G.lineup))};
@@ -625,6 +630,7 @@ function actionArea(){
     return `<div style="display:flex;flex-direction:column;gap:14px">
         <div><div style="font-family:${MONO};font-size:23px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:${T.ink}">Teams</div>
           <div style="font-size:12px;color:${T.sage};margin-top:3px">Manage a team's roster &amp; season stats, or jump into a quick game.</div></div>
+        ${gameActive?`<button data-act="resume" style="${bigBtn(T.safe)}">${IC('<path d="M8 5l11 7-11 7z" fill="currentColor" stroke="none"/>')} Resume game &middot; ${OUR.short} vs ${OPP.short}</button>`:""}
         <div style="display:flex;flex-direction:column;gap:8px">${cards}</div>
         <button data-act="newteam" style="${bigBtn(OUR.color)}">${IC('<path d="M12 5v14M5 12h14"/>')} New team</button>
         <button data-act="quickgame" style="${ghost};display:flex;align-items:center;justify-content:center;gap:7px">Quick game (no stats)</button>
@@ -753,6 +759,29 @@ function actionArea(){
             <input type="text" value="${(p.name||"").replace(/"/g,"&quot;")}" placeholder="Player name" oninput="edName(this.value)" style="${fld}"></div></div>
         <button data-act="backlineup" style="${bigBtn(OUR.color)}">Done</button>
       </div>`);
+  }
+  if(mode==="summary"){
+    const box=buildBox(),o=ourRuns(),p=oppRuns();
+    const res=o>p?"WIN":o<p?"LOSS":"TIE",resCol=o>p?T.safe:o<p?T.out:T.sage;
+    const maxI=Math.max(1,G.inning);
+    const lineHead=`<th style="text-align:left;padding:4px 6px">Team</th>`+Array.from({length:maxI},(_,i)=>`<th style="padding:4px 5px">${i+1}</th>`).join("")+`<th style="padding:4px 5px">R</th><th style="padding:4px 5px">H</th><th style="padding:4px 5px">E</th>`;
+    const lineRow=side=>{let c=`<td style="text-align:left;padding:4px 6px;font-weight:800">${TEAMS[side].short}</td>`;for(let i=1;i<=maxI;i++)c+=`<td style="padding:4px 5px">${(G.line[side]&&G.line[side][i])||0}</td>`;c+=`<td style="padding:4px 5px;font-weight:800;color:${T.ink}">${box.totals[side].r}</td><td style="padding:4px 5px">${box.totals[side].h}</td><td style="padding:4px 5px">${box.totals[side].e}</td>`;return `<tr style="border-top:1px solid ${T.line}">${c}</tr>`;};
+    const bb=(box[G.ourSide]||[]).map(b=>`<tr style="border-top:1px solid ${T.line}"><td style="text-align:left;padding:5px 6px;font-weight:700;white-space:nowrap">#${b.num} ${b.name}</td><td style="padding:5px 4px">${b.ab}</td><td style="padding:5px 4px">${b.r}</td><td style="padding:5px 4px">${b.h}</td><td style="padding:5px 4px">${b.rbi}</td><td style="padding:5px 4px">${b.bb}</td><td style="padding:5px 4px">${b.k}</td></tr>`).join("");
+    return `<div style="display:flex;flex-direction:column;gap:14px">
+        <div style="text-align:center">
+          <div style="font-family:${MONO};font-size:14px;font-weight:800;letter-spacing:1.5px;color:${resCol}">FINAL &middot; ${res}</div>
+          <div style="display:flex;align-items:flex-end;justify-content:center;gap:20px;margin-top:8px">
+            <div style="text-align:center"><div style="font-family:${MONO};font-size:14px;font-weight:700;color:${T.sage}">${TEAMS.away.short}</div><div style="font-family:${MONO};font-size:44px;font-weight:800;line-height:.9;color:${T.ink}">${G.away}</div></div>
+            <div style="color:${T.sageDim};font-weight:800;font-size:22px;padding-bottom:6px">&ndash;</div>
+            <div style="text-align:center"><div style="font-family:${MONO};font-size:14px;font-weight:700;color:${T.sage}">${TEAMS.home.short}</div><div style="font-family:${MONO};font-size:44px;font-weight:800;line-height:.9;color:${T.ink}">${G.home}</div></div>
+          </div></div>
+        <div style="overflow-x:auto;background:${T.surface};border:1px solid ${T.line};border-radius:10px;padding:6px"><table style="width:100%;border-collapse:collapse;font-family:${MONO};font-size:12px;text-align:center;color:${T.chalk}"><thead><tr style="color:${T.sageDim};font-size:10px">${lineHead}</tr></thead><tbody>${lineRow("away")}${lineRow("home")}</tbody></table></div>
+        <div><div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.sageDim};margin:0 2px 4px">${OUR.name} &mdash; batting</div>
+          <div style="overflow-x:auto;background:${T.surface};border:1px solid ${T.line};border-radius:10px;padding:4px 6px"><table style="width:100%;border-collapse:collapse;font-family:${MONO};font-size:12px;text-align:center;color:${T.chalk}"><thead><tr style="color:${T.sageDim};font-size:10px"><th style="text-align:left;padding:4px 6px">Batter</th><th>AB</th><th>R</th><th>H</th><th>RBI</th><th>BB</th><th>K</th></tr></thead><tbody>${bb||`<tr><td colspan="7" style="padding:8px;color:${T.sageDim}">No at-bats recorded</td></tr>`}</tbody></table></div></div>
+        <div style="display:flex;gap:10px">
+          <button data-act="resumegame" style="${ghost};flex:1;padding:14px">&lsaquo; Resume game</button>
+          <button data-act="summary-done" style="${bigBtn(OUR.color)};flex:2">Done</button></div>
+      </div>`;
   }
   if(mode==="idle"){
     const halfLabel=`${G.half==="T"?"Top":"Bot"} ${ordinal(G.inning)}`;
@@ -920,7 +949,7 @@ function setupLineupDrag(){
   });
 }
 function render(){
-  const menu=(mode==="teams"||mode==="team"||mode==="pickteam"||mode==="newgame"||mode==="lineup"||mode==="pickplayer"||mode==="pickpos"||mode==="editplayer");
+  const menu=(mode==="teams"||mode==="team"||mode==="pickteam"||mode==="newgame"||mode==="lineup"||mode==="pickplayer"||mode==="pickpos"||mode==="editplayer"||mode==="summary");
   if(menu){
     const scroll=mode!=="lineup";
     document.getElementById("app").innerHTML=`<div class="${mode!==_lastMode?"screen-in":""}" style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px;${scroll?"overflow-y:auto;-webkit-overflow-scrolling:touch":""}">${actionArea()}</div>`;
@@ -935,10 +964,11 @@ function render(){
     :stepScreen?"flex:0 0 auto;height:min(48vh,320px);min-height:190px":"flex:1;min-height:0";
   const actionStyle=mode==="runners"?"flex:1 1 auto;min-height:0;display:flex;flex-direction:column;gap:8px"
     :stepScreen?"flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch":"flex-shrink:0";
-  const footer=playing?"":`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-shrink:0">
-      <button data-act="undo" style="background:transparent;border:1px solid ${T.line};color:${hist.length?T.chalk:T.sageDim};border-radius:8px;padding:7px 13px;font-size:13px;font-weight:600">↶ Undo</button>
-      ${mode==="idle"?`<button data-act="lineup" style="background:${T.surface2};border:1px solid ${T.line};color:${T.chalk};border-radius:8px;padding:7px 16px;font-size:13px;font-weight:700">Lineup</button>
-      <button data-act="endgame" style="background:${G.final?T.safe:"transparent"};border:1px solid ${G.final?T.safe:T.line};color:${G.final?"#FFFFFF":T.sage};border-radius:8px;padding:7px 14px;font-size:13px;font-weight:700">${G.final?"Resume game":"End game"}</button>`:""}</div>`;
+  const footer=playing?"":`<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-shrink:0">
+      <button data-act="undo" style="background:transparent;border:1px solid ${T.line};color:${hist.length?T.chalk:T.sageDim};border-radius:8px;padding:7px 11px;font-size:13px;font-weight:600">↶ Undo</button>
+      ${mode==="idle"?`<button data-act="home" style="background:${T.surface};border:1px solid ${T.line};color:${T.chalk};border-radius:8px;padding:7px 12px;font-size:13px;font-weight:700">⌂ Home</button>
+      <button data-act="lineup" style="background:${T.surface2};border:1px solid ${T.line};color:${T.chalk};border-radius:8px;padding:7px 13px;font-size:13px;font-weight:700">Lineup</button>
+      <button data-act="endgame" style="background:transparent;border:1px solid ${T.out};color:${T.out};border-radius:8px;padding:7px 12px;font-size:13px;font-weight:700">End game</button>`:""}</div>`;
   document.getElementById("app").innerHTML=`
     ${mode==="idle"?statusBar():""}
     ${playing?"":batterCard()}
@@ -1003,7 +1033,11 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="confirm")commit(result,plan);
   else if(act==="zones"){showZones=!showZones;render();}
   else if(act==="lineup"){mode="lineup";render();}
-  else if(act==="lineupdone"){mode="idle";render();broadcast();}
+  else if(act==="lineupdone"){gameActive=true;mode="idle";render();broadcast();}
+  else if(act==="home"){mode="teams";render();}
+  else if(act==="resume"){mode="idle";render();}
+  else if(act==="resumegame"){G.final=false;mode="idle";render();broadcast();}
+  else if(act==="summary-done"){gameActive=false;mode="teams";render();broadcast();}
   else if(act==="sideflip"){G.ourSide=G.ourSide==="home"?"away":"home";render();broadcast();}
   else if(act==="pickplayer"){editSlot=+arg;mode="pickplayer";render();}
   else if(act==="pickpos"){editSlot=+arg;mode="pickpos";render();}
