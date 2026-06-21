@@ -436,7 +436,7 @@ function applyPlanInline(kind){
 const LINK=(()=>{
   let bc=null; try{bc=new BroadcastChannel("liberty-league");}catch(e){}
   // Relay URL is configurable: ?server=wss://allstars.up.railway.app  (alias: ?ws=)
-  let ws=null, connected=false; const q=new URLSearchParams(location.search); const wsUrl=q.get("server")||q.get("ws");
+  let ws=null, connected=false; const q=new URLSearchParams(location.search); const DEFAULT_RELAY="wss://web-production-77d34.up.railway.app"; const wsUrl=q.get("server")||q.get("ws")||DEFAULT_RELAY;
   function setConn(v){ if(connected===v)return; connected=v; if(window.onLinkChange)window.onLinkChange(); }
   (function connect(){ if(!wsUrl)return;
     try{ ws=new WebSocket(wsUrl);
@@ -1253,10 +1253,10 @@ function renderToolbar(){
 }
 window.onLinkChange=renderToolbar;   // relay open/close → repaint the dot
 
-/* ===== fan share: the watch.html landing page (relay WS + team names baked in) ===== */
+/* ===== fan share: the viewer.html fan page (relay WS + team names baked in) ===== */
 function shareUrl(){
   const ws=LINK.viewerWsUrl();
-  const u=new URL("watch.html", location.href);
+  const u=new URL("viewer.html", location.href);
   if(ws) u.searchParams.set("ws", ws);
   const homeT=G.ourSide==="home"?OUR:OPP, awayT=G.ourSide==="home"?OPP:OUR;   // map our/opp -> home/away
   u.searchParams.set("home", homeT.short); u.searchParams.set("homeName", homeT.name);

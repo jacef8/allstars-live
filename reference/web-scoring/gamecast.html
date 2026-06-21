@@ -208,7 +208,8 @@ addEventListener("storage",e=>{ if(e.key==="liberty-league-msg"&&e.newValue){ se
 try{ const last=localStorage.getItem("liberty-league-msg"); if(last){ setConn(true); handle(last); } }catch(e){}
 
 const q=new URLSearchParams(location.search);
-const wsUrl=q.get("server")||q.get("ws");
+const DEFAULT_RELAY="wss://web-production-77d34.up.railway.app";   // baked-in relay; ?server= overrides
+const wsUrl=q.get("server")||q.get("ws")||DEFAULT_RELAY;
 if(wsUrl){ (function connect(){ let ws; try{ws=new WebSocket(wsUrl);}catch(e){ return setTimeout(connect,2000); }
   ws.onopen=()=>setConn(true); ws.onmessage=e=>{ setConn(true); handle(e.data); };
   ws.onclose=()=>{ setConn(false); setTimeout(connect,2000); }; ws.onerror=()=>{ try{ws.close()}catch(e){} };

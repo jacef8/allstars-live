@@ -693,7 +693,8 @@ function narrate(ev,s,rd){
 // Relay URL is configurable so the same file works locally and in production:
 //   ?server=wss://allstars.up.railway.app   (alias: ?ws=)
 const _q=new URLSearchParams(location.search);
-const WS_URL=_q.get("server")||_q.get("ws");
+const DEFAULT_RELAY="wss://web-production-77d34.up.railway.app";   // baked-in relay; ?server= overrides
+const WS_URL=_q.get("server")||_q.get("ws")||DEFAULT_RELAY;
 function markReal(){ gotReal=true; demo=false; $("demoBadge").hidden=true; }
 
 try{ const bc=new BroadcastChannel("liberty-league"); bc.onmessage=e=>{ markReal(); setConn("live"); handle(e.data); }; }catch(e){}
