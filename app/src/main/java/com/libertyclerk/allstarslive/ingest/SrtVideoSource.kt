@@ -66,39 +66,57 @@ class SrtVideoSource(private val context: Context) : VideoSource {
             .removeCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
             .build()
         val cb = object : ConnectivityManager.NetworkCallback() {
-            override fun onAvailable(network: Network) {
-                try {
-                    cm.bindProcessToNetwork(network)
-                    Log.i(TAG, "bound process to Wi-Fi; starting SRT")
-                } catch (e: Exception) {
-                    Log.e(TAG, "bindProcessToNetwork failed", e)
-                }
-                val u = pendingUrl
-                if (u != null && nativeHandle == 0L) {
-                    nativeHandle = nativeStart(u)
-                    if (nativeHandle == 0L) {
-                        _stats.value = _stats.value.copy(
-                            state = IngestState.ERROR, message = "native start failed",
-                        )
-                    }
-                }
-            }
+            override fun onAvailable(network: Network) = beginSrt(network)
 
             override fun onUnavailable() {
-                _stats.value = _stats.value.copy(
-                    state = IngestState.ERROR,
-                    message = "No Wi-Fi found — connect the tablet to the Mevo's Wi-Fi",
-                )
+                // Samsung intermittently won't hand back an internet-less Wi-Fi via
+                // requestNetwork even while the tablet is plainly connected to it.
+                // Fall back to the Wi-Fi the system already holds.
+                val existing = existingWifiNetwork()
+                if (existing != null) {
+                    Log.i(TAG, "requestNetwork onUnavailable — using already-connected Wi-Fi")
+                    beginSrt(existing)
+                } else if (nativeHandle == 0L) {
+                    _stats.value = _stats.value.copy(
+                        state = IngestState.ERROR,
+                        message = "No Wi-Fi found — connect the tablet to the Mevo's Wi-Fi",
+                    )
+                }
             }
         }
         netCallback = cb
         try {
-            cm.requestNetwork(req, cb, 10_000)   // up to 10s to grab the Mevo Wi-Fi
+            cm.requestNetwork(req, cb, 10_000)   // up to 10s to grab/hold the Mevo Wi-Fi
         } catch (e: Exception) {
             Log.e(TAG, "requestNetwork failed", e)
-            _stats.value = _stats.value.copy(state = IngestState.ERROR, message = "network request failed")
+        }
+        // Don't wait on the (flaky) callback if the tablet is already on the Mevo's
+        // Wi-Fi — bind to it and start SRT immediately. beginSrt is idempotent.
+        existingWifiNetwork()?.let { beginSrt(it) }
+    }
+
+    /** Bind this process to [network] and start the native SRT receiver. Idempotent. */
+    @Synchronized
+    private fun beginSrt(network: Network) {
+        if (nativeHandle != 0L) return
+        val u = pendingUrl ?: return
+        try {
+            cm.bindProcessToNetwork(network)
+            Log.i(TAG, "bound process to Wi-Fi; starting SRT")
+        } catch (e: Exception) {
+            Log.e(TAG, "bindProcessToNetwork failed", e)
+        }
+        nativeHandle = nativeStart(u)
+        if (nativeHandle == 0L) {
+            _stats.value = _stats.value.copy(state = IngestState.ERROR, message = "native start failed")
         }
     }
+
+    /** The Wi-Fi network the system currently holds, if any (regardless of internet). */
+    private fun existingWifiNetwork(): Network? =
+        cm.allNetworks.firstOrNull {
+            cm.getNetworkCapabilities(it)?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true
+        }
 
     override fun stop() {
         val handle = nativeHandle

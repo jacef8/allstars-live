@@ -12,7 +12,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -86,6 +89,12 @@ fun SrtIngestScreen() {
 
         Hud(stats, Modifier.align(Alignment.TopStart).padding(12.dp))
 
+        // Step-by-step connection guide — stays up until the feed is live, so the
+        // operator always has the routine in front of them when nothing is showing.
+        if (stats.state != IngestState.PLAYING) {
+            SetupGuide(Modifier.align(Alignment.Center))
+        }
+
         // Control bar.
         Row(
             Modifier
@@ -118,6 +127,53 @@ fun SrtIngestScreen() {
                 Text(if (connected) "Disconnect" else "Connect")
             }
         }
+    }
+}
+
+/**
+ * Connecting a camera, step by step. Mevo-specific for now; when Camera Profiles
+ * land this list comes from the active profile so each camera shows its own steps.
+ */
+private val CAMERA_STEPS = listOf(
+    "Power on the camera and wait until it shows it's ready.",
+    "On your phone, open the Mevo app and connect to the camera.",
+    "In the Mevo app, tap Go Live to start the SRT broadcast — the camera only sends video while it's live.",
+    "On this tablet, join the camera's Wi-Fi: Mevo-2DDTR (password 12345678).",
+    "Check the address at the bottom reads srt://192.168.17.1:4201.",
+    "Tap Connect.",
+)
+
+@Composable
+private fun SetupGuide(modifier: Modifier = Modifier) {
+    Column(
+        modifier
+            .widthIn(max = 560.dp)
+            .padding(16.dp)
+            .background(Color(0xE6101418), RoundedCornerShape(16.dp))
+            .padding(20.dp)
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Text("Connect the camera", color = Color.White, fontSize = 22.sp)
+        CAMERA_STEPS.forEachIndexed { i, step ->
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    "${i + 1}",
+                    color = Color(0xFF4C9AFF),
+                    fontSize = 16.sp,
+                    fontFamily = FontFamily.Monospace,
+                    modifier = Modifier.width(20.dp),
+                )
+                Text(step, color = Color(0xFFE8EAED), fontSize = 16.sp)
+            }
+        }
+        Text(
+            "Your tablet's cellular stays on for streaming to YouTube — only the " +
+                "camera feed uses the Mevo's Wi-Fi.",
+            color = Color(0xFF9AA0A6),
+            fontSize = 13.sp,
+            modifier = Modifier.padding(top = 4.dp),
+        )
     }
 }
 
