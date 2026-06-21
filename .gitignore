@@ -40,3 +40,4 @@ Thumbs.db
 
 # ── Local agent-mode / session artifacts ────────
 .claude/settings.local.json
+app/src/main/cpp/third_party/srt/

@@ -29,6 +29,9 @@ public:
     void feed(const uint8_t *data, size_t size);
 
 private:
+    void onPacket(const uint8_t *pkt);  // parse one 188-byte TS packet
+    void flushAU();                     // emit the assembled access unit (if any)
+
     AccessUnitCallback cb_;
     void *userData_;
 

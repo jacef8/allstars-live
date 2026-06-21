@@ -30,20 +30,14 @@ if(USE_LIBSRT)
             ${SRT_ROOT}/include
             ${SRT_ROOT}/include/srt)
 
-    # Static libs keep the APK lean and avoid packaging extra .so files.
+    # Static lib keeps the APK lean and avoids packaging extra .so files.
     add_library(srt STATIC IMPORTED)
     set_target_properties(srt PROPERTIES IMPORTED_LOCATION
             ${SRT_ROOT}/libs/${ANDROID_ABI}/libsrt.a)
 
-    # libsrt needs an SSL backend; mbedTLS is the lightest for Android (README.md).
-    add_library(mbedtls STATIC IMPORTED)
-    set_target_properties(mbedtls PROPERTIES IMPORTED_LOCATION
-            ${SRT_ROOT}/libs/${ANDROID_ABI}/libmbedtls.a)
-    add_library(mbedcrypto STATIC IMPORTED)
-    set_target_properties(mbedcrypto PROPERTIES IMPORTED_LOCATION
-            ${SRT_ROOT}/libs/${ANDROID_ABI}/libmbedcrypto.a)
-
-    target_link_libraries(srtjni srt mbedtls mbedcrypto)
+    # Built with ENABLE_ENCRYPTION=OFF for the closed LAN, so no SSL backend is
+    # needed. libsrt is C++ — link the NDK C++ runtime so its symbols resolve.
+    target_link_libraries(srtjni srt)
 else()
     message(WARNING
             "srtjni: USE_LIBSRT=OFF -> stub transport (no real SRT). See cpp/README.md.")

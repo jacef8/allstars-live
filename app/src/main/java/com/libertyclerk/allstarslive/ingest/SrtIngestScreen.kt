@@ -39,15 +39,13 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
  * SRT transport once it's chosen — "see a frame" is the whole test.
  */
 @Composable
-fun SrtIngestScreen(
-    sourceFactory: () -> VideoSource = { StubVideoSource() },
-) {
-    val source = remember { sourceFactory() }
+fun SrtIngestScreen() {
+    val source = remember { SrtVideoSource() }
     val stats by source.stats.collectAsStateWithLifecycle()
 
-    // Default to a listener-mode SRT URL on a common port; the orientation
-    // (Mevo=caller / tablet=listener) is one of the M1 things to confirm live.
-    var url by remember { mutableStateOf("srt://0.0.0.0:8890?mode=listener") }
+    // Mevo is the SRT listener at its own IP:port (from the Mevo app's SRT screen);
+    // we connect as the caller. Editable at runtime since the IP can change per network.
+    var url by remember { mutableStateOf("srt://10.13.40.34:4201") }
     var connected by remember { mutableStateOf(false) }
     var surface by remember { mutableStateOf<android.view.Surface?>(null) }
 

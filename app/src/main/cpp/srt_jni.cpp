@@ -19,6 +19,9 @@
 
 #if USE_LIBSRT
 #include <srt/srt.h>
+#include <arpa/inet.h>
+#include <cstdlib>
+#include <cstring>
 #endif
 
 #define LOG_TAG "SrtJni"
@@ -81,18 +84,61 @@ void runReceive(Session *s) {
     emitState(CONNECTING, "opening SRT socket");
 
 #if USE_LIBSRT
-    // ---- TODO(M1): real libsrt receive loop (see cpp/README.md) ----
-    //  1) srt_startup() once (here or in JNI_OnLoad).
-    //  2) Parse s->url -> mode (listener/caller), host, port, latency, passphrase.
-    //  3) listener: srt_create_socket -> srt_bind -> srt_listen -> srt_accept.
-    //     caller:   srt_create_socket -> srt_connect.
-    //  4) Options: SRTO_RCVSYN=true, SRTO_TSBPDMODE=1, SRTO_LATENCY (~80-120ms LAN).
-    //  5) Loop: int n = srt_recvmsg(sock, buf, sizeof buf); demuxer.feed(buf, n);
-    //     emit PLAYING on first good recv, RECONNECTING on transient error.
-    //  6) On exit: srt_close(sock); srt_cleanup() at process end.
-    uint8_t buf[1500];
-    (void) buf;  // remove once the loop above is filled in
-    emitState(ERROR, "USE_LIBSRT on but receive loop not implemented yet");
+    static std::atomic<bool> s_srtUp{false};
+    bool expected = false;
+    if (s_srtUp.compare_exchange_strong(expected, true)) srt_startup();
+
+    // Parse srt://host:port[?...] -- we connect as the CALLER to the Mevo (listener).
+    std::string u = s->url;
+    auto sep = u.find("://"); if (sep != std::string::npos) u = u.substr(sep + 3);
+    auto qm = u.find('?'); if (qm != std::string::npos) u = u.substr(0, qm);
+    auto colon = u.find(':');
+    std::string host = (colon == std::string::npos) ? u : u.substr(0, colon);
+    int port = (colon == std::string::npos) ? 0 : atoi(u.substr(colon + 1).c_str());
+
+    SRTSOCKET sock = SRT_INVALID_SOCK;
+    if (host.empty() || port <= 0) {
+        emitState(ERROR, "bad SRT URL");
+    } else {
+        sock = srt_create_socket();
+        int live = SRTT_LIVE;
+        srt_setsockflag(sock, SRTO_TRANSTYPE, &live, sizeof live);  // live defaults (TSBPD on)
+        int latency = 120; srt_setsockflag(sock, SRTO_LATENCY, &latency, sizeof latency);
+        bool yes = true;   srt_setsockflag(sock, SRTO_RCVSYN, &yes, sizeof yes);   // blocking recv
+        int rcvto = 1000;  srt_setsockflag(sock, SRTO_RCVTIMEO, &rcvto, sizeof rcvto); // so stop() unblocks
+
+        sockaddr_in sa{};
+        sa.sin_family = AF_INET;
+        sa.sin_port = htons((uint16_t) port);
+        if (inet_pton(AF_INET, host.c_str(), &sa.sin_addr) != 1) {
+            emitState(ERROR, "bad host address");
+            srt_close(sock); sock = SRT_INVALID_SOCK;
+        } else {
+            LOGI("srt connect (caller) -> %s:%d", host.c_str(), port);
+            if (srt_connect(sock, reinterpret_cast<sockaddr *>(&sa), sizeof sa) == SRT_ERROR) {
+                emitState(ERROR, srt_getlasterror_str());
+                srt_close(sock); sock = SRT_INVALID_SOCK;
+            } else {
+                emitState(BUFFERING, "connected, receiving");
+                bool got = false;
+                char buf[1500];
+                while (s->running.load()) {
+                    int n = srt_recvmsg(sock, buf, sizeof buf);
+                    if (n == SRT_ERROR) {
+                        int code = srt_getlasterror(nullptr);
+                        if (code == SRT_ETIMEOUT || code == SRT_EASYNCRCV) continue;  // no data this tick
+                        emitState(ERROR, srt_getlasterror_str());
+                        break;
+                    }
+                    if (n > 0) {
+                        if (!got) { got = true; emitState(PLAYING, "live"); }
+                        demuxer.feed(reinterpret_cast<const uint8_t *>(buf), (size_t) n);
+                    }
+                }
+                srt_close(sock); sock = SRT_INVALID_SOCK;
+            }
+        }
+    }
 #else
     emitState(ERROR, "libsrt not built (USE_LIBSRT=OFF) -- see cpp/README.md");
 #endif

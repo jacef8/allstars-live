@@ -21,8 +21,8 @@ android {
         externalNativeBuild {
             cmake {
                 cppFlags += "-std=c++17"
-                // Flip to "-DUSE_LIBSRT=ON" after vendoring libsrt (see cpp/README.md).
-                arguments += "-DUSE_LIBSRT=OFF"
+                // libsrt vendored under cpp/third_party/srt (arm64, encryption off).
+                arguments += "-DUSE_LIBSRT=ON"
             }
         }
     }
@@ -81,6 +81,8 @@ dependencies {
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
+    // (libVLC removed — its Android build has no SRT module. SRT ingest is the
+    //  native libsrt route under app/src/main/cpp.)
 
     debugImplementation("androidx.compose.ui:ui-tooling")
 }
