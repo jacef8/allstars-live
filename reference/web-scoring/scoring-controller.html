@@ -550,6 +550,11 @@ function diamondSVG(){
   const marker=tap?`<g><circle cx="${tap.x}" cy="${tap.y}" r="9" fill="none" stroke="${FIELDLINE}" stroke-width="3"/><circle cx="${tap.x}" cy="${tap.y}" r="9" fill="none" stroke="${T.clay}" stroke-width="1.5"/>
       <circle cx="${tap.x}" cy="${tap.y}" r="3" fill="${T.clay}"/></g>`:"";
   const ballFly="";
+  // Defensive alignment: 9 fielders as numbered dots (team color + jersey # when we're fielding).
+  const FPOS={P:[150,201],C:[150,261],"1B":[206,176],"2B":[182,151],SS:[118,151],"3B":[94,176],LF:[77,95],CF:[150,72],RF:[223,95]};
+  const onDef=fielding();
+  const fieldersSVG=inRunners?"":Object.keys(FPOS).map(pos=>{const[x,y]=FPOS[pos];const pl=onDef?playerAtPos(pos):null;const lbl=onDef?(pl&&pl.num?pl.num:pos):pos;const fill=onDef?OUR.color:"#64748B";
+    return `<g><circle cx="${x}" cy="${y}" r="9" fill="${fill}" stroke="#fff" stroke-width="1.5" opacity="0.96"/><text x="${x}" y="${y+3.2}" font-size="9" font-family="${MONO}" font-weight="800" text-anchor="middle" fill="#fff">${lbl}</text></g>`;}).join("");
   const zoneSVG=showZones?zonesOverlay():"";
   const banner=armed?`<div style="position:absolute;inset:0;display:flex;align-items:flex-start;justify-content:center;pointer-events:none;padding-top:8px">
       <span style="background:${T.clay};color:#FFFFFF;font-size:11px;font-weight:800;padding:4px 10px;border-radius:999px;letter-spacing:.3px">Tap where the ball went</span></div>`:"";
@@ -566,6 +571,7 @@ function diamondSVG(){
       <line x1="150" y1="250" x2="8" y2="108" stroke="${FIELDLINE}" stroke-width="1.2" opacity="0.7"/>
       <circle cx="150" cy="190" r="9" fill="${T.clay}" opacity="0.95"/>
       <rect x="147" y="188" width="6" height="3" fill="${FIELDLINE}" opacity="0.9"/>
+      ${fieldersSVG}
       ${arrowSVG}
       ${baseSq("1")}${baseSq("2")}${baseSq("3")}
       <polygon points="150,245 156,250 156,256 144,256 144,250" fill="${FIELDLINE}"/>
