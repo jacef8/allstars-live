@@ -6,6 +6,8 @@ import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
+import android.net.wifi.WifiNetworkSpecifier
+import android.os.Build
 import android.util.Log
 import android.view.Surface
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -39,6 +41,15 @@ class SrtVideoSource(private val context: Context) : VideoSource {
     private var netCallback: ConnectivityManager.NetworkCallback? = null
     private var pendingUrl: String? = null
 
+    /**
+     * Camera Wi-Fi to join on [start]. When [wifiSsid] is set (and the OS supports
+     * it), the app connects to that AP itself via WifiNetworkSpecifier — no manual
+     * Wi-Fi switching, and Android won't auto-drop it for lack of internet. Blank
+     * SSID falls back to binding whatever Wi-Fi the tablet is already on.
+     */
+    var wifiSsid: String = ""
+    var wifiPassphrase: String = ""
+
     override fun start(url: String, surface: Surface) {
         if (nativeHandle != 0L) return
         firstFrameSeen = false
@@ -59,8 +70,52 @@ class SrtVideoSource(private val context: Context) : VideoSource {
             },
         ).also { it.start() }
 
-        _stats.value = VideoStats(state = IngestState.CONNECTING, message = "finding camera Wi-Fi…")
+        val ssid = wifiSsid.trim()
+        if (ssid.isNotEmpty() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            joinCameraWifi(ssid, wifiPassphrase)
+        } else {
+            useExistingWifi()
+        }
+    }
 
+    /**
+     * Bring up the camera's Wi-Fi ourselves. Android shows a one-time approval
+     * dialog the first time per SSID; after that it keeps the network up *for this
+     * app* (bound, internet-less, never auto-dropped) until [stop].
+     */
+    @androidx.annotation.RequiresApi(Build.VERSION_CODES.Q)
+    private fun joinCameraWifi(ssid: String, passphrase: String) {
+        _stats.value = VideoStats(state = IngestState.CONNECTING, message = "joining $ssid…")
+        val spec = WifiNetworkSpecifier.Builder()
+            .setSsid(ssid)
+            .apply { if (passphrase.isNotEmpty()) setWpa2Passphrase(passphrase) }
+            .build()
+        val req = NetworkRequest.Builder()
+            .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
+            .removeCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+            .setNetworkSpecifier(spec)
+            .build()
+        val cb = object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: Network) = beginSrt(network)
+            override fun onUnavailable() {
+                if (nativeHandle == 0L) _stats.value = _stats.value.copy(
+                    state = IngestState.ERROR,
+                    message = "Couldn't join \"$ssid\" — check the camera Wi-Fi name & password",
+                )
+            }
+        }
+        netCallback = cb
+        try {
+            cm.requestNetwork(req, cb)   // no timeout: hold the camera Wi-Fi up for the app
+        } catch (e: Exception) {
+            Log.e(TAG, "requestNetwork (specifier) failed", e)
+            _stats.value = _stats.value.copy(state = IngestState.ERROR, message = "Wi-Fi request failed")
+        }
+    }
+
+    /** Legacy path: hold/bind whatever Wi-Fi the tablet is already connected to. */
+    private fun useExistingWifi() {
+        _stats.value = VideoStats(state = IngestState.CONNECTING, message = "finding camera Wi-Fi…")
         val req = NetworkRequest.Builder()
             .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
             .removeCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)

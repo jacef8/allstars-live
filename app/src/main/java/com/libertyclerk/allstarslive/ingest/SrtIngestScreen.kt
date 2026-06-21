@@ -47,13 +47,23 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 fun SrtIngestScreen() {
     val ctx = LocalContext.current
     val source = remember { SrtVideoSource(ctx) }
+    val settings = remember { CameraSettings(ctx) }
     val stats by source.stats.collectAsStateWithLifecycle()
 
-    // Mevo is the SRT listener at its own IP:port (from the Mevo app's SRT screen);
-    // we connect as the caller. Editable at runtime since the IP can change per network.
-    var url by remember { mutableStateOf("srt://192.168.17.1:4201") }
+    // Connection config — persisted & editable (not hardcoded) so the app isn't
+    // tied to one camera and a Wi-Fi password change is an in-app edit. The SRT
+    // URL is the camera's listener address; we connect as the caller.
+    var url by remember { mutableStateOf(settings.url) }
+    var ssid by remember { mutableStateOf(settings.wifiSsid) }
+    var pass by remember { mutableStateOf(settings.wifiPassphrase) }
     var connected by remember { mutableStateOf(false) }
     var surface by remember { mutableStateOf<android.view.Surface?>(null) }
+
+    // Push the camera Wi-Fi creds into the source so start() can join it for us.
+    fun applyCreds() {
+        source.wifiSsid = ssid
+        source.wifiPassphrase = pass
+    }
 
     DisposableEffect(Unit) {
         onDispose { source.stop() }
@@ -73,7 +83,10 @@ fun SrtIngestScreen() {
                     holder.addCallback(object : SurfaceHolder.Callback {
                         override fun surfaceCreated(holder: SurfaceHolder) {
                             surface = holder.surface
-                            if (connected) source.start(url, holder.surface)
+                            if (connected) {
+                                applyCreds()
+                                source.start(url, holder.surface)
+                            }
                         }
 
                         override fun surfaceChanged(h: SurfaceHolder, f: Int, w: Int, ht: Int) {}
@@ -95,30 +108,53 @@ fun SrtIngestScreen() {
             SetupGuide(Modifier.align(Alignment.Center))
         }
 
-        // Control bar.
-        Row(
+        // Control bar. Wi-Fi name/password + SRT URL are editable and persisted;
+        // on Connect the app joins that Wi-Fi itself. Fields hide once we're live.
+        Column(
             Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
                 .background(Color(0xCC000000))
                 .padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            OutlinedTextField(
-                value = url,
-                onValueChange = { url = it },
-                label = { Text("SRT source URL") },
-                singleLine = true,
-                modifier = Modifier.weight(1f),
-            )
+            if (!connected) {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedTextField(
+                        value = ssid,
+                        onValueChange = { ssid = it },
+                        label = { Text("Camera Wi-Fi name") },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f),
+                    )
+                    OutlinedTextField(
+                        value = pass,
+                        onValueChange = { pass = it },
+                        label = { Text("Wi-Fi password") },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f),
+                    )
+                    OutlinedTextField(
+                        value = url,
+                        onValueChange = { url = it },
+                        label = { Text("SRT source URL") },
+                        singleLine = true,
+                        modifier = Modifier.weight(1.4f),
+                    )
+                }
+            }
             Button(
-                modifier = Modifier.width(150.dp),
+                modifier = Modifier.width(180.dp).align(Alignment.End),
                 onClick = {
                     if (connected) {
                         source.stop()
                         connected = false
                     } else {
+                        // Persist whatever the operator entered, then connect.
+                        settings.url = url
+                        settings.wifiSsid = ssid
+                        settings.wifiPassphrase = pass
+                        applyCreds()
                         surface?.let { source.start(url, it) }
                         connected = true
                     }
@@ -138,9 +174,8 @@ private val CAMERA_STEPS = listOf(
     "Power on the camera and wait until it shows it's ready.",
     "On your phone, open the Mevo app and connect to the camera.",
     "In the Mevo app, tap Go Live to start the SRT broadcast — the camera only sends video while it's live.",
-    "On this tablet, join the camera's Wi-Fi: Mevo-2DDTR (password 12345678).",
-    "Check the address at the bottom reads srt://192.168.17.1:4201.",
-    "Tap Connect.",
+    "Check the camera Wi-Fi name, password, and SRT address in the fields below are correct.",
+    "Tap Connect. The app joins the camera's Wi-Fi for you — if the tablet asks to connect to it, tap Connect/Allow.",
 )
 
 @Composable
