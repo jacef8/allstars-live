@@ -24,6 +24,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -40,12 +41,13 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
  */
 @Composable
 fun SrtIngestScreen() {
-    val source = remember { SrtVideoSource() }
+    val ctx = LocalContext.current
+    val source = remember { SrtVideoSource(ctx) }
     val stats by source.stats.collectAsStateWithLifecycle()
 
     // Mevo is the SRT listener at its own IP:port (from the Mevo app's SRT screen);
     // we connect as the caller. Editable at runtime since the IP can change per network.
-    var url by remember { mutableStateOf("srt://10.13.40.34:4201") }
+    var url by remember { mutableStateOf("srt://192.168.17.1:4201") }
     var connected by remember { mutableStateOf(false) }
     var surface by remember { mutableStateOf<android.view.Surface?>(null) }
 

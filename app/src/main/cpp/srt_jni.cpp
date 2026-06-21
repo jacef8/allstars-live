@@ -20,6 +20,7 @@
 #if USE_LIBSRT
 #include <srt/srt.h>
 #include <arpa/inet.h>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #endif
@@ -106,6 +107,7 @@ void runReceive(Session *s) {
         int latency = 120; srt_setsockflag(sock, SRTO_LATENCY, &latency, sizeof latency);
         bool yes = true;   srt_setsockflag(sock, SRTO_RCVSYN, &yes, sizeof yes);   // blocking recv
         int rcvto = 1000;  srt_setsockflag(sock, SRTO_RCVTIMEO, &rcvto, sizeof rcvto); // so stop() unblocks
+        int conntimeo = 5000; srt_setsockflag(sock, SRTO_CONNTIMEO, &conntimeo, sizeof conntimeo);
 
         sockaddr_in sa{};
         sa.sin_family = AF_INET;
@@ -116,7 +118,12 @@ void runReceive(Session *s) {
         } else {
             LOGI("srt connect (caller) -> %s:%d", host.c_str(), port);
             if (srt_connect(sock, reinterpret_cast<sockaddr *>(&sa), sizeof sa) == SRT_ERROR) {
-                emitState(ERROR, srt_getlasterror_str());
+                int rej = srt_getrejectreason(sock);
+                char msg[256];
+                snprintf(msg, sizeof msg, "%s (reject %d: %s)",
+                         srt_getlasterror_str(), rej, srt_rejectreason_str(rej));
+                LOGE("srt_connect failed: %s", msg);
+                emitState(ERROR, msg);
                 srt_close(sock); sock = SRT_INVALID_SOCK;
             } else {
                 emitState(BUFFERING, "connected, receiving");

@@ -1,28 +1,30 @@
 package com.libertyclerk.allstarslive.ingest
 
+import android.content.Context
 import android.media.MediaFormat
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
+import android.net.NetworkRequest
+import android.util.Log
 import android.view.Surface
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
 /**
- * Real SRT [VideoSource] for the libsrt + NDK route — the recommended M1 path
- * (see the srt-ingest-decision memo).
+ * Real SRT [VideoSource] for the libsrt + NDK route.
  *
- * Pipeline:
  *   native libsrt recv + MPEG-TS demux (app/src/main/cpp)
- *     -> [onAccessUnit] (this class, called from the native recv thread)
- *       -> [MediaCodecVideoDecoder] (HW decode straight to the [Surface], emits HUD stats)
+ *     -> [onAccessUnit] -> [MediaCodecVideoDecoder] -> Surface
  *
- * This is the single swap the architecture was built for: change the default
- * `sourceFactory` in SrtIngestScreen from `StubVideoSource()` to `SrtVideoSource()`
- * once the native build is green.
- *
- * SKELETON: the native lib compiles in stub mode (USE_LIBSRT=OFF) until libsrt is
- * vendored — see app/src/main/cpp/README.md. In stub mode the HUD will show ERROR
- * ("libsrt not built"); that is expected and proves the JNI/lifecycle plumbing.
+ * The Mevo serves SRT on its own Wi-Fi, which has no internet — so Android keeps
+ * cellular as the default network (good: YouTube goes out cellular) and will even
+ * drop the Wi-Fi if left alone. We therefore *request* the Wi-Fi transport
+ * explicitly (internet not required) to hold it up, then bind this process's
+ * sockets to it so libsrt's UDP reaches the camera. Cellular stays available for
+ * the outbound stream.
  */
-class SrtVideoSource : VideoSource {
+class SrtVideoSource(private val context: Context) : VideoSource {
 
     private val _stats = MutableStateFlow(VideoStats())
     override val stats: StateFlow<VideoStats> = _stats
@@ -31,12 +33,17 @@ class SrtVideoSource : VideoSource {
     private var nativeHandle: Long = 0L
     @Volatile private var firstFrameSeen = false
 
-    override fun start(url: String, surface: Surface) {
-        if (nativeHandle != 0L) return // already running; stop() first
-        firstFrameSeen = false
+    private val cm by lazy {
+        context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+    }
+    private var netCallback: ConnectivityManager.NetworkCallback? = null
+    private var pendingUrl: String? = null
 
-        // Mevo defaults to H.264. Width/height are placeholders until the demuxer
-        // reads SPS or onOutputFormatChanged corrects them.
+    override fun start(url: String, surface: Surface) {
+        if (nativeHandle != 0L) return
+        firstFrameSeen = false
+        pendingUrl = url
+
         decoder = MediaCodecVideoDecoder(
             mimeType = MediaFormat.MIMETYPE_VIDEO_AVC,
             surface = surface,
@@ -52,19 +59,57 @@ class SrtVideoSource : VideoSource {
             },
         ).also { it.start() }
 
-        _stats.value = VideoStats(state = IngestState.CONNECTING, message = "starting SRT")
-        nativeHandle = nativeStart(url)
-        if (nativeHandle == 0L) {
-            _stats.value = VideoStats(state = IngestState.ERROR, message = "native start failed")
+        _stats.value = VideoStats(state = IngestState.CONNECTING, message = "finding camera Wi-Fi…")
+
+        val req = NetworkRequest.Builder()
+            .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
+            .removeCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+            .build()
+        val cb = object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: Network) {
+                try {
+                    cm.bindProcessToNetwork(network)
+                    Log.i(TAG, "bound process to Wi-Fi; starting SRT")
+                } catch (e: Exception) {
+                    Log.e(TAG, "bindProcessToNetwork failed", e)
+                }
+                val u = pendingUrl
+                if (u != null && nativeHandle == 0L) {
+                    nativeHandle = nativeStart(u)
+                    if (nativeHandle == 0L) {
+                        _stats.value = _stats.value.copy(
+                            state = IngestState.ERROR, message = "native start failed",
+                        )
+                    }
+                }
+            }
+
+            override fun onUnavailable() {
+                _stats.value = _stats.value.copy(
+                    state = IngestState.ERROR,
+                    message = "No Wi-Fi found — connect the tablet to the Mevo's Wi-Fi",
+                )
+            }
+        }
+        netCallback = cb
+        try {
+            cm.requestNetwork(req, cb, 10_000)   // up to 10s to grab the Mevo Wi-Fi
+        } catch (e: Exception) {
+            Log.e(TAG, "requestNetwork failed", e)
+            _stats.value = _stats.value.copy(state = IngestState.ERROR, message = "network request failed")
         }
     }
 
     override fun stop() {
         val handle = nativeHandle
         nativeHandle = 0L
+        pendingUrl = null
         if (handle != 0L) nativeStop(handle)
         decoder?.stop()
         decoder = null
+        netCallback?.let { runCatching { cm.unregisterNetworkCallback(it) } }
+        netCallback = null
+        runCatching { cm.bindProcessToNetwork(null) }   // restore normal routing (cellular)
         _stats.value = VideoStats(state = IngestState.IDLE)
     }
 
@@ -81,7 +126,6 @@ class SrtVideoSource : VideoSource {
     /** Called from native to mirror transport state into the HUD. */
     @Suppress("unused") // invoked via JNI (see srt_jni.cpp)
     private fun onNativeState(state: Int, message: String) {
-        // `state` is an IngestState ordinal; keep srt_jni.cpp's NativeState in sync.
         val mapped = IngestState.entries.getOrElse(state) { IngestState.ERROR }
         _stats.value = _stats.value.copy(state = mapped, message = message)
     }
@@ -90,6 +134,7 @@ class SrtVideoSource : VideoSource {
     private external fun nativeStop(handle: Long)
 
     companion object {
+        private const val TAG = "SrtVideoSource"
         init { System.loadLibrary("srtjni") }
     }
 }
