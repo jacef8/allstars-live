@@ -726,8 +726,8 @@ function actionArea(){
       </div>`;
   }
   if(mode==="lineup"){
-    const tabBtn=(id,lbl)=>`<button data-act="lutab" data-arg="${id}" style="flex:1;padding:10px;border-radius:9px;font-family:${MONO};font-weight:800;font-size:14px;text-transform:uppercase;letter-spacing:.5px;border:1px solid ${lineupTab===id?OUR.color:T.line};background:${lineupTab===id?OUR.color:T.surface};color:${lineupTab===id?"#fff":T.ink}">${lbl}</button>`;
-    const luToggle=`<div style="display:flex;gap:8px;flex-shrink:0">${tabBtn("us",OUR.short||"US")}${tabBtn("opp",OPP.short||"OPP")}</div>`;
+    const tabBtn=(id,lbl,col)=>`<button data-act="lutab" data-arg="${id}" style="flex:1;min-width:0;padding:10px;border-radius:9px;font-family:${MONO};font-weight:800;font-size:14px;text-transform:uppercase;letter-spacing:.3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border:1px solid ${lineupTab===id?col:T.line};background:${lineupTab===id?col:T.surface};color:${lineupTab===id?"#fff":T.ink}">${lbl}</button>`;
+    const luToggle=`<div style="display:flex;gap:8px;flex-shrink:0">${tabBtn("us",OUR.name,OUR.color)}${tabBtn("opp",OPP.name,OPP.color)}</div>`;
     if(lineupTab==="opp"){
       if(!G.oppLineup)G.oppLineup=Array.from({length:Math.max(1,G.oppBatters)},(_,i)=>({num:String(i+1),name:""}));
       const orows=G.oppLineup.map((e,i)=>`<div style="display:flex;align-items:center;gap:6px;background:${T.surface};border:1px solid ${T.line};border-radius:9px;padding:6px 8px">
