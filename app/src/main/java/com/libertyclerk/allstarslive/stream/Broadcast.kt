@@ -42,6 +42,12 @@ object Broadcast {
     fun requestDialog() { _showDialog.value = true }
     fun dismissDialog() { _showDialog.value = false }
 
+    // Confirm before ending a live broadcast (so it's not killed mid-game by accident).
+    private val _showStopConfirm = MutableStateFlow(false)
+    val showStopConfirm: StateFlow<Boolean> = _showStopConfirm
+    fun requestStop() { if (isActive) _showStopConfirm.value = true }
+    fun dismissStop() { _showStopConfirm.value = false }
+
     private const val PROG_W = 1280
     private const val PROG_H = 720
     private val main = Handler(Looper.getMainLooper())
@@ -63,6 +69,12 @@ object Broadcast {
         val comp = RtmpHub.videoCompositor
         if (comp == null) {
             _state.value = State(phase = Phase.ERROR, status = "Camera link not ready — try again")
+            return
+        }
+        // Don't start a broadcast with no picture — that's what left dead "upcoming"
+        // broadcasts on YouTube. Require the camera to actually be delivering frames.
+        if (!RtmpHub.hasVideo) {
+            _state.value = State(phase = Phase.ERROR, status = "No camera yet — connect the camera, then Go Live")
             return
         }
         _state.value = State(phase = Phase.STARTING, title = title, privacy = privacy, status = "Setting up your YouTube broadcast…")

@@ -43,9 +43,14 @@ object RtmpHub {
     private var sps: ByteArray? = null   // Annex-B (from the AVC config record)
     private var pps: ByteArray? = null
     @Volatile private var firstFrameSeen = false
+    @Volatile private var lastFrameMs = 0L
+    private var watchdog: Thread? = null
     private var pendingPreview: Surface? = null
 
     val isRunning: Boolean get() = receiver != null
+
+    /** True once the camera has actually delivered a decodable frame (not just connected). */
+    val hasVideo: Boolean get() = firstFrameSeen
 
     @Synchronized
     fun start(port: Int) {
@@ -86,11 +91,29 @@ object RtmpHub {
                 }
             },
         ).also { it.start() }
+
+        // Watchdog: if frames stop after we were playing (camera dropped), show a clear
+        // "reconnecting" status. The receiver keeps accepting reconnects, so it recovers
+        // on its own once the camera comes back (onVideo flips us back to PLAYING).
+        lastFrameMs = System.currentTimeMillis()
+        watchdog = Thread {
+            while (receiver != null) {
+                try { Thread.sleep(1000) } catch (e: InterruptedException) { break }
+                if (firstFrameSeen && _stats.value.state == IngestState.PLAYING &&
+                    System.currentTimeMillis() - lastFrameMs > 3000
+                ) {
+                    _stats.value = _stats.value.copy(state = IngestState.RECONNECTING, message = "Camera reconnecting…")
+                }
+            }
+        }.apply { isDaemon = true; start() }
     }
 
     private fun onVideo(au: ByteArray, ptsMs: Long, keyframe: Boolean) {
+        lastFrameMs = System.currentTimeMillis()
         if (!firstFrameSeen) {
             firstFrameSeen = true
+            _stats.value = _stats.value.copy(state = IngestState.PLAYING, message = "")
+        } else if (_stats.value.state == IngestState.RECONNECTING) {
             _stats.value = _stats.value.copy(state = IngestState.PLAYING, message = "")
         }
         // The decoder takes in-band Annex-B: prepend SPS/PPS to each keyframe so it can
@@ -124,6 +147,7 @@ object RtmpHub {
     @Synchronized
     fun stop() {
         receiver?.stop(); receiver = null
+        watchdog?.interrupt(); watchdog = null
         decoder?.stop(); decoder = null
         compositor?.release(); compositor = null
         sps = null; pps = null; firstFrameSeen = false; pendingPreview = null

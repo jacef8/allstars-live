@@ -136,7 +136,7 @@ fun SrtIngestScreen(onUseTestPattern: () -> Unit = {}) {
             status = bcast.status,
             cameraReady = playing,
             onGoLive = { Broadcast.requestDialog() },
-            onEnd = { Broadcast.stop() },
+            onEnd = { Broadcast.requestStop() },
             modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 18.dp),
         )
 

@@ -75,9 +75,9 @@ private class ScorerBridge(private val appContext: Context) {
     @JavascriptInterface
     fun requestGoLive() { main.post { Broadcast.requestDialog() } }
 
-    /** "End broadcast" from the Game page. */
+    /** "End broadcast" from the Game page — asks for confirmation first. */
     @JavascriptInterface
-    fun stopStream() { main.post { Broadcast.stop() } }
+    fun stopStream() { main.post { Broadcast.requestStop() } }
 
     /** The web tells us when a game/console is on screen (vs the menus). */
     @JavascriptInterface

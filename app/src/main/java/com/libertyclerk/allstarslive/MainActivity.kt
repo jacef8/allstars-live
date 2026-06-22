@@ -34,6 +34,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -142,6 +143,18 @@ class MainActivity : ComponentActivity() {
                             onCancel = { Broadcast.dismissDialog() },
                         )
                     }
+
+                    // Confirm before ending a live broadcast.
+                    val showStop by Broadcast.showStopConfirm.collectAsStateWithLifecycle()
+                    if (showStop) {
+                        ConfirmDialog(
+                            title = "End the broadcast?",
+                            message = "Fans will stop seeing the game on YouTube.",
+                            confirmLabel = "End broadcast",
+                            onConfirm = { Broadcast.stop(); Broadcast.dismissStop() },
+                            onCancel = { Broadcast.dismissStop() },
+                        )
+                    }
                 }
             }
         }
@@ -194,6 +207,41 @@ private fun AllStarsBottomBar(tabs: List<Tab>, selected: Int, onSelect: (Int) ->
                         fontSize = 14.sp,
                     )
                 }
+            }
+        }
+    }
+}
+
+/** Generic confirm dialog (e.g. ending the broadcast). */
+@Composable
+private fun ConfirmDialog(
+    title: String,
+    message: String,
+    confirmLabel: String,
+    onConfirm: () -> Unit,
+    onCancel: () -> Unit,
+) {
+    Box(
+        Modifier.fillMaxSize().background(Color(0xCC05080C)).clickable(onClick = onCancel),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            Modifier
+                .widthIn(max = 460.dp)
+                .padding(24.dp)
+                .background(Color(0xFF141A22), RoundedCornerShape(16.dp))
+                .padding(22.dp)
+                .clickable {},   // swallow taps so tapping the card doesn't cancel
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(title, color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            Text(message, color = Color(0xFF9AA0A6), fontSize = 14.sp)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
+                TextButton(onClick = onCancel) { Text("Cancel", color = Color(0xFF9AA0A6)) }
+                Button(
+                    onClick = onConfirm,
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF3B5C), contentColor = Color.White),
+                ) { Text(confirmLabel, fontWeight = FontWeight.Bold) }
             }
         }
     }
