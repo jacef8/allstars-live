@@ -26,6 +26,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Scoreboard
 import androidx.compose.material.icons.filled.Settings
@@ -112,7 +113,12 @@ class MainActivity : ComponentActivity() {
                     Scaffold(
                         containerColor = MaterialTheme.colorScheme.background,
                         bottomBar = {
-                            if (!hideTabs) AllStarsBottomBar(tabs, tabIndex, onSelect = { tabsOpen = false; tabIndex = it })
+                            if (!hideTabs) AllStarsBottomBar(
+                                tabs, tabIndex,
+                                onSelect = { tabsOpen = false; tabIndex = it },
+                                // In a game, let the operator collapse the bar back to the Menu pill.
+                                onCollapse = if (inGame && tabs[tabIndex] == Tab.GAME) ({ tabsOpen = false }) else null,
+                            )
                         },
                     ) { inner ->
                         Box(Modifier.fillMaxSize().padding(inner)) {
@@ -168,7 +174,7 @@ class MainActivity : ComponentActivity() {
  * indicator swap like the default Material nav).
  */
 @Composable
-private fun AllStarsBottomBar(tabs: List<Tab>, selected: Int, onSelect: (Int) -> Unit) {
+private fun AllStarsBottomBar(tabs: List<Tab>, selected: Int, onSelect: (Int) -> Unit, onCollapse: (() -> Unit)? = null) {
     val lime = MaterialTheme.colorScheme.primary
     val field = Color(0xFF0B0E13)
     val unselectedFill = Color(0xFF18223A)
@@ -179,7 +185,20 @@ private fun AllStarsBottomBar(tabs: List<Tab>, selected: Int, onSelect: (Int) ->
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 9.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
+            if (onCollapse != null) {
+                Box(
+                    Modifier
+                        .clip(shape)
+                        .background(unselectedFill)
+                        .border(2.dp, NavHairline, shape)
+                        .clickable(onClick = onCollapse)
+                        .padding(vertical = 12.dp, horizontal = 12.dp),
+                ) {
+                    Icon(Icons.Filled.KeyboardArrowDown, contentDescription = "Hide tabs", tint = Sage, modifier = Modifier.size(20.dp))
+                }
+            }
             tabs.forEachIndexed { i, tab ->
                 val sel = i == selected
                 Row(
