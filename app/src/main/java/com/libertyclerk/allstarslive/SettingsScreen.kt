@@ -1,5 +1,6 @@
 package com.libertyclerk.allstarslive
 
+import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -36,7 +37,11 @@ import com.libertyclerk.allstarslive.youtube.YouTubeAuth
 @Composable
 fun SettingsScreen() {
     val ctx = LocalContext.current
-    var status by remember { mutableStateOf("Not connected") }
+    val prefs = remember { ctx.getSharedPreferences("allstars", Context.MODE_PRIVATE) }
+    // Show the remembered channel so returning to Settings doesn't look "disconnected".
+    var status by remember {
+        mutableStateOf(prefs.getString("yt_channel", null)?.let { "Connected: $it" } ?: "Not connected")
+    }
     var working by remember { mutableStateOf(false) }
 
     fun setOnMain(s: String, busy: Boolean) {
@@ -46,9 +51,12 @@ fun SettingsScreen() {
     fun verify(token: String) {
         status = "Checking your channel…"; working = true
         Thread {
-            val msg = runCatching { "Connected: " + YouTubeAuth.fetchChannelTitle(token) }
-                .getOrElse { "Signed in, but channel read failed: ${it.message}" }
-            setOnMain(msg, false)
+            runCatching { YouTubeAuth.fetchChannelTitle(token) }
+                .onSuccess { name ->
+                    prefs.edit().putString("yt_channel", name).apply()   // remember across tab switches
+                    setOnMain("Connected: $name", false)
+                }
+                .onFailure { setOnMain("Signed in, but channel read failed: ${it.message}", false) }
         }.start()
     }
 

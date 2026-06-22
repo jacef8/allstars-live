@@ -70,7 +70,10 @@ fun SrtIngestScreen(onUseTestPattern: () -> Unit = {}) {
     fun connect() {
         source.wifiSsid = ssid
         source.wifiPassphrase = pass
-        surface?.let { source.start(url, it) }
+        val s = surface ?: return
+        // Off the main thread: start() spins up the GL compositor, decoder, and Wi-Fi
+        // bind, which together block long enough to freeze the UI (and tab switches).
+        Thread { source.start(url, s) }.start()
     }
 
     DisposableEffect(Unit) { onDispose { source.stop() } }
