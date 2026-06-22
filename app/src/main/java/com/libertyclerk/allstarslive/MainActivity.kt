@@ -25,7 +25,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Scoreboard
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Videocam
@@ -57,10 +56,11 @@ import com.libertyclerk.allstarslive.scorer.createScorerWebView
 import com.libertyclerk.allstarslive.ui.theme.AllStarsLiveTheme
 
 /** Bottom-bar destinations. Game = scoring (next), Video = live ingest (working). */
+// Persistent app sections only. Lineup is per-game, so it lives inside the scorer
+// (Game tab -> New Game / Manage Teams), not as a global tab.
 private enum class Tab(val label: String, val icon: ImageVector) {
     GAME("Game", Icons.Filled.Scoreboard),
     VIDEO("Video", Icons.Filled.Videocam),
-    LINEUP("Lineup", Icons.Filled.People),
     SETTINGS("Settings", Icons.Filled.Settings),
 }
 
@@ -94,11 +94,6 @@ class MainActivity : ComponentActivity() {
                         when (tabs[tabIndex]) {
                             Tab.GAME -> GameScorerScreen(scorerWeb)
                             Tab.VIDEO -> VideoTab()
-                            Tab.LINEUP -> ComingSoon(
-                                Icons.Filled.People,
-                                "Lineup",
-                                "Set the batting order and field positions for the All-Stars here.",
-                            )
                             Tab.SETTINGS -> ComingSoon(
                                 Icons.Filled.Settings,
                                 "Settings",
