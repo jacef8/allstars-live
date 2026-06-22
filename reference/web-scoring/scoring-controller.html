@@ -826,15 +826,21 @@ function actionArea(){
           <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px">${list.map(card).join("")}</div>`
       : `<button data-act="gototeams" style="text-align:center;color:${T.sage};font-size:15px;padding:22px;border:1px dashed ${T.line};border-radius:12px;background:none;width:100%;cursor:pointer">No teams yet — <span style="color:${T.lime};font-weight:800">create one</span> to track rosters, records &amp; season stats.</button>`;
 
-    return `<div style="display:flex;flex-direction:column;gap:14px">
-        <div style="position:relative;border-radius:16px;padding:26px 22px;text-align:center;overflow:hidden;background:linear-gradient(135deg,${T.navy},#101B30 78%);border:2px solid ${T.lime};box-shadow:0 0 0 1px rgba(0,0,0,.4), 0 14px 34px rgba(0,0,0,.5)">
+    const hero = `<div style="position:relative;border-radius:16px;padding:22px;text-align:center;overflow:hidden;background:linear-gradient(135deg,${T.navy},#101B30 78%);border:2px solid ${T.lime};box-shadow:0 0 0 1px rgba(0,0,0,.4), 0 14px 34px rgba(0,0,0,.5)">
           <div style="position:absolute;left:0;top:0;bottom:0;width:7px;background:${T.lime};box-shadow:0 0 18px rgba(163,230,53,.7)"></div>
-          <div style="font-family:${MONO};font-size:40px;font-weight:800;letter-spacing:1.5px;line-height:1;color:#fff">ALL-STARS <span style="color:${T.lime}">LIVE</span></div></div>
-        ${gameActive?`<button data-act="resume" style="${bigBtn(T.safe)};font-size:17px;padding:16px;display:flex;align-items:center;justify-content:center;gap:8px">${IC(PLAY)} Resume &middot; ${OUR.short} vs ${OPP.short}</button>`:""}
-        <button data-act="newgamestart" style="${bigBtn(T.lime,"font-size:24px;padding:24px;box-shadow:0 8px 22px rgba(163,230,53,.22)",T.field)}">${IC(PLAY)} New Game</button>
-        ${teamsBlock}
-        <button data-act="gototeams" style="${ghost};padding:17px;font-size:17px;border:2px solid #3F6CA8;color:${T.ink};display:flex;align-items:center;justify-content:center;gap:9px">${IC('<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>')} Manage teams &amp; rosters</button>
-      </div>`;
+          <div style="font-family:${MONO};font-size:38px;font-weight:800;letter-spacing:1.5px;line-height:1;color:#fff">ALL-STARS <span style="color:${T.lime}">LIVE</span></div></div>`;
+    const resumeBtn = gameActive?`<button data-act="resume" style="${bigBtn(T.safe)};font-size:17px;padding:16px;display:flex;align-items:center;justify-content:center;gap:8px">${IC(PLAY)} Resume &middot; ${OUR.short} vs ${OPP.short}</button>`:"";
+    const newGameBtn = `<button data-act="newgamestart" style="${bigBtn(T.lime,"font-size:24px;padding:24px;box-shadow:0 8px 22px rgba(163,230,53,.22)",T.field)}">${IC(PLAY)} New Game</button>`;
+    const manageBtn = `<button data-act="gototeams" style="${ghost};padding:17px;font-size:17px;border:2px solid #3F6CA8;color:${T.ink};display:flex;align-items:center;justify-content:center;gap:9px">${IC('<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>')} Manage teams &amp; rosters</button>`;
+    // Wide (tablet): two columns so the key actions fit without scrolling — only a long
+    // team list scrolls, inside its own column. Narrow (phone): the classic vertical stack.
+    if(isWide()){
+      return `<div style="flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr;gap:16px;align-content:center">
+          <div style="display:flex;flex-direction:column;gap:14px;justify-content:center;min-width:0">${hero}${resumeBtn}${newGameBtn}</div>
+          <div style="display:flex;flex-direction:column;gap:10px;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch">${teamsBlock}${manageBtn}</div>
+        </div>`;
+    }
+    return `<div style="display:flex;flex-direction:column;gap:14px">${hero}${resumeBtn}${newGameBtn}${teamsBlock}${manageBtn}</div>`;
   }
   if(mode==="teams"){
     const sorted=DB.teams.slice().sort((a,b)=>(b.fav?1:0)-(a.fav?1:0));
