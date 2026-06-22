@@ -927,23 +927,36 @@ function actionArea(){
     const teamRow=(who,name,color,act)=>`<button data-act="${act}" style="display:flex;align-items:center;justify-content:space-between;background:${color}1f;border:1px solid ${color}55;border-left:6px solid ${color};border-radius:12px;padding:13px 14px;width:100%;text-align:left">
         <div><div style="${lbl};margin:0 0 2px">${who}</div><div style="font-family:${MONO};font-size:19px;font-weight:800;color:${T.ink}">${name}</div></div>
         <span style="color:${color};font-weight:800;font-size:12px;letter-spacing:.5px">CHANGE &rsaquo;</span></button>`;
-    return `<div style="display:flex;flex-direction:column;gap:14px">
-        <div style="display:flex;align-items:center;gap:10px">
+    const header=`<div style="display:flex;align-items:center;gap:10px;flex:none">
           <button data-act="gohome" style="${ghost};padding:9px 11px">&lsaquo; Home</button>
-          <div style="font-family:${MONO};font-size:23px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:${T.ink}">New Game</div></div>
-        ${teamRow("Your team",OUR.name,OUR.color,"pickour")}
-        ${teamRow("Opponent",OPP.name,OPP.color,"pickopp")}
-        <div><div style="${lbl}">Is ${OUR.name} home or away?</div>
-          <div style="display:flex;gap:8px">${sideBtn("home","Home")}${sideBtn("away","Away")}</div></div>
-        <div style="${rowCard}">
+          <div style="font-family:${MONO};font-size:23px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:${T.ink}">New Game</div></div>`;
+    const sideSel=`<div><div style="${lbl}">Is ${OUR.name} home or away?</div>
+          <div style="display:flex;gap:8px">${sideBtn("home","Home")}${sideBtn("away","Away")}</div></div>`;
+    const runCapCard=`<div style="${rowCard}">
           <div><div style="font-weight:800;color:${T.ink};font-size:14px">Run cap</div>
             <div style="color:${T.sage};font-size:11px;margin-top:1px">Per half-inning · 0 = no cap</div></div>
-          <input type="number" inputmode="numeric" min="0" max="30" value="${G.runCap}" oninput="ngRunCap(this.value)" style="${inpSm}"></div>
-        <div style="${rowCard}">
+          <input type="number" inputmode="numeric" min="0" max="30" value="${G.runCap}" oninput="ngRunCap(this.value)" style="${inpSm}"></div>`;
+    const hittersCard=`<div style="${rowCard}">
           <div><div style="font-weight:800;color:${T.ink};font-size:14px">Number of hitters</div>
             <div style="color:${T.sage};font-size:11px;margin-top:1px">In the opponent's lineup</div></div>
-          <input type="number" inputmode="numeric" min="1" max="15" value="${G.oppBatters}" oninput="ngOppBatters(this.value)" style="${inpSm}"></div>
-        <button data-act="ng-start" style="${bigBtn(OUR.color)};margin-top:4px">Start game &rarr;</button>
+          <input type="number" inputmode="numeric" min="1" max="15" value="${G.oppBatters}" oninput="ngOppBatters(this.value)" style="${inpSm}"></div>`;
+    const startBtn=`<button data-act="ng-start" style="${bigBtn(OUR.color)};flex:none;margin-top:2px">Start game &rarr;</button>`;
+    if(isWide()){
+      // Two columns so everything (incl. Start) fits a tablet without scrolling.
+      return `<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:14px">
+          ${header}
+          <div style="flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr;gap:16px;align-content:start">
+            <div style="display:flex;flex-direction:column;gap:12px">${teamRow("Your team",OUR.name,OUR.color,"pickour")}${teamRow("Opponent",OPP.name,OPP.color,"pickopp")}${sideSel}</div>
+            <div style="display:flex;flex-direction:column;gap:12px">${runCapCard}${hittersCard}</div>
+          </div>
+          ${startBtn}
+        </div>`;
+    }
+    return `<div style="display:flex;flex-direction:column;gap:14px">
+        ${header}
+        ${teamRow("Your team",OUR.name,OUR.color,"pickour")}
+        ${teamRow("Opponent",OPP.name,OPP.color,"pickopp")}
+        ${sideSel}${runCapCard}${hittersCard}${startBtn}
       </div>`;
   }
   if(mode==="lineup"){
