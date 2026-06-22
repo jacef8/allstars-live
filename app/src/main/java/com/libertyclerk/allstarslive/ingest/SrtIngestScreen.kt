@@ -1,24 +1,31 @@
 package com.libertyclerk.allstarslive.ingest
 
+import android.view.Surface
 import android.view.SurfaceHolder
 import android.view.SurfaceView
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -28,20 +35,22 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 /**
- * M1 ingest spike UI.
- *
- * Full-screen [SurfaceView] for the live picture with a translucent control bar
- * (SRT URL + Connect/Disconnect) and a live FPS/latency HUD. The [VideoSource]
- * is injected, so this same screen drives the placeholder today and the real
- * SRT transport once it's chosen — "see a frame" is the whole test.
+ * Operator-facing camera screen. No backend on display: it **auto-connects** with
+ * the saved camera settings and shows only a friendly status (or the live picture).
+ * All the technical bits — Wi-Fi name/password, SRT URL, FPS/latency diagnostics —
+ * live in a setup panel reached by **long-pressing** the screen (for whoever sets
+ * up the hardware). The [VideoSource] is injected, so the transport can change
+ * without touching this UI.
  */
 @Composable
 fun SrtIngestScreen() {
@@ -50,43 +59,41 @@ fun SrtIngestScreen() {
     val settings = remember { CameraSettings(ctx) }
     val stats by source.stats.collectAsStateWithLifecycle()
 
-    // Connection config — persisted & editable (not hardcoded) so the app isn't
-    // tied to one camera and a Wi-Fi password change is an in-app edit. The SRT
-    // URL is the camera's listener address; we connect as the caller.
+    var surface by remember { mutableStateOf<Surface?>(null) }
+    var showSetup by remember { mutableStateOf(false) }
+    // Advanced (setup) fields — persisted, edited only in the setup panel.
     var url by remember { mutableStateOf(settings.url) }
     var ssid by remember { mutableStateOf(settings.wifiSsid) }
     var pass by remember { mutableStateOf(settings.wifiPassphrase) }
-    var connected by remember { mutableStateOf(false) }
-    var surface by remember { mutableStateOf<android.view.Surface?>(null) }
 
-    // Push the camera Wi-Fi creds into the source so start() can join it for us.
-    fun applyCreds() {
+    fun connect() {
         source.wifiSsid = ssid
         source.wifiPassphrase = pass
+        surface?.let { source.start(url, it) }
     }
 
-    DisposableEffect(Unit) {
-        onDispose { source.stop() }
-    }
+    DisposableEffect(Unit) { onDispose { source.stop() } }
 
-    // Render the video at its true aspect ratio (letterboxed, centered) so the
-    // 16:9 camera isn't stretched to the ~16:10 screen.
     val videoAspect = if (stats.widthPx > 0 && stats.heightPx > 0)
         stats.widthPx.toFloat() / stats.heightPx else 16f / 9f
+    val playing = stats.state == IngestState.PLAYING
 
-    Box(Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
-
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(Color.Black)
+            // Hidden setup access for admins: long-press anywhere on the screen.
+            .pointerInput(Unit) { detectTapGestures(onLongPress = { showSetup = true }) },
+        contentAlignment = Alignment.Center,
+    ) {
         AndroidView(
             modifier = Modifier.fillMaxWidth().aspectRatio(videoAspect),
-            factory = { ctx ->
-                SurfaceView(ctx).apply {
+            factory = { c ->
+                SurfaceView(c).apply {
                     holder.addCallback(object : SurfaceHolder.Callback {
                         override fun surfaceCreated(holder: SurfaceHolder) {
                             surface = holder.surface
-                            if (connected) {
-                                applyCreds()
-                                source.start(url, holder.surface)
-                            }
+                            connect()   // AUTO-CONNECT with saved settings — no operator action
                         }
 
                         override fun surfaceChanged(h: SurfaceHolder, f: Int, w: Int, ht: Int) {}
@@ -100,153 +107,110 @@ fun SrtIngestScreen() {
             },
         )
 
-        Hud(stats, Modifier.align(Alignment.TopStart).padding(12.dp))
-
-        // Step-by-step connection guide — stays up until the feed is live, so the
-        // operator always has the routine in front of them when nothing is showing.
-        if (stats.state != IngestState.PLAYING) {
-            SetupGuide(Modifier.align(Alignment.Center))
+        if (playing) {
+            LiveChip(Modifier.align(Alignment.TopStart).padding(14.dp))
+        } else {
+            CameraStatus(stats.state, onSetup = { showSetup = true })
         }
 
-        // Control bar. Wi-Fi name/password + SRT URL are editable and persisted;
-        // on Connect the app joins that Wi-Fi itself. Fields hide once we're live.
+        if (showSetup) {
+            CameraSetupSheet(
+                stats = stats,
+                ssid = ssid, pass = pass, url = url,
+                onSsid = { ssid = it }, onPass = { pass = it }, onUrl = { url = it },
+                onConnect = {
+                    settings.url = url; settings.wifiSsid = ssid; settings.wifiPassphrase = pass
+                    source.stop(); connect()
+                },
+                onClose = { showSetup = false },
+            )
+        }
+    }
+}
+
+/** Friendly, jargon-free status shown when there's no live picture. */
+@Composable
+private fun CameraStatus(state: IngestState, onSetup: () -> Unit) {
+    val looking = state == IngestState.CONNECTING || state == IngestState.BUFFERING || state == IngestState.RECONNECTING
+    val title = if (looking) "Looking for your camera…" else "Camera not connected"
+    val sub = if (looking) "Make sure the camera is on and streaming." else "Tap Camera setup to get started."
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+        modifier = Modifier.widthIn(max = 420.dp).padding(24.dp),
+    ) {
+        Icon(Icons.Filled.Videocam, contentDescription = null, tint = Color(0xFF5B6880), modifier = Modifier.size(56.dp))
+        Text(title, color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+        Text(sub, color = Color(0xFF9AA0A6), fontSize = 14.sp)
+        TextButton(onClick = onSetup) {
+            Text("Camera setup", color = Color(0xFFA3E635), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
+/** Small unobtrusive LIVE badge once the feed is up. */
+@Composable
+private fun LiveChip(modifier: Modifier = Modifier) {
+    Row(
+        modifier.background(Color(0x99000000), RoundedCornerShape(999.dp)).padding(horizontal = 11.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(8.dp).background(Color(0xFF3FB950), RoundedCornerShape(999.dp)))
+        Text("LIVE", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+    }
+}
+
+/** Admin setup: the only place the camera Wi-Fi / SRT URL and raw diagnostics live. */
+@Composable
+private fun CameraSetupSheet(
+    stats: VideoStats,
+    ssid: String, pass: String, url: String,
+    onSsid: (String) -> Unit, onPass: (String) -> Unit, onUrl: (String) -> Unit,
+    onConnect: () -> Unit, onClose: () -> Unit,
+) {
+    Box(
+        Modifier.fillMaxSize().background(Color(0xCC05080C)).clickable(onClick = onClose),
+        contentAlignment = Alignment.Center,
+    ) {
         Column(
             Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .background(Color(0xCC000000))
-                .padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+                .widthIn(max = 560.dp)
+                .padding(16.dp)
+                .background(Color(0xFF141A22), RoundedCornerShape(16.dp))
+                .padding(20.dp)
+                .verticalScroll(rememberScrollState())
+                // Swallow taps so clicking inside the card doesn't close it.
+                .clickable(enabled = false) {},
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            if (!connected) {
+            Text("Camera setup", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+            CAMERA_STEPS.forEachIndexed { i, step ->
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    OutlinedTextField(
-                        value = ssid,
-                        onValueChange = { ssid = it },
-                        label = { Text("Camera Wi-Fi name") },
-                        singleLine = true,
-                        modifier = Modifier.weight(1f),
-                    )
-                    OutlinedTextField(
-                        value = pass,
-                        onValueChange = { pass = it },
-                        label = { Text("Wi-Fi password") },
-                        singleLine = true,
-                        modifier = Modifier.weight(1f),
-                    )
-                    OutlinedTextField(
-                        value = url,
-                        onValueChange = { url = it },
-                        label = { Text("SRT source URL") },
-                        singleLine = true,
-                        modifier = Modifier.weight(1.4f),
-                    )
+                    Text("${i + 1}", color = Color(0xFF4C9AFF), fontSize = 15.sp, fontFamily = FontFamily.Monospace)
+                    Text(step, color = Color(0xFFE8EAED), fontSize = 14.sp)
                 }
             }
-            Button(
-                modifier = Modifier.width(180.dp).align(Alignment.End),
-                onClick = {
-                    if (connected) {
-                        source.stop()
-                        connected = false
-                    } else {
-                        // Persist whatever the operator entered, then connect.
-                        settings.url = url
-                        settings.wifiSsid = ssid
-                        settings.wifiPassphrase = pass
-                        applyCreds()
-                        surface?.let { source.start(url, it) }
-                        connected = true
-                    }
-                },
-            ) {
-                Text(if (connected) "Disconnect" else "Connect")
-            }
+            OutlinedTextField(ssid, onSsid, label = { Text("Camera Wi-Fi name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(pass, onPass, label = { Text("Wi-Fi password") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(url, onUrl, label = { Text("Camera stream URL (SRT)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+            Button(onClick = onConnect, modifier = Modifier.fillMaxWidth()) { Text("Save & connect") }
+            // Raw diagnostics — for setup/troubleshooting only.
+            Text(
+                "state ${stats.state}   ${"%.0f".format(stats.fps)} fps   ${stats.latencyMs} ms   " +
+                    (if (stats.widthPx > 0) "${stats.widthPx}×${stats.heightPx}" else "—") +
+                    "   frames ${stats.framesRendered}" +
+                    (if (stats.message.isNotEmpty()) "\n${stats.message}" else ""),
+                color = Color(0xFF6B7585), fontSize = 12.sp, fontFamily = FontFamily.Monospace,
+            )
+            TextButton(onClick = onClose) { Text("Close", color = Color(0xFF9AA0A6)) }
         }
     }
 }
 
-/**
- * Connecting a camera, step by step. Mevo-specific for now; when Camera Profiles
- * land this list comes from the active profile so each camera shows its own steps.
- */
-// Generic, camera-agnostic steps — NOT specific to any one camera/app. Different
-// hardware starts its stream differently; per-camera instructions come later with
-// camera profiles. Keep this wording universal.
+/** Generic, camera-agnostic setup steps — per-camera instructions come with profiles later. */
 private val CAMERA_STEPS = listOf(
-    "Power on your camera and start its live stream (SRT). Some cameras need their own app or a button to begin streaming.",
+    "Power on your camera and start its live stream (SRT). Some cameras need their own app or a button to begin.",
     "Connect this tablet to the camera's Wi-Fi network.",
-    "Tap Connect to pull in the live feed.",
+    "Tap Save & connect to pull in the live feed.",
 )
-
-@Composable
-private fun SetupGuide(modifier: Modifier = Modifier) {
-    Column(
-        modifier
-            .widthIn(max = 560.dp)
-            .padding(16.dp)
-            .background(Color(0xE6101418), RoundedCornerShape(16.dp))
-            .padding(20.dp)
-            .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Text("Connect the camera", color = Color.White, fontSize = 22.sp)
-        CAMERA_STEPS.forEachIndexed { i, step ->
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(
-                    "${i + 1}",
-                    color = Color(0xFF4C9AFF),
-                    fontSize = 16.sp,
-                    fontFamily = FontFamily.Monospace,
-                    modifier = Modifier.width(20.dp),
-                )
-                Text(step, color = Color(0xFFE8EAED), fontSize = 16.sp)
-            }
-        }
-        Text(
-            "Your tablet's cellular stays on for streaming to YouTube — only the " +
-                "camera feed uses the Mevo's Wi-Fi.",
-            color = Color(0xFF9AA0A6),
-            fontSize = 13.sp,
-            modifier = Modifier.padding(top = 4.dp),
-        )
-    }
-}
-
-@Composable
-private fun Hud(stats: VideoStats, modifier: Modifier = Modifier) {
-    Column(
-        modifier
-            .background(Color(0x99000000), RoundedCornerShape(8.dp))
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-    ) {
-        HudLine("STATE", stats.state.name, stateColor(stats.state))
-        HudLine("FPS", String.format("%.1f", stats.fps))
-        HudLine("LATENCY", "${stats.latencyMs} ms")
-        HudLine("SIZE", if (stats.widthPx > 0) "${stats.widthPx}×${stats.heightPx}" else "—")
-        HudLine("FRAMES", stats.framesRendered.toString())
-        if (stats.message.isNotEmpty()) {
-            Text(stats.message, color = Color(0xFFFFC107), fontSize = 11.sp)
-        }
-    }
-}
-
-@Composable
-private fun HudLine(label: String, value: String, valueColor: Color = Color.White) {
-    Row {
-        Text(
-            "$label ",
-            color = Color(0xFF9AA0A6),
-            fontSize = 13.sp,
-            fontFamily = FontFamily.Monospace,
-        )
-        Text(value, color = valueColor, fontSize = 13.sp, fontFamily = FontFamily.Monospace)
-    }
-}
-
-private fun stateColor(state: IngestState): Color = when (state) {
-    IngestState.PLAYING -> Color(0xFF4CAF50)
-    IngestState.ERROR -> Color(0xFFE53935)
-    IngestState.RECONNECTING, IngestState.BUFFERING, IngestState.CONNECTING -> Color(0xFFFFC107)
-    IngestState.IDLE -> Color(0xFF9AA0A6)
-}
