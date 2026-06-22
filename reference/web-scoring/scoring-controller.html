@@ -78,6 +78,15 @@
   /* Tablet in landscape: use the width — wider column so the field is big and the
      event picker can sit as a side panel (no scrolling). Phones/portrait stay narrow. */
   @media (min-width:760px) and (orientation:landscape){ #app{max-width:1280px;} }
+
+  /* Monitor slide in/out (wide layout) — hide the video for distraction-free scoring.
+     Toggling .video-off on #console-row animates the monitor column away; the scorer
+     expands to fill, and a compact score line (.mini-count) appears in its place. */
+  /* Collapse is driven by inline styles on #mon-col (set in render + the toggle
+     handler); this just animates the change. The mini score line shows when hidden. */
+  #mon-col{transition:flex-basis .34s ease, max-width .34s ease, opacity .22s ease, margin-right .34s ease;}
+  .mini-count{display:none;}
+  #console-row.video-off .mini-count{display:flex;}
 </style>
 </head>
 <body>
@@ -477,6 +486,7 @@ const LINK=(()=>{
 })();
 let _seq=0,_event=null,_eventId=0,_pitch=null;
 let phonePane="score";   // phone-only paging: "score" | "video" (large screens show both)
+let monitorOn=(()=>{try{return localStorage.getItem("al-monitor-on")!=="0";}catch(e){return true;}})();  // wide: video shown/hidden
 const PLAYHEAD={single:"SINGLE",double:"DOUBLE",triple:"TRIPLE",hr:"HOME RUN",error:"REACHED ON ERROR",
   fc:"FIELDER'S CHOICE",out1:"GROUND OUT",flyout:"FLY OUT",lineout:"LINE OUT",popout:"POP OUT",
   dp:"DOUBLE PLAY",sacfly:"SAC FLY",sacbunt:"SAC BUNT",walk:"WALK",hbp:"HIT BY PITCH",strikeout:"STRIKEOUT"};
@@ -738,6 +748,18 @@ function monitorPane(){
       ${ctrls}
       <div style="position:absolute;left:8px;right:8px;bottom:8px;z-index:2;pointer-events:none">${statusBar()}</div>
     </div>`;
+}
+
+/* Compact score line shown in the scorer column ONLY when the video is hidden
+   (wide layout) — so the count/score stays visible without the monitor's scorebug. */
+function miniCount(){
+  const onb=[1,2,3].filter(n=>G.bases&&G.bases[n]).length;
+  return `<div class="mini-count" style="align-items:center;gap:16px;background:${T.surface};border:1px solid ${T.line};border-radius:10px;padding:10px 14px;flex-shrink:0;font-family:${MONO}">
+    <span style="font-weight:800;font-size:17px;color:${T.chalk}">${TEAMS.away.short} ${G.away} · ${TEAMS.home.short} ${G.home}</span>
+    <span style="font-weight:700;color:${T.sage}">${G.half==="T"?"▲":"▼"}${G.inning}</span>
+    <span style="font-weight:700;color:${T.sage}">B ${G.balls} · S ${G.strikes} · O ${G.outs}</span>
+    ${onb?`<span style="font-weight:700;color:${T.clay}">${onb} on</span>`:""}
+  </div>`;
 }
 
 /* ---- minimal line icons (inherit the button's text color) ---- */
@@ -1196,12 +1218,13 @@ function render(){
   const actionEl=pickerModal?"":`<div id="action-area" style="display:flex;flex-direction:column;gap:8px;${actionStyle}">${actionArea()}</div>`;
   let body;
   if(wide){
-    body=`<div style="flex:1;min-height:0;display:flex;flex-direction:row;gap:12px">
-        <div style="flex:0 0 52%;max-width:52%;min-height:0;display:flex;flex-direction:column;justify-content:center;gap:11px">
+    const monColCollapsed=";flex-basis:0;max-width:0;min-width:0;opacity:0;margin-right:-12px;overflow:hidden;pointer-events:none";
+    body=`<div id="console-row"${monitorOn?"":" class=\"video-off\""} style="flex:1;min-height:0;display:flex;flex-direction:row;gap:12px">
+        <div id="mon-col" style="flex:0 0 52%;max-width:52%;min-width:0;min-height:0;display:flex;flex-direction:column;justify-content:center;gap:11px${monitorOn?"":monColCollapsed}">
           ${monitorPane()}${shareBtn}${controls}
         </div>
         <div style="flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;gap:8px">
-          ${batterCard()}${fieldEl}${actionEl}
+          ${miniCount()}${batterCard()}${fieldEl}${actionEl}
         </div>
       </div>`;
   } else {
@@ -1260,6 +1283,12 @@ document.getElementById("app").addEventListener("click",e=>{
   const el=e.target.closest("[data-act]"); if(!el)return;
   const act=el.dataset.act,arg=el.dataset.arg;
   if(act==="pane"){ phonePane=arg; render(); return; }
+  if(act==="togglevideo"){
+    monitorOn=!monitorOn;
+    try{localStorage.setItem("al-monitor-on", monitorOn?"1":"0");}catch(e){}
+    render();   // re-emits the layout from monitorOn (collapsed col + mini score, or full monitor)
+    return;
+  }
   if(act==="fullscreen"){ const m=document.getElementById("monitor"); const r=m&&(m.requestFullscreen||m.webkitRequestFullscreen); if(r)r.call(m); return; }
   if(act==="ytopen"){ const ytv=streamYt(); if(ytv)window.open("https://www.youtube.com/watch?v="+encodeURIComponent(ytv),"_blank","noopener"); return; }
   if(act==="setstream"){ openStream(); return; }
@@ -1340,8 +1369,13 @@ function renderToolbar(){
     : `ALL-STARS <span style="color:${T.lime}">LIVE</span>`;
   const conn=LINK.connected(), hasRelay=LINK.hasRelay();
   const dot = !hasRelay ? {c:T.sageDim,l:"LOCAL"} : conn ? {c:T.safe,l:"LIVE"} : {c:T.out,l:"OFFLINE"};
+  // Wide-only: slide the video monitor in/out for distraction-free scoring.
+  const playMode=!["home","teams","team","pickteam","newgame","lineup","pickplayer","pickpos","editplayer","summary"].includes(mode);
+  const vidToggle=(isWide()&&playMode)?`<button data-act="togglevideo" title="${monitorOn?"Hide video":"Show video"}" style="display:flex;align-items:center;gap:7px;background:${monitorOn?T.surface2:T.lime};border:1px solid ${monitorOn?T.line:T.lime};color:${monitorOn?T.chalk:T.field};border-radius:10px;padding:9px 13px;font-size:14px;font-weight:800">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>${monitorOn?"Hide video":"Show video"}</button>`:"";
   tb.innerHTML=`<div style="display:flex;align-items:center;gap:8px;padding:4px 2px 2px">
     <div style="flex:1;min-width:0;font-family:${MONO};font-weight:700;font-size:16px;letter-spacing:.5px;color:${T.chalk};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${chip}</div>
+    ${vidToggle}
     <button data-act="share" style="display:flex;align-items:center;gap:7px;background:${T.surface2};border:1px solid ${T.line};color:${T.chalk};border-radius:10px;padding:9px 15px;font-size:15px;font-weight:800">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="${T.lime}" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="19" r="2.6"/><path d="M8.3 10.8 15.7 6.4M8.3 13.2l7.4 4.4"/></svg>Share</button>
     <div title="${dot.l}" style="display:flex;align-items:center;gap:5px;background:${T.surface};border:1px solid ${T.line};border-radius:999px;padding:5px 9px">
