@@ -22,6 +22,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -53,7 +54,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
  * without touching this UI.
  */
 @Composable
-fun SrtIngestScreen() {
+fun SrtIngestScreen(onUseTestPattern: () -> Unit = {}) {
     val ctx = LocalContext.current
     val source = remember { SrtVideoSource(ctx) }
     val settings = remember { CameraSettings(ctx) }
@@ -110,7 +111,7 @@ fun SrtIngestScreen() {
         if (playing) {
             LiveChip(Modifier.align(Alignment.TopStart).padding(14.dp))
         } else {
-            CameraStatus(stats.state, onSetup = { showSetup = true })
+            CameraStatus(stats.state, onSetup = { showSetup = true }, onUseTestPattern = onUseTestPattern)
         }
 
         if (showSetup) {
@@ -130,14 +131,14 @@ fun SrtIngestScreen() {
 
 /** Friendly, jargon-free status shown when there's no live picture. */
 @Composable
-private fun CameraStatus(state: IngestState, onSetup: () -> Unit) {
+private fun CameraStatus(state: IngestState, onSetup: () -> Unit, onUseTestPattern: () -> Unit) {
     val looking = state == IngestState.CONNECTING || state == IngestState.BUFFERING || state == IngestState.RECONNECTING
     val title = if (looking) "Looking for your camera…" else "Camera not connected"
     val sub = if (looking) "Make sure the camera is on and streaming." else "Tap Camera setup to get started."
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(10.dp),
-        modifier = Modifier.widthIn(max = 420.dp).padding(24.dp),
+        modifier = Modifier.widthIn(max = 460.dp).padding(24.dp),
     ) {
         Icon(Icons.Filled.Videocam, contentDescription = null, tint = Color(0xFF5B6880), modifier = Modifier.size(56.dp))
         Text(title, color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
@@ -145,6 +146,11 @@ private fun CameraStatus(state: IngestState, onSetup: () -> Unit) {
         TextButton(onClick = onSetup) {
             Text("Camera setup", color = Color(0xFFA3E635), fontSize = 14.sp, fontWeight = FontWeight.Bold)
         }
+        // No camera yet? Jump to the test pattern to try streaming / recording.
+        Button(
+            onClick = onUseTestPattern,
+            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4C9AFF), contentColor = Color.White),
+        ) { Text("Use test pattern instead", fontSize = 15.sp) }
     }
 }
 

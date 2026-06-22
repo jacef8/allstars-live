@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -74,9 +75,8 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         // The scorer is handheld for a whole game on top of live video — keep the screen on.
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        // Full-screen broadcast surface: hide the status + nav bars; a swipe from an
-        // edge brings them back transiently, then they auto-hide again.
-        hideSystemBars()
+        // Keep the system bars VISIBLE so the Scaffold insets push our top toggle /
+        // bottom tabs clear of the screen edges + camera cutout (hiding them clipped UI).
 
         setContent {
             AllStarsLiveTheme {
@@ -102,22 +102,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    // Re-hide the bars after they were shown by a swipe, the soft keyboard, or a dialog.
-    override fun onWindowFocusChanged(hasFocus: Boolean) {
-        super.onWindowFocusChanged(hasFocus)
-        if (hasFocus) hideSystemBars()
-    }
-
-    private fun hideSystemBars() {
-        WindowCompat.setDecorFitsSystemWindows(window, false)
-        WindowInsetsControllerCompat(window, window.decorView).apply {
-            // Hide only the status bar for a clean top; keep the navigation area so the
-            // tablet's gesture/nav bar doesn't sit on top of our bottom tabs.
-            hide(WindowInsetsCompat.Type.statusBars())
-            systemBarsBehavior =
-                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-        }
-    }
 }
 
 /**
@@ -170,36 +154,15 @@ private fun AllStarsBottomBar(tabs: List<Tab>, selected: Int, onSelect: (Int) ->
     }
 }
 
-/** Video tab: choose the live SRT camera, or the M2 compositor test (pattern + scorebug + record). */
+/** Video tab: live camera, or a test pattern (for streaming/recording without the camera).
+ *  The mode switch lives INSIDE each screen (a top Row toggle wouldn't render reliably
+ *  above the SurfaceView), so each screen offers a button to jump to the other. */
 @Composable
 private fun VideoTab() {
-    var mode by rememberSaveable { mutableStateOf(0) }   // 0 = Live camera, 1 = M2 test
-    Column(Modifier.fillMaxSize()) {
-        Row(
-            Modifier.fillMaxWidth().background(NavBarColor).padding(8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            val gold = MaterialTheme.colorScheme.primary
-            Button(
-                onClick = { mode = 0 },
-                modifier = Modifier.weight(1f),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (mode == 0) gold else NavBarColor,
-                    contentColor = if (mode == 0) Color(0xFF0B0E13) else Sage,
-                ),
-            ) { Text("Live camera") }
-            Button(
-                onClick = { mode = 1 },
-                modifier = Modifier.weight(1f),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (mode == 1) gold else NavBarColor,
-                    contentColor = if (mode == 1) Color(0xFF0B0E13) else Sage,
-                ),
-            ) { Text("M2 test") }
-        }
-        Box(Modifier.fillMaxWidth().weight(1f)) {
-            if (mode == 0) SrtIngestScreen() else CompositorTestScreen()
-        }
+    var mode by rememberSaveable { mutableStateOf(0) }   // 0 = Camera, 1 = Test pattern
+    Box(Modifier.fillMaxSize()) {
+        if (mode == 0) SrtIngestScreen(onUseTestPattern = { mode = 1 })
+        else CompositorTestScreen(onUseCamera = { mode = 0 })
     }
 }
 

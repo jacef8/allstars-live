@@ -10,6 +10,7 @@ import android.os.Looper
 import android.view.SurfaceHolder
 import android.view.SurfaceView
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -61,7 +62,7 @@ private class M2State {
  * composite + record pipeline without needing the camera live.
  */
 @Composable
-fun CompositorTestScreen() {
+fun CompositorTestScreen(onUseCamera: () -> Unit = {}) {
     val ctx = LocalContext.current
     val stub = remember { StubVideoSource() }
     val st = remember { M2State() }
@@ -140,7 +141,9 @@ fun CompositorTestScreen() {
             Modifier.align(Alignment.TopStart).padding(12.dp)
                 .background(Color(0x99000000), RoundedCornerShape(8.dp)).padding(horizontal = 12.dp, vertical = 8.dp),
         ) {
-            Text("M2 COMPOSITOR TEST", color = Color(0xFFA3E635), fontSize = 12.sp, fontFamily = FontFamily.Monospace)
+            Text("TEST PATTERN", color = Color(0xFFA3E635), fontSize = 12.sp, fontFamily = FontFamily.Monospace)
+            Text("← Use camera", color = Color(0xFF4C9AFF), fontSize = 12.sp, fontFamily = FontFamily.Monospace,
+                modifier = Modifier.clickable { onUseCamera() })
             Text("state ${stats.state}", color = Color.White, fontSize = 13.sp, fontFamily = FontFamily.Monospace)
             Text("fps ${"%.1f".format(stats.fps)}   frames ${stats.framesRendered}", color = Color.White, fontSize = 13.sp, fontFamily = FontFamily.Monospace)
             if (recording) Text("● REC", color = Color(0xFFFF3B5C), fontSize = 13.sp, fontFamily = FontFamily.Monospace)
