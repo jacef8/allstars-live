@@ -2,10 +2,13 @@ package com.libertyclerk.allstarslive.scorer
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.view.ViewGroup
 import android.webkit.JavascriptInterface
+import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.foundation.layout.fillMaxSize
@@ -37,7 +40,23 @@ fun createScorerWebView(context: Context): WebView {
         settings.allowFileAccess = true
         setBackgroundColor(0xFF10141A.toInt())     // match the scorer's dark field bg
         addJavascriptInterface(ScorerBridge(context.applicationContext), "AllStars")
-        webViewClient = WebViewClient()            // keep navigation in the WebView
+        // Keep the scorer (file://) in the WebView; send any real http(s) link (e.g. the
+        // YouTube watch page) to the external browser/app so the operator can return via
+        // the Android back button instead of being stranded in the WebView.
+        webViewClient = object : WebViewClient() {
+            override fun shouldOverrideUrlLoading(view: WebView, req: WebResourceRequest): Boolean {
+                val u = req.url
+                if (u.scheme == "http" || u.scheme == "https") {
+                    runCatching {
+                        view.context.startActivity(
+                            Intent(Intent.ACTION_VIEW, u).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                        )
+                    }
+                    return true
+                }
+                return false
+            }
+        }
         loadUrl("file:///android_asset/scorer/scoring-controller.html")
     }
 }
@@ -57,6 +76,16 @@ private class ScorerBridge(private val appContext: Context) {
     /** "End broadcast" from the Game page. */
     @JavascriptInterface
     fun stopStream() { main.post { Broadcast.stop() } }
+
+    /** Open a link (e.g. the YouTube watch page) in the external app/browser. */
+    @JavascriptInterface
+    fun openExternal(url: String) {
+        runCatching {
+            appContext.startActivity(
+                Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            )
+        }
+    }
 }
 
 @Composable

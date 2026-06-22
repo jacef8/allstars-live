@@ -42,6 +42,7 @@ object YouTubeLive {
             put("contentDetails", JSONObject()
                 .put("enableAutoStart", true)
                 .put("enableAutoStop", true)
+                .put("enableEmbed", true)   // allow our in-app monitor to play it (else YouTube error 153/150)
                 .put("monitorStream", JSONObject().put("enableMonitorStream", false)))
         }
         val bc = api(token, "liveBroadcasts?part=snippet,status,contentDetails", bcBody)

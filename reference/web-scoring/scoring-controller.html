@@ -1303,7 +1303,7 @@ document.getElementById("app").addEventListener("click",e=>{
     return;
   }
   if(act==="fullscreen"){ const m=document.getElementById("monitor"); const r=m&&(m.requestFullscreen||m.webkitRequestFullscreen); if(r)r.call(m); return; }
-  if(act==="ytopen"){ const ytv=streamYt(); if(ytv)window.open("https://www.youtube.com/watch?v="+encodeURIComponent(ytv),"_blank","noopener"); return; }
+  if(act==="ytopen"){ const ytv=streamYt(); if(ytv){ const u="https://www.youtube.com/watch?v="+encodeURIComponent(ytv); if(IS_APP&&window.AllStars.openExternal)AllStars.openExternal(u); else window.open(u,"_blank","noopener"); } return; }
   if(act==="appgolive"){ try{ window.AllStars.requestGoLive(); }catch(e){} return; }
   if(act==="appstop"){ try{ window.AllStars.stopStream(); }catch(e){} return; }
   if(act==="setstream"){ openStream(); return; }

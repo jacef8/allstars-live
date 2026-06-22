@@ -7,6 +7,7 @@ import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -72,6 +73,9 @@ fun SrtIngestScreen(onUseTestPattern: () -> Unit = {}) {
 
     var surface by remember { mutableStateOf<Surface?>(null) }
     var showSetup by remember { mutableStateOf(false) }
+    // Which camera the operator uses — picks the right setup instructions. Persisted.
+    val prefs = remember { ctx.getSharedPreferences("allstars", android.content.Context.MODE_PRIVATE) }
+    var cameraProfile by remember { mutableStateOf(prefs.getString("cam_profile", "mevo") ?: "mevo") }
 
     fun connect() {
         val s = surface ?: return
@@ -140,6 +144,8 @@ fun SrtIngestScreen(onUseTestPattern: () -> Unit = {}) {
             CameraSetupSheet(
                 stats = stats,
                 publishUrl = RtmpHub.publishHint,
+                profileId = cameraProfile,
+                onProfile = { cameraProfile = it; prefs.edit().putString("cam_profile", it).apply() },
                 onRestart = { source.shutdown(); connect() },
                 onClose = { showSetup = false },
             )
@@ -155,7 +161,7 @@ private fun CameraStatus(state: IngestState, message: String, onSetup: () -> Uni
     // While waiting, RtmpVideoSource puts the exact publish URL in the message so the
     // operator can type it into the Mevo's Custom RTMP destination.
     val urlHint = message.substringAfter("rtmp://", "").let { if (it.isNotEmpty()) "rtmp://$it" else "" }
-    val sub = if (looking) "On the Mevo, set the Custom RTMP destination to:" else "Tap Camera setup to get started."
+    val sub = if (looking) "On your camera, set the RTMP destination to:" else "Tap Camera setup to get started."
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -175,7 +181,7 @@ private fun CameraStatus(state: IngestState, message: String, onSetup: () -> Uni
                     .background(Color(0xFF101720), RoundedCornerShape(8.dp))
                     .clickable {
                         clipboard.setText(AnnotatedString(urlHint))
-                        Toast.makeText(ctx, "Copied — paste into the Mevo", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(ctx, "Copied — paste into your camera app", Toast.LENGTH_SHORT).show()
                     }
                     .padding(horizontal = 12.dp, vertical = 8.dp),
             ) {
@@ -258,17 +264,20 @@ private fun LiveChip(modifier: Modifier = Modifier) {
     }
 }
 
-/** Admin setup: how to point the camera at this app (RTMP push) + raw diagnostics. */
+/** Admin setup: pick the camera, get its specific instructions + the RTMP address. */
 @Composable
 private fun CameraSetupSheet(
     stats: VideoStats,
     publishUrl: String,
+    profileId: String,
+    onProfile: (String) -> Unit,
     onRestart: () -> Unit,
     onClose: () -> Unit,
 ) {
     val clipboard = LocalClipboardManager.current
     val ctx = LocalContext.current
     val url = if (publishUrl.startsWith("rtmp://")) publishUrl else ""
+    val profile = profileOf(profileId)
     Box(
         Modifier.fillMaxSize().background(Color(0xCC05080C)).clickable(onClick = onClose).imePadding(),
         contentAlignment = Alignment.Center,
@@ -289,7 +298,26 @@ private fun CameraSetupSheet(
                 "The camera streams to this tablet; we add the scorebug and send it to YouTube.",
                 color = Color(0xFF9AA0A6), fontSize = 13.sp,
             )
-            CAMERA_STEPS.forEachIndexed { i, step ->
+            // Camera picker — instructions below adapt to the selected camera.
+            Text("YOUR CAMERA", color = Color(0xFF6B7585), fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+            Row(
+                Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                CAMERA_PROFILES.forEach { p ->
+                    val on = p.id == profileId
+                    Text(
+                        p.name,
+                        color = if (on) Color(0xFF05080C) else Color(0xFFE8EAED),
+                        fontSize = 14.sp, fontWeight = if (on) FontWeight.Bold else FontWeight.Normal,
+                        modifier = Modifier
+                            .background(if (on) Color(0xFFA3E635) else Color(0xFF222B36), RoundedCornerShape(999.dp))
+                            .clickable { onProfile(p.id) }
+                            .padding(horizontal = 14.dp, vertical = 8.dp),
+                    )
+                }
+            }
+            profile.steps.forEachIndexed { i, step ->
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text("${i + 1}", color = Color(0xFF4C9AFF), fontSize = 15.sp, fontFamily = FontFamily.Monospace)
                     Text(step, color = Color(0xFFE8EAED), fontSize = 14.sp)
@@ -339,9 +367,57 @@ private fun CameraSetupSheet(
     }
 }
 
-/** RTMP-push setup steps (the Mevo publishes to this tablet). */
-private val CAMERA_STEPS = listOf(
-    "Connect this tablet to the camera's Wi-Fi (Android Settings → Wi-Fi).",
-    "In the Mevo app: turn SRT off, then add a Custom RTMP destination using the address below.",
-    "In the Mevo app: press Go Live and choose that Custom RTMP destination.",
+/** A camera type + its RTMP-push setup steps. All push to the same address below. */
+private data class CameraProfile(val id: String, val name: String, val steps: List<String>)
+
+private fun profileOf(id: String): CameraProfile =
+    CAMERA_PROFILES.firstOrNull { it.id == id } ?: CAMERA_PROFILES.first()
+
+/** Per-camera instructions. Every camera ends up pushing RTMP to this tablet. */
+private val CAMERA_PROFILES = listOf(
+    CameraProfile(
+        "mevo", "Mevo",
+        listOf(
+            "Connect this tablet to the Mevo's Wi-Fi (Android Settings → Wi-Fi).",
+            "In the Mevo app: open streaming settings and turn SRT OFF.",
+            "Add a Custom RTMP destination and paste the address below (stream key: any).",
+            "Press Go Live and choose that Custom RTMP destination.",
+        ),
+    ),
+    CameraProfile(
+        "gopro", "GoPro",
+        listOf(
+            "Put this tablet and the GoPro/Quik app on the same Wi-Fi.",
+            "In GoPro Quik: control the camera → Live → set the platform to RTMP / Other.",
+            "Paste the address below as the RTMP URL (stream key: any).",
+            "Start the live stream.",
+        ),
+    ),
+    CameraProfile(
+        "dji", "DJI",
+        listOf(
+            "Put this tablet and the DJI app (Mimo / Fly) on the same Wi-Fi.",
+            "In the DJI app: Live Streaming → choose RTMP / Custom (Platform).",
+            "Paste the address below as the RTMP URL.",
+            "Start the live stream.",
+        ),
+    ),
+    CameraProfile(
+        "phone", "Phone",
+        listOf(
+            "Install an RTMP camera app (e.g. Larix Broadcaster) on the phone.",
+            "Put the phone on the same Wi-Fi as this tablet.",
+            "Set its connection / server URL to the address below (stream key: any).",
+            "Start streaming from the app.",
+        ),
+    ),
+    CameraProfile(
+        "other", "Other",
+        listOf(
+            "Put the camera/encoder on the same Wi-Fi as this tablet.",
+            "In its live-stream settings choose Custom RTMP.",
+            "Use the address below as the RTMP server URL (stream key: any).",
+            "Start the stream.",
+        ),
+    ),
 )
