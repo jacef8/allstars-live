@@ -81,6 +81,16 @@ class MainActivity : ComponentActivity() {
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         // Bring the camera link up at launch so Go Live works from any tab (not just Video).
         com.libertyclerk.allstarslive.ingest.RtmpReceiverService.start(this, 1935)
+        // Mic for the broadcast's audio track (YouTube needs audio to go live). Silence
+        // is the fallback if denied, but real game sound is better — ask once.
+        val needAudio = checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) != android.content.pm.PackageManager.PERMISSION_GRANTED
+        val needNotif = android.os.Build.VERSION.SDK_INT >= 33 &&
+            checkSelfPermission("android.permission.POST_NOTIFICATIONS") != android.content.pm.PackageManager.PERMISSION_GRANTED
+        val ask = buildList {
+            if (needAudio) add(android.Manifest.permission.RECORD_AUDIO)
+            if (needNotif) add("android.permission.POST_NOTIFICATIONS")
+        }
+        if (ask.isNotEmpty()) requestPermissions(ask.toTypedArray(), 1)
         // Keep the system bars VISIBLE so the Scaffold insets push our top toggle /
         // bottom tabs clear of the screen edges + camera cutout (hiding them clipped UI).
 

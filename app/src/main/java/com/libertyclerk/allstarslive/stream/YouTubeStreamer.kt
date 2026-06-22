@@ -1,22 +1,28 @@
 package com.libertyclerk.allstarslive.stream
 
+import android.annotation.SuppressLint
+import android.media.AudioFormat
+import android.media.AudioRecord
 import android.media.MediaCodec
 import android.media.MediaCodecInfo
 import android.media.MediaFormat
+import android.media.MediaRecorder
 import android.util.Log
 import android.view.Surface
 import com.pedro.common.ConnectChecker
 import com.pedro.rtmp.rtmp.RtmpClient
 
 /**
- * M3 (slice 1, video-only): pushes the composited program frame to YouTube Live
- * over RTMP. The [com.libertyclerk.allstarslive.gl.VideoCompositor] draws each
- * frame into [inputSurface] (our H.264 encoder's input); [drain] (called on the
- * compositor's GL thread after every frame) pulls the encoded NALUs and hands them
- * to RootEncoder's [RtmpClient], which talks RTMP to YouTube.
+ * Pushes the composited program frame to YouTube Live over RTMP. The
+ * [com.libertyclerk.allstarslive.gl.VideoCompositor] draws each frame into
+ * [inputSurface] (our H.264 encoder's input); [drain] (called on the compositor's GL
+ * thread after every frame) pulls the encoded NALUs and hands them to RootEncoder's
+ * [RtmpClient].
  *
- * Audio (mic -> AAC) is the next slice; until then we stream video-only
- * (setOnlyVideo(true)). YouTube URL = rtmp://a.rtmp.youtube.com/live2/<stream-key>.
+ * Audio: YouTube Live will NOT transition a broadcast to "live" without an audio
+ * track (the stream just sits at "upcoming"), so we always send AAC — from the mic
+ * when RECORD_AUDIO is granted (real game sound), otherwise silence as a fallback.
+ * YouTube URL = rtmp://a.rtmp.youtube.com/live2/<stream-key>.
  */
 class YouTubeStreamer(
     private val width: Int,
@@ -42,6 +48,12 @@ class YouTubeStreamer(
     @Volatile private var streaming = false
     @Volatile private var sentConfig = false
 
+    // ---- audio ----
+    private val sampleRate = 44100
+    private val audioEncoder = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_AUDIO_AAC)
+    private val audioInfo = MediaCodec.BufferInfo()
+    private var audioThread: Thread? = null
+
     init {
         val format = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, width, height).apply {
             setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface)
@@ -51,19 +63,29 @@ class YouTubeStreamer(
         }
         encoder.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
         inputSurface = encoder.createInputSurface()   // must precede start()
-        client.setOnlyVideo(true)                     // slice 1: video-only
+
+        val aFmt = MediaFormat.createAudioFormat(MediaFormat.MIMETYPE_AUDIO_AAC, sampleRate, 1).apply {
+            setInteger(MediaFormat.KEY_AAC_PROFILE, MediaCodecInfo.CodecProfileLevel.AACObjectLC)
+            setInteger(MediaFormat.KEY_BIT_RATE, 128_000)
+            setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, 8192)
+        }
+        audioEncoder.configure(aFmt, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
+
         client.setVideoResolution(width, height)
         client.setFps(fps)
+        client.setAudioInfo(sampleRate, false)   // mono — and tells the client we DO have audio
     }
 
     /** Start encoding and connect. [rtmpUrl] = rtmp://a.rtmp.youtube.com/live2/<key> */
     fun start(rtmpUrl: String) {
         encoder.start()
+        audioEncoder.start()
         streaming = true
+        startAudio()
         client.connect(rtmpUrl)
     }
 
-    /** Pull encoded frames and send them. Runs on the compositor's GL thread. */
+    /** Pull encoded VIDEO frames and send them. Runs on the compositor's GL thread. */
     fun drain() {
         if (!streaming) return
         while (true) {
@@ -91,12 +113,86 @@ class YouTubeStreamer(
         }
     }
 
-    /** Stop streaming and release the encoder. Call on the compositor GL thread (after detach). */
+    /** Capture audio (mic, or silence if unavailable) -> AAC -> RTMP, on its own thread. */
+    @SuppressLint("MissingPermission")
+    private fun startAudio() {
+        audioThread = Thread {
+            val chunkSamples = 1024
+            val chunkBytes = chunkSamples * 2          // 16-bit mono
+            val pcm = ByteArray(chunkBytes)
+            val usPerChunk = chunkSamples * 1_000_000L / sampleRate
+            var ptsUs = 0L
+
+            // Try the mic; fall back to silence (so YouTube still gets an audio track).
+            val mic = runCatching {
+                val min = AudioRecord.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
+                AudioRecord(
+                    MediaRecorder.AudioSource.MIC, sampleRate,
+                    AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT,
+                    maxOf(min, chunkBytes * 4),
+                ).takeIf { it.state == AudioRecord.STATE_INITIALIZED }
+            }.getOrNull()
+            mic?.runCatching { startRecording() }
+            Log.i(TAG, if (mic != null) "audio: mic" else "audio: silence")
+
+            try {
+                while (streaming) {
+                    if (mic != null) {
+                        val n = mic.read(pcm, 0, chunkBytes)
+                        if (n <= 0) { Thread.sleep(5); continue }
+                        feedAudio(pcm, n, ptsUs)
+                    } else {
+                        java.util.Arrays.fill(pcm, 0)
+                        feedAudio(pcm, chunkBytes, ptsUs)
+                        Thread.sleep(20)               // pace silence ~real-time
+                    }
+                    ptsUs += usPerChunk
+                    drainAudio()
+                }
+            } catch (_: InterruptedException) {
+            } finally {
+                mic?.runCatching { stop() }
+                mic?.runCatching { release() }
+            }
+        }.also { it.start() }
+    }
+
+    private fun feedAudio(data: ByteArray, len: Int, ptsUs: Long) {
+        val idx = try { audioEncoder.dequeueInputBuffer(10_000) } catch (e: IllegalStateException) { return }
+        if (idx >= 0) {
+            val ib = audioEncoder.getInputBuffer(idx) ?: return
+            ib.clear(); ib.put(data, 0, len)
+            audioEncoder.queueInputBuffer(idx, 0, len, ptsUs, 0)
+        }
+    }
+
+    private fun drainAudio() {
+        while (true) {
+            val i = try { audioEncoder.dequeueOutputBuffer(audioInfo, 0) } catch (e: IllegalStateException) { return }
+            when {
+                i == MediaCodec.INFO_TRY_AGAIN_LATER -> return
+                i == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {}
+                i >= 0 -> {
+                    val buf = audioEncoder.getOutputBuffer(i)
+                    val isConfig = audioInfo.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG != 0
+                    if (buf != null && audioInfo.size > 0 && !isConfig) {
+                        runCatching { client.sendAudio(buf, audioInfo) }
+                    }
+                    audioEncoder.releaseOutputBuffer(i, false)
+                }
+            }
+        }
+    }
+
+    /** Stop streaming and release encoders. Call on the compositor GL thread (after detach). */
     fun stop() {
         streaming = false
+        audioThread?.interrupt(); audioThread = null
         runCatching { client.disconnect() }
         runCatching { encoder.stop() }
         runCatching { encoder.release() }
+        runCatching { audioEncoder.stop() }
+        runCatching { audioEncoder.release() }
         runCatching { inputSurface.release() }
         Log.i(TAG, "stream stopped")
     }
