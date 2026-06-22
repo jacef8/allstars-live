@@ -66,23 +66,18 @@ fun SrtIngestScreen(onUseTestPattern: () -> Unit = {}) {
     // retired for the Mevo — it only serves SRT while streaming to a network
     // destination, and "Go Live" forces picking one. See RtmpVideoSource.
     val source = remember { RtmpVideoSource(ctx) }
-    val settings = remember { CameraSettings(ctx) }
     val stats by source.stats.collectAsStateWithLifecycle()
     // Shared YouTube broadcast state — same source of truth as the Game page.
     val bcast by Broadcast.state.collectAsStateWithLifecycle()
 
     var surface by remember { mutableStateOf<Surface?>(null) }
     var showSetup by remember { mutableStateOf(false) }
-    // Advanced (setup) fields — persisted, edited only in the setup panel.
-    var url by remember { mutableStateOf(settings.url) }
-    var ssid by remember { mutableStateOf(settings.wifiSsid) }
-    var pass by remember { mutableStateOf(settings.wifiPassphrase) }
 
     fun connect() {
         val s = surface ?: return
         // Off the main thread: start() spins up the GL compositor, decoder, and the
         // RTMP listener, which together block long enough to freeze the UI.
-        Thread { source.start(url, s) }.start()
+        Thread { source.start("", s) }.start()
     }
 
     DisposableEffect(Unit) { onDispose { source.stop() } }
@@ -144,12 +139,8 @@ fun SrtIngestScreen(onUseTestPattern: () -> Unit = {}) {
         if (showSetup) {
             CameraSetupSheet(
                 stats = stats,
-                ssid = ssid, pass = pass, url = url,
-                onSsid = { ssid = it }, onPass = { pass = it }, onUrl = { url = it },
-                onConnect = {
-                    settings.url = url; settings.wifiSsid = ssid; settings.wifiPassphrase = pass
-                    source.stop(); connect()
-                },
+                publishUrl = RtmpHub.publishHint,
+                onRestart = { source.shutdown(); connect() },
                 onClose = { showSetup = false },
             )
         }
@@ -267,14 +258,17 @@ private fun LiveChip(modifier: Modifier = Modifier) {
     }
 }
 
-/** Admin setup: the only place the camera Wi-Fi / SRT URL and raw diagnostics live. */
+/** Admin setup: how to point the camera at this app (RTMP push) + raw diagnostics. */
 @Composable
 private fun CameraSetupSheet(
     stats: VideoStats,
-    ssid: String, pass: String, url: String,
-    onSsid: (String) -> Unit, onPass: (String) -> Unit, onUrl: (String) -> Unit,
-    onConnect: () -> Unit, onClose: () -> Unit,
+    publishUrl: String,
+    onRestart: () -> Unit,
+    onClose: () -> Unit,
 ) {
+    val clipboard = LocalClipboardManager.current
+    val ctx = LocalContext.current
+    val url = if (publishUrl.startsWith("rtmp://")) publishUrl else ""
     Box(
         Modifier.fillMaxSize().background(Color(0xCC05080C)).clickable(onClick = onClose).imePadding(),
         contentAlignment = Alignment.Center,
@@ -291,22 +285,53 @@ private fun CameraSetupSheet(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text("Camera setup", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+            Text(
+                "The camera streams to this tablet; we add the scorebug and send it to YouTube.",
+                color = Color(0xFF9AA0A6), fontSize = 13.sp,
+            )
             CAMERA_STEPS.forEachIndexed { i, step ->
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text("${i + 1}", color = Color(0xFF4C9AFF), fontSize = 15.sp, fontFamily = FontFamily.Monospace)
                     Text(step, color = Color(0xFFE8EAED), fontSize = 14.sp)
                 }
             }
-            OutlinedTextField(ssid, onSsid, label = { Text("Camera Wi-Fi name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-            OutlinedTextField(pass, onPass, label = { Text("Wi-Fi password") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-            OutlinedTextField(url, onUrl, label = { Text("Camera stream URL (SRT)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-            Button(onClick = onConnect, modifier = Modifier.fillMaxWidth()) { Text("Save & connect") }
+            // The address to type into the Mevo's Custom RTMP destination.
+            Text(
+                "CAMERA RTMP ADDRESS", color = Color(0xFF6B7585),
+                fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp,
+            )
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(0xFF101720), RoundedCornerShape(8.dp))
+                    .clickable {
+                        if (url.isNotEmpty()) {
+                            clipboard.setText(AnnotatedString(url))
+                            Toast.makeText(ctx, "Copied — paste into the Mevo", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+            ) {
+                Text(
+                    url.ifEmpty { "Connect the tablet to the camera's Wi-Fi first…" },
+                    color = if (url.isNotEmpty()) Color(0xFFA3E635) else Color(0xFF9AA0A6),
+                    fontSize = 15.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace,
+                    modifier = Modifier.weight(1f),
+                )
+                if (url.isNotEmpty()) {
+                    Icon(Icons.Filled.ContentCopy, contentDescription = "Copy", tint = Color(0xFF9AA0A6), modifier = Modifier.size(18.dp))
+                }
+            }
+            Text("Stream key: anything (e.g. live).  SRT must be OFF in the Mevo.", color = Color(0xFF6B7585), fontSize = 12.sp)
+
+            Button(onClick = onRestart, modifier = Modifier.fillMaxWidth()) { Text("Restart camera link") }
             // Raw diagnostics — for setup/troubleshooting only.
             Text(
-                "state ${stats.state}   ${"%.0f".format(stats.fps)} fps   ${stats.latencyMs} ms   " +
+                "state ${stats.state}   ${"%.0f".format(stats.fps)} fps   " +
                     (if (stats.widthPx > 0) "${stats.widthPx}×${stats.heightPx}" else "—") +
-                    "   frames ${stats.framesRendered}" +
-                    (if (stats.message.isNotEmpty()) "\n${stats.message}" else ""),
+                    "   frames ${stats.framesRendered}",
                 color = Color(0xFF6B7585), fontSize = 12.sp, fontFamily = FontFamily.Monospace,
             )
             TextButton(onClick = onClose) { Text("Close", color = Color(0xFF9AA0A6)) }
@@ -314,9 +339,9 @@ private fun CameraSetupSheet(
     }
 }
 
-/** Generic, camera-agnostic setup steps — per-camera instructions come with profiles later. */
+/** RTMP-push setup steps (the Mevo publishes to this tablet). */
 private val CAMERA_STEPS = listOf(
-    "Power on your camera and start its live stream (SRT). Some cameras need their own app or a button to begin.",
-    "Connect this tablet to the camera's Wi-Fi network.",
-    "Tap Save & connect to pull in the live feed.",
+    "Connect this tablet to the camera's Wi-Fi (Android Settings → Wi-Fi).",
+    "In the Mevo app: turn SRT off, then add a Custom RTMP destination using the address below.",
+    "In the Mevo app: press Go Live and choose that Custom RTMP destination.",
 )
