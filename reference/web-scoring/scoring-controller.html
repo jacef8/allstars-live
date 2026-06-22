@@ -1263,9 +1263,7 @@ function render(){
   // Wide (tablet): a single compact row under a BIGGER monitor — instead of a full-width
   // Share button plus a separate controls row stacked beneath, which crowded the player.
   const wideBtn=(act,label,extra)=>`<button data-act="${act}" style="background:${T.surface2};border:1px solid ${T.line};color:${T.chalk};border-radius:9px;padding:10px 13px;font-family:${SANS};font-size:14px;font-weight:700;white-space:nowrap;${extra||""}">${label}</button>`;
-  const wideBar=playing?"":`<div style="display:flex;gap:8px;align-items:center;flex:none;flex-wrap:wrap">
-      <button data-act="share" style="display:flex;align-items:center;gap:7px;background:${T.surface2};border:1px solid ${T.line};color:${T.chalk};border-radius:9px;padding:10px 13px;font-family:${SANS};font-size:14px;font-weight:700;white-space:nowrap">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${T.lime}" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="19" r="2.6"/><path d="M8.3 10.8 15.7 6.4M8.3 13.2l7.4 4.4"/></svg>Share</button>
+  const wideBar=playing?"":`<div style="display:flex;gap:8px;align-items:center;justify-content:center;flex:none;flex-wrap:wrap">
       ${wideBtn("undo","↶ Undo")}
       ${mode==="idle"?wideBtn("home","⌂ Home")+wideBtn("lineup","Lineup")+wideBtn("endgame","End",`color:${T.out};border-color:${T.out}`):""}
     </div>`;
@@ -1284,7 +1282,7 @@ function render(){
     // decisions get the rest of the width — more room, less scrolling.
     body=`<div id="console-row" class="video-off" style="flex:1;min-height:0;display:flex;flex-direction:row;gap:12px">
         <div style="flex:0 0 46%;max-width:46%;min-width:0;min-height:0;display:flex;flex-direction:column;gap:8px">
-          ${miniCount()}${batterCard()}${fieldEl}${wideBar}
+          ${miniCount()}${batterCard()}<div style="flex:1;min-height:0;display:flex;align-items:center;justify-content:center;position:relative">${diamondSVG()}${toastEl}</div>${wideBar}
         </div>
         <div style="flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;gap:8px">
           ${actionEl}
