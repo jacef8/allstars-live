@@ -733,7 +733,9 @@ function appLive(){ return window.__bcastPhase==="LIVE" || window.__bcastPhase==
    placeholder) with the scorebug overlaid — exactly what streams to YouTube.
    This is the web mirror of the native tablet console (monitor + scorer in one). */
 function monitorPane(){
-  const yt=streamYt();
+  // In the app, only show the player while actually live — otherwise show the
+  // "Start game stream" placeholder (don't surface a stale/ended broadcast id).
+  const yt=(IS_APP && !appLive())?"":streamYt();
   const feed=yt
     ? `<iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(yt)}?autoplay=1&mute=1&playsinline=1&modestbranding=1&rel=0" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen style="position:absolute;inset:0;width:100%;height:100%;border:0"></iframe>`
     : `<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;padding:0 20px 104px;background:radial-gradient(circle at 50% 34%, #16202e, #0b0f15)">
@@ -1229,12 +1231,21 @@ function render(){
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="${T.lime}" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="19" r="2.6"/><path d="M8.3 10.8 15.7 6.4M8.3 13.2l7.4 4.4"/></svg>Share with fans</button>`;
   const fieldEl=`<div style="${fieldStyle};display:flex;align-items:center;justify-content:center;position:relative">${diamondSVG()}${toastEl}</div>`;
   const actionEl=pickerModal?"":`<div id="action-area" style="display:flex;flex-direction:column;gap:8px;${actionStyle}">${actionArea()}</div>`;
+  // Wide (tablet): a single compact row under a BIGGER monitor — instead of a full-width
+  // Share button plus a separate controls row stacked beneath, which crowded the player.
+  const wideBtn=(act,label,extra)=>`<button data-act="${act}" style="background:${T.surface2};border:1px solid ${T.line};color:${T.chalk};border-radius:9px;padding:10px 13px;font-family:${SANS};font-size:14px;font-weight:700;white-space:nowrap;${extra||""}">${label}</button>`;
+  const wideBar=playing?"":`<div style="display:flex;gap:8px;align-items:center;flex:none">
+      <button data-act="share" style="flex:1;min-width:0;background:${T.surface2};border:2px solid ${T.line};color:${T.chalk};border-radius:9px;padding:11px;font-family:${SANS};font-size:15px;font-weight:800;display:flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="${T.lime}" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="19" r="2.6"/><path d="M8.3 10.8 15.7 6.4M8.3 13.2l7.4 4.4"/></svg>Share</button>
+      ${wideBtn("undo","↶ Undo")}
+      ${mode==="idle"?wideBtn("home","⌂ Home")+wideBtn("lineup","Lineup")+wideBtn("endgame","End",`color:${T.out};border-color:${T.out}`):""}
+    </div>`;
   let body;
   if(wide){
     const monColCollapsed=";flex-basis:0;max-width:0;min-width:0;opacity:0;margin-right:-12px;overflow:hidden;pointer-events:none";
     body=`<div id="console-row"${monitorOn?"":" class=\"video-off\""} style="flex:1;min-height:0;display:flex;flex-direction:row;gap:12px">
-        <div id="mon-col" style="flex:0 0 52%;max-width:52%;min-width:0;min-height:0;display:flex;flex-direction:column;justify-content:center;gap:11px${monitorOn?"":monColCollapsed}">
-          ${monitorPane()}${shareBtn}${controls}
+        <div id="mon-col" style="flex:0 0 60%;max-width:60%;min-width:0;min-height:0;display:flex;flex-direction:column;justify-content:center;gap:10px${monitorOn?"":monColCollapsed}">
+          ${monitorPane()}${wideBar}
         </div>
         <div style="flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;gap:8px">
           ${miniCount()}${batterCard()}${fieldEl}${actionEl}
