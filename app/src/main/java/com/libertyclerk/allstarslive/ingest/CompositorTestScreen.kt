@@ -75,6 +75,7 @@ fun CompositorTestScreen(onUseCamera: () -> Unit = {}) {
     var streaming by remember { mutableStateOf(false) }
     var streamKey by remember { mutableStateOf("") }
     var streamStatus by remember { mutableStateOf("") }
+    var eventTitle by remember { mutableStateOf("All-Stars Live") }
     val mainHandler = remember { Handler(Looper.getMainLooper()) }
 
     // Start pushing the composited frame to YouTube at rtmp://…/live2/<key>. Main thread.
@@ -188,6 +189,14 @@ fun CompositorTestScreen(onUseCamera: () -> Unit = {}) {
             // --- Go Live to YouTube (M3) ---
             if (streamStatus.isNotEmpty()) Text("Stream: $streamStatus", color = Color(0xFF4C9AFF), fontSize = 12.sp)
             OutlinedTextField(
+                value = eventTitle,
+                onValueChange = { eventTitle = it },
+                label = { Text("Broadcast name (shown on YouTube)") },
+                singleLine = true,
+                enabled = !streaming,
+                modifier = Modifier.fillMaxWidth(0.7f),
+            )
+            OutlinedTextField(
                 value = streamKey,
                 onValueChange = { streamKey = it },
                 label = { Text("Stream key (optional — blank uses your YouTube)") },
@@ -217,7 +226,7 @@ fun CompositorTestScreen(onUseCamera: () -> Unit = {}) {
                                         return@addOnSuccessListener
                                     }
                                     Thread {
-                                        runCatching { YouTubeLive.startBroadcast(token, "All-Stars Live") }
+                                        runCatching { YouTubeLive.startBroadcast(token, eventTitle.ifBlank { "All-Stars Live" }) }
                                             .onSuccess { live -> mainHandler.post { streamStatus = "Starting…"; goLiveWithKey(live.streamKey) } }
                                             .onFailure { e -> mainHandler.post { streamStatus = "YouTube setup failed: ${e.message}" } }
                                     }.start()

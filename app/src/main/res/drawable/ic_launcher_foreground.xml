@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <!-- lime ring (brand pop) -->
+    <path android:strokeColor="#A3E635" android:strokeWidth="4" android:fillColor="#00000000"
+        android:pathData="M21,54 a33,33 0 1,0 66,0 a33,33 0 1,0 -66,0"/>
+    <!-- baseball -->
+    <path android:fillColor="#FFFFFF"
+        android:pathData="M24,54 a30,30 0 1,0 60,0 a30,30 0 1,0 -60,0"/>
+    <!-- red seams -->
+    <path android:strokeColor="#E2574C" android:strokeWidth="3.5" android:strokeLineCap="round" android:fillColor="#00000000"
+        android:pathData="M40,30 Q30,54 40,78"/>
+    <path android:strokeColor="#E2574C" android:strokeWidth="3.5" android:strokeLineCap="round" android:fillColor="#00000000"
+        android:pathData="M68,30 Q78,54 68,78"/>
+</vector>
