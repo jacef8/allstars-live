@@ -725,6 +725,7 @@ window.__bcastPhase = "OFFLINE";
 window.__bcast = function(phase, videoId){
   window.__bcastPhase = phase || "OFFLINE";
   if(videoId){ try{ localStorage.setItem("al-stream-yt", videoId); }catch(e){} }
+  else if(window.__bcastPhase==="OFFLINE"){ try{ localStorage.removeItem("al-stream-yt"); }catch(e){} }  // ended → reset the monitor
   try{ render(); }catch(e){}
 };
 function appLive(){ return window.__bcastPhase==="LIVE" || window.__bcastPhase==="STARTING"; }
@@ -733,9 +734,10 @@ function appLive(){ return window.__bcastPhase==="LIVE" || window.__bcastPhase==
    placeholder) with the scorebug overlaid — exactly what streams to YouTube.
    This is the web mirror of the native tablet console (monitor + scorer in one). */
 function monitorPane(){
-  // In the app, only show the player while actually live — otherwise show the
-  // "Start game stream" placeholder (don't surface a stale/ended broadcast id).
-  const yt=(IS_APP && !appLive())?"":streamYt();
+  // In the app, only show the player once actually LIVE — otherwise show the
+  // "Start game stream" placeholder (don't surface a stale/ended/not-yet-live id,
+  // which is what throws YouTube error 153).
+  const yt=(IS_APP && window.__bcastPhase!=="LIVE")?"":streamYt();
   const feed=yt
     ? `<iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(yt)}?autoplay=1&mute=1&playsinline=1&modestbranding=1&rel=0" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen style="position:absolute;inset:0;width:100%;height:100%;border:0"></iframe>`
     : `<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;padding:0 20px 104px;background:radial-gradient(circle at 50% 34%, #16202e, #0b0f15)">

@@ -6,6 +6,7 @@ import android.os.Looper
 import android.util.Log
 import com.libertyclerk.allstarslive.gl.VideoCompositor
 import com.libertyclerk.allstarslive.ingest.RtmpHub
+import com.libertyclerk.allstarslive.ingest.RtmpReceiverService
 import com.libertyclerk.allstarslive.youtube.YouTubeAuth
 import com.libertyclerk.allstarslive.youtube.YouTubeLive
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -55,9 +56,13 @@ object Broadcast {
      */
     fun goLive(context: Context, title: String, privacy: String) {
         if (isActive) return
+        // Ensure the camera pipeline is running even if the operator went straight to the
+        // Game tab and never opened Video — otherwise there'd be no compositor to stream.
+        RtmpReceiverService.start(context, RtmpHub.port)
+        if (RtmpHub.videoCompositor == null) RtmpHub.start(RtmpHub.port)
         val comp = RtmpHub.videoCompositor
         if (comp == null) {
-            _state.value = State(phase = Phase.ERROR, status = "Open the camera (Video tab) first")
+            _state.value = State(phase = Phase.ERROR, status = "Camera link not ready — try again")
             return
         }
         _state.value = State(phase = Phase.STARTING, title = title, privacy = privacy, status = "Setting up your YouTube broadcast…")

@@ -78,6 +78,8 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         // The scorer is handheld for a whole game on top of live video — keep the screen on.
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        // Bring the camera link up at launch so Go Live works from any tab (not just Video).
+        com.libertyclerk.allstarslive.ingest.RtmpReceiverService.start(this, 1935)
         // Keep the system bars VISIBLE so the Scaffold insets push our top toggle /
         // bottom tabs clear of the screen edges + camera cutout (hiding them clipped UI).
 
