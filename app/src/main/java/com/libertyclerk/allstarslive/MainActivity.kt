@@ -52,6 +52,8 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.libertyclerk.allstarslive.ingest.CompositorTestScreen
 import com.libertyclerk.allstarslive.ingest.SrtIngestScreen
+import com.libertyclerk.allstarslive.scorer.GameScorerScreen
+import com.libertyclerk.allstarslive.scorer.createScorerWebView
 import com.libertyclerk.allstarslive.ui.theme.AllStarsLiveTheme
 
 /** Bottom-bar destinations. Game = scoring (next), Video = live ingest (working). */
@@ -80,6 +82,9 @@ class MainActivity : ComponentActivity() {
             AllStarsLiveTheme {
                 var tabIndex by rememberSaveable { mutableStateOf(0) }
                 val tabs = Tab.entries
+                val ctx = androidx.compose.ui.platform.LocalContext.current
+                // Created once + kept alive so switching tabs doesn't reload a live game.
+                val scorerWeb = androidx.compose.runtime.remember { createScorerWebView(ctx) }
 
                 Scaffold(
                     containerColor = MaterialTheme.colorScheme.background,
@@ -87,11 +92,7 @@ class MainActivity : ComponentActivity() {
                 ) { inner ->
                     Box(Modifier.fillMaxSize().padding(inner)) {
                         when (tabs[tabIndex]) {
-                            Tab.GAME -> ComingSoon(
-                                Icons.Filled.Scoreboard,
-                                "Live scoring",
-                                "Tap-to-score the game from here — porting the web scorer into the app is next.",
-                            )
+                            Tab.GAME -> GameScorerScreen(scorerWeb)
                             Tab.VIDEO -> VideoTab()
                             Tab.LINEUP -> ComingSoon(
                                 Icons.Filled.People,

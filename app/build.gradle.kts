@@ -88,3 +88,14 @@ dependencies {
 
     debugImplementation("androidx.compose.ui:ui-tooling")
 }
+
+// M4: bundle the web scorer into the app so the Game tab can show it offline.
+// Single source of truth stays reference/web-scoring/; this copies it into assets
+// at build time (the dest is git-ignored, never hand-edited).
+val syncScorerAssets by tasks.registering(Copy::class) {
+    from(rootProject.file("reference/web-scoring")) {
+        include("scoring-controller.html", "lib/**")
+    }
+    into(layout.projectDirectory.dir("src/main/assets/scorer"))
+}
+tasks.named("preBuild") { dependsOn(syncScorerAssets) }

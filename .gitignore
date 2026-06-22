@@ -44,3 +44,6 @@ app/src/main/cpp/third_party/srt/
 
 # scratch screenshots
 _*.png
+
+# Generated: web scorer copied into the APK at build time (source is reference/web-scoring/)
+app/src/main/assets/scorer/
