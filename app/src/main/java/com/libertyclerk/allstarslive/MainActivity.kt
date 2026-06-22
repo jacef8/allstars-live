@@ -94,11 +94,7 @@ class MainActivity : ComponentActivity() {
                         when (tabs[tabIndex]) {
                             Tab.GAME -> GameScorerScreen(scorerWeb)
                             Tab.VIDEO -> VideoTab()
-                            Tab.SETTINGS -> ComingSoon(
-                                Icons.Filled.Settings,
-                                "Settings",
-                                "Camera Wi-Fi, stream, and game options will live here.",
-                            )
+                            Tab.SETTINGS -> SettingsScreen()
                         }
                     }
                 }
