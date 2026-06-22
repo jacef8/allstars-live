@@ -91,6 +91,9 @@ dependencies {
     // compileSdk 34 — plain 2.5.9 needs Kotlin 2.1, and 2.6+/2.7+ need compileSdk 35/36.
     implementation("com.github.pedroSG94.RootEncoder:library:2.5.4-1.8.22")
 
+    // M3 (full): Google Sign-In -> OAuth token for the YouTube Live API (auto broadcast + key).
+    implementation("com.google.android.gms:play-services-auth:20.7.0")
+
     debugImplementation("androidx.compose.ui:ui-tooling")
 }
 
