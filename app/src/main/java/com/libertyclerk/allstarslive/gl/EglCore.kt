@@ -52,6 +52,18 @@ class EglCore {
         return s
     }
 
+    /**
+     * A tiny offscreen pbuffer. The compositor keeps this current as its base so the
+     * GL context stays valid even with no preview attached (encoder-only streaming
+     * while the operator is on another tab).
+     */
+    fun createOffscreenSurface(width: Int, height: Int): EGLSurface {
+        val attribs = intArrayOf(EGL14.EGL_WIDTH, width, EGL14.EGL_HEIGHT, height, EGL14.EGL_NONE)
+        val s = EGL14.eglCreatePbufferSurface(display, config, attribs, 0)
+        check(s != null && s != EGL14.EGL_NO_SURFACE) { "eglCreatePbufferSurface failed" }
+        return s
+    }
+
     fun makeCurrent(surface: EGLSurface) {
         check(EGL14.eglMakeCurrent(display, surface, surface, context)) { "eglMakeCurrent failed" }
     }

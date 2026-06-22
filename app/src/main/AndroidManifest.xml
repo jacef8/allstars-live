@@ -11,6 +11,11 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <!-- M3: mic audio for the YouTube stream (Live requires an audio track). -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- Keep the RTMP receiver listening while the Mevo app is foreground (one-tablet
+         reality: you leave our app to press Go Live, which would otherwise freeze us). -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
         android:allowBackup="true"
@@ -32,5 +37,10 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <service
+            android:name=".ingest.RtmpReceiverService"
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice" />
     </application>
 </manifest>

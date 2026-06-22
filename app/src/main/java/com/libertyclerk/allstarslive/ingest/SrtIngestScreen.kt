@@ -3,6 +3,7 @@ package com.libertyclerk.allstarslive.ingest
 import android.view.Surface
 import android.view.SurfaceHolder
 import android.view.SurfaceView
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -21,6 +22,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -38,13 +40,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.libertyclerk.allstarslive.stream.Broadcast
 
 /**
  * Operator-facing camera screen. No backend on display: it **auto-connects** with
@@ -57,9 +62,15 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 @Composable
 fun SrtIngestScreen(onUseTestPattern: () -> Unit = {}) {
     val ctx = LocalContext.current
-    val source = remember { SrtVideoSource(ctx) }
+    // RTMP-push: the Mevo publishes to us (rtmp://<tablet-ip>:1935/live). SRT pull is
+    // retired for the Mevo — it only serves SRT while streaming to a network
+    // destination, and "Go Live" forces picking one. See RtmpVideoSource.
+    val source = remember { RtmpVideoSource(ctx) }
     val settings = remember { CameraSettings(ctx) }
     val stats by source.stats.collectAsStateWithLifecycle()
+    // Shared YouTube broadcast state — same source of truth as the Game page.
+    val bcast by Broadcast.state.collectAsStateWithLifecycle()
+    var showGoLive by remember { mutableStateOf(false) }
 
     var surface by remember { mutableStateOf<Surface?>(null) }
     var showSetup by remember { mutableStateOf(false) }
@@ -69,11 +80,9 @@ fun SrtIngestScreen(onUseTestPattern: () -> Unit = {}) {
     var pass by remember { mutableStateOf(settings.wifiPassphrase) }
 
     fun connect() {
-        source.wifiSsid = ssid
-        source.wifiPassphrase = pass
         val s = surface ?: return
-        // Off the main thread: start() spins up the GL compositor, decoder, and Wi-Fi
-        // bind, which together block long enough to freeze the UI (and tab switches).
+        // Off the main thread: start() spins up the GL compositor, decoder, and the
+        // RTMP listener, which together block long enough to freeze the UI.
         Thread { source.start(url, s) }.start()
     }
 
@@ -119,7 +128,25 @@ fun SrtIngestScreen(onUseTestPattern: () -> Unit = {}) {
         if (playing) {
             LiveChip(Modifier.align(Alignment.TopStart).padding(14.dp))
         } else {
-            CameraStatus(stats.state, onSetup = { showSetup = true }, onUseTestPattern = onUseTestPattern)
+            CameraStatus(stats.state, stats.message, onSetup = { showSetup = true }, onUseTestPattern = onUseTestPattern)
+        }
+
+        // Go Live control — reflects the shared broadcast state (synced with the Game page).
+        GoLiveBar(
+            phase = bcast.phase,
+            status = bcast.status,
+            cameraReady = playing,
+            onGoLive = { showGoLive = true },
+            onEnd = { Broadcast.stop() },
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 18.dp),
+        )
+
+        if (showGoLive) {
+            GoLiveDialog(
+                initialTitle = bcast.title,
+                onStart = { title, privacy -> Broadcast.goLive(ctx, title, privacy); showGoLive = false },
+                onCancel = { showGoLive = false },
+            )
         }
 
         if (showSetup) {
@@ -139,10 +166,13 @@ fun SrtIngestScreen(onUseTestPattern: () -> Unit = {}) {
 
 /** Friendly, jargon-free status shown when there's no live picture. */
 @Composable
-private fun CameraStatus(state: IngestState, onSetup: () -> Unit, onUseTestPattern: () -> Unit) {
+private fun CameraStatus(state: IngestState, message: String, onSetup: () -> Unit, onUseTestPattern: () -> Unit) {
     val looking = state == IngestState.CONNECTING || state == IngestState.BUFFERING || state == IngestState.RECONNECTING
-    val title = if (looking) "Looking for your camera…" else "Camera not connected"
-    val sub = if (looking) "Make sure the camera is on and streaming." else "Tap Camera setup to get started."
+    val title = if (looking) "Waiting for your camera…" else "Camera not connected"
+    // While waiting, RtmpVideoSource puts the exact publish URL in the message so the
+    // operator can type it into the Mevo's Custom RTMP destination.
+    val urlHint = message.substringAfter("rtmp://", "").let { if (it.isNotEmpty()) "rtmp://$it" else "" }
+    val sub = if (looking) "On the Mevo, set the Custom RTMP destination to:" else "Tap Camera setup to get started."
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -151,6 +181,30 @@ private fun CameraStatus(state: IngestState, onSetup: () -> Unit, onUseTestPatte
         Icon(Icons.Filled.Videocam, contentDescription = null, tint = Color(0xFF5B6880), modifier = Modifier.size(56.dp))
         Text(title, color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
         Text(sub, color = Color(0xFF9AA0A6), fontSize = 14.sp)
+        if (looking && urlHint.isNotEmpty()) {
+            val clipboard = LocalClipboardManager.current
+            val ctx = LocalContext.current
+            // Tap to copy — the operator pastes this straight into the Mevo's RTMP field.
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .background(Color(0xFF101720), RoundedCornerShape(8.dp))
+                    .clickable {
+                        clipboard.setText(AnnotatedString(urlHint))
+                        Toast.makeText(ctx, "Copied — paste into the Mevo", Toast.LENGTH_SHORT).show()
+                    }
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+            ) {
+                Text(
+                    urlHint,
+                    color = Color(0xFFA3E635), fontSize = 16.sp, fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace,
+                )
+                Icon(Icons.Filled.ContentCopy, contentDescription = "Copy", tint = Color(0xFF9AA0A6), modifier = Modifier.size(18.dp))
+            }
+            Text("Tap to copy  ·  Stream key: any (e.g. live)", color = Color(0xFF6B7585), fontSize = 12.sp)
+        }
         TextButton(onClick = onSetup) {
             Text("Camera setup", color = Color(0xFFA3E635), fontSize = 14.sp, fontWeight = FontWeight.Bold)
         }
@@ -160,6 +214,111 @@ private fun CameraStatus(state: IngestState, onSetup: () -> Unit, onUseTestPatte
             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4C9AFF), contentColor = Color.White),
         ) { Text("Use test pattern instead", fontSize = 15.sp) }
     }
+}
+
+/** Go Live / End-broadcast control, driven by the shared [Broadcast] state. */
+@Composable
+private fun GoLiveBar(
+    phase: Broadcast.Phase,
+    status: String,
+    cameraReady: Boolean,
+    onGoLive: () -> Unit,
+    onEnd: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val active = phase == Broadcast.Phase.LIVE || phase == Broadcast.Phase.STARTING
+    Column(
+        modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        if (active) {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    Modifier.background(Color(0xCC11161F), RoundedCornerShape(999.dp)).padding(horizontal = 12.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(7.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(Modifier.size(9.dp).background(Color(0xFFFF3B5C), RoundedCornerShape(999.dp)))
+                    Text(
+                        if (phase == Broadcast.Phase.LIVE) "LIVE on YouTube" else "Going live…",
+                        color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold,
+                    )
+                }
+                Button(
+                    onClick = onEnd,
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF3B5C), contentColor = Color.White),
+                ) { Text("End broadcast", fontSize = 14.sp) }
+            }
+        } else if (cameraReady) {
+            Button(
+                onClick = onGoLive,
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF3B5C), contentColor = Color.White),
+            ) { Text("● Go Live", fontSize = 16.sp, fontWeight = FontWeight.Bold) }
+        }
+        if (status.isNotEmpty()) {
+            Text(status, color = if (phase == Broadcast.Phase.ERROR) Color(0xFFFF6B6B) else Color(0xFFB7C0CC), fontSize = 12.sp)
+        }
+    }
+}
+
+/** "Start game stream" sheet — name + who-can-watch, then creates the broadcast. */
+@Composable
+private fun GoLiveDialog(
+    initialTitle: String,
+    onStart: (title: String, privacy: String) -> Unit,
+    onCancel: () -> Unit,
+) {
+    var title by remember { mutableStateOf(initialTitle.ifBlank { "All-Stars Live" }) }
+    var privacy by remember { mutableStateOf("unlisted") }
+    Box(
+        Modifier.fillMaxSize().background(Color(0xCC05080C)).clickable(onClick = onCancel).imePadding(),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            Modifier
+                .widthIn(max = 520.dp)
+                .padding(16.dp)
+                .background(Color(0xFF141A22), RoundedCornerShape(16.dp))
+                .padding(20.dp)
+                .pointerInput(Unit) { detectTapGestures { } },   // swallow taps so the card doesn't close
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Text("Start game stream", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+            OutlinedTextField(
+                value = title, onValueChange = { title = it },
+                label = { Text("Stream name (shown on YouTube)") }, singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Text("Who can watch", color = Color(0xFF9AA0A6), fontSize = 13.sp)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                PrivacyChip("Public", "public", privacy) { privacy = "public" }
+                PrivacyChip("Unlisted", "unlisted", privacy) { privacy = "unlisted" }
+                PrivacyChip("Private", "private", privacy) { privacy = "private" }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.align(Alignment.End)) {
+                TextButton(onClick = onCancel) { Text("Cancel", color = Color(0xFF9AA0A6)) }
+                Button(
+                    onClick = { onStart(title, privacy) },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF3B5C), contentColor = Color.White),
+                ) { Text("Go Live", fontWeight = FontWeight.Bold) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PrivacyChip(label: String, value: String, selected: String, onClick: () -> Unit) {
+    val on = value == selected
+    Text(
+        label,
+        color = if (on) Color(0xFF05080C) else Color(0xFFE8EAED),
+        fontSize = 14.sp, fontWeight = if (on) FontWeight.Bold else FontWeight.Normal,
+        modifier = Modifier
+            .background(if (on) Color(0xFFA3E635) else Color(0xFF222B36), RoundedCornerShape(999.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 9.dp),
+    )
 }
 
 /** Small unobtrusive LIVE badge once the feed is up. */

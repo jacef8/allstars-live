@@ -1,16 +1,39 @@
 <?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp" android:height="108dp"
     android:viewportWidth="108" android:viewportHeight="108">
-    <!-- lime ring (brand pop) -->
-    <path android:strokeColor="#A3E635" android:strokeWidth="4" android:fillColor="#00000000"
-        android:pathData="M21,54 a33,33 0 1,0 66,0 a33,33 0 1,0 -66,0"/>
-    <!-- baseball -->
-    <path android:fillColor="#FFFFFF"
-        android:pathData="M24,54 a30,30 0 1,0 60,0 a30,30 0 1,0 -60,0"/>
-    <!-- red seams -->
-    <path android:strokeColor="#E2574C" android:strokeWidth="3.5" android:strokeLineCap="round" android:fillColor="#00000000"
-        android:pathData="M40,30 Q30,54 40,78"/>
-    <path android:strokeColor="#E2574C" android:strokeWidth="3.5" android:strokeLineCap="round" android:fillColor="#00000000"
-        android:pathData="M68,30 Q78,54 68,78"/>
+
+    <!-- grounding shadow under the ball -->
+    <path android:fillColor="#33000000"
+        android:pathData="M24,56 a30,30 0 1,0 60,0 a30,30 0 1,0 -60,0"/>
+
+    <!-- baseball: white with a subtle vertical sheen -->
+    <path android:pathData="M24,54 a30,30 0 1,0 60,0 a30,30 0 1,0 -60,0">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear"
+                android:startX="54" android:startY="24" android:endX="54" android:endY="84"
+                android:startColor="#FFFFFFFF" android:endColor="#FFE6E9EF"/>
+        </aapt:attr>
+    </path>
+
+    <!-- left seam -->
+    <path android:strokeColor="#D8443B" android:strokeWidth="3" android:fillColor="#00000000"
+        android:strokeLineCap="round"
+        android:pathData="M42,26 Q27,54 42,82"/>
+    <!-- right seam -->
+    <path android:strokeColor="#D8443B" android:strokeWidth="3" android:fillColor="#00000000"
+        android:strokeLineCap="round"
+        android:pathData="M66,26 Q81,54 66,82"/>
+
+    <!-- left stitches (chevrons pointing toward center) -->
+    <group>
+        <path android:strokeColor="#E2574C" android:strokeWidth="2.2" android:strokeLineCap="round" android:fillColor="#00000000"
+            android:pathData="M35,30 l6,2 M34,40 l6,2 M33.5,50 l6,1.5 M33.5,58 l6,-1.5 M34,68 l6,-2 M35,78 l6,-2"/>
+    </group>
+    <!-- right stitches -->
+    <group>
+        <path android:strokeColor="#E2574C" android:strokeWidth="2.2" android:strokeLineCap="round" android:fillColor="#00000000"
+            android:pathData="M73,30 l-6,2 M74,40 l-6,2 M74.5,50 l-6,1.5 M74.5,58 l-6,-1.5 M74,68 l-6,-2 M73,78 l-6,-2"/>
+    </group>
 </vector>

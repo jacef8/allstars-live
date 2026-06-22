@@ -29,6 +29,9 @@ class VideoCompositor {
     private val texMatrix = FloatArray(16)
 
     private var displaySurface: EGLSurface? = null
+    // Always-valid offscreen surface so the GL context survives with no preview
+    // attached (encoder-only streaming while the operator scores on another tab).
+    private var baseSurface: EGLSurface? = null
 
     // Encoder target (Step 3) — null until recording.
     private var encoderSurface: EGLSurface? = null
@@ -46,13 +49,18 @@ class VideoCompositor {
     lateinit var inputSurface: Surface
         private set
 
-    /** Initialise GL against the preview [display] surface. Blocks until ready. */
-    fun start(display: Surface) {
+    /**
+     * Initialise GL. [display] is optional: pass it for an immediate preview, or omit
+     * to start headless (the pipeline runs and can stream while the preview is later
+     * attached via [attachPreview]). Blocks until ready.
+     */
+    fun start(display: Surface? = null) {
         val latch = CountDownLatch(1)
         handler.post {
             egl = EglCore()
-            displaySurface = egl.createWindowSurface(display)
-            egl.makeCurrent(displaySurface!!)
+            baseSurface = egl.createOffscreenSurface(1, 1)
+            displaySurface = display?.let { egl.createWindowSurface(it) }
+            egl.makeCurrent(displaySurface ?: baseSurface!!)
             scene = GlScene()
             oesTexId = scene.createOesTexture()
             overlayTexId = scene.createTexture()
@@ -64,6 +72,23 @@ class VideoCompositor {
         }
         latch.await()
         Log.i(TAG, "compositor started")
+    }
+
+    /** Attach (or replace) the on-screen preview surface. Safe to call any time after [start]. */
+    fun attachPreview(display: Surface) {
+        handler.post {
+            displaySurface?.let { egl.releaseSurface(it) }
+            displaySurface = egl.createWindowSurface(display)
+        }
+    }
+
+    /** Drop the on-screen preview (tab switched away); the encoder path keeps running. */
+    fun detachPreview() {
+        handler.post {
+            displaySurface?.let { egl.releaseSurface(it) }
+            displaySurface = null
+            baseSurface?.let { egl.makeCurrent(it) }   // keep the context current on the base
+        }
     }
 
     fun setVideoSize(width: Int, height: Int) {
@@ -124,26 +149,31 @@ class VideoCompositor {
     }
 
     private fun drawFrame() {
-        val display = displaySurface ?: return
+        val base = baseSurface ?: return
+        // Keep the context current on an always-valid surface so updateTexImage works
+        // even with no preview and no encoder attached.
+        egl.makeCurrent(displaySurface ?: base)
         surfaceTexture.updateTexImage()
         surfaceTexture.getTransformMatrix(texMatrix)
         val ptsNs = surfaceTexture.timestamp
 
-        // Preview: letterbox the video to the screen, overlay on top.
-        egl.makeCurrent(display)
-        val dw = egl.getWidth(display)
-        val dh = egl.getHeight(display)
-        GLES20.glClearColor(0f, 0f, 0f, 1f)
-        GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
-        letterboxViewport(dw, dh)
-        scene.drawVideo(oesTexId, texMatrix)
-        if (hasOverlay) {
-            GLES20.glViewport(0, 0, dw, dh)
-            scene.drawOverlay(overlayTexId)
+        // Preview (if attached): letterbox the video to the screen, overlay on top.
+        displaySurface?.let { display ->
+            egl.makeCurrent(display)
+            val dw = egl.getWidth(display)
+            val dh = egl.getHeight(display)
+            GLES20.glClearColor(0f, 0f, 0f, 1f)
+            GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
+            letterboxViewport(dw, dh)
+            scene.drawVideo(oesTexId, texMatrix)
+            if (hasOverlay) {
+                GLES20.glViewport(0, 0, dw, dh)
+                scene.drawOverlay(overlayTexId)
+            }
+            egl.swapBuffers(display)
         }
-        egl.swapBuffers(display)
 
-        // Recording: draw the clean program frame at full encoder resolution.
+        // Recording / streaming: draw the clean program frame at full encoder resolution.
         encoderSurface?.let { enc ->
             egl.makeCurrent(enc)
             GLES20.glViewport(0, 0, encoderW, encoderH)
@@ -174,6 +204,7 @@ class VideoCompositor {
             runCatching { inputSurface.release() }
             encoderSurface?.let { egl.releaseSurface(it) }
             displaySurface?.let { egl.releaseSurface(it) }
+            baseSurface?.let { egl.releaseSurface(it) }
             runCatching { egl.release() }
             latch.countDown()
         }
