@@ -98,18 +98,18 @@
 
 <!-- Share / QR modal: fans scan to open the live viewer -->
 <div id="qrmodal" style="display:none;position:fixed;inset:0;z-index:200;background:rgba(8,11,16,.84);align-items:center;justify-content:center;padding:20px">
-  <div style="max-width:330px;width:100%;background:#1B212B;border:1px solid #333C49;border-radius:18px;padding:20px;text-align:center;box-shadow:0 24px 60px rgba(0,0,0,.6)">
+  <div style="max-width:330px;width:100%;background:#212A38;border:1px solid #4A5870;border-radius:18px;padding:20px;text-align:center;box-shadow:0 24px 60px rgba(0,0,0,.6)">
     <div style="font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:20px;letter-spacing:.5px;color:#EAEDF2">WATCH LIVE</div>
-    <div style="font-size:12px;color:#9BA6B4;margin:3px 0 14px">Fans scan this to follow the game</div>
+    <div style="font-size:12px;color:#B7C2D6;margin:3px 0 14px">Fans scan this to follow the game</div>
     <div id="qrbox" style="background:#fff;border-radius:12px;padding:12px;width:244px;height:244px;margin:0 auto;display:flex;align-items:center;justify-content:center;color:#677281;font-size:12px"></div>
-    <div id="qrurl" style="font-size:11px;color:#9BA6B4;word-break:break-all;margin:12px 4px 14px"></div>
+    <div id="qrurl" style="font-size:11px;color:#B7C2D6;word-break:break-all;margin:12px 4px 14px"></div>
     <div style="display:flex;flex-direction:column;gap:8px">
       <button data-act="navshare" id="navShareBtn" style="display:none;align-items:center;justify-content:center;gap:7px;background:#A3E635;border:none;color:#0B0E13;border-radius:10px;padding:13px;font-family:'Barlow',sans-serif;font-size:15px;font-weight:800;cursor:pointer">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0B0E13" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><path d="M16 6l-4-4-4 4"/><path d="M12 2v13"/></svg>
         <span>Text a fan</span></button>
       <div style="display:flex;gap:8px">
-        <button data-act="copyshare" style="flex:1;background:#262E3A;border:1px solid #333C49;color:#EAEDF2;border-radius:10px;padding:12px;font-family:'Barlow',sans-serif;font-size:14px;font-weight:700;cursor:pointer">Copy link</button>
-        <button data-act="closeshare" style="flex:1;background:#1B212B;border:1px solid #333C49;color:#9BA6B4;border-radius:10px;padding:12px;font-family:'Barlow',sans-serif;font-size:14px;font-weight:700;cursor:pointer">Done</button>
+        <button data-act="copyshare" style="flex:1;background:#324056;border:1px solid #4A5870;color:#EAEDF2;border-radius:10px;padding:12px;font-family:'Barlow',sans-serif;font-size:14px;font-weight:700;cursor:pointer">Copy link</button>
+        <button data-act="closeshare" style="flex:1;background:#212A38;border:1px solid #4A5870;color:#B7C2D6;border-radius:10px;padding:12px;font-family:'Barlow',sans-serif;font-size:14px;font-weight:700;cursor:pointer">Done</button>
       </div>
     </div>
   </div>
@@ -117,21 +117,21 @@
 
 <!-- Connect-stream modal: point the monitor at a YouTube Live stream -->
 <div id="ytmodal" style="display:none;position:fixed;inset:0;z-index:200;background:rgba(8,11,16,.84);align-items:center;justify-content:center;padding:20px">
-  <div style="max-width:390px;width:100%;background:#1B212B;border:1px solid #333C49;border-radius:18px;padding:20px;box-shadow:0 24px 60px rgba(0,0,0,.6)">
+  <div style="max-width:390px;width:100%;background:#212A38;border:1px solid #4A5870;border-radius:18px;padding:20px;box-shadow:0 24px 60px rgba(0,0,0,.6)">
     <div style="display:flex;align-items:center;gap:9px">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="#FF0000"><path d="M23 7.5a3 3 0 0 0-2.1-2.1C19 5 12 5 12 5s-7 0-8.9.4A3 3 0 0 0 1 7.5 31 31 0 0 0 .6 12 31 31 0 0 0 1 16.5a3 3 0 0 0 2.1 2.1C5 19 12 19 12 19s7 0 8.9-.4a3 3 0 0 0 2.1-2.1A31 31 0 0 0 23.4 12 31 31 0 0 0 23 7.5z"/><path d="M9.8 15.3V8.7l5.7 3.3z" fill="#1B212B"/></svg>
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="#FF0000"><path d="M23 7.5a3 3 0 0 0-2.1-2.1C19 5 12 5 12 5s-7 0-8.9.4A3 3 0 0 0 1 7.5 31 31 0 0 0 .6 12 31 31 0 0 0 1 16.5a3 3 0 0 0 2.1 2.1C5 19 12 19 12 19s7 0 8.9-.4a3 3 0 0 0 2.1-2.1A31 31 0 0 0 23.4 12 31 31 0 0 0 23 7.5z"/><path d="M9.8 15.3V8.7l5.7 3.3z" fill="#212A38"/></svg>
       <div style="font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:20px;letter-spacing:.5px;color:#EAEDF2">CONNECT YOUR STREAM</div>
     </div>
-    <div style="font-size:12px;color:#9BA6B4;margin:7px 0 14px;line-height:1.5">Paste your <b style="color:#EAEDF2">YouTube Live</b> link or video ID. It plays in the monitor and becomes the link you share with fans. Saved on this device.</div>
-    <label style="display:block;font-size:11px;font-weight:700;letter-spacing:.5px;color:#9BA6B4;margin-bottom:5px">YOUTUBE LINK OR VIDEO ID</label>
-    <input id="streamInput" placeholder="https://youtube.com/watch?v=…  or  youtu.be/…" autocomplete="off" spellcheck="false" style="width:100%;box-sizing:border-box;background:#10141A;border:1px solid #41506A;color:#EAEDF2;border-radius:10px;padding:12px;font-size:14px;font-family:system-ui;outline:none">
-    <div id="streamHint" style="font-size:11px;color:#8E9BB2;min-height:15px;margin:7px 2px 0"></div>
+    <div style="font-size:12px;color:#B7C2D6;margin:7px 0 14px;line-height:1.5">Paste your <b style="color:#EAEDF2">YouTube Live</b> link or video ID. It plays in the monitor and becomes the link you share with fans. Saved on this device.</div>
+    <label style="display:block;font-size:11px;font-weight:700;letter-spacing:.5px;color:#B7C2D6;margin-bottom:5px">YOUTUBE LINK OR VIDEO ID</label>
+    <input id="streamInput" placeholder="https://youtube.com/watch?v=…  or  youtu.be/…" autocomplete="off" spellcheck="false" style="width:100%;box-sizing:border-box;background:#10141A;border:1px solid #6A7EA6;color:#EAEDF2;border-radius:10px;padding:12px;font-size:14px;font-family:system-ui;outline:none">
+    <div id="streamHint" style="font-size:11px;color:#AEBBD4;min-height:15px;margin:7px 2px 0"></div>
     <div style="display:flex;gap:8px;margin-top:12px">
       <button data-act="savestream" style="flex:1;background:#A3E635;border:none;color:#0B0E13;border-radius:10px;padding:13px;font-family:'Barlow',sans-serif;font-size:15px;font-weight:800;cursor:pointer">Use this stream</button>
-      <button data-act="closestream" style="background:#1B212B;border:1px solid #333C49;color:#9BA6B4;border-radius:10px;padding:13px 16px;font-family:'Barlow',sans-serif;font-size:14px;font-weight:700;cursor:pointer">Cancel</button>
+      <button data-act="closestream" style="background:#212A38;border:1px solid #4A5870;color:#B7C2D6;border-radius:10px;padding:13px 16px;font-family:'Barlow',sans-serif;font-size:14px;font-weight:700;cursor:pointer">Cancel</button>
     </div>
-    <button data-act="clearstream" style="width:100%;margin-top:8px;background:transparent;border:none;color:#8E9BB2;font-size:12px;font-weight:600;cursor:pointer;padding:6px">Disconnect / clear stream</button>
-    <div style="font-size:11px;color:#8E9BB2;margin-top:12px;line-height:1.5;border-top:1px solid #333C49;padding-top:11px">One-tap <b style="color:#9BA6B4">Go Live</b> (creating the broadcast and pushing the camera) comes in the tablet app. Here you point the monitor at a stream you've already started on YouTube.</div>
+    <button data-act="clearstream" style="width:100%;margin-top:8px;background:transparent;border:none;color:#AEBBD4;font-size:12px;font-weight:600;cursor:pointer;padding:6px">Disconnect / clear stream</button>
+    <div style="font-size:11px;color:#AEBBD4;margin-top:12px;line-height:1.5;border-top:1px solid #4A5870;padding-top:11px">One-tap <b style="color:#B7C2D6">Go Live</b> (creating the broadcast and pushing the camera) comes in the tablet app. Here you point the monitor at a stream you've already started on YouTube.</div>
   </div>
 </div>
 
@@ -409,7 +409,7 @@ function startNewGame(){
   const ot=oppTeamId&&teamById(oppTeamId);
   G.oppLineup = ot ? ot.players.map(p=>({num:p.num,name:p.name})) : Array.from({length:Math.max(1,G.oppBatters)},(_,i)=>({num:String(i+1),name:""}));
   if(ot) G.oppBatters=G.oppLineup.length;
-  lineupTab="us"; hist=[]; resetUI(); mode="lineup"; render(); broadcast();
+  lineupTab="us"; hist=[]; gameFeed=[]; resetUI(); mode="lineup"; render(); broadcast();
 }
 /* Opponent name from the New Game text field (no re-render, so typing keeps focus). */
 window.ngOurName=function(v){const s=(v||"").trim(); OUR.name=s||"Your Team"; OUR.short=(s||"YOU").slice(0,3).toUpperCase();};
@@ -488,10 +488,17 @@ let _seq=0,_event=null,_eventId=0,_pitch=null;
 let phonePane="score";   // phone-only paging: "score" | "video" (large screens show both)
 let monitorOn=(()=>{try{return localStorage.getItem("al-monitor-on")!=="0";}catch(e){return true;}})();  // wide: video shown/hidden
 let viewMode=(()=>{try{return localStorage.getItem("al-view-mode")||"scorer";}catch(e){return "scorer";}})();  // "scorer" | "viewer"
+let gameFeed=[];   // live play-by-play (most recent last) for the viewer feed
 const PLAYHEAD={single:"SINGLE",double:"DOUBLE",triple:"TRIPLE",hr:"HOME RUN",error:"REACHED ON ERROR",
   fc:"FIELDER'S CHOICE",out1:"GROUND OUT",flyout:"FLY OUT",lineout:"LINE OUT",popout:"POP OUT",
   dp:"DOUBLE PLAY",sacfly:"SAC FLY",sacbunt:"SAC BUNT",walk:"WALK",hbp:"HIT BY PITCH",strikeout:"STRIKEOUT"};
-function bcastEvent(kind,sub,team){_event={id:++_eventId,head:PLAYHEAD[kind]||kind.toUpperCase(),sub:sub||"",team};}
+function bcastEvent(kind,sub,team){
+  const head=PLAYHEAD[kind]||kind.toUpperCase();
+  _event={id:++_eventId,head,sub:sub||"",team};
+  // Append to the live game feed (play-by-play) shown to viewers.
+  gameFeed.push({id:_eventId,inn:G.inning,half:G.half,head,sub:sub||"",away:G.away,home:G.home});
+  if(gameFeed.length>80)gameFeed.shift();
+}
 /* Assemble the live box score (per-batter rows + R/H/E totals), mapped to away/home. */
 function buildBox(){
   const our=[],opp=[];
@@ -778,6 +785,19 @@ function miniCount(){
     <span style="font-weight:700;color:${T.sage}">B ${G.balls} · S ${G.strikes} · O ${G.outs}</span>
     ${onb?`<span style="font-weight:700;color:${T.clay}">${onb} on</span>`:""}
   </div>`;
+}
+
+/* Live play-by-play feed (viewer). Most recent on top. */
+function feedPanel(){
+  const rows=gameFeed.slice(-40).reverse().map(e=>`<div style="display:flex;align-items:baseline;gap:10px;padding:8px 12px;border-bottom:1px solid ${T.line}">
+      <span style="font-family:${MONO};font-size:12px;font-weight:800;color:${T.lime};min-width:34px">${e.half==="T"?"▲":"▼"}${e.inn}</span>
+      <span style="flex:1;min-width:0;color:${T.chalk};font-size:14px;font-weight:700">${e.head}${e.sub?` <span style="color:${T.sage};font-weight:600">— ${e.sub}</span>`:""}</span>
+      <span style="font-family:${MONO};font-size:12px;color:${T.sage};white-space:nowrap">${TEAMS.away.short} ${e.away}-${e.home} ${TEAMS.home.short}</span>
+    </div>`).join("");
+  return `<div style="flex:1;min-height:0;display:flex;flex-direction:column;background:${T.surface};border:1px solid ${T.line};border-radius:12px;overflow:hidden">
+      <div style="padding:10px 12px;font-family:${MONO};font-weight:800;font-size:13px;letter-spacing:1.4px;color:${T.sage};border-bottom:1px solid ${T.line};flex:none">GAME FEED</div>
+      <div style="flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch">${rows||`<div style="padding:16px;color:${T.sageDim};font-size:13px">Plays show here as the game happens.</div>`}</div>
+    </div>`;
 }
 
 /* ---- minimal line icons (inherit the button's text color) ---- */
@@ -1285,16 +1305,19 @@ function render(){
   if(wide && viewMode==="viewer"){
     // Viewer: watch the game with NO scoring tools. Video + the digital ball field /
     // pitch-&-hit feed side by side; "Hide video" minimizes the feed so the field fills.
-    const feedPane=`<div style="flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;gap:8px">
+    const fieldCol=`<div style="flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;gap:8px">
         ${miniCount()}${batterCard()}
         <div style="flex:1;min-height:0;display:flex;align-items:center;justify-content:center;position:relative">${diamondSVG()}${toastEl}</div>
       </div>`;
     body=monitorOn
       ? `<div style="flex:1;min-height:0;display:flex;flex-direction:row;gap:12px">
           <div style="flex:0 0 55%;max-width:55%;min-width:0;min-height:0;display:flex;flex-direction:column">${monitorPane()}</div>
-          ${feedPane}
+          ${fieldCol}
         </div>`
-      : `<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px">${feedPane}</div>`;
+      : `<div style="flex:1;min-height:0;display:flex;flex-direction:row;gap:12px">
+          <div style="flex:0 0 52%;max-width:52%;min-width:0;min-height:0;display:flex;flex-direction:column;gap:8px">${miniCount()}${batterCard()}<div style="flex:1;min-height:0;display:flex;align-items:center;justify-content:center;position:relative">${diamondSVG()}${toastEl}</div></div>
+          ${feedPanel()}
+        </div>`;
   } else if(wide && monitorOn){
     body=`<div id="console-row" style="flex:1;min-height:0;display:flex;flex-direction:row;gap:12px">
         <div id="mon-col" style="flex:0 0 64%;max-width:64%;min-width:0;min-height:0;display:flex;flex-direction:column;gap:10px">
@@ -1412,7 +1435,7 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="lutab"){lineupTab=arg;render();}
   else if(act==="oppadd"){if(!G.oppLineup)G.oppLineup=[];G.oppLineup.push({num:String(G.oppLineup.length+1),name:""});G.oppBatters=G.oppLineup.length;render();}
   else if(act==="opprem"){if(G.oppLineup&&G.oppLineup.length>1){G.oppLineup.splice(+arg,1);G.oppBatters=G.oppLineup.length;render();broadcast();}}
-  else if(act==="home"){mode="teams";render();}
+  else if(act==="home"){mode="home";render();}
   else if(act==="resume"){mode="idle";render();}
   else if(act==="resumegame"){G.final=false;mode="idle";render();broadcast();}
   else if(act==="summary-done"){gameActive=false;mode="teams";render();broadcast();}
@@ -1499,7 +1522,7 @@ function openShare(){
   const box=document.getElementById("qrbox"); box.innerHTML="";
   if(!url){
     box.style.background="transparent";
-    box.innerHTML=`<div style="color:#9BA6B4;font-size:13px;line-height:1.5;text-align:center;padding:0 8px">No YouTube stream set yet.<br>Once you're live on YouTube, your fans' watch link and QR code show up here.</div>`;
+    box.innerHTML=`<div style="color:#B7C2D6;font-size:13px;line-height:1.5;text-align:center;padding:0 8px">No YouTube stream set yet.<br>Once you're live on YouTube, your fans' watch link and QR code show up here.</div>`;
   } else if(window.QRCode){
     box.style.background="#fff";
     try{ new QRCode(box,{text:url,width:220,height:220,colorDark:"#10141A",colorLight:"#FFFFFF",correctLevel:QRCode.CorrectLevel.M}); }
@@ -1574,7 +1597,7 @@ function applySetupParams(){
   G.lineup.order=Array.from({length:batters},(_,i)=>i);            // our continuous batting order
   G.oppBatters=batters;
   G.oppLineup=Array.from({length:batters},(_,i)=>({num:String(i+1),name:""}));
-  curTeamId=null; oppTeamId=null; gameActive=true; hist=[]; resetUI(); mode="lineup";
+  curTeamId=null; oppTeamId=null; gameActive=true; hist=[]; gameFeed=[]; resetUI(); mode="lineup";
   return true;
 }
 

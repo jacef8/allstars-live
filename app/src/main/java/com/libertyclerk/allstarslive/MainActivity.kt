@@ -93,8 +93,9 @@ class MainActivity : ComponentActivity() {
             if (needNotif) add("android.permission.POST_NOTIFICATIONS")
         }
         if (ask.isNotEmpty()) requestPermissions(ask.toTypedArray(), 1)
-        // Keep the system bars VISIBLE so the Scaffold insets push our top toggle /
-        // bottom tabs clear of the screen edges + camera cutout (hiding them clipped UI).
+        // Immersive: hide the status bar + nav/taskbar so the broadcast app is full-bleed.
+        // Swipe from an edge to reveal them transiently; onWindowFocusChanged re-hides.
+        hideSystemBars()
 
         setContent {
             AllStarsLiveTheme {
@@ -166,6 +167,18 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) hideSystemBars()   // re-hide after dialogs / transient swipe-reveal
+    }
+
+    private fun hideSystemBars() {
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        WindowInsetsControllerCompat(window, window.decorView).apply {
+            hide(WindowInsetsCompat.Type.systemBars())
+            systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        }
+    }
 }
 
 /**
