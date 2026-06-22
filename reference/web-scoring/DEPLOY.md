@@ -1,59 +1,50 @@
-# Deploy — All-Stars Live web (relay + pages)
+# Deploy — All-Stars Live web (the console)
 
-**What this deploys:** the WEB prototype — the **scorer** (`scoring-controller.html`),
-the **viewer** (`viewer.html`), and **GameCast** (`gamecast.html`). It does **not**
-include the native camera app (that runs on the tablet from the Android build).
+**What this deploys:** the **all-in-one console** (`scoring-controller.html`) — the
+broadcast monitor + scorebug + scoring controls on a single page, one device. This is
+the web mirror of the native tablet app.
 
-Two pieces work together:
-- **Relay** (Railway) — `server.js`. Passes live score state between devices and
-  catches late joiners up. Without it, the pages only sync within one browser.
-- **Pages** (GitHub Pages) — the static HTML, reachable from any device by URL.
+**Fans don't open any of our pages** — they watch the **YouTube stream** (the scorebug
+is burned into the video). The console's **Share with fans** button hands out the
+YouTube watch link / QR. There is intentionally **no separate viewer page**.
+
+Two pieces:
+- **Relay** (Railway) — `server.js`. Optional now: it passes live state between devices
+  and is kept for the native app / future multi-device use. The single console works
+  without it.
+- **Pages** (GitHub Pages) — the static console, reachable from any device by URL.
 
 ---
 
-## A. Relay on Railway
+## A. Relay on Railway  ✅ deployed
 
-1. Push this project to a GitHub repo (see **B.1** — use the same repo).
-2. [railway.app](https://railway.app) → **New Project → Deploy from GitHub repo** → pick the repo.
-3. Project → **Settings → Root Directory** = `reference/web-scoring`
-   (so Railway finds this `package.json` / `server.js`).
-4. Railway auto-detects Node and runs `npm install` then `npm start`.
-   **Do not set `PORT`** — Railway injects it.
-5. **Settings → Networking → Generate Domain.** You'll get a URL like
-   `https://allstars-live.up.railway.app`. The WebSocket URL is the same host with `wss://`:
-   **`wss://allstars-live.up.railway.app`**
-6. Verify: open the `https://…` URL in a browser → it should say
-   *"Liberty League relay is running."* (and `/health` returns `ok`).
-7. *(Optional)* crash-recovery persistence: add env vars `FIREBASE_DB_URL` and
-   `FIREBASE_SERVICE_ACCOUNT`. Leave them unset to run as a pure in-memory relay.
+- Live at **`https://web-production-77d34.up.railway.app`** (root says
+  *"Liberty League relay is running."*, `/health` returns `ok`).
+- Config is pinned in `railway.json` (`node server.js`, healthcheck `/health`).
+- **Root Directory** = `reference/web-scoring`. **Do not set `PORT`** — Railway injects it.
+- The `wss://web-production-77d34.up.railway.app` URL is already baked into the console
+  as the default (an explicit `?server=` / `?ws=` still overrides).
+- *(Optional)* crash-recovery persistence: add env vars `FIREBASE_DB_URL` and
+  `FIREBASE_SERVICE_ACCOUNT`. Leave unset to run as a pure in-memory relay.
 
 ---
 
 ## B. Pages on GitHub Pages
 
-1. Create a GitHub repo and push the project.
-2. Repo **Settings → Pages → Source = Deploy from branch → `main`**.
-   - Root of repo → pages live at `…/reference/web-scoring/scoring-controller.html`.
-   - For clean URLs, serve from `/docs` (copy these files there) or a `gh-pages` branch.
-3. GitHub gives you `https://<user>.github.io/<repo>/…`.
-4. Open on each device, pointing at the relay with `?server=`:
-   - **Tablet (scorer):** `…/scoring-controller.html?server=wss://allstars-live.up.railway.app`
-   - **Phones / TV (fans):** `…/viewer.html?server=wss://…` and `…/gamecast.html?server=wss://…`
-   - GameCast can also embed YouTube: add `&yt=VIDEO_ID`.
-
----
-
-## C. Skip the `?server=` (optional)
-
-So you don't type the relay URL every time, I can set it as the **default** in the
-pages. Send me your Railway `wss://…` URL and I'll bake it in (pages still honor an
-explicit `?server=` override).
+1. Repo **Settings → Pages → Source = Deploy from a branch → `main`** → Save.
+2. Wait ~1 min for the green "Your site is live" banner.
+3. Clean entry URL (repo-root `index.html` redirects to the console):
+   **`https://jacef8.github.io/allstars-live/`**
+   - Direct: `…/allstars-live/reference/web-scoring/scoring-controller.html`
+   - Embed the live YouTube feed in the monitor with `?yt=VIDEO_ID`.
 
 ---
 
 ## Notes / gotchas
 - GitHub Pages is **HTTPS**, so the relay must be **WSS** — Railway provides that. ✓
-- GitHub Pages repos are **public** (the scoreboard/scorer will be publicly reachable by URL).
-- Same browser/device syncs via BroadcastChannel automatically; **cross-device needs the relay** (`?server=`).
-- This is the scoring + fan-view experience over the internet. The **camera → video → YouTube**
-  pipeline is the native tablet app (M2/M3) and is deployed separately.
+- The Pages repo is **public** (no secrets are committed; the keystore and any
+  service-account JSON are git-ignored).
+- The **camera → video → YouTube** pipeline is the native tablet app (M2/M3) and is
+  deployed separately from this web console.
+- Archived prototypes (the old separate viewer / gamecast / overlay / setup pages) live
+  in `_archive/` and are not part of the deployed app.

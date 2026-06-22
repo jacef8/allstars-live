@@ -673,6 +673,26 @@ function batterCard(){
   </div>`;
 }
 
+/* All-in-one broadcast monitor: the live feed (YouTube via ?yt=VIDEO_ID, else a
+   placeholder) with the scorebug overlaid — exactly what streams to YouTube.
+   This is the web mirror of the native tablet console (monitor + scorer in one). */
+function monitorPane(){
+  const yt=new URLSearchParams(location.search).get("yt");
+  const feed=yt
+    ? `<iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(yt)}?autoplay=1&mute=1&playsinline=1&modestbranding=1&rel=0" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen style="position:absolute;inset:0;width:100%;height:100%;border:0"></iframe>`
+    : `<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;text-align:center;padding:0 20px;background:radial-gradient(circle at 50% 36%, #16202e, #0b0f15)">
+        <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="${T.sageDim}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+        <div style="font-family:${MONO};font-weight:800;letter-spacing:2px;font-size:14px;color:${T.sage}">CAMERA FEED</div>
+        <div style="font-size:11px;color:${T.sageDim};max-width:250px;line-height:1.45">Your broadcast monitor — what streams to YouTube with the scorebug burned in.</div></div>`;
+  return `<div style="position:relative;width:100%;aspect-ratio:16/9;background:#0b0f15;border:2px solid ${T.line};border-radius:14px;overflow:hidden;flex:none;box-shadow:0 6px 22px rgba(0,0,0,.4)">
+      ${feed}
+      <div style="position:absolute;top:9px;left:10px;display:flex;align-items:center;gap:6px;background:rgba(8,11,16,.62);border-radius:999px;padding:4px 11px">
+        <span style="width:8px;height:8px;border-radius:50%;background:${T.live};box-shadow:0 0 8px ${T.live}"></span>
+        <span style="font-family:${MONO};font-weight:800;font-size:11px;letter-spacing:1.6px;color:#fff">LIVE</span></div>
+      <div style="position:absolute;left:8px;right:8px;bottom:8px">${statusBar()}</div>
+    </div>`;
+}
+
 /* ---- minimal line icons (inherit the button's text color) ---- */
 const IC=(p)=>`<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none">${p}</svg>`;
 const ICN={
@@ -1119,12 +1139,24 @@ function render(){
       ${mode==="idle"?`<button data-act="home" style="background:${T.surface};border:1px solid ${T.line};color:${T.chalk};border-radius:8px;padding:7px 12px;font-size:13px;font-weight:700">⌂ Home</button>
       <button data-act="lineup" style="background:${T.surface2};border:1px solid ${T.line};color:${T.chalk};border-radius:8px;padding:7px 13px;font-size:13px;font-weight:700">Lineup</button>
       <button data-act="endgame" style="background:transparent;border:1px solid ${T.out};color:${T.out};border-radius:8px;padding:7px 12px;font-size:13px;font-weight:700">End game</button>`:""}</div>`;
+  // All-in-one console: broadcast monitor (with scorebug) beside the scoring tools.
+  // Side-by-side on the tablet (landscape), stacked on a phone. The scorebug lives
+  // on the monitor — the scorer column carries the batter + field + controls.
+  const controls=footer;   // undo + (idle: home/lineup/endgame); empty during transient picker steps
+  const shareBtn=`<button data-act="share" style="${bigBtn(T.surface2,"border:2px solid "+T.line+";font-size:16px",T.chalk)}">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="${T.lime}" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="19" r="2.6"/><path d="M8.3 10.8 15.7 6.4M8.3 13.2l7.4 4.4"/></svg>Share with fans</button>`;
+  const monitorCol=`<div style="${wide?"flex:0 0 47%;max-width:47%":"flex:none"};min-height:0;display:flex;flex-direction:column;gap:10px">
+      ${monitorPane()}
+      ${wide?`<div style="flex:1;min-height:0;display:flex;flex-direction:column;justify-content:flex-end;gap:9px">${shareBtn}${controls}</div>`:""}</div>`;
+  const scorerCol=`<div style="flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;gap:8px">
+      ${batterCard()}
+      <div style="${fieldStyle};display:flex;align-items:center;justify-content:center;position:relative">${diamondSVG()}${toastEl}</div>
+      ${pickerModal?"":`<div id="action-area" style="display:flex;flex-direction:column;gap:8px;${actionStyle}">${actionArea()}</div>`}
+      ${wide?"":controls}</div>`;
   document.getElementById("content").innerHTML=`
-    ${mode==="idle"?statusBar():""}
-    ${playing?"":batterCard()}
-    <div style="${fieldStyle};display:flex;align-items:center;justify-content:center;position:relative">${diamondSVG()}${toastEl}</div>
-    ${pickerModal?"":`<div id="action-area" style="display:flex;flex-direction:column;gap:8px;${actionStyle}">${actionArea()}</div>`}
-    ${footer}${confirmOverlay()}
+    <div style="flex:1;min-height:0;display:flex;${wide?"flex-direction:row":"flex-direction:column"};gap:10px">
+      ${monitorCol}${scorerCol}
+    </div>${confirmOverlay()}
     ${pickerModal?`<div style="${sheetWrap}">
         <div id="action-area" style="${sheetCard};overflow-y:auto;-webkit-overflow-scrolling:touch;background:${T.surface};padding:16px;display:flex;flex-direction:column;gap:8px">${actionArea()}</div></div>`:""}`;
   animateStatusBar();
@@ -1253,26 +1285,26 @@ function renderToolbar(){
 }
 window.onLinkChange=renderToolbar;   // relay open/close → repaint the dot
 
-/* ===== fan share: the viewer.html fan page (relay WS + team names baked in) ===== */
+/* ===== fan share: fans watch the YouTube broadcast (scorebug burned into video).
+   Share that link — no separate fan page. Pass the stream via ?yt=VIDEO_ID. ===== */
 function shareUrl(){
-  const ws=LINK.viewerWsUrl();
-  const u=new URL("viewer.html", location.href);
-  if(ws) u.searchParams.set("ws", ws);
-  const homeT=G.ourSide==="home"?OUR:OPP, awayT=G.ourSide==="home"?OPP:OUR;   // map our/opp -> home/away
-  u.searchParams.set("home", homeT.short); u.searchParams.set("homeName", homeT.name);
-  u.searchParams.set("away", awayT.short); u.searchParams.set("awayName", awayT.name);
-  return u.href;
+  const yt=new URLSearchParams(location.search).get("yt");
+  return yt ? ("https://www.youtube.com/watch?v="+encodeURIComponent(yt)) : "";
 }
 function openShare(){
   const url=shareUrl();
   document.getElementById("qrurl").textContent=url;
   const box=document.getElementById("qrbox"); box.innerHTML="";
-  if(window.QRCode){
+  if(!url){
+    box.style.background="transparent";
+    box.innerHTML=`<div style="color:#9BA6B4;font-size:13px;line-height:1.5;text-align:center;padding:0 8px">No YouTube stream set yet.<br>Once you're live on YouTube, your fans' watch link and QR code show up here.</div>`;
+  } else if(window.QRCode){
+    box.style.background="#fff";
     try{ new QRCode(box,{text:url,width:220,height:220,colorDark:"#10141A",colorLight:"#FFFFFF",correctLevel:QRCode.CorrectLevel.M}); }
     catch(e){ box.textContent="Couldn't render QR — copy the link below."; }
   } else { box.textContent="QR library didn't load — copy the link below."; }
   // Native share sheet (SMS/messaging) only on devices that support it.
-  const nb=document.getElementById("navShareBtn"); if(nb) nb.style.display = navigator.share ? "flex" : "none";
+  const nb=document.getElementById("navShareBtn"); if(nb) nb.style.display = (navigator.share && url) ? "flex" : "none";
   document.getElementById("qrmodal").style.display="flex";
 }
 function closeShare(){ document.getElementById("qrmodal").style.display="none"; }
