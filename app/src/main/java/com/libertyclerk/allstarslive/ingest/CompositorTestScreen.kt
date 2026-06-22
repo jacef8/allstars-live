@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -36,15 +37,17 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.libertyclerk.allstarslive.gl.Mp4Recorder
 import com.libertyclerk.allstarslive.gl.VideoCompositor
+import com.libertyclerk.allstarslive.stream.YouTubeStreamer
 import java.io.File
 
 private const val PROG_W = 1280
 private const val PROG_H = 720
 
-/** Mutable refs shared between the Surface callbacks and the Record button. */
+/** Mutable refs shared between the Surface callbacks and the Record / Go Live buttons. */
 private class M2State {
     var comp: VideoCompositor? = null
     var rec: Mp4Recorder? = null
+    var streamer: YouTubeStreamer? = null
 }
 
 /**
@@ -64,11 +67,15 @@ fun CompositorTestScreen() {
     var recording by remember { mutableStateOf(false) }
     var lastPath by remember { mutableStateOf<String?>(null) }
     var savedPath by remember { mutableStateOf<String?>(null) }
+    var streaming by remember { mutableStateOf(false) }
+    var streamKey by remember { mutableStateOf("") }
+    var streamStatus by remember { mutableStateOf("") }
 
     DisposableEffect(Unit) {
         onDispose {
             stub.stop()
             st.rec?.let { r -> st.comp?.detachEncoder { r.finish() }; st.rec = null }
+            st.streamer?.let { s -> st.comp?.detachEncoder { s.stop() }; st.streamer = null }
             st.comp?.release()
             st.comp = null
         }
@@ -97,6 +104,7 @@ fun CompositorTestScreen() {
                             stub.stop()
                             val comp = st.comp
                             st.rec?.let { r -> comp?.detachEncoder { r.finish() }; st.rec = null }
+                            st.streamer?.let { s -> comp?.detachEncoder { s.stop() }; st.streamer = null }
                             comp?.release()
                             st.comp = null
                         }
@@ -143,12 +151,57 @@ fun CompositorTestScreen() {
                         savedPath = lastPath
                     }
                 },
+                enabled = !streaming,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = if (recording) Color(0xFFFF3B5C) else Color(0xFFA3E635),
                     contentColor = Color(0xFF0B0E13),
                 ),
             ) {
                 Text(if (recording) "Stop recording" else "Record .mp4", fontSize = 16.sp)
+            }
+
+            // --- Go Live to YouTube (M3) ---
+            if (streamStatus.isNotEmpty()) Text("Stream: $streamStatus", color = Color(0xFF4C9AFF), fontSize = 12.sp)
+            OutlinedTextField(
+                value = streamKey,
+                onValueChange = { streamKey = it },
+                label = { Text("YouTube stream key") },
+                singleLine = true,
+                enabled = !streaming,
+                modifier = Modifier.fillMaxWidth(0.7f),
+            )
+            Button(
+                onClick = {
+                    val comp = st.comp ?: return@Button
+                    if (!streaming) {
+                        if (streamKey.isBlank()) { streamStatus = "Enter your YouTube stream key first"; return@Button }
+                        val s = YouTubeStreamer(PROG_W, PROG_H, onStatus = { status ->
+                            streamStatus = status
+                            // A failed/auth-rejected connect ends the stream — reset the UI + free the encoder.
+                            if (streaming && (status.startsWith("Failed") || status.startsWith("Auth"))) {
+                                streaming = false
+                                val old = st.streamer; st.streamer = null
+                                st.comp?.detachEncoder { old?.stop() }
+                            }
+                        })
+                        comp.setEncoderSurface(s.inputSurface, PROG_W, PROG_H) { s.drain() }
+                        s.start("rtmp://a.rtmp.youtube.com/live2/" + streamKey.trim())
+                        st.streamer = s
+                        streaming = true
+                    } else {
+                        val s = st.streamer
+                        streaming = false
+                        comp.detachEncoder { s?.stop() }
+                        st.streamer = null
+                    }
+                },
+                enabled = !recording,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (streaming) Color(0xFFFF3B5C) else Color(0xFF4C9AFF),
+                    contentColor = Color(0xFFFFFFFF),
+                ),
+            ) {
+                Text(if (streaming) "Stop streaming" else "Go Live", fontSize = 16.sp)
             }
         }
     }
