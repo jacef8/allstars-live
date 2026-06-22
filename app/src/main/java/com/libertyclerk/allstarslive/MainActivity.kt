@@ -50,10 +50,13 @@ import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.libertyclerk.allstarslive.ingest.CompositorTestScreen
 import com.libertyclerk.allstarslive.ingest.SrtIngestScreen
 import com.libertyclerk.allstarslive.scorer.GameScorerScreen
 import com.libertyclerk.allstarslive.scorer.createScorerWebView
+import com.libertyclerk.allstarslive.stream.Broadcast
+import com.libertyclerk.allstarslive.stream.GoLiveDialog
 import com.libertyclerk.allstarslive.ui.theme.AllStarsLiveTheme
 
 /** Bottom-bar destinations. Game = scoring (next), Video = live ingest (working). */
@@ -86,16 +89,30 @@ class MainActivity : ComponentActivity() {
                 // Created once + kept alive so switching tabs doesn't reload a live game.
                 val scorerWeb = androidx.compose.runtime.remember { createScorerWebView(ctx) }
 
-                Scaffold(
-                    containerColor = MaterialTheme.colorScheme.background,
-                    bottomBar = { AllStarsBottomBar(tabs, tabIndex, onSelect = { tabIndex = it }) },
-                ) { inner ->
-                    Box(Modifier.fillMaxSize().padding(inner)) {
-                        when (tabs[tabIndex]) {
-                            Tab.GAME -> GameScorerScreen(scorerWeb)
-                            Tab.VIDEO -> VideoTab()
-                            Tab.SETTINGS -> SettingsScreen()
+                Box(Modifier.fillMaxSize()) {
+                    Scaffold(
+                        containerColor = MaterialTheme.colorScheme.background,
+                        bottomBar = { AllStarsBottomBar(tabs, tabIndex, onSelect = { tabIndex = it }) },
+                    ) { inner ->
+                        Box(Modifier.fillMaxSize().padding(inner)) {
+                            when (tabs[tabIndex]) {
+                                Tab.GAME -> GameScorerScreen(scorerWeb)
+                                Tab.VIDEO -> VideoTab()
+                                Tab.SETTINGS -> SettingsScreen()
+                            }
                         }
+                    }
+
+                    // App-level "Start game stream" dialog — raised from the Video tab
+                    // button OR the Game-page web button, both via Broadcast.requestDialog().
+                    val showGoLive by Broadcast.showDialog.collectAsStateWithLifecycle()
+                    val bcast by Broadcast.state.collectAsStateWithLifecycle()
+                    if (showGoLive) {
+                        GoLiveDialog(
+                            initialTitle = bcast.title,
+                            onStart = { t, p -> Broadcast.goLive(ctx, t, p); Broadcast.dismissDialog() },
+                            onCancel = { Broadcast.dismissDialog() },
+                        )
                     }
                 }
             }

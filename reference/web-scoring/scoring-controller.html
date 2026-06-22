@@ -717,6 +717,18 @@ function parseYouTubeId(s){
   }catch(e){ return s; }
 }
 
+/* ===== tablet-app bridge (window.AllStars) =====
+   In the app the monitor never needs a pasted link: native creates the broadcast and
+   pushes the video id here, and Start/End route to the native Go Live flow. */
+const IS_APP = !!(window.AllStars && window.AllStars.isApp);
+window.__bcastPhase = "OFFLINE";
+window.__bcast = function(phase, videoId){
+  window.__bcastPhase = phase || "OFFLINE";
+  if(videoId){ try{ localStorage.setItem("al-stream-yt", videoId); }catch(e){} }
+  try{ render(); }catch(e){}
+};
+function appLive(){ return window.__bcastPhase==="LIVE" || window.__bcastPhase==="STARTING"; }
+
 /* All-in-one broadcast monitor: the live feed (saved YouTube stream or ?yt=, else a
    placeholder) with the scorebug overlaid — exactly what streams to YouTube.
    This is the web mirror of the native tablet console (monitor + scorer in one). */
@@ -727,19 +739,20 @@ function monitorPane(){
     : `<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;padding:0 20px 104px;background:radial-gradient(circle at 50% 34%, #16202e, #0b0f15)">
         <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="${T.sageDim}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
         <div style="font-family:${MONO};font-weight:800;letter-spacing:2px;font-size:14px;color:${T.sage}">CAMERA FEED</div>
-        <div style="font-size:11px;color:${T.sageDim};max-width:260px;line-height:1.45">Connect your YouTube Live stream to see it here with the scorebug.</div>
-        <button data-act="setstream" style="margin-top:4px;background:${T.lime};color:${T.field};border:none;border-radius:9px;padding:10px 16px;font-family:${SANS};font-weight:800;font-size:13px;display:inline-flex;align-items:center;gap:7px;cursor:pointer">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="${T.field}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3l14 9-14 9V3z"/></svg>Connect your stream</button></div>`;
+        <div style="font-size:11px;color:${T.sageDim};max-width:260px;line-height:1.45">${IS_APP?"Start the stream to put the game on YouTube with the scorebug.":"Connect your YouTube Live stream to see it here with the scorebug."}</div>
+        <button data-act="${IS_APP?'appgolive':'setstream'}" style="margin-top:4px;background:${T.lime};color:${T.field};border:none;border-radius:9px;padding:10px 16px;font-family:${SANS};font-weight:800;font-size:13px;display:inline-flex;align-items:center;gap:7px;cursor:pointer">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="${T.field}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3l14 9-14 9V3z"/></svg>${IS_APP?(appLive()?"Going live…":"Start game stream"):"Connect your stream"}</button></div>`;
   const monBtn="width:32px;height:32px;border-radius:8px;background:rgba(8,11,16,.6);border:1px solid rgba(255,255,255,.2);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer";
   const fsIcon=`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>`;
   const ytIcon=`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M9 7h8v8"/></svg>`;
   const gearIcon=`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/></svg>`;
-  const ctrls=yt
-    ? `<div style="position:absolute;top:9px;right:10px;display:flex;gap:6px;z-index:3">
-        <button data-act="setstream" title="Change stream" style="${monBtn}">${gearIcon}</button>
-        <button data-act="ytopen" title="Open in YouTube" style="${monBtn}">${ytIcon}</button>
-        <button data-act="fullscreen" title="Fullscreen" style="${monBtn}">${fsIcon}</button></div>`
-    : "";
+  const endBtn=`<button data-act="appstop" title="End broadcast" style="height:32px;border-radius:8px;background:#FF3B5C;border:1px solid #FF3B5C;color:#fff;display:flex;align-items:center;justify-content:center;padding:0 12px;font-family:${SANS};font-weight:800;font-size:12px;cursor:pointer">End</button>`;
+  const ctrls=`<div style="position:absolute;top:9px;right:10px;display:flex;gap:6px;z-index:3">
+      ${IS_APP&&appLive()?endBtn:""}
+      ${(!IS_APP&&yt)?`<button data-act="setstream" title="Change stream" style="${monBtn}">${gearIcon}</button>`:""}
+      ${yt?`<button data-act="ytopen" title="Open in YouTube" style="${monBtn}">${ytIcon}</button>`:""}
+      ${yt?`<button data-act="fullscreen" title="Fullscreen" style="${monBtn}">${fsIcon}</button>`:""}
+    </div>`;
   return `<div id="monitor" style="position:relative;width:100%;aspect-ratio:16/9;background:#0b0f15;border:2px solid ${T.line};border-radius:14px;overflow:hidden;flex:none;box-shadow:0 6px 22px rgba(0,0,0,.4)">
       ${feed}
       <div style="position:absolute;top:9px;left:10px;display:flex;align-items:center;gap:6px;background:rgba(8,11,16,.62);border-radius:999px;padding:4px 11px;z-index:3">
@@ -1291,6 +1304,8 @@ document.getElementById("app").addEventListener("click",e=>{
   }
   if(act==="fullscreen"){ const m=document.getElementById("monitor"); const r=m&&(m.requestFullscreen||m.webkitRequestFullscreen); if(r)r.call(m); return; }
   if(act==="ytopen"){ const ytv=streamYt(); if(ytv)window.open("https://www.youtube.com/watch?v="+encodeURIComponent(ytv),"_blank","noopener"); return; }
+  if(act==="appgolive"){ try{ window.AllStars.requestGoLive(); }catch(e){} return; }
+  if(act==="appstop"){ try{ window.AllStars.stopStream(); }catch(e){} return; }
   if(act==="setstream"){ openStream(); return; }
   if(act==="savestream"){ saveStream(); return; }
   if(act==="clearstream"){ try{localStorage.removeItem("al-stream-yt");}catch(e){} closeStream(); render(); return; }

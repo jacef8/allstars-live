@@ -70,7 +70,6 @@ fun SrtIngestScreen(onUseTestPattern: () -> Unit = {}) {
     val stats by source.stats.collectAsStateWithLifecycle()
     // Shared YouTube broadcast state — same source of truth as the Game page.
     val bcast by Broadcast.state.collectAsStateWithLifecycle()
-    var showGoLive by remember { mutableStateOf(false) }
 
     var surface by remember { mutableStateOf<Surface?>(null) }
     var showSetup by remember { mutableStateOf(false) }
@@ -131,23 +130,16 @@ fun SrtIngestScreen(onUseTestPattern: () -> Unit = {}) {
             CameraStatus(stats.state, stats.message, onSetup = { showSetup = true }, onUseTestPattern = onUseTestPattern)
         }
 
-        // Go Live control — reflects the shared broadcast state (synced with the Game page).
+        // Go Live control — reflects the shared broadcast state (synced with the Game
+        // page). The dialog itself is raised app-level via Broadcast.requestDialog().
         GoLiveBar(
             phase = bcast.phase,
             status = bcast.status,
             cameraReady = playing,
-            onGoLive = { showGoLive = true },
+            onGoLive = { Broadcast.requestDialog() },
             onEnd = { Broadcast.stop() },
             modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 18.dp),
         )
-
-        if (showGoLive) {
-            GoLiveDialog(
-                initialTitle = bcast.title,
-                onStart = { title, privacy -> Broadcast.goLive(ctx, title, privacy); showGoLive = false },
-                onCancel = { showGoLive = false },
-            )
-        }
 
         if (showSetup) {
             CameraSetupSheet(
@@ -260,65 +252,6 @@ private fun GoLiveBar(
             Text(status, color = if (phase == Broadcast.Phase.ERROR) Color(0xFFFF6B6B) else Color(0xFFB7C0CC), fontSize = 12.sp)
         }
     }
-}
-
-/** "Start game stream" sheet — name + who-can-watch, then creates the broadcast. */
-@Composable
-private fun GoLiveDialog(
-    initialTitle: String,
-    onStart: (title: String, privacy: String) -> Unit,
-    onCancel: () -> Unit,
-) {
-    var title by remember { mutableStateOf(initialTitle.ifBlank { "All-Stars Live" }) }
-    var privacy by remember { mutableStateOf("unlisted") }
-    Box(
-        Modifier.fillMaxSize().background(Color(0xCC05080C)).clickable(onClick = onCancel).imePadding(),
-        contentAlignment = Alignment.Center,
-    ) {
-        Column(
-            Modifier
-                .widthIn(max = 520.dp)
-                .padding(16.dp)
-                .background(Color(0xFF141A22), RoundedCornerShape(16.dp))
-                .padding(20.dp)
-                .pointerInput(Unit) { detectTapGestures { } },   // swallow taps so the card doesn't close
-            verticalArrangement = Arrangement.spacedBy(14.dp),
-        ) {
-            Text("Start game stream", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-            OutlinedTextField(
-                value = title, onValueChange = { title = it },
-                label = { Text("Stream name (shown on YouTube)") }, singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Text("Who can watch", color = Color(0xFF9AA0A6), fontSize = 13.sp)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                PrivacyChip("Public", "public", privacy) { privacy = "public" }
-                PrivacyChip("Unlisted", "unlisted", privacy) { privacy = "unlisted" }
-                PrivacyChip("Private", "private", privacy) { privacy = "private" }
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.align(Alignment.End)) {
-                TextButton(onClick = onCancel) { Text("Cancel", color = Color(0xFF9AA0A6)) }
-                Button(
-                    onClick = { onStart(title, privacy) },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF3B5C), contentColor = Color.White),
-                ) { Text("Go Live", fontWeight = FontWeight.Bold) }
-            }
-        }
-    }
-}
-
-@Composable
-private fun PrivacyChip(label: String, value: String, selected: String, onClick: () -> Unit) {
-    val on = value == selected
-    Text(
-        label,
-        color = if (on) Color(0xFF05080C) else Color(0xFFE8EAED),
-        fontSize = 14.sp, fontWeight = if (on) FontWeight.Bold else FontWeight.Normal,
-        modifier = Modifier
-            .background(if (on) Color(0xFFA3E635) else Color(0xFF222B36), RoundedCornerShape(999.dp))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 9.dp),
-    )
 }
 
 /** Small unobtrusive LIVE badge once the feed is up. */

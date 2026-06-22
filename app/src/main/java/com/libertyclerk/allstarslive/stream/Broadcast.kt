@@ -34,6 +34,13 @@ object Broadcast {
     private val _state = MutableStateFlow(State())
     val state: StateFlow<State> = _state
 
+    // App-level "Start game stream" dialog request, so the Video tab button and the
+    // Game-page web button both raise the SAME dialog (one UI, one flow).
+    private val _showDialog = MutableStateFlow(false)
+    val showDialog: StateFlow<Boolean> = _showDialog
+    fun requestDialog() { _showDialog.value = true }
+    fun dismissDialog() { _showDialog.value = false }
+
     private const val PROG_W = 1280
     private const val PROG_H = 720
     private val main = Handler(Looper.getMainLooper())
