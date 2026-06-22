@@ -11,7 +11,7 @@
       "package-lock.json"
     ],
     "rewrites": [
-      { "source": "/", "destination": "/watch.html" }
+      { "source": "/", "destination": "/scoring-controller.html" }
     ]
   }
 }

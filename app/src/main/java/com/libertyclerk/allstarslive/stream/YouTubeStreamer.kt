@@ -31,12 +31,20 @@ class YouTubeStreamer(
     bitRate: Int = (width * height * 5).coerceAtLeast(2_500_000),
     private val onStatus: (String) -> Unit,
 ) {
-    private val client = RtmpClient(object : ConnectChecker {
+    // True between start() and stop(): while set, a dropped RTMP connection (e.g. the
+    // camera glitched and the stream starved → "broken pipe") auto-reconnects instead of
+    // ending the broadcast. Cleared by stop() so an intentional end doesn't retry.
+    @Volatile private var shouldStream = false
+
+    private val client: RtmpClient = RtmpClient(object : ConnectChecker {
         override fun onConnectionStarted(url: String) = onStatus("Connecting…")
-        override fun onConnectionSuccess() = onStatus("LIVE")
-        override fun onConnectionFailed(reason: String) = onStatus("Failed: $reason")
+        override fun onConnectionSuccess() {
+            requestKeyFrame()        // push an IDR immediately so YouTube re-locks fast
+            onStatus("LIVE")
+        }
+        override fun onConnectionFailed(reason: String) = onConnFailed(reason)
         override fun onNewBitrate(bitrate: Long) {}
-        override fun onDisconnect() = onStatus("Stopped")
+        override fun onDisconnect() { if (!shouldStream) onStatus("Stopped") }
         override fun onAuthError() = onStatus("Auth error — check the stream key")
         override fun onAuthSuccess() {}
     })
@@ -81,8 +89,32 @@ class YouTubeStreamer(
         encoder.start()
         audioEncoder.start()
         streaming = true
+        shouldStream = true
+        client.setReTries(60)          // ~5 min of 5s retries — survive a whole game's hiccups
         startAudio()
         client.connect(rtmpUrl)
+    }
+
+    /** Auto-reconnect on a dropped connection (e.g. "broken pipe" after the camera
+     *  glitched). Defined as a member fn so it can use [client] at call-time (referencing
+     *  it inside client's own initializer would be a recursive/uninitialized error). */
+    private fun onConnFailed(reason: String) {
+        if (shouldStream && client.shouldRetry(reason)) {
+            client.reConnect(5000)
+            onStatus("Reconnecting…")
+        } else {
+            onStatus("Failed: $reason")
+        }
+    }
+
+    /** Ask the encoder for an immediate keyframe (so a fresh/reconnected RTMP session
+     *  gets an IDR right away instead of waiting up to the 2s GOP). */
+    private fun requestKeyFrame() {
+        runCatching {
+            encoder.setParameters(android.os.Bundle().apply {
+                putInt(MediaCodec.PARAMETER_KEY_REQUEST_SYNC_FRAME, 0)
+            })
+        }
     }
 
     /** Pull encoded VIDEO frames and send them. Runs on the compositor's GL thread. */
@@ -187,6 +219,7 @@ class YouTubeStreamer(
     /** Stop streaming and release encoders. Call on the compositor GL thread (after detach). */
     fun stop() {
         streaming = false
+        shouldStream = false        // intentional end — don't auto-reconnect
         audioThread?.interrupt(); audioThread = null
         runCatching { client.disconnect() }
         runCatching { encoder.stop() }

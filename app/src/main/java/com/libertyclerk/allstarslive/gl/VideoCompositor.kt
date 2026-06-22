@@ -37,7 +37,29 @@ class VideoCompositor {
     private var encoderSurface: EGLSurface? = null
     private var encoderW = 0
     private var encoderH = 0
+    // Wall-clock base captured at the first encoder frame, so the encoder's video PTS is
+    // ZERO-BASED on the same real-time clock the audio track uses — otherwise YouTube can't
+    // sync them (stuck "starting", recorded-but-no-video). Wall-clock (not the camera
+    // clock) also lets keep-alive frames advance smoothly when the camera has stalled.
+    // -1 = not yet set; reset whenever a new encoder attaches.
+    private var encoderBaseNs = -1L
     private var onEncoderFrame: ((Long) -> Unit)? = null
+
+    // Keep-alive: if the camera stalls (e.g. Mevo dropped) WHILE streaming, keep pushing
+    // the last frame to the encoder so the RTMP stream — and thus the YouTube broadcast —
+    // stays alive instead of YouTube auto-stopping it. Resumes real frames when the camera
+    // returns. lastCamNs = wall time (ms) of the last real camera frame.
+    @Volatile private var lastCamNs = 0L
+    private val heartbeat = object : Runnable {
+        override fun run() {
+            if (encoderSurface != null && lastCamNs > 0L &&
+                System.currentTimeMillis() - lastCamNs > STALE_MS
+            ) {
+                runCatching { renderEncoder() }   // re-push the last frame to keep RTMP alive
+            }
+            handler.postDelayed(this, KEEPALIVE_MS)
+        }
+    }
 
     // Overlay (Step 2).
     private var overlayTexId = 0
@@ -71,6 +93,7 @@ class VideoCompositor {
             latch.countDown()
         }
         latch.await()
+        handler.postDelayed(heartbeat, KEEPALIVE_MS)   // keep-alive while streaming
         Log.i(TAG, "compositor started")
     }
 
@@ -136,6 +159,7 @@ class VideoCompositor {
     fun setEncoderSurface(surface: Surface?, width: Int, height: Int, onFrame: ((Long) -> Unit)?) {
         handler.post {
             encoderSurface?.let { egl.releaseSurface(it) }
+            encoderBaseNs = -1L          // re-zero the video clock for the new stream
             if (surface == null) {
                 encoderSurface = null
                 onEncoderFrame = null
@@ -155,7 +179,7 @@ class VideoCompositor {
         egl.makeCurrent(displaySurface ?: base)
         surfaceTexture.updateTexImage()
         surfaceTexture.getTransformMatrix(texMatrix)
-        val ptsNs = surfaceTexture.timestamp
+        lastCamNs = System.currentTimeMillis()   // a real frame arrived (keep-alive backs off)
 
         // Preview (if attached): letterbox the video to the screen, overlay on top.
         displaySurface?.let { display ->
@@ -173,16 +197,26 @@ class VideoCompositor {
             egl.swapBuffers(display)
         }
 
-        // Recording / streaming: draw the clean program frame at full encoder resolution.
-        encoderSurface?.let { enc ->
-            egl.makeCurrent(enc)
-            GLES20.glViewport(0, 0, encoderW, encoderH)
-            scene.drawVideo(oesTexId, texMatrix)
-            if (hasOverlay) scene.drawOverlay(overlayTexId)
-            egl.setPresentationTime(enc, ptsNs)
-            egl.swapBuffers(enc)
-            onEncoderFrame?.invoke(ptsNs)
-        }
+        renderEncoder()
+    }
+
+    /** Draw the clean program frame (last camera frame + overlay) to the encoder. Called
+     *  per real frame from [drawFrame] AND by the keep-alive [heartbeat] during a camera
+     *  stall — both re-use whatever [oesTexId]/[texMatrix] currently hold. */
+    private fun renderEncoder() {
+        val enc = encoderSurface ?: return
+        egl.makeCurrent(enc)
+        GLES20.glViewport(0, 0, encoderW, encoderH)
+        scene.drawVideo(oesTexId, texMatrix)
+        if (hasOverlay) scene.drawOverlay(overlayTexId)
+        // Wall-clock, zero-based PTS so video + audio share a timeline YouTube can sync,
+        // and so keep-alive frames advance smoothly with no camera timestamp.
+        val now = System.nanoTime()
+        if (encoderBaseNs < 0) encoderBaseNs = now
+        val encPts = now - encoderBaseNs
+        egl.setPresentationTime(enc, encPts)
+        egl.swapBuffers(enc)
+        onEncoderFrame?.invoke(encPts)
     }
 
     private fun letterboxViewport(w: Int, h: Int) {
@@ -199,6 +233,7 @@ class VideoCompositor {
 
     fun release() {
         val latch = CountDownLatch(1)
+        handler.removeCallbacks(heartbeat)
         handler.post {
             runCatching { surfaceTexture.release() }
             runCatching { inputSurface.release() }
@@ -215,5 +250,7 @@ class VideoCompositor {
 
     companion object {
         private const val TAG = "VideoCompositor"
+        private const val KEEPALIVE_MS = 200L   // re-push the last frame ~5fps while stalled
+        private const val STALE_MS = 350L       // camera considered stalled after this gap
     }
 }

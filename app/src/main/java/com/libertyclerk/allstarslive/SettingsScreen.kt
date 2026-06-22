@@ -9,7 +9,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -30,15 +29,18 @@ import androidx.compose.ui.unit.sp
 import com.libertyclerk.allstarslive.youtube.YouTubeAuth
 
 /**
- * Settings — home for the YouTube account connection (M3 full). "Connect YouTube"
- * runs Google authorization for the YouTube scope and verifies by reading the
- * signed-in channel. The broadcast-creation + one-tap Go Live wiring builds on this.
+ * YouTube account connection (M3 full). "Connect YouTube" runs Google authorization
+ * for the YouTube scope and verifies by reading the signed-in channel — so the app can
+ * create the broadcast and stream with no stream key to copy.
+ *
+ * This used to be a standalone Settings tab; with only one option, it now embeds on the
+ * Video tab's Camera setup panel (the admin/setup home) instead of taking its own tab.
  */
 @Composable
-fun SettingsScreen() {
+fun YouTubeAccountSection(modifier: Modifier = Modifier) {
     val ctx = LocalContext.current
     val prefs = remember { ctx.getSharedPreferences("allstars", Context.MODE_PRIVATE) }
-    // Show the remembered channel so returning to Settings doesn't look "disconnected".
+    // Show the remembered channel so returning here doesn't look "disconnected".
     var status by remember {
         mutableStateOf(prefs.getString("yt_channel", null)?.let { "Connected: $it" } ?: "Not connected")
     }
@@ -85,29 +87,24 @@ fun SettingsScreen() {
     }
 
     Column(
-        Modifier.fillMaxSize().padding(28.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        modifier
+            .fillMaxWidth()
+            .background(Color(0xFF18223A), RoundedCornerShape(14.dp))
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text("Settings", fontSize = 26.sp, fontWeight = FontWeight.Bold, color = Color(0xFFEAEDF2))
-        Column(
-            Modifier.fillMaxWidth()
-                .background(Color(0xFF18223A), RoundedCornerShape(14.dp))
-                .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+        Text("YouTube account", color = Color(0xFFEAEDF2), fontSize = 16.sp, fontWeight = FontWeight.Bold)
+        Text(
+            "Connect your channel so the app can start the broadcast and stream — no stream key to copy.",
+            color = Color(0xFF9AA0A6), fontSize = 13.sp,
+        )
+        Text(status, color = Color(0xFFA3E635), fontSize = 13.sp)
+        Button(
+            onClick = { connect() },
+            enabled = !working,
+            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF0000), contentColor = Color.White),
         ) {
-            Text("YouTube account", color = Color(0xFFEAEDF2), fontSize = 18.sp, fontWeight = FontWeight.Bold)
-            Text(
-                "Connect your channel so the app can start the broadcast and stream — no stream key to copy.",
-                color = Color(0xFF9AA0A6), fontSize = 13.sp,
-            )
-            Text(status, color = Color(0xFFA3E635), fontSize = 13.sp)
-            Button(
-                onClick = { connect() },
-                enabled = !working,
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF0000), contentColor = Color.White),
-            ) {
-                Text(if (status.startsWith("Connected")) "Reconnect YouTube" else "Connect YouTube", fontSize = 15.sp)
-            }
+            Text(if (status.startsWith("Connected")) "Reconnect YouTube" else "Connect YouTube", fontSize = 15.sp)
         }
     }
 }

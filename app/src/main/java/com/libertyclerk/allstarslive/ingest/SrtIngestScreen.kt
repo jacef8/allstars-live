@@ -354,6 +354,10 @@ private fun CameraSetupSheet(
             }
             Text("Stream key: anything (e.g. live).  SRT must be OFF in the Mevo.", color = Color(0xFF6B7585), fontSize = 12.sp)
 
+            // YouTube account lives here now (the old Settings tab is gone) — connect once
+            // so Go Live can create the broadcast and stream without a stream key.
+            com.libertyclerk.allstarslive.YouTubeAccountSection()
+
             Button(onClick = onRestart, modifier = Modifier.fillMaxWidth()) { Text("Restart camera link") }
             // Raw diagnostics — for setup/troubleshooting only.
             Text(

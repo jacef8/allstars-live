@@ -47,3 +47,11 @@ _*.png
 
 # Generated: web scorer copied into the APK at build time (source is reference/web-scoring/)
 app/src/main/assets/scorer/
+
+# scratch screenshots (agent session captures)
+al*.png
+m.png
+ng*.png
+s.png
+v.png
+*_small.png

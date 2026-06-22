@@ -154,14 +154,18 @@ object RtmpHub {
         _stats.value = VideoStats(state = IngestState.IDLE)
     }
 
-    /** Tablet IPv4 on the Wi-Fi (NetworkInterface — WifiManager is redacted on 12+). */
+    /** Tablet's LAN IPv4 the camera should push to (NetworkInterface — WifiManager is
+     *  redacted on 12+). Accepts ANY private/site-local address (192.168.x, 10.x,
+     *  172.16–31.x), not just 192.168.x, so the address shows on any field/home Wi-Fi.
+     *  Prefers the Wi-Fi interface and excludes cellular (rmnet/100.x is not site-local). */
     private fun localWifiIp(): String? = try {
         java.net.NetworkInterface.getNetworkInterfaces().asSequence()
             .filter { it.isUp && !it.isLoopback }
+            .sortedByDescending { it.name.startsWith("wlan") }   // Wi-Fi first, then anything else
             .flatMap { it.inetAddresses.asSequence() }
             .filterIsInstance<java.net.Inet4Address>()
-            .mapNotNull { it.hostAddress }
-            .firstOrNull { it.startsWith("192.168.") }
+            .firstOrNull { it.isSiteLocalAddress }
+            ?.hostAddress
     } catch (e: Exception) { Log.w(TAG, "ip lookup failed", e); null }
 
     private const val TAG = "RtmpHub"

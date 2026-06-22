@@ -102,7 +102,7 @@ dependencies {
 // at build time (the dest is git-ignored, never hand-edited).
 val syncScorerAssets by tasks.registering(Copy::class) {
     from(rootProject.file("reference/web-scoring")) {
-        include("scoring-controller.html", "lib/**")
+        include("scoring-controller.html", "lib/**", "manifest.webmanifest", "sw.js", "icons/**")
     }
     into(layout.projectDirectory.dir("src/main/assets/scorer"))
 }

@@ -29,7 +29,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Scoreboard
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -68,7 +67,6 @@ import com.libertyclerk.allstarslive.ui.theme.AllStarsLiveTheme
 private enum class Tab(val label: String, val icon: ImageVector) {
     GAME("Game", Icons.Filled.Scoreboard),
     VIDEO("Video", Icons.Filled.Videocam),
-    SETTINGS("Settings", Icons.Filled.Settings),
 }
 
 private val NavBarColor = Color(0xFF0E1626)   // slightly lifted navy for the tab bar
@@ -126,7 +124,6 @@ class MainActivity : ComponentActivity() {
                             when (tabs[tabIndex]) {
                                 Tab.GAME -> GameScorerScreen(scorerWeb)
                                 Tab.VIDEO -> VideoTab()
-                                Tab.SETTINGS -> SettingsScreen()
                             }
                         }
                     }
@@ -279,21 +276,20 @@ private fun ConfirmDialog(
     }
 }
 
-/** Small floating pill shown during a game to reveal the hidden tab bar. */
+/** Tiny floating handle shown during a game to reveal the hidden tab bar. Kept small
+ *  and icon-only so it doesn't sit on top of the scorer's bottom panels. */
 @Composable
 private fun TabsPeekButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Row(
+    Box(
         modifier
             .clip(RoundedCornerShape(999.dp))
-            .background(NavBarColor)
+            .background(NavBarColor.copy(alpha = 0.92f))
             .border(1.dp, NavHairline, RoundedCornerShape(999.dp))
             .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 7.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(7.dp),
+            .padding(horizontal = 9.dp, vertical = 4.dp),
+        contentAlignment = Alignment.Center,
     ) {
         Icon(Icons.Filled.KeyboardArrowUp, contentDescription = "Show tabs", tint = Sage, modifier = Modifier.size(18.dp))
-        Text("Menu", color = Sage, fontWeight = FontWeight.Bold, fontSize = 13.sp)
     }
 }
 

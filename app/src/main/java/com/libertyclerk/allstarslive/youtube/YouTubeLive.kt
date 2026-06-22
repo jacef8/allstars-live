@@ -54,6 +54,11 @@ object YouTubeLive {
         return Live(key, broadcastId, "https://www.youtube.com/watch?v=$broadcastId")
     }
 
+    /** Force a broadcast transition (e.g. to "live"). Harmless/redundant if autoStart
+     *  already moved it; YouTube returns an error we can ignore in that case. Blocking. */
+    fun transition(token: String, broadcastId: String, status: String = "live"): JSONObject =
+        api(token, "liveBroadcasts/transition?broadcastStatus=$status&id=$broadcastId&part=status", null)
+
     /** Broadcast lifecycle: created → ready → (testing) → live → complete. Blocking. */
     fun lifeCycleStatus(token: String, broadcastId: String): String {
         val json = get(token, "liveBroadcasts?part=status&id=$broadcastId")

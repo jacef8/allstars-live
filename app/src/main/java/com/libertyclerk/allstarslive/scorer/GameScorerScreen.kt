@@ -3,21 +3,32 @@ package com.libertyclerk.allstarslive.scorer
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
+import android.graphics.Color
+import android.graphics.SurfaceTexture
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
+import android.view.Surface
+import android.view.TextureView
 import android.view.ViewGroup
 import android.webkit.JavascriptInterface
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.absoluteOffset
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.libertyclerk.allstarslive.AppUi
+import com.libertyclerk.allstarslive.ingest.IngestState
 import com.libertyclerk.allstarslive.ingest.RtmpHub
 import com.libertyclerk.allstarslive.ingest.buildScorebugOverlay
 import com.libertyclerk.allstarslive.stream.Broadcast
@@ -25,12 +36,14 @@ import com.libertyclerk.allstarslive.stream.Broadcast
 /**
  * M4: the Game tab hosts the existing web scorer (bundled into the APK assets at
  * build time from reference/web-scoring/). One codebase; works offline at the field.
- * The WebView instance is created once and kept alive across tab switches so an
- * in-progress game isn't lost when the operator peeks at the Video tab.
  *
- * The web ↔ app bridge ([ScorerBridge], exposed as `window.AllStars`) lets the
- * Game-page "Start game stream" button raise the same native Go Live dialog and the
- * monitor auto-load the broadcast — all driven by the shared [Broadcast] state.
+ * The web ↔ app bridge ([ScorerBridge], exposed as `window.AllStars`) lets the Game-page
+ * "Start game stream" button raise the native Go Live dialog. The WebView is rendered
+ * TRANSPARENT over a native [SurfaceView]: the web reports where its monitor region is
+ * ([ScorerBridge.setPreviewRect]) and we place the live camera preview there — so the
+ * operator can aim the camera and confirm the feed right on the scorer page, before going
+ * live. (This replaces the old in-app YouTube embed, which threw error 153 for private
+ * broadcasts.)
  */
 @SuppressLint("SetJavaScriptEnabled")
 fun createScorerWebView(context: Context): WebView {
@@ -40,15 +53,13 @@ fun createScorerWebView(context: Context): WebView {
         settings.domStorageEnabled = true          // team DB / season stats / settings persist
         settings.mediaPlaybackRequiresUserGesture = false
         settings.allowFileAccess = true
-        setBackgroundColor(0xFF10141A.toInt())     // match the scorer's dark field bg
+        setBackgroundColor(Color.TRANSPARENT)       // see-through so the native camera preview shows behind
         addJavascriptInterface(ScorerBridge(context.applicationContext), "AllStars")
-        // Keep the scorer (file://) in the WebView; send any real http(s) link (e.g. the
-        // YouTube watch page) to the external browser/app so the operator can return via
-        // the Android back button instead of being stranded in the WebView.
         webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(view: WebView, req: WebResourceRequest): Boolean {
                 val u = req.url
-                if (u.scheme == "http" || u.scheme == "https") {
+                // Real links (YouTube) + email/text share open in their native apps, not the WebView.
+                if (u.scheme in setOf("http", "https", "mailto", "sms", "smsto", "tel")) {
                     runCatching {
                         view.context.startActivity(
                             Intent(Intent.ACTION_VIEW, u).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
@@ -82,8 +93,19 @@ private class ScorerBridge(private val appContext: Context) {
     /** The web tells us when a game/console is on screen (vs the menus). */
     @JavascriptInterface
     fun setInGame(inGame: Boolean) {
-        com.libertyclerk.allstarslive.AppUi.setInGame(inGame)
-        if (!inGame) RtmpHub.videoCompositor?.setOverlay(null)   // hide the scorebug off-console
+        AppUi.setInGame(inGame)
+        if (!inGame) {
+            AppUi.setPreviewRect(null)                              // no console → no preview
+            RtmpHub.videoCompositor?.setOverlay(null)               // hide the scorebug off-console
+        }
+    }
+
+    /** The web reports where (in CSS px ≈ dp) it wants the live camera shown. */
+    @JavascriptInterface
+    fun setPreviewRect(x: Float, y: Float, w: Float, h: Float, show: Boolean) {
+        main.post {
+            AppUi.setPreviewRect(if (show && w > 0 && h > 0) AppUi.PreviewRect(x, y, w, h) else null)
+        }
     }
 
     /**
@@ -115,20 +137,53 @@ private class ScorerBridge(private val appContext: Context) {
 
 @Composable
 fun GameScorerScreen(webView: WebView) {
-    // Mirror the shared broadcast state into the web monitor: set the video id (so the
-    // player auto-loads) and the phase (so the page shows Start vs End). Same source of
-    // truth as the Video tab — going live anywhere reflects here.
+    // Mirror the shared broadcast state into the web monitor (Start vs End, video id).
     val bcast by Broadcast.state.collectAsStateWithLifecycle()
     LaunchedEffect(bcast.phase, bcast.videoId) {
         val vid = bcast.videoId ?: ""
         webView.evaluateJavascript("window.__bcast && window.__bcast('${bcast.phase.name}','$vid')", null)
     }
+    // Tell the web whether the camera is delivering frames (drives the monitor's
+    // "● camera live" vs "waiting for camera" status — the operator's connection check).
+    val stats by RtmpHub.stats.collectAsStateWithLifecycle()
+    val camLive = stats.state == IngestState.PLAYING
+    LaunchedEffect(camLive) {
+        webView.evaluateJavascript("window.__cam && window.__cam(${if (camLive) "true" else "false"})", null)
+    }
 
-    AndroidView(
-        modifier = Modifier.fillMaxSize(),
-        factory = {
-            (webView.parent as? ViewGroup)?.removeView(webView)   // re-attach the kept-alive instance
-            webView
-        },
-    )
+    // Where the web wants the live camera shown (its monitor region, in dp).
+    val rect by AppUi.previewRect.collectAsStateWithLifecycle()
+
+    // Dark backdrop matching the scorer theme: the WebView is transparent, so this shows
+    // everywhere except the monitor rect (where the camera TextureView sits).
+    Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color(0xFF0B0E13))) {
+        // Native camera preview, BEHIND the transparent WebView, at the web's monitor rect.
+        // TextureView (not SurfaceView) so it composites in the normal view hierarchy and
+        // reliably shows through the transparent WebView, with web controls drawn on top.
+        rect?.let { r ->
+            AndroidView(
+                modifier = Modifier.absoluteOffset(x = r.x.dp, y = r.y.dp).size(width = r.w.dp, height = r.h.dp),
+                factory = { ctx ->
+                    TextureView(ctx).apply {
+                        surfaceTextureListener = object : TextureView.SurfaceTextureListener {
+                            override fun onSurfaceTextureAvailable(st: SurfaceTexture, w: Int, h: Int) =
+                                RtmpHub.attachPreview(Surface(st))
+                            override fun onSurfaceTextureSizeChanged(st: SurfaceTexture, w: Int, h: Int) {}
+                            override fun onSurfaceTextureDestroyed(st: SurfaceTexture): Boolean {
+                                RtmpHub.detachPreview(); return true
+                            }
+                            override fun onSurfaceTextureUpdated(st: SurfaceTexture) {}
+                        }
+                    }
+                },
+            )
+        }
+        AndroidView(
+            modifier = Modifier.fillMaxSize(),
+            factory = {
+                (webView.parent as? ViewGroup)?.removeView(webView)   // re-attach the kept-alive instance
+                webView
+            },
+        )
+    }
 }

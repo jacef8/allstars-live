@@ -2,8 +2,19 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-<title>Scoring Controller</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<title>All-Stars Live</title>
+<!-- PWA: installable, app-like, offline-resilient (see manifest.webmanifest + sw.js). -->
+<meta name="description" content="Live youth baseball — scorebug, play-by-play, and the game stream." />
+<link rel="manifest" href="manifest.webmanifest" />
+<meta name="theme-color" content="#0B0E13" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="All-Stars" />
+<meta name="application-name" content="All-Stars" />
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@500;600;700;800&family=Barlow:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -20,6 +31,9 @@
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;scrollbar-width:none;}
   *::-webkit-scrollbar{width:0;height:0;display:none;}
+  /* Dark theme background everywhere (browser/PWA). Inside the NATIVE app we switch this
+     to transparent at runtime (see IS_APP below) so the native camera-preview layer shows
+     through the monitor region; the app paints a matching #0B0E13 backdrop behind it. */
   html,body{margin:0;height:100%;background:#0B0E13;font-family:var(--sans);}
   button{font-family:var(--sans);cursor:pointer;
     transition:transform .12s var(--ease-soft), filter .15s ease, box-shadow .18s ease, background .15s ease;}
@@ -103,15 +117,13 @@
     <div style="font-size:12px;color:#B7C2D6;margin:3px 0 14px">Fans scan this to follow the game</div>
     <div id="qrbox" style="background:#fff;border-radius:12px;padding:12px;width:244px;height:244px;margin:0 auto;display:flex;align-items:center;justify-content:center;color:#677281;font-size:12px"></div>
     <div id="qrurl" style="font-size:11px;color:#B7C2D6;word-break:break-all;margin:12px 4px 14px"></div>
-    <div style="display:flex;flex-direction:column;gap:8px">
-      <button data-act="navshare" id="navShareBtn" style="display:none;align-items:center;justify-content:center;gap:7px;background:#A3E635;border:none;color:#0B0E13;border-radius:10px;padding:13px;font-family:'Barlow',sans-serif;font-size:15px;font-weight:800;cursor:pointer">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0B0E13" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><path d="M16 6l-4-4-4 4"/><path d="M12 2v13"/></svg>
-        <span>Text a fan</span></button>
-      <div style="display:flex;gap:8px">
-        <button data-act="copyshare" style="flex:1;background:#324056;border:1px solid #4A5870;color:#EAEDF2;border-radius:10px;padding:12px;font-family:'Barlow',sans-serif;font-size:14px;font-weight:700;cursor:pointer">Copy link</button>
-        <button data-act="closeshare" style="flex:1;background:#212A38;border:1px solid #4A5870;color:#B7C2D6;border-radius:10px;padding:12px;font-family:'Barlow',sans-serif;font-size:14px;font-weight:700;cursor:pointer">Done</button>
-      </div>
+    <div style="display:flex;gap:8px">
+      <button data-act="shareemail" style="flex:1;display:flex;align-items:center;justify-content:center;gap:8px;background:#A3E635;border:none;color:#0B0E13;border-radius:10px;padding:13px;font-family:'Barlow',sans-serif;font-size:15px;font-weight:800;cursor:pointer">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#0B0E13" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M22 7l-10 6L2 7"/></svg>Email</button>
+      <button data-act="sharetext" style="flex:1;display:flex;align-items:center;justify-content:center;gap:8px;background:#324056;border:1px solid #4A5870;color:#EAEDF2;border-radius:10px;padding:13px;font-family:'Barlow',sans-serif;font-size:15px;font-weight:800;cursor:pointer">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#EAEDF2" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Text</button>
     </div>
+    <button data-act="closeshare" style="width:100%;margin-top:8px;background:transparent;border:none;color:#B7C2D6;padding:8px;font-family:'Barlow',sans-serif;font-size:13px;font-weight:700;cursor:pointer">Done</button>
   </div>
 </div>
 
@@ -333,6 +345,12 @@ const initGame=()=>({inning:1,half:"T",away:0,home:0,outs:0,balls:0,strikes:0,
   halfRuns:0,      // runs scored so far in the current half-inning
   oppBatters:9,    // opponent's batting-order size (continuous order support)
   stats:{},        // per-batter box-score stats, keyed "o"+rosterIdx (ours) / "p"+spot (opp)
+  pitches:{},      // pitch count per pitcher, keyed "o"+rosterIdx (our P) / "oppP" (their P)
+  pa:{},           // per-batter plate-appearance log (pitch sequence, count, outcome, location)
+  ab:{pitches:[],loc:null},   // the in-progress at-bat's pitch sequence
+  innLog:[],       // completed half-inning summaries (pitches/runs/hits) for review
+  halfPitches:0,   // pitches thrown so far in the current half-inning
+  halfHits:0,      // hits so far in the current half-inning
   line:{away:{},home:{}},   // runs per inning, e.g. line.away[3]=2  (drives the R-H-E line score)
   errors:{away:0,home:0},   // team errors (E column)
   final:false,     // set true by "End Game" so the viewer shows the Final summary
@@ -386,13 +404,20 @@ function removeBatter(){
   G.lineup.order.pop();
 }
 function snapshot(){hist.push(JSON.parse(JSON.stringify(G)));if(hist.length>40)hist.shift();}
-function resetUI(){mode="idle";tap=null;contact=null;result=null;plan=null;showAll=false;}
+function resetUI(){mode="idle";tap=null;contact=null;result=null;plan=null;showAll=false;reviewBatter=null;reviewInn=false;}
 function undo(){if(!hist.length)return;G=hist.pop();resetUI();render();broadcast();}
 
 function nextBatter(){const k=G.half==="T"?"awayPtr":"homePtr";G[k]++;G.balls=0;G.strikes=0;}
-/* Close the current half-inning: switch sides, bump inning on T->B->T, clear everything. */
-function doFlip(){const nh=G.half==="T"?"B":"T";G.half=nh;if(nh==="T")G.inning++;
-  G.outs=0;G.balls=0;G.strikes=0;G.bases={1:null,2:null,3:null};G.halfRuns=0;}
+/* Close the current half-inning: log its totals (for review), switch sides, bump inning
+   on T->B->T, clear everything (count, bases, per-half tallies). */
+function doFlip(){
+  if(!G.innLog)G.innLog=[];
+  G.innLog.push({inning:G.inning, half:G.half, batteam:battingKey(),
+    pitches:G.halfPitches||0, runs:G.halfRuns||0, hits:G.halfHits||0,
+    lob:[1,2,3].filter(x=>G.bases[x]).length});
+  const nh=G.half==="T"?"B":"T";G.half=nh;if(nh==="T")G.inning++;
+  G.outs=0;G.balls=0;G.strikes=0;G.bases={1:null,2:null,3:null};
+  G.halfRuns=0;G.halfPitches=0;G.halfHits=0;G.ab={pitches:[],loc:null};}
 function flipIfNeeded(){if(G.outs>=3)doFlip();}
 const capReached=()=>G.runCap>0&&G.halfRuns>=G.runCap;
 /* Manual half-inning close — for ending early or when a 3rd out wasn't entered as outs. */
@@ -436,6 +461,47 @@ function creditBatter(kind,rbi){
   if(kind==="strikeout") s.k++;
   if(rbi) s.rbi+=rbi;
   if(LOB_OUTS.includes(kind)) s.lob+=[1,2,3].filter(x=>G.bases[x]).length;  // runners stranded on an out
+  if(HIT_KINDS.includes(kind)) G.halfHits=(G.halfHits||0)+1;                 // hits this half-inning
+  storePA(b,kind,rbi);                                                        // log the plate appearance for review
+}
+/* ===== pitch count (current pitcher) =====
+   Counts one per ball/strike/foul tap and per batted ball (commit) + HBP. Keyed by the
+   pitcher's identity, so a pitching change starts the new arm at 0. Our pitcher uses his
+   roster index; the opponent's pitcher is a single bucket (we don't track their changes). */
+function currentPitcherKey(){ return fielding()?("o"+G.lineup.pos.P):"oppP"; }
+function currentPitcherName(){ if(fielding()){ const p=playerAtPos("P"); return p?p.name:"Pitcher"; } return OPP.short+" Pitcher"; }
+function countPitch(){ if(!G.pitches)G.pitches={}; const k=currentPitcherKey(); G.pitches[k]=(G.pitches[k]||0)+1; }
+function currentPitchCount(){ return (G.pitches&&G.pitches[currentPitcherKey()])||0; }
+/* Record one pitch: bump the pitcher's count + the half-inning count, and append it to
+   the current at-bat's sequence (res = ball/strike/foul/inplay/hbp, + armed type). */
+function recordPitch(res){
+  countPitch();
+  if(!G.ab)G.ab={pitches:[],loc:null};
+  G.ab.pitches.push({res,type:advPitch?pitchType:null});
+  G.halfPitches=(G.halfPitches||0)+1;
+}
+/* Save the just-completed plate appearance to the batter's log, then clear the at-bat. */
+function storePA(b,kind,rbi){
+  if(!G.pa)G.pa={};
+  const key=batterKeyOf(b); if(!G.pa[key])G.pa[key]=[];
+  const ab=G.ab||{pitches:[],loc:null};
+  G.pa[key].push({
+    inning:G.inning, half:G.half,
+    pitches:(ab.pitches||[]).slice(), n:(ab.pitches||[]).length,
+    balls:G.balls, strikes:G.strikes,
+    kind, note:PLAYHEAD[kind]||kind, hit:HIT_KINDS.includes(kind),
+    loc:ab.loc||null, rbi:rbi||0,
+  });
+  G.ab={pitches:[],loc:null};   // reset for the next batter
+}
+/* Team hit total (sums per-batter box-score H) for the away/home side. */
+function sideHits(side){ const tag=side===G.ourSide?"our":"opp"; return Object.values(G.stats||{}).reduce((a,s)=>a+(s.team===tag?(s.h||0):0),0); }
+/* Current batter's game line: { line:"1-3", extra:"1 R · 2 RBI" }. */
+function batterLineParts(){
+  const b=batter(),s=G.stats?G.stats[batterKeyOf(b)]:null;
+  const ab=s?s.ab:0,h=s?s.h:0,extras=[];
+  if(s){ if(s.r)extras.push(s.r+" R"); if(s.rbi)extras.push(s.rbi+" RBI"); if(s.bb)extras.push(s.bb+" BB"); if(s.k)extras.push(s.k+" K"); }
+  return { line:h+"-"+ab, extra:extras.join(" · ") };
 }
 function resolve(movers,extraOuts){
   const bases={1:null,2:null,3:null};let runs=0;const scorers=[];
@@ -465,7 +531,12 @@ function applyPlanInline(kind){
 const LINK=(()=>{
   let bc=null; try{bc=new BroadcastChannel("liberty-league");}catch(e){}
   // Relay URL is configurable: ?server=wss://allstars.up.railway.app  (alias: ?ws=)
-  let ws=null, connected=false; const q=new URLSearchParams(location.search); const DEFAULT_RELAY="wss://web-production-77d34.up.railway.app"; const wsUrl=q.get("server")||q.get("ws")||DEFAULT_RELAY;
+  let ws=null, connected=false; const q=new URLSearchParams(location.search);
+  // Served over http(s) (the PWA on Railway) → connect to our OWN origin's relay, so it
+  // works on any Railway URL with no ?server needed. file:// (native app) → the Railway URL.
+  const SAME_ORIGIN=(location.protocol==="https:"||location.protocol==="http:")?((location.protocol==="https:"?"wss":"ws")+"://"+location.host):"";
+  const DEFAULT_RELAY=SAME_ORIGIN||"wss://web-production-77d34.up.railway.app";
+  const wsUrl=q.get("server")||q.get("ws")||DEFAULT_RELAY;
   function setConn(v){ if(connected===v)return; connected=v; if(window.onLinkChange)window.onLinkChange(); }
   (function connect(){ if(!wsUrl)return;
     try{ ws=new WebSocket(wsUrl);
@@ -489,6 +560,14 @@ let phonePane="score";   // phone-only paging: "score" | "video" (large screens 
 let monitorOn=(()=>{try{return localStorage.getItem("al-monitor-on")!=="0";}catch(e){return true;}})();  // wide: video shown/hidden
 let viewMode=(()=>{try{return localStorage.getItem("al-view-mode")||"scorer";}catch(e){return "scorer";}})();  // "scorer" | "viewer"
 let gameFeed=[];   // live play-by-play (most recent last) for the viewer feed
+// Advanced pitch tracking: when on, the scorer arms a pitch type that's recorded with
+// each pitch. reviewBatter / reviewInn drive the tap-to-review modals (read-only).
+let advPitch=(()=>{try{return localStorage.getItem("al-adv-pitch")==="1";}catch(e){return false;}})();
+let pitchType=null;     // armed (sticky) pitch type while advPitch is on
+let reviewBatter=null;  // batterKey shown in the batter-review modal
+let reviewInn=false;    // inning-log modal open
+const PITCH_TYPES=[{k:"FB",n:"Fastball"},{k:"CB",n:"Curve"},{k:"CH",n:"Change"},{k:"SL",n:"Slider"},{k:"OTH",n:"Other"}];
+const PITCH_TYPE_NAME=k=>{const p=PITCH_TYPES.find(x=>x.k===k);return p?p.n:k;};
 const PLAYHEAD={single:"SINGLE",double:"DOUBLE",triple:"TRIPLE",hr:"HOME RUN",error:"REACHED ON ERROR",
   fc:"FIELDER'S CHOICE",out1:"GROUND OUT",flyout:"FLY OUT",lineout:"LINE OUT",popout:"POP OUT",
   dp:"DOUBLE PLAY",sacfly:"SAC FLY",sacbunt:"SAC BUNT",walk:"WALK",hbp:"HIT BY PITCH",strikeout:"STRIKEOUT"};
@@ -524,13 +603,13 @@ function broadcast(){
 }
 
 function pitch(type){
-  snapshot();const k0=battingKey(),bn=batter().name;_pitch=type;
+  snapshot();const k0=battingKey(),bn=batter().name;_pitch=type;recordPitch(type);
   if(type==="ball"){G.balls++;if(G.balls>=4){applyPlanInline("walk");flash("Walk");bcastEvent("walk","Ball four · "+bn,k0);}}
   else if(type==="strike"){G.strikes++;if(G.strikes>=3){G.outs++;creditBatter("strikeout",0);nextBatter();flipIfNeeded();flash("Strikeout");bcastEvent("strikeout",bn,k0);}}
   else if(type==="foul"){if(G.strikes<2)G.strikes++;}
   render();broadcast();
 }
-function manual(kind,label){snapshot();const k0=battingKey(),bn=batter().name;applyPlanInline(kind);bcastEvent(kind,bn,k0);flash(label);render();broadcast();}
+function manual(kind,label){snapshot();const k0=battingKey(),bn=batter().name;if(kind==="hbp")recordPitch("hbp");applyPlanInline(kind);bcastEvent(kind,bn,k0);flash(label);render();broadcast();}
 function startInPlay(){mode="locate";tap=null;render();}
 function onFieldTap(x,y){const z=zoneFromPoint(x,y);tap={x,y,pos:z.pos,zone:z.zone};contact=defaultContact(z.pos);mode="contact";render();}
 function chooseContact(c){contact=c;showAll=false;mode="result";render();}
@@ -567,7 +646,8 @@ function setErrorFielder(pos){
 }
 function setDest(i,c){const m=plan[i];if(!m||m.out)return;const floor=m.start===0?1:m.start;if(c<floor)return;m.dest=c;render();}
 function commit(r,movers){
-  snapshot();const outs=outsFromKind(r.kind);
+  snapshot();recordPitch("inplay");const outs=outsFromKind(r.kind);   // the pitch that was put in play
+  if(G.ab&&tap)G.ab.loc={zone:tap.zone,pos:tap.pos};   // remember where it was hit
   const k0=battingKey(),bn=batter().name;
   const runs=resolve(movers,outs);                 // capped runs that actually count
   const rbi=rbiEligible(r.kind)?runs:0;
@@ -664,7 +744,7 @@ function diamondSVG(){
       ${baseSq("1")}${baseSq("2")}${baseSq("3")}
       <polygon points="150,245 156,250 156,256 144,256 144,250" fill="${FIELDLINE}"/>
       ${marker}${ballFly}
-    </svg>${banner}</div>`;
+    </svg>${banner}${fieldOverlays()}</div>`;
 }
 
 function statusBar(){
@@ -696,19 +776,23 @@ function statusBar(){
 
 function batterCard(){
   const b=batter(),k=battingKey(),c=TEAMS[k].color;
+  const lp=batterLineParts();
   const ord=ordinal(battingSlot()+1);
   const big=b.ours?b.num:b.num;
   const nameLine=b.ours?b.name:TEAMS[k].name.toUpperCase();
   const sub=b.ours
     ? `${TEAMS[k].short}${b.pos?` · ${b.pos}`:""} &middot; ${ord} in order`
     : `${TEAMS[k].name} &middot; ${ord} batter`;
-  return `<div style="display:flex;align-items:center;gap:13px;background:${c}14;border:1px solid ${c}40;border-left:5px solid ${c};border-radius:10px;padding:9px 14px;flex-shrink:0">
+  return `<div data-act="reviewbatter" data-arg="${batterKeyOf(b)}" style="display:flex;align-items:center;gap:13px;background:${c}14;border:1px solid ${c}40;border-left:5px solid ${c};border-radius:10px;padding:9px 14px;flex-shrink:0;cursor:pointer">
     <span style="font-family:${MONO};font-size:34px;font-weight:700;color:${c};line-height:1;min-width:46px;text-align:center">${big}</span>
     <div style="flex:1;min-width:0">
       <div style="font-family:${MONO};font-size:23px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;line-height:1;color:${T.chalk};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${nameLine}</div>
       <div style="font-size:11px;color:${T.sage};font-weight:500;margin-top:3px">${sub}</div></div>
-    <div style="text-align:right;line-height:1.15"><div style="font-family:${MONO};font-size:11px;font-weight:700;letter-spacing:1.5px;color:${c}">NOW</div>
-      <div style="font-family:${MONO};font-size:11px;font-weight:700;letter-spacing:1.5px;color:${c}">BATTING</div></div>
+    <div style="text-align:right;line-height:1.1;min-width:58px">
+      <div style="font-family:${MONO};font-size:10px;font-weight:800;letter-spacing:1.5px;color:${c}">TODAY</div>
+      <div style="font-family:${MONO};font-size:22px;font-weight:800;color:${T.chalk};line-height:1.05">${lp.line}</div>
+      ${lp.extra?`<div style="font-size:10px;font-weight:600;color:${T.sage};white-space:nowrap">${lp.extra}</div>`:""}
+    </div>
   </div>`;
 }
 
@@ -729,6 +813,9 @@ function parseYouTubeId(s){
    In the app the monitor never needs a pasted link: native creates the broadcast and
    pushes the video id here, and Start/End route to the native Go Live flow. */
 const IS_APP = !!(window.AllStars && window.AllStars.isApp);
+// In the native app only: go transparent so the native camera-preview layer shows through
+// the monitor region. In a browser/PWA the dark #0B0E13 background (CSS) stays.
+if(IS_APP){ document.documentElement.style.background="transparent"; document.body.style.background="transparent"; }
 window.__bcastPhase = "OFFLINE";
 window.__bcast = function(phase, videoId){
   window.__bcastPhase = phase || "OFFLINE";
@@ -737,14 +824,57 @@ window.__bcast = function(phase, videoId){
   try{ render(); }catch(e){}
 };
 function appLive(){ return window.__bcastPhase==="LIVE" || window.__bcastPhase==="STARTING"; }
+// Native pushes the camera state here (frames flowing or not) — drives the monitor's
+// "● CAMERA LIVE" vs "WAITING FOR CAMERA" status, the operator's connection check.
+window.__camLive=false;
+window.__cam=function(connected){ const v=!!connected; if(v===window.__camLive)return; window.__camLive=v; try{render();}catch(e){} };
+// Report the monitor div's on-screen rect to native so it can place the live camera
+// preview exactly there (CSS px ≈ dp). Debounced by value so we don't spam the bridge.
+let _previewKey="";
+function alignPreview(){
+  if(!IS_APP || !(window.AllStars&&AllStars.setPreviewRect)) return;
+  const m=document.getElementById("monitor");
+  if(!m){ if(_previewKey!=="none"){ _previewKey="none"; try{AllStars.setPreviewRect(0,0,0,0,false);}catch(e){} } return; }
+  const r=m.getBoundingClientRect();
+  const key=[Math.round(r.left),Math.round(r.top),Math.round(r.width),Math.round(r.height)].join(",");
+  if(key===_previewKey)return; _previewKey=key;
+  try{AllStars.setPreviewRect(r.left,r.top,r.width,r.height,true);}catch(e){}
+}
+if(typeof window!=="undefined"){
+  window.addEventListener("resize",()=>{ try{alignPreview();}catch(e){} });
+  setInterval(()=>{ try{alignPreview();}catch(e){} },400);   // catch layout shifts (scroll/animations)
+}
 
 /* All-in-one broadcast monitor: the live feed (saved YouTube stream or ?yt=, else a
    placeholder) with the scorebug overlaid — exactly what streams to YouTube.
    This is the web mirror of the native tablet console (monitor + scorer in one). */
 function monitorPane(){
-  // In the app, only show the player once actually LIVE — otherwise show the
-  // "Start game stream" placeholder (don't surface a stale/ended/not-yet-live id,
-  // which is what throws YouTube error 153).
+  // In the app, the monitor is a TRANSPARENT region: the native layer draws the live
+  // camera (with the scorebug already composited) behind the WebView, positioned to this
+  // div's rect (see alignPreview). So the operator aims + confirms the feed right here —
+  // no YouTube embed (which threw error 153 for private streams).
+  if(IS_APP){
+    const camLive=!!window.__camLive, phase=window.__bcastPhase||"OFFLINE";
+    const broadcasting=(phase==="LIVE"||phase==="STARTING");
+    const dot=phase==="LIVE"?T.live:(broadcasting?T.amber:(camLive?T.safe:T.amber));
+    const label=phase==="LIVE"?"LIVE ON YOUTUBE":(phase==="STARTING"?"GOING LIVE…":(camLive?"CAMERA LIVE":"WAITING FOR CAMERA"));
+    const chip=`<div style="position:absolute;top:10px;left:11px;display:flex;align-items:center;gap:7px;background:rgba(8,11,16,.66);border-radius:999px;padding:5px 12px;z-index:3">
+        <span class="${phase==="LIVE"?'livedot':''}" style="width:9px;height:9px;border-radius:50%;background:${dot};box-shadow:0 0 8px ${dot}"></span>
+        <span style="font-family:${MONO};font-weight:800;font-size:11px;letter-spacing:1.4px;color:#fff">${label}</span></div>`;
+    const end=broadcasting?`<button data-act="appstop" title="End broadcast" style="position:absolute;top:10px;right:11px;z-index:3;height:34px;border-radius:9px;background:#FF3B5C;border:none;color:#fff;padding:0 14px;font-family:${SANS};font-weight:800;font-size:13px;cursor:pointer">End broadcast</button>`:"";
+    const center = !camLive
+      ? `<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;padding:0 24px;pointer-events:none">
+          <svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="${T.sageDim}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+          <div style="font-family:${MONO};font-weight:800;letter-spacing:1.5px;font-size:14px;color:${T.sage}">WAITING FOR CAMERA</div>
+          <div style="font-size:12px;color:${T.sageDim};max-width:300px;line-height:1.45">In Mevo Multicam, Go Live to the “AllStars App” destination — the feed shows here once it’s connected.</div></div>`
+      : (!broadcasting
+          ? `<button data-act="appgolive" style="position:absolute;bottom:14px;left:50%;transform:translateX(-50%);z-index:3;background:${T.live};color:#fff;border:none;border-radius:10px;padding:12px 22px;font-family:${SANS};font-weight:800;font-size:16px;display:inline-flex;align-items:center;gap:9px;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.55)">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="#fff" stroke="none"><path d="M5 3l14 9-14 9V3z"/></svg>Go Live</button>`
+          : "");
+    return `<div id="monitor" style="position:relative;width:100%;flex:1;min-height:0;background:transparent;border:2px solid ${camLive?T.line:T.surface2};border-radius:14px;overflow:hidden">
+        ${chip}${end}${center}</div>`;
+  }
+  // Browser prototype (not the app): embed the YouTube player as before.
   const yt=(IS_APP && window.__bcastPhase!=="LIVE")?"":streamYt();
   const feed=yt
     ? `<iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(yt)}?autoplay=1&mute=1&playsinline=1&modestbranding=1&rel=0" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen style="position:absolute;inset:0;width:100%;height:100%;border:0"></iframe>`
@@ -787,6 +917,89 @@ function miniCount(){
   </div>`;
 }
 
+/* At-a-glance stats drawn INTO the field's empty corners (no separate strip): the
+   current pitcher's pitch count (top-left) and a compact R-H-E line (top-right). Hidden
+   while the scorer is working a play (locate/picker/runners) so the field is unobstructed. */
+function fieldOverlays(){
+  if(["locate","contact","result","runners","errpos","outpos","dppick"].includes(mode)) return "";
+  const pc=currentPitchCount(),pn=currentPitcherName();
+  const aH=sideHits("away"),hH=sideHits("home");
+  const aE=(G.errors&&G.errors.away)||0,hE=(G.errors&&G.errors.home)||0;
+  const box=`position:absolute;z-index:4;background:rgba(9,13,19,.74);border:1px solid ${T.line};border-radius:11px;box-shadow:0 3px 12px rgba(0,0,0,.45)`;
+  const pcChip=`<div style="${box};top:9px;left:9px;padding:7px 14px;display:flex;flex-direction:column;align-items:center;line-height:1">
+      <div style="font-family:${MONO};font-size:34px;font-weight:800;color:${T.amber}">${pc}</div>
+      <div style="font-size:10px;font-weight:800;letter-spacing:1.4px;color:${T.sageDim};margin-top:2px">PITCHES</div>
+      <div style="font-size:11px;font-weight:600;color:${T.sage};max-width:110px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center">${pn}</div></div>`;
+  const hdr=t=>`<th style="padding:0 8px;font-family:${MONO};font-size:10px;font-weight:700;letter-spacing:.5px;color:${T.sageDim}">${t}</th>`;
+  const nm=(t,act)=>`<td style="text-align:left;padding:1px 9px 1px 2px;font-family:${MONO};font-size:12px;font-weight:800;color:${act?T.chalk:T.sage}">${t}</td>`;
+  const cell=(v,act)=>`<td style="text-align:center;padding:1px 8px;font-family:${MONO};font-size:16px;font-weight:800;color:${act?T.chalk:T.sage}">${v}</td>`;
+  const rheChip=`<div style="${box};top:9px;right:9px;padding:6px 9px">
+      <table style="border-collapse:collapse"><tr><th></th>${hdr("R")}${hdr("H")}${hdr("E")}</tr>
+      <tr>${nm(TEAMS.away.short,G.half==="T")}${cell(G.away,G.half==="T")}${cell(aH,G.half==="T")}${cell(aE,G.half==="T")}</tr>
+      <tr>${nm(TEAMS.home.short,G.half==="B")}${cell(G.home,G.half==="B")}${cell(hH,G.half==="B")}${cell(hE,G.half==="B")}</tr></table></div>`;
+  return pcChip+rheChip;
+}
+
+/* ===== tap-to-review modals (batter at-bats, inning log) ===== */
+function modalWrap(title,sub,inner,closeAct){
+  return `<div data-act="${closeAct}" style="position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;background:rgba(8,11,16,.62);padding:24px">
+    <div data-act="noop" class="screen-in" style="background:${T.navy};border:2px solid ${T.lime};border-radius:16px;max-width:540px;width:100%;max-height:100%;overflow-y:auto;-webkit-overflow-scrolling:touch;box-shadow:0 20px 50px rgba(0,0,0,.55)">
+      <div style="padding:16px 18px">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">
+          <div style="min-width:0"><div style="font-family:${MONO};font-size:19px;font-weight:800;color:${T.chalk};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${title}</div>
+            <div style="font-size:12px;color:${T.sage};margin-top:3px">${sub}</div></div>
+          <button data-act="${closeAct}" style="background:${T.surface2};border:1px solid ${T.line};color:${T.chalk};border-radius:8px;padding:8px 14px;font-weight:800;font-size:13px;flex:none">Done</button></div>
+        <div style="margin-top:12px;display:flex;flex-direction:column;gap:8px">${inner}</div>
+      </div>
+    </div></div>`;
+}
+/* one pitch as a colored badge (B/S/F/•/H), with its type code if recorded */
+function pitchBadge(p){
+  const map={ball:{c:T.amber,l:"B"},strike:{c:T.out,l:"S"},foul:{c:T.amber,l:"F"},inplay:{c:T.safe,l:"•"},hbp:{c:T.clay,l:"H"}};
+  const m=map[p.res]||{c:T.sage,l:"?"};
+  return `<span style="display:inline-flex;flex-direction:column;align-items:center;gap:2px;margin:2px 4px 2px 0">
+      <span style="width:22px;height:22px;border-radius:6px;background:${m.c}26;border:1px solid ${m.c};color:${m.c};font-family:${MONO};font-size:12px;font-weight:800;display:inline-flex;align-items:center;justify-content:center">${m.l}</span>
+      ${p.type?`<span style="font-family:${MONO};font-size:8px;font-weight:700;color:${T.sageDim}">${p.type}</span>`:""}</span>`;
+}
+/* one plate appearance row (newest flagged LAST) */
+function paRowHtml(pa,idx,total){
+  const last=idx===total-1;
+  const badges=(pa.pitches||[]).map(pitchBadge).join("");
+  const loc=(pa.loc&&pa.loc.zone)?` ${pa.loc.zone}`:"";
+  return `<div style="background:${last?T.surface2:T.surface};border:1px solid ${last?T.lime:T.line};border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:6px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+        <span style="font-family:${MONO};font-size:12px;font-weight:800;color:${T.sage}">${pa.half==="T"?"▲":"▼"}${pa.inning} · PA ${idx+1}${last?` <span style="color:${T.lime}">· LAST</span>`:""}</span>
+        <span style="font-family:${MONO};font-size:12px;color:${T.sage}">${pa.n} pitch${pa.n===1?"":"es"} · count ${pa.balls}-${pa.strikes}</span></div>
+      <div style="font-size:15px;font-weight:800;color:${pa.hit?T.safe:T.chalk}">${pa.note}${loc}${pa.rbi?` · ${pa.rbi} RBI`:""}</div>
+      ${badges?`<div style="display:flex;flex-wrap:wrap;align-items:flex-start">${badges}</div>`:`<div style="font-size:11px;color:${T.sageDim}">No pitch detail recorded.</div>`}
+    </div>`;
+}
+/* Tap a batter → their day: season-game line + every plate appearance (pitches seen,
+   count reached, what they did and where). */
+function batterReviewModal(){
+  const key=reviewBatter,list=(G.pa&&G.pa[key])||[],s=G.stats&&G.stats[key];
+  let title="Batter";
+  if(key&&key[0]==="o"){ const ri=+key.slice(1),p=ROSTER[ri]; if(p)title=`#${p.num} ${p.name}`; }
+  else if(s&&s.name) title=`#${s.num} ${s.name}`;
+  const gl=s?`${s.h}-${s.ab}${s.r?` · ${s.r} R`:""}${s.rbi?` · ${s.rbi} RBI`:""}${s.bb?` · ${s.bb} BB`:""}${s.k?` · ${s.k} K`:""}`:"0-0";
+  const rows=list.length?list.map((pa,i)=>paRowHtml(pa,i,list.length)).reverse().join("")
+    :`<div style="color:${T.sageDim};padding:18px;text-align:center">No at-bats yet — this is their first time up.</div>`;
+  return modalWrap(title,`Today: ${gl}`,rows,"closereview");
+}
+/* Inning log — totals by half-inning (pitches, runs, hits, LOB) for review. */
+function inningLogModal(){
+  const log=G.innLog||[];
+  const cur=`<div style="display:flex;align-items:center;justify-content:space-between;background:${T.surface2};border:1px dashed ${T.lime};border-radius:10px;padding:11px 13px">
+      <span style="font-family:${MONO};font-size:14px;font-weight:800;color:${T.lime}">${G.half==="T"?"Top":"Bot"} ${G.inning} · now</span>
+      <span style="font-family:${MONO};font-size:13px;color:${T.sage}">${G.halfRuns||0} R · ${G.halfHits||0} H · ${G.halfPitches||0} P</span></div>`;
+  const rows=log.length?log.slice().reverse().map(e=>`
+      <div style="display:flex;align-items:center;justify-content:space-between;background:${T.surface};border:1px solid ${T.line};border-radius:10px;padding:11px 13px">
+        <span style="font-family:${MONO};font-size:14px;font-weight:800;color:${T.chalk}">${e.half==="T"?"Top":"Bot"} ${e.inning}<span style="color:${T.sage};font-weight:600;font-size:12px"> · ${TEAMS[e.batteam].short} batting</span></span>
+        <span style="font-family:${MONO};font-size:13px;color:${T.sage}">${e.runs} R · ${e.hits} H · ${e.pitches} P${e.lob?` · ${e.lob} LOB`:""}</span></div>`).join("")
+    :`<div style="color:${T.sageDim};padding:14px;text-align:center">No completed innings yet.</div>`;
+  return modalWrap("Inning log","Totals by half-inning",`${cur}${rows}`,"closeinnlog");
+}
+
 /* Live play-by-play feed (viewer). Most recent on top. */
 function feedPanel(){
   const rows=gameFeed.slice(-40).reverse().map(e=>`<div style="display:flex;align-items:baseline;gap:10px;padding:8px 12px;border-bottom:1px solid ${T.line}">
@@ -795,7 +1008,7 @@ function feedPanel(){
       <span style="font-family:${MONO};font-size:12px;color:${T.sage};white-space:nowrap">${TEAMS.away.short} ${e.away}-${e.home} ${TEAMS.home.short}</span>
     </div>`).join("");
   return `<div style="flex:1;min-height:0;display:flex;flex-direction:column;background:${T.surface};border:1px solid ${T.line};border-radius:12px;overflow:hidden">
-      <div style="padding:10px 12px;font-family:${MONO};font-weight:800;font-size:13px;letter-spacing:1.4px;color:${T.sage};border-bottom:1px solid ${T.line};flex:none">GAME FEED</div>
+      <div style="padding:10px 12px;font-family:${MONO};font-weight:800;font-size:13px;letter-spacing:1.4px;color:${T.lime};border-bottom:1px solid ${T.line};flex:none">GAME FEED</div>
       <div style="flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch">${rows||`<div style="padding:16px;color:${T.sageDim};font-size:13px">Plays show here as the game happens.</div>`}</div>
     </div>`;
 }
@@ -842,7 +1055,7 @@ function actionArea(){
           </div></div>`;};
     const teamsBlock = DB.teams.length
       ? `<div style="display:flex;align-items:center;justify-content:space-between;margin:4px 2px -2px">
-            <span style="font-size:13px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:${T.sageDim}">${favs.length?"★ Your teams":"Teams"}</span>
+            <span style="font-size:13px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:${T.lime}">${favs.length?"★ Your teams":"Teams"}</span>
             <button data-act="gototeams" style="background:none;border:none;color:${T.lime};font-weight:800;font-size:14px;letter-spacing:.4px;cursor:pointer">All teams &rsaquo;</button></div>
           <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px">${list.map(card).join("")}</div>`
       : `<button data-act="gototeams" style="text-align:center;color:${T.sage};font-size:15px;padding:22px;border:1px dashed ${T.line};border-radius:12px;background:none;width:100%;cursor:pointer">No teams yet — <span style="color:${T.lime};font-weight:800">create one</span> to track rosters, records &amp; season stats.</button>`;
@@ -853,6 +1066,9 @@ function actionArea(){
     const resumeBtn = gameActive?`<button data-act="resume" style="${bigBtn(T.safe)};font-size:17px;padding:16px;display:flex;align-items:center;justify-content:center;gap:8px">${IC(PLAY)} Resume &middot; ${OUR.short} vs ${OPP.short}</button>`:"";
     const newGameBtn = `<button data-act="newgamestart" style="${bigBtn(T.lime,"font-size:24px;padding:24px;box-shadow:0 8px 22px rgba(163,230,53,.22)",T.field)}">${IC(PLAY)} New Game</button>`;
     const manageBtn = `<button data-act="gototeams" style="${ghost};padding:17px;font-size:17px;border:2px solid #3F6CA8;color:${T.ink};display:flex;align-items:center;justify-content:center;gap:9px">${IC('<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>')} Manage teams &amp; rosters</button>`;
+    // Share only makes sense once a game (and its stream link) exists.
+    const shareBtnHome = `<button data-act="share" style="flex:none;display:flex;align-items:center;justify-content:center;gap:9px;background:${T.surface};border:1px solid ${T.line};color:${T.chalk};border-radius:12px;padding:13px;font-family:${SANS};font-weight:800;font-size:15px">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="${T.lime}" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="19" r="2.6"/><path d="M8.3 10.8 15.7 6.4M8.3 13.2l7.4 4.4"/></svg>Share game link</button>`;
     // Wide (tablet): two columns so the key actions fit without scrolling — only a long
     // team list scrolls, inside its own column. Narrow (phone): the classic vertical stack.
     if(isWide()){
@@ -868,18 +1084,16 @@ function actionArea(){
              <div style="flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;display:flex;flex-direction:column;gap:10px">${teamsBlock}</div>
              ${manageBtn}</div>`
         : manageTile;
-      const shareHome=`<button data-act="share" style="flex:none;display:flex;align-items:center;justify-content:center;gap:9px;background:${T.surface};border:1px solid ${T.line};color:${T.chalk};border-radius:12px;padding:13px;font-family:${SANS};font-weight:800;font-size:15px">
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="${T.lime}" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="19" r="2.6"/><path d="M8.3 10.8 15.7 6.4M8.3 13.2l7.4 4.4"/></svg>Share game link</button>`;
       return `<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:14px">
           ${hero}
           <div style="flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr;gap:14px">
             <div style="display:flex;flex-direction:column;gap:14px;min-height:0">${resumeBtn}${newTile}</div>
             <div style="display:flex;flex-direction:column;min-height:0">${rightCell}</div>
           </div>
-          ${shareHome}
+          ${gameActive?shareBtnHome:""}
         </div>`;
     }
-    return `<div style="display:flex;flex-direction:column;gap:14px">${hero}${resumeBtn}${newGameBtn}${teamsBlock}${manageBtn}<button data-act="share" style="display:flex;align-items:center;justify-content:center;gap:9px;background:${T.surface};border:1px solid ${T.line};color:${T.chalk};border-radius:12px;padding:13px;font-family:${SANS};font-weight:800;font-size:15px"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="${T.lime}" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="19" r="2.6"/><path d="M8.3 10.8 15.7 6.4M8.3 13.2l7.4 4.4"/></svg>Share game link</button></div>`;
+    return `<div style="display:flex;flex-direction:column;gap:14px">${hero}${resumeBtn}${newGameBtn}${teamsBlock}${manageBtn}${gameActive?shareBtnHome:""}</div>`;
   }
   if(mode==="teams"){
     const sorted=DB.teams.slice().sort((a,b)=>(b.fav?1:0)-(a.fav?1:0));
@@ -894,7 +1108,7 @@ function actionArea(){
     return `<div style="display:flex;flex-direction:column;gap:14px">
         <div style="display:flex;align-items:center;gap:10px">
           <button data-act="gohome" style="${ghost};padding:9px 11px">&lsaquo; Home</button>
-          <div style="font-family:${MONO};font-size:23px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:${T.ink}">Teams</div></div>
+          <div style="font-family:${MONO};font-size:23px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:${T.lime}">Teams</div></div>
         <div style="font-size:12px;color:${T.sage};margin-top:-6px">Manage rosters &amp; season stats.</div>
         <div style="display:flex;flex-direction:column;gap:8px">${cards}</div>
         <button data-act="newteam" style="${bigBtn(OUR.color)}">${IC('<path d="M12 5v14M5 12h14"/>')} New team</button>
@@ -918,13 +1132,13 @@ function actionArea(){
           <button data-act="teamsback" style="${ghost};padding:9px 11px">&lsaquo; Teams</button>
           <input value="${(t.name||"").replace(/"/g,"&quot;")}" oninput="edTeamName(this.value)" placeholder="Team name" style="${cell};flex:1;font-family:${MONO};font-size:18px;font-weight:800;background:${T.surface};border-left:5px solid ${t.color}"></div>
         <div style="display:flex;align-items:center;gap:10px">
-          <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.sageDim}">Scoreboard abbr</div>
+          <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime}">Scoreboard abbr</div>
           <input value="${(t.short||"").replace(/"/g,"&quot;")}" oninput="edTeamAbbr(this.value)" maxlength="6" placeholder="TIGERS" style="${cell};width:128px;text-align:center;font-family:${MONO};font-weight:800;letter-spacing:.5px;text-transform:uppercase">
           <span style="font-size:11px;color:${T.sageDim}">up to 6 chars</span></div>
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-          <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.sageDim};width:100%;margin-bottom:2px">Team color</div>
+          <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};width:100%;margin-bottom:2px">Team color</div>
           ${["#2E6BE6","#0EA5E9","#12A150","#E08A12","#E2574C","#EC4899","#8B5CF6","#0F172A"].map(c=>`<button data-act="teamcolor" data-arg="${c}" style="width:32px;height:32px;border-radius:8px;background:${c};border:3px solid ${t.color.toLowerCase()===c.toLowerCase()?T.ink:"transparent"};box-shadow:0 0 0 1px ${T.line}"></button>`).join("")}</div>
-        <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.sageDim};margin:2px 2px -2px">Roster — tap to edit #/name</div>
+        <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin:2px 2px -2px">Roster — tap to edit #/name</div>
         <div style="display:flex;flex-direction:column;gap:6px">${roster}</div>
         <button data-act="addteamp" style="${ghost}">+ Add player</button>
         ${statTable}
@@ -944,7 +1158,7 @@ function actionArea(){
         <button data-act="ngback" style="${ghost}">&lsaquo; Back</button></div>`);
   }
   if(mode==="newgame"){
-    const lbl=`font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.sageDim};margin:0 2px 7px`;
+    const lbl=`font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin:0 2px 7px`;
     const inpSm=`width:80px;flex:none;background:${T.surface2};border:1px solid ${T.line};color:${T.ink};border-radius:9px;padding:11px 8px;font-family:${MONO};font-size:19px;font-weight:800;text-align:center;outline:none`;
     const rowCard=`display:flex;align-items:center;justify-content:space-between;gap:12px;background:${T.surface};border:1px solid ${T.line};border-radius:10px;padding:10px 14px;box-shadow:0 2px 6px rgba(15,30,60,.07)`;
     const sideBtn=(s,lbl2)=>{const on=G.ourSide===s;return `<button data-act="ng-side" data-arg="${s}" style="flex:1;padding:14px;border-radius:10px;font-family:${MONO};font-weight:800;font-size:15px;text-transform:uppercase;letter-spacing:.5px;border:2px solid ${on?OUR.color:T.line};background:${on?OUR.color:T.surface};color:${on?"#FFFFFF":T.ink}">${lbl2}</button>`;};
@@ -953,7 +1167,7 @@ function actionArea(){
         <span style="color:${color};font-weight:800;font-size:12px;letter-spacing:.5px">CHANGE &rsaquo;</span></button>`;
     const header=`<div style="display:flex;align-items:center;gap:10px;flex:none">
           <button data-act="gohome" style="${ghost};padding:9px 11px">&lsaquo; Home</button>
-          <div style="font-family:${MONO};font-size:23px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:${T.ink}">New Game</div></div>`;
+          <div style="font-family:${MONO};font-size:23px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:${T.lime}">New Game</div></div>`;
     const sideSel=`<div><div style="${lbl}">Is ${OUR.name} home or away?</div>
           <div style="display:flex;gap:8px">${sideBtn("home","Home")}${sideBtn("away","Away")}</div></div>`;
     const runCapCard=`<div style="${rowCard}">
@@ -993,7 +1207,7 @@ function actionArea(){
           <input value="${(e.num||"").replace(/"/g,"&quot;")}" oninput="oppPNum(${i},this.value)" inputmode="numeric" maxlength="3" style="width:46px;text-align:center;font-family:${MONO};font-weight:800;background:${T.surface2};border:1px solid ${T.line};color:${T.ink};border-radius:7px;padding:8px 4px;outline:none">
           <input value="${(e.name||"").replace(/"/g,"&quot;")}" oninput="oppPName(${i},this.value)" placeholder="Opponent hitter" style="flex:1;min-width:0;background:${T.surface2};border:1px solid ${T.line};color:${T.ink};border-radius:7px;padding:8px 10px;font-weight:700;outline:none">
           <button data-act="opprem" data-arg="${i}" style="background:none;border:1px solid ${T.line};color:${T.out};border-radius:7px;padding:8px 10px;font-weight:800"${G.oppLineup.length<=1?" disabled":""}>&times;</button></div>`).join("");
-      return `<div style="flex-shrink:0"><div style="font-family:${MONO};font-size:20px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:${T.ink}">Lineups</div>
+      return `<div style="flex-shrink:0"><div style="font-family:${MONO};font-size:20px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:${T.lime}">Lineups</div>
           <div style="font-size:11px;color:${T.sage};margin-top:2px">${OPP.name} &middot; batting order (names show on the bug)</div></div>
         ${luToggle}
         <div style="flex:1 1 auto;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:6px">${orows}</div>
@@ -1009,7 +1223,7 @@ function actionArea(){
     const bench=benchIdx().map(ri=>`<span style="font-family:${MONO};font-size:12px;color:${T.sage};background:${T.surface};border:1px solid ${T.line};border-radius:6px;padding:3px 8px;white-space:nowrap">#${ROSTER[ri].num} ${ROSTER[ri].name}</span>`).join(" ");
     const pit=playerAtPos("P");
     const n=G.lineup.order.length;
-    return `<div style="flex-shrink:0"><div style="font-family:${MONO};font-size:20px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:${T.ink}">Lineups</div>
+    return `<div style="flex-shrink:0"><div style="font-family:${MONO};font-size:20px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:${T.lime}">Lineups</div>
         <div style="font-size:11px;color:${T.sage};margin-top:2px">${OUR.name} &middot; batting ${n}${n>9?" (continuous)":""} &middot; drag &#9776; to reorder, tap a name to edit</div></div>
       ${luToggle}
       <button data-act="newgame" style="${ghost};flex-shrink:0;display:flex;align-items:center;justify-content:center;gap:7px;color:${T.sage}">&#9881; Game setup &amp; rules</button>
@@ -1045,7 +1259,7 @@ function actionArea(){
   if(mode==="editplayer"){
     const ri=G.lineup.order[editSlot],p=ROSTER[ri]||{num:"",name:""};
     const fld=`background:${T.surface};border:1px solid ${T.line};color:${T.ink};border-radius:10px;padding:14px 16px;font-family:${SANS};font-size:16px;font-weight:700;outline:none;width:100%`;
-    const lb=`font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.sageDim};margin:0 2px 6px`;
+    const lb=`font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin:0 2px 6px`;
     return step("Edit player",`Batting ${editSlot+1} &middot; set number &amp; name.`,
       `<div style="display:flex;flex-direction:column;gap:12px">
         <div style="display:flex;gap:10px">
@@ -1072,7 +1286,7 @@ function actionArea(){
             <div style="text-align:center"><div style="font-family:${MONO};font-size:14px;font-weight:700;color:${T.sage}">${TEAMS.home.short}</div><div style="font-family:${MONO};font-size:44px;font-weight:800;line-height:.9;color:${T.ink}">${G.home}</div></div>
           </div></div>
         <div style="overflow-x:auto;background:${T.surface};border:1px solid ${T.line};border-radius:10px;padding:6px"><table style="width:100%;border-collapse:collapse;font-family:${MONO};font-size:12px;text-align:center;color:${T.chalk}"><thead><tr style="color:${T.sageDim};font-size:10px">${lineHead}</tr></thead><tbody>${lineRow("away")}${lineRow("home")}</tbody></table></div>
-        <div><div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.sageDim};margin:0 2px 4px">${OUR.name} &mdash; batting</div>
+        <div><div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin:0 2px 4px">${OUR.name} &mdash; batting</div>
           <div style="overflow-x:auto;background:${T.surface};border:1px solid ${T.line};border-radius:10px;padding:4px 6px"><table style="width:100%;border-collapse:collapse;font-family:${MONO};font-size:12px;text-align:center;color:${T.chalk}"><thead><tr style="color:${T.sageDim};font-size:10px"><th style="text-align:left;padding:4px 6px">Batter</th><th>AB</th><th>R</th><th>H</th><th>RBI</th><th>BB</th><th>K</th></tr></thead><tbody>${bb||`<tr><td colspan="7" style="padding:8px;color:${T.sageDim}">No at-bats recorded</td></tr>`}</tbody></table></div></div>
         <div style="display:flex;gap:10px">
           <button data-act="resumegame" style="${ghost};flex:1;padding:14px">&lsaquo; Resume game</button>
@@ -1082,12 +1296,21 @@ function actionArea(){
   if(mode==="idle"){
     const halfLabel=`${G.half==="T"?"Top":"Bot"} ${ordinal(G.inning)}`;
     const flatBtn=`background:${T.surface};border:2px solid #3F6CA8;color:${T.chalk};border-radius:10px;padding:11px;font-size:14px;font-weight:800;display:flex;align-items:center;justify-content:center;gap:8px;letter-spacing:.3px;text-transform:uppercase`;
-    return `<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
+    const miniBtn=`background:${T.surface};border:1px solid ${T.line};color:${T.sage};border-radius:9px;padding:9px;font-size:12px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;display:flex;align-items:center;justify-content:center;gap:6px`;
+    // Advanced: a sticky pitch-type selector recorded with each pitch (shown only when on).
+    const ptypeRow=advPitch?`<div style="display:grid;grid-template-columns:repeat(${PITCH_TYPES.length},1fr);gap:6px">
+        ${PITCH_TYPES.map(pt=>{const on=pitchType===pt.k;return `<button data-act="ptype" data-arg="${pt.k}" title="${pt.n}" style="background:${on?T.amber:T.surface};border:1px solid ${on?T.amber:T.line};color:${on?T.field:T.chalk};border-radius:8px;padding:9px 2px;font-family:${MONO};font-size:13px;font-weight:800">${pt.k}</button>`;}).join("")}
+      </div>`:"";
+    return `${ptypeRow}
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
         ${pitchBtn("ball","Ball",ICN.ball)}${pitchBtn("strike","Strike",ICN.strike)}${pitchBtn("foul","Foul",ICN.foul)}${pitchBtn("inplay","In Play",ICN.inplay,true)}</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
         <button data-act="walk" style="${flatBtn}"><span style="color:${T.sage}">${ICN.walk}</span>Walk</button>
         <button data-act="hbp" style="${flatBtn}"><span style="color:${T.sage}">${ICN.hbp}</span>HBP</button></div>
-      <button data-act="endinning" style="${flatBtn};border-left:4px solid ${T.amber}"><span style="color:${T.amber}">${ICN.inning}</span>End Inning <span style="color:${T.sage};font-weight:600;font-size:11px;text-transform:none;letter-spacing:0">${halfLabel} · ${G.outs} out${G.outs===1?"":"s"}</span></button>`;
+      <button data-act="endinning" style="${flatBtn};border-left:4px solid ${T.amber}"><span style="color:${T.amber}">${ICN.inning}</span>End Inning <span style="color:${T.sage};font-weight:600;font-size:11px;text-transform:none;letter-spacing:0">${halfLabel} · ${G.outs} out${G.outs===1?"":"s"}</span></button>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <button data-act="advtoggle" style="${miniBtn}${advPitch?`;border-color:${T.amber};color:${T.amber}`:""}">${advPitch?"● ":""}Pitch types</button>
+        <button data-act="inninglog" style="${miniBtn}">${ICN.inning} Inning log</button></div>`;
   }
   if(mode==="locate"){
     return step("Where did it go?","Tap the field above — the fielder is set automatically.",
@@ -1269,10 +1492,13 @@ function render(){
     return;
   }
   const playing=!(mode==="idle"||mode==="locate");
-  const toastEl=toast?`<div style="position:absolute;bottom:12px;left:50%;transform:translateX(-50%);background:${T.ink};color:#FFFFFF;font-family:${MONO};font-weight:700;font-size:13px;padding:6px 14px;border-radius:999px;white-space:nowrap;z-index:5;box-shadow:0 4px 14px rgba(15,30,60,.3)">${toast}</div>`:"";
+  const toastEl=toast?`<div style="position:absolute;bottom:12px;left:50%;transform:translateX(-50%);background:#0B0E13;color:${T.lime};border:1.5px solid ${T.lime};font-family:${MONO};font-weight:800;font-size:14px;letter-spacing:.5px;text-transform:uppercase;padding:7px 16px;border-radius:999px;white-space:nowrap;z-index:5;box-shadow:0 4px 16px rgba(0,0,0,.55)">${toast}</div>`:"";
   // GameChanger model: the field stays the big hero, and the pick-an-event steps
   // appear as a bottom-sheet MODAL over it (no inline scrolling to choose).
   const pickerModal=(mode==="contact"||mode==="result"||mode==="errpos"||mode==="dppick"||mode==="outpos");
+  // Focus the field while a play is being entered: drop the score box / video tabs / role
+  // toggle so the diamond gets the room. Restored automatically when back to idle.
+  const focusPlay=(mode==="locate"||mode==="runners"||pickerModal);
   const fieldStyle=mode==="runners"?"flex:0 0 auto;height:min(30vh,210px);min-height:140px":"flex:1;min-height:0";
   const actionStyle=mode==="runners"?"flex:1 1 auto;min-height:0;display:flex;flex-direction:column;gap:8px":"flex-shrink:0";
   // Responsive event picker: bottom-sheet on phone/portrait, SIDE panel on tablet/landscape
@@ -1305,11 +1531,24 @@ function render(){
       ${mode==="idle"?wideBtn("home","⌂ Home")+wideBtn("lineup","Lineup")+wideBtn("endgame","End",`color:${T.out};border-color:${T.out}`):""}
     </div>`;
   let body;
-  if(wide && viewMode==="viewer"){
+  if(wide && focusPlay){
+    // Working a play on a tablet: drop the monitor/feed so the field is the hero. The
+    // event picker is a side panel on the right (pickerModal), so the field sits left;
+    // for locate/runners there's no panel, so it spans full width.
+    const fieldW=pickerModal?"flex:0 0 54%;max-width:54%":"flex:1";
+    const fieldH=mode==="runners"?"flex:0 0 auto;height:min(42vh,320px);min-height:160px":"flex:1";
+    body=`<div style="flex:1;min-height:0;display:flex;gap:12px">
+        <div style="${fieldW};min-width:0;min-height:0;display:flex;flex-direction:column;gap:8px">
+          ${batterCard()}
+          <div style="${fieldH};min-height:0;display:flex;align-items:center;justify-content:center;position:relative">${diamondSVG()}${toastEl}</div>
+          ${actionEl}
+        </div>
+      </div>`;
+  } else if(wide && viewMode==="viewer"){
     // Viewer: watch the game with NO scoring tools. Video + the digital ball field /
     // pitch-&-hit feed side by side; "Hide video" minimizes the feed so the field fills.
     const fieldCol=`<div style="flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;gap:8px">
-        ${miniCount()}${batterCard()}
+        ${focusPlay?"":miniCount()}${batterCard()}
         <div style="flex:1;min-height:0;display:flex;align-items:center;justify-content:center;position:relative">${diamondSVG()}${toastEl}</div>
       </div>`;
     body=monitorOn
@@ -1318,7 +1557,7 @@ function render(){
           ${fieldCol}
         </div>`
       : `<div style="flex:1;min-height:0;display:flex;flex-direction:row;gap:12px">
-          <div style="flex:0 0 52%;max-width:52%;min-width:0;min-height:0;display:flex;flex-direction:column;gap:8px">${miniCount()}${batterCard()}<div style="flex:1;min-height:0;display:flex;align-items:center;justify-content:center;position:relative">${diamondSVG()}${toastEl}</div></div>
+          <div style="flex:0 0 52%;max-width:52%;min-width:0;min-height:0;display:flex;flex-direction:column;gap:8px">${focusPlay?"":miniCount()}${batterCard()}<div style="flex:1;min-height:0;display:flex;align-items:center;justify-content:center;position:relative">${diamondSVG()}${toastEl}</div></div>
           ${feedPanel()}
         </div>`;
   } else if(wide && monitorOn){
@@ -1327,7 +1566,7 @@ function render(){
           ${monitorPane()}${wideBar}
         </div>
         <div style="flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;gap:8px">
-          ${miniCount()}${batterCard()}${fieldEl}${actionEl}
+          ${focusPlay?"":miniCount()}${batterCard()}${fieldEl}${actionEl}
         </div>
       </div>`;
   } else if(wide){
@@ -1335,28 +1574,31 @@ function render(){
     // decisions get the rest of the width — more room, less scrolling.
     body=`<div id="console-row" class="video-off" style="flex:1;min-height:0;display:flex;flex-direction:row;gap:12px">
         <div style="flex:0 0 46%;max-width:46%;min-width:0;min-height:0;display:flex;flex-direction:column;gap:8px">
-          ${miniCount()}${batterCard()}<div style="flex:1;min-height:0;display:flex;align-items:center;justify-content:center;position:relative">${diamondSVG()}${toastEl}</div>
+          ${focusPlay?"":miniCount()}${batterCard()}<div style="flex:1;min-height:0;display:flex;align-items:center;justify-content:center;position:relative">${diamondSVG()}${toastEl}</div>
         </div>
         <div style="flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;gap:8px">
-          ${actionEl}${wideBar}
+          ${actionEl}${feedPanel()}${wideBar}
         </div>
       </div>`;
   } else {
     const tab=(id,label)=>`<button data-act="pane" data-arg="${id}" style="flex:1;background:${phonePane===id?T.lime:T.surface};border:2px solid ${phonePane===id?T.lime:T.line};color:${phonePane===id?T.field:T.sage};border-radius:10px;padding:9px;font-family:${MONO};font-weight:800;font-size:14px;letter-spacing:.6px;text-transform:uppercase">${label}</button>`;
     const pane=phonePane==="video"
       ? `<div style="flex:1;min-height:0;display:flex;flex-direction:column;justify-content:center;gap:11px">${monitorPane()}${shareBtn}</div>`
-      : `<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px">${statusBar()}${batterCard()}${fieldEl}${actionEl}${controls}</div>`;
+      : `<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px">${focusPlay?"":statusBar()}${batterCard()}${fieldEl}${actionEl}${controls}</div>`;
     body=`<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:9px">
-        <div style="display:flex;gap:8px;flex:none">${tab("score","● Scoring")}${tab("video","▶ Video")}</div>
+        ${focusPlay?"":`<div style="display:flex;gap:8px;flex:none">${tab("score","● Scoring")}${tab("video","▶ Video")}</div>`}
         ${pane}
       </div>`;
   }
   document.getElementById("content").innerHTML=`
     ${body}${confirmOverlay()}
+    ${reviewBatter?batterReviewModal():""}
+    ${reviewInn?inningLogModal():""}
     ${pickerModal?`<div style="${sheetWrap}">
         <div id="action-area" style="${sheetCard};overflow-y:auto;-webkit-overflow-scrolling:touch;background:${T.surface};padding:16px;display:flex;flex-direction:column;gap:8px">${actionArea()}</div></div>`:""}`;
   animateStatusBar();
   if(mode!==_lastMode){ const a=document.getElementById("action-area"); if(a)a.classList.add("screen-in"); _lastMode=mode; }
+  try{ alignPreview(); }catch(e){}   // keep the native camera preview aligned to the monitor region
 }
 
 /* ---- diff the last-shown scoreboard vs current and fire one-shot animations ---- */
@@ -1396,6 +1638,13 @@ document.getElementById("app").addEventListener("click",e=>{
   }
   const el=e.target.closest("[data-act]"); if(!el)return;
   const act=el.dataset.act,arg=el.dataset.arg;
+  if(act==="noop")return;                                    // swallow taps inside a modal card
+  if(act==="reviewbatter"){ reviewBatter=arg; render(); return; }
+  if(act==="closereview"){ reviewBatter=null; render(); return; }
+  if(act==="inninglog"){ reviewInn=true; render(); return; }
+  if(act==="closeinnlog"){ reviewInn=false; render(); return; }
+  if(act==="advtoggle"){ advPitch=!advPitch; try{localStorage.setItem("al-adv-pitch",advPitch?"1":"0");}catch(e){} render(); return; }
+  if(act==="ptype"){ pitchType=(pitchType===arg?null:arg); render(); return; }
   if(act==="pane"){ phonePane=arg; render(); return; }
   if(act==="togglevideo"){
     monitorOn=!monitorOn;
@@ -1490,6 +1739,9 @@ function renderToolbar(){
   // No top bar on menu screens (home/teams/etc.) — it duplicated the page title and
   // showed a misleading "LIVE" relay dot before any game. Reclaims that space.
   if(!playMode2){ tb.innerHTML=""; return; }
+  // While the scorer works through a play (locate/pick/runners), hide the top bar so the
+  // field gets the room — it comes back when they're done.
+  if(["locate","contact","result","runners","errpos","outpos","dppick"].includes(mode)){ tb.innerHTML=""; return; }
   // In a live game the title slot becomes the Scorer/Viewer role toggle (the matchup
   // already shows in the scorebug below — no need to repeat it here).
   const roleSeg=(r,lbl)=>`<button data-act="role" data-arg="${r}" style="padding:8px 14px;border:none;font-family:${MONO};font-weight:800;font-size:13px;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;background:${viewMode===r?T.lime:"transparent"};color:${viewMode===r?T.field:T.sage}">${lbl}</button>`;
@@ -1543,17 +1795,13 @@ document.getElementById("qrmodal").addEventListener("click",e=>{
   if(e.target.id==="qrmodal"){ closeShare(); return; }      // tap backdrop to close
   const a=e.target.closest("[data-act]"); if(!a)return;
   if(a.dataset.act==="closeshare") closeShare();
-  else if(a.dataset.act==="navshare"){
-    if(navigator.share){
-      navigator.share({title:"Watch All-Stars Live",text:"Follow the game live:",url:shareUrl()}).catch(()=>{});
-    }else{   // graceful fallback: copy to clipboard
-      if(navigator.clipboard) navigator.clipboard.writeText(shareUrl()).catch(()=>{});
-      const lbl=a.querySelector("span"); if(lbl){ lbl.textContent="Link copied!"; setTimeout(()=>{lbl.textContent="Text a fan";},1300); }
-    }
+  else if(a.dataset.act==="shareemail"){
+    const u=shareUrl(); if(!u)return;
+    location.href="mailto:?subject="+encodeURIComponent("Watch All-Stars Live")+"&body="+encodeURIComponent("Follow the game live:\n"+u);
   }
-  else if(a.dataset.act==="copyshare"){
-    if(navigator.clipboard) navigator.clipboard.writeText(shareUrl()).catch(()=>{});
-    a.textContent="Copied!"; setTimeout(()=>{a.textContent="Copy link";},1300);
+  else if(a.dataset.act==="sharetext"){
+    const u=shareUrl(); if(!u)return;
+    location.href="sms:?body="+encodeURIComponent("Watch All-Stars Live: "+u);
   }
 });
 
@@ -1612,6 +1860,27 @@ render();broadcast();
 setTimeout(function(){var s=document.getElementById("splash");if(s)s.remove();},2000);
 // Re-render on rotate/resize so the event picker swaps between bottom-sheet and side panel.
 let _rsz; window.addEventListener("resize",function(){clearTimeout(_rsz);_rsz=setTimeout(render,150);});
+</script>
+<script>
+/* ---- PWA: service worker + install button ---- */
+(function(){
+  // Register the service worker only on http/https (skips file:// inside the native app).
+  if ("serviceWorker" in navigator && location.protocol.indexOf("http")===0) {
+    window.addEventListener("load", function(){ navigator.serviceWorker.register("sw.js").catch(function(){}); });
+  }
+  // Show a small "Install app" pill only when the browser reports the app is installable.
+  var deferred=null;
+  window.addEventListener("beforeinstallprompt", function(e){ e.preventDefault(); deferred=e; showInstall(); });
+  window.addEventListener("appinstalled", function(){ deferred=null; var b=document.getElementById("pwa-install"); if(b)b.remove(); });
+  function showInstall(){
+    if(document.getElementById("pwa-install"))return;
+    var b=document.createElement("button");
+    b.id="pwa-install"; b.textContent="⬇  Install app";
+    b.setAttribute("style","position:fixed;z-index:9999;left:50%;bottom:14px;transform:translateX(-50%);background:#A3E635;color:#0B0E13;border:none;border-radius:999px;padding:10px 18px;font-family:'Barlow',system-ui,sans-serif;font-weight:800;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.5);cursor:pointer");
+    b.onclick=function(){ if(!deferred)return; deferred.prompt(); deferred.userChoice.finally(function(){ deferred=null; var x=document.getElementById("pwa-install"); if(x)x.remove(); }); };
+    document.body.appendChild(b);
+  }
+})();
 </script>
 </body>
 </html>

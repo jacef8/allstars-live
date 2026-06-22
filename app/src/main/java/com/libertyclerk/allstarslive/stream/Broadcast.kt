@@ -123,16 +123,30 @@ object Broadcast {
         Log.i(TAG, "pushing to YouTube: ${live.watchUrl}")
 
         // Poll YouTube until the broadcast is actually live, THEN embed in the monitor.
+        // Keep polling for as long as we're active (don't give up after a fixed window —
+        // YouTube can sit in "liveStarting" for a while, and we must reflect the real
+        // state whenever it flips). If it lingers in liveStarting/testing, nudge it with
+        // an explicit transition (harmless if autoStart already handled it).
         Thread {
-            var tries = 0
-            while (isActive && tries < 40) {     // ~2 min
+            var nudged = false
+            var lingering = 0
+            while (isActive) {
                 try { Thread.sleep(3000) } catch (_: InterruptedException) { return@Thread }
-                tries++
                 val st = runCatching { YouTubeLive.lifeCycleStatus(token, live.broadcastId) }.getOrNull() ?: continue
                 Log.i(TAG, "broadcast lifeCycle=$st")
                 when (st) {
                     "live" -> { main.post { if (isActive) _state.value = _state.value.copy(phase = Phase.LIVE, status = "LIVE") }; return@Thread }
-                    "complete", "revoked" -> return@Thread
+                    "complete", "revoked" -> { main.post { _state.value = State(phase = Phase.OFFLINE) }; return@Thread }
+                    "testing", "liveStarting", "ready" -> {
+                        lingering++
+                        main.post { if (isActive) _state.value = _state.value.copy(status = "YouTube is starting the broadcast…") }
+                        // After ~15s stuck, explicitly ask YouTube to go live (once).
+                        if (!nudged && lingering >= 5) {
+                            nudged = true
+                            runCatching { YouTubeLive.transition(token, live.broadcastId, "live") }
+                                .onFailure { Log.w(TAG, "transition nudge: ${it.message}") }
+                        }
+                    }
                 }
             }
         }.start()
