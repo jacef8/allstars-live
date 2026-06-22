@@ -77,7 +77,7 @@
 
   /* Tablet in landscape: use the width — wider column so the field is big and the
      event picker can sit as a side panel (no scrolling). Phones/portrait stay narrow. */
-  @media (min-width:760px) and (orientation:landscape){ #app{max-width:920px;} }
+  @media (min-width:760px) and (orientation:landscape){ #app{max-width:1280px;} }
 </style>
 </head>
 <body>
@@ -103,6 +103,26 @@
         <button data-act="closeshare" style="flex:1;background:#1B212B;border:1px solid #333C49;color:#9BA6B4;border-radius:10px;padding:12px;font-family:'Barlow',sans-serif;font-size:14px;font-weight:700;cursor:pointer">Done</button>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- Connect-stream modal: point the monitor at a YouTube Live stream -->
+<div id="ytmodal" style="display:none;position:fixed;inset:0;z-index:200;background:rgba(8,11,16,.84);align-items:center;justify-content:center;padding:20px">
+  <div style="max-width:390px;width:100%;background:#1B212B;border:1px solid #333C49;border-radius:18px;padding:20px;box-shadow:0 24px 60px rgba(0,0,0,.6)">
+    <div style="display:flex;align-items:center;gap:9px">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="#FF0000"><path d="M23 7.5a3 3 0 0 0-2.1-2.1C19 5 12 5 12 5s-7 0-8.9.4A3 3 0 0 0 1 7.5 31 31 0 0 0 .6 12 31 31 0 0 0 1 16.5a3 3 0 0 0 2.1 2.1C5 19 12 19 12 19s7 0 8.9-.4a3 3 0 0 0 2.1-2.1A31 31 0 0 0 23.4 12 31 31 0 0 0 23 7.5z"/><path d="M9.8 15.3V8.7l5.7 3.3z" fill="#1B212B"/></svg>
+      <div style="font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:20px;letter-spacing:.5px;color:#EAEDF2">CONNECT YOUR STREAM</div>
+    </div>
+    <div style="font-size:12px;color:#9BA6B4;margin:7px 0 14px;line-height:1.5">Paste your <b style="color:#EAEDF2">YouTube Live</b> link or video ID. It plays in the monitor and becomes the link you share with fans. Saved on this device.</div>
+    <label style="display:block;font-size:11px;font-weight:700;letter-spacing:.5px;color:#9BA6B4;margin-bottom:5px">YOUTUBE LINK OR VIDEO ID</label>
+    <input id="streamInput" placeholder="https://youtube.com/watch?v=…  or  youtu.be/…" autocomplete="off" spellcheck="false" style="width:100%;box-sizing:border-box;background:#10141A;border:1px solid #41506A;color:#EAEDF2;border-radius:10px;padding:12px;font-size:14px;font-family:system-ui;outline:none">
+    <div id="streamHint" style="font-size:11px;color:#8E9BB2;min-height:15px;margin:7px 2px 0"></div>
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button data-act="savestream" style="flex:1;background:#A3E635;border:none;color:#0B0E13;border-radius:10px;padding:13px;font-family:'Barlow',sans-serif;font-size:15px;font-weight:800;cursor:pointer">Use this stream</button>
+      <button data-act="closestream" style="background:#1B212B;border:1px solid #333C49;color:#9BA6B4;border-radius:10px;padding:13px 16px;font-family:'Barlow',sans-serif;font-size:14px;font-weight:700;cursor:pointer">Cancel</button>
+    </div>
+    <button data-act="clearstream" style="width:100%;margin-top:8px;background:transparent;border:none;color:#8E9BB2;font-size:12px;font-weight:600;cursor:pointer;padding:6px">Disconnect / clear stream</button>
+    <div style="font-size:11px;color:#8E9BB2;margin-top:12px;line-height:1.5;border-top:1px solid #333C49;padding-top:11px">One-tap <b style="color:#9BA6B4">Go Live</b> (creating the broadcast and pushing the camera) comes in the tablet app. Here you point the monitor at a stream you've already started on YouTube.</div>
   </div>
 </div>
 
@@ -674,22 +694,39 @@ function batterCard(){
   </div>`;
 }
 
-/* All-in-one broadcast monitor: the live feed (YouTube via ?yt=VIDEO_ID, else a
+/* Which YouTube stream the monitor shows: ?yt= wins, else the device-saved one. */
+function streamYt(){ try{ return new URLSearchParams(location.search).get("yt") || localStorage.getItem("al-stream-yt") || ""; }catch(e){ return new URLSearchParams(location.search).get("yt")||""; } }
+/* Accept a full YouTube link (watch?v=, youtu.be/, /live/, /embed/) or a bare id. */
+function parseYouTubeId(s){
+  s=(s||"").trim(); if(!s) return "";
+  if(!/[\/\s.]/.test(s)) return s;                       // already a bare id
+  try{ const u=new URL(s.includes("://")?s:"https://"+s);
+    const v=u.searchParams.get("v"); if(v) return v;
+    const parts=u.pathname.split("/").filter(Boolean);
+    return parts[parts.length-1]||"";
+  }catch(e){ return s; }
+}
+
+/* All-in-one broadcast monitor: the live feed (saved YouTube stream or ?yt=, else a
    placeholder) with the scorebug overlaid — exactly what streams to YouTube.
    This is the web mirror of the native tablet console (monitor + scorer in one). */
 function monitorPane(){
-  const yt=new URLSearchParams(location.search).get("yt");
+  const yt=streamYt();
   const feed=yt
     ? `<iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(yt)}?autoplay=1&mute=1&playsinline=1&modestbranding=1&rel=0" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen style="position:absolute;inset:0;width:100%;height:100%;border:0"></iframe>`
-    : `<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;text-align:center;padding:0 20px;background:radial-gradient(circle at 50% 36%, #16202e, #0b0f15)">
+    : `<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;padding:0 20px 104px;background:radial-gradient(circle at 50% 34%, #16202e, #0b0f15)">
         <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="${T.sageDim}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
         <div style="font-family:${MONO};font-weight:800;letter-spacing:2px;font-size:14px;color:${T.sage}">CAMERA FEED</div>
-        <div style="font-size:11px;color:${T.sageDim};max-width:250px;line-height:1.45">Your broadcast monitor — what streams to YouTube with the scorebug burned in.</div></div>`;
+        <div style="font-size:11px;color:${T.sageDim};max-width:260px;line-height:1.45">Connect your YouTube Live stream to see it here with the scorebug.</div>
+        <button data-act="setstream" style="margin-top:4px;background:${T.lime};color:${T.field};border:none;border-radius:9px;padding:10px 16px;font-family:${SANS};font-weight:800;font-size:13px;display:inline-flex;align-items:center;gap:7px;cursor:pointer">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="${T.field}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3l14 9-14 9V3z"/></svg>Connect your stream</button></div>`;
   const monBtn="width:32px;height:32px;border-radius:8px;background:rgba(8,11,16,.6);border:1px solid rgba(255,255,255,.2);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer";
   const fsIcon=`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>`;
   const ytIcon=`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M9 7h8v8"/></svg>`;
+  const gearIcon=`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/></svg>`;
   const ctrls=yt
     ? `<div style="position:absolute;top:9px;right:10px;display:flex;gap:6px;z-index:3">
+        <button data-act="setstream" title="Change stream" style="${monBtn}">${gearIcon}</button>
         <button data-act="ytopen" title="Open in YouTube" style="${monBtn}">${ytIcon}</button>
         <button data-act="fullscreen" title="Fullscreen" style="${monBtn}">${fsIcon}</button></div>`
     : "";
@@ -1159,10 +1196,9 @@ function render(){
   const actionEl=pickerModal?"":`<div id="action-area" style="display:flex;flex-direction:column;gap:8px;${actionStyle}">${actionArea()}</div>`;
   let body;
   if(wide){
-    body=`<div style="flex:1;min-height:0;display:flex;flex-direction:row;gap:10px">
-        <div style="flex:0 0 47%;max-width:47%;min-height:0;display:flex;flex-direction:column;gap:10px">
-          ${monitorPane()}
-          <div style="flex:1;min-height:0;display:flex;flex-direction:column;justify-content:flex-end;gap:9px">${shareBtn}${controls}</div>
+    body=`<div style="flex:1;min-height:0;display:flex;flex-direction:row;gap:12px">
+        <div style="flex:0 0 52%;max-width:52%;min-height:0;display:flex;flex-direction:column;justify-content:center;gap:11px">
+          ${monitorPane()}${shareBtn}${controls}
         </div>
         <div style="flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;gap:8px">
           ${batterCard()}${fieldEl}${actionEl}
@@ -1225,7 +1261,11 @@ document.getElementById("app").addEventListener("click",e=>{
   const act=el.dataset.act,arg=el.dataset.arg;
   if(act==="pane"){ phonePane=arg; render(); return; }
   if(act==="fullscreen"){ const m=document.getElementById("monitor"); const r=m&&(m.requestFullscreen||m.webkitRequestFullscreen); if(r)r.call(m); return; }
-  if(act==="ytopen"){ const ytv=new URLSearchParams(location.search).get("yt"); if(ytv)window.open("https://www.youtube.com/watch?v="+encodeURIComponent(ytv),"_blank","noopener"); return; }
+  if(act==="ytopen"){ const ytv=streamYt(); if(ytv)window.open("https://www.youtube.com/watch?v="+encodeURIComponent(ytv),"_blank","noopener"); return; }
+  if(act==="setstream"){ openStream(); return; }
+  if(act==="savestream"){ saveStream(); return; }
+  if(act==="clearstream"){ try{localStorage.removeItem("al-stream-yt");}catch(e){} closeStream(); render(); return; }
+  if(act==="closestream"){ closeStream(); return; }
   if(act==="ball"||act==="strike"||act==="foul")pitch(act);
   else if(act==="inplay")startInPlay();
   else if(act==="walk")manual("walk","Walk");
@@ -1314,7 +1354,7 @@ window.onLinkChange=renderToolbar;   // relay open/close → repaint the dot
 /* ===== fan share: fans watch the YouTube broadcast (scorebug burned into video).
    Share that link — no separate fan page. Pass the stream via ?yt=VIDEO_ID. ===== */
 function shareUrl(){
-  const yt=new URLSearchParams(location.search).get("yt");
+  const yt=streamYt();
   return yt ? ("https://www.youtube.com/watch?v="+encodeURIComponent(yt)) : "";
 }
 function openShare(){
@@ -1351,6 +1391,31 @@ document.getElementById("qrmodal").addEventListener("click",e=>{
     a.textContent="Copied!"; setTimeout(()=>{a.textContent="Copy link";},1300);
   }
 });
+
+/* ===== connect-stream modal: point the monitor at a YouTube Live stream ===== */
+function openStream(){
+  const cur=streamYt();
+  const inp=document.getElementById("streamInput");
+  inp.value=cur?("https://www.youtube.com/watch?v="+cur):"";
+  document.getElementById("streamHint").textContent="";
+  document.getElementById("ytmodal").style.display="flex";
+  setTimeout(()=>{ try{inp.focus();inp.select();}catch(e){} },50);
+}
+function saveStream(){
+  const id=parseYouTubeId(document.getElementById("streamInput").value);
+  if(!id){ document.getElementById("streamHint").textContent="Couldn't find a video ID — paste the full YouTube link (watch?v=… or youtu.be/…)."; return; }
+  try{ localStorage.setItem("al-stream-yt", id); }catch(e){}
+  closeStream(); render();
+}
+function closeStream(){ document.getElementById("ytmodal").style.display="none"; }
+document.getElementById("ytmodal").addEventListener("click",e=>{
+  if(e.target.id==="ytmodal"){ closeStream(); return; }       // tap backdrop to close
+  const a=e.target.closest("[data-act]"); if(!a)return;
+  if(a.dataset.act==="savestream") saveStream();
+  else if(a.dataset.act==="clearstream"){ try{localStorage.removeItem("al-stream-yt");}catch(e){} closeStream(); render(); }
+  else if(a.dataset.act==="closestream") closeStream();
+});
+document.getElementById("streamInput").addEventListener("keydown",e=>{ if(e.key==="Enter")saveStream(); });
 
 /* ===== apply game setup passed from setup.html (?home=&away=&our=&innings=&runcap=&batters=) ===== */
 function clampInt(v,min,max,def){ const n=parseInt(v,10); return isNaN(n)?def:Math.max(min,Math.min(max,n)); }
