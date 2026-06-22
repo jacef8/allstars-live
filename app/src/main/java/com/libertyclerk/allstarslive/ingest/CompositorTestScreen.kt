@@ -5,6 +5,8 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Typeface
+import android.os.Handler
+import android.os.Looper
 import android.view.SurfaceHolder
 import android.view.SurfaceView
 import androidx.compose.foundation.background
@@ -38,6 +40,8 @@ import androidx.compose.ui.viewinterop.AndroidView
 import com.libertyclerk.allstarslive.gl.Mp4Recorder
 import com.libertyclerk.allstarslive.gl.VideoCompositor
 import com.libertyclerk.allstarslive.stream.YouTubeStreamer
+import com.libertyclerk.allstarslive.youtube.YouTubeAuth
+import com.libertyclerk.allstarslive.youtube.YouTubeLive
 import java.io.File
 
 private const val PROG_W = 1280
@@ -70,6 +74,24 @@ fun CompositorTestScreen() {
     var streaming by remember { mutableStateOf(false) }
     var streamKey by remember { mutableStateOf("") }
     var streamStatus by remember { mutableStateOf("") }
+    val mainHandler = remember { Handler(Looper.getMainLooper()) }
+
+    // Start pushing the composited frame to YouTube at rtmp://…/live2/<key>. Main thread.
+    fun goLiveWithKey(key: String) {
+        val comp = st.comp ?: return
+        val s = YouTubeStreamer(PROG_W, PROG_H, onStatus = { status ->
+            streamStatus = status
+            if (streaming && (status.startsWith("Failed") || status.startsWith("Auth"))) {
+                streaming = false
+                val old = st.streamer; st.streamer = null
+                st.comp?.detachEncoder { old?.stop() }
+            }
+        })
+        comp.setEncoderSurface(s.inputSurface, PROG_W, PROG_H) { s.drain() }
+        s.start("rtmp://a.rtmp.youtube.com/live2/$key")
+        st.streamer = s
+        streaming = true
+    }
 
     DisposableEffect(Unit) {
         onDispose {
@@ -165,34 +187,40 @@ fun CompositorTestScreen() {
             OutlinedTextField(
                 value = streamKey,
                 onValueChange = { streamKey = it },
-                label = { Text("YouTube stream key") },
+                label = { Text("Stream key (optional — blank uses your YouTube)") },
                 singleLine = true,
                 enabled = !streaming,
                 modifier = Modifier.fillMaxWidth(0.7f),
             )
             Button(
                 onClick = {
-                    val comp = st.comp ?: return@Button
-                    if (!streaming) {
-                        if (streamKey.isBlank()) { streamStatus = "Enter your YouTube stream key first"; return@Button }
-                        val s = YouTubeStreamer(PROG_W, PROG_H, onStatus = { status ->
-                            streamStatus = status
-                            // A failed/auth-rejected connect ends the stream — reset the UI + free the encoder.
-                            if (streaming && (status.startsWith("Failed") || status.startsWith("Auth"))) {
-                                streaming = false
-                                val old = st.streamer; st.streamer = null
-                                st.comp?.detachEncoder { old?.stop() }
-                            }
-                        })
-                        comp.setEncoderSurface(s.inputSurface, PROG_W, PROG_H) { s.drain() }
-                        s.start("rtmp://a.rtmp.youtube.com/live2/" + streamKey.trim())
-                        st.streamer = s
-                        streaming = true
-                    } else {
+                    if (streaming) {
                         val s = st.streamer
                         streaming = false
-                        comp.detachEncoder { s?.stop() }
+                        st.comp?.detachEncoder { s?.stop() }
                         st.streamer = null
+                    } else {
+                        val key = streamKey.trim()
+                        if (key.isNotBlank()) {
+                            goLiveWithKey(key)                       // manual override
+                        } else {
+                            // One-tap: use the connected YouTube account to set up the broadcast.
+                            streamStatus = "Setting up your YouTube broadcast…"
+                            YouTubeAuth.client(ctx).authorize(YouTubeAuth.request())
+                                .addOnSuccessListener { result ->
+                                    val token = result.accessToken
+                                    if (token == null) {
+                                        streamStatus = "Connect YouTube in Settings first"
+                                        return@addOnSuccessListener
+                                    }
+                                    Thread {
+                                        runCatching { YouTubeLive.startBroadcast(token, "All-Stars Live") }
+                                            .onSuccess { live -> mainHandler.post { streamStatus = "Starting…"; goLiveWithKey(live.streamKey) } }
+                                            .onFailure { e -> mainHandler.post { streamStatus = "YouTube setup failed: ${e.message}" } }
+                                    }.start()
+                                }
+                                .addOnFailureListener { streamStatus = "YouTube auth failed: ${it.message}" }
+                        }
                     }
                 },
                 enabled = !recording,
