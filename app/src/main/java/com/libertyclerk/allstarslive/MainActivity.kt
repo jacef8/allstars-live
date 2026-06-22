@@ -6,17 +6,24 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Scoreboard
@@ -24,9 +31,6 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -36,6 +40,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -45,6 +50,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import com.libertyclerk.allstarslive.ingest.CompositorTestScreen
 import com.libertyclerk.allstarslive.ingest.SrtIngestScreen
 import com.libertyclerk.allstarslive.ui.theme.AllStarsLiveTheme
 
@@ -86,7 +92,7 @@ class MainActivity : ComponentActivity() {
                                 "Live scoring",
                                 "Tap-to-score the game from here — porting the web scorer into the app is next.",
                             )
-                            Tab.VIDEO -> SrtIngestScreen()
+                            Tab.VIDEO -> VideoTab()
                             Tab.LINEUP -> ComingSoon(
                                 Icons.Filled.People,
                                 "Lineup",
@@ -113,36 +119,94 @@ class MainActivity : ComponentActivity() {
     private fun hideSystemBars() {
         WindowCompat.setDecorFitsSystemWindows(window, false)
         WindowInsetsControllerCompat(window, window.decorView).apply {
-            hide(WindowInsetsCompat.Type.systemBars())
+            // Hide only the status bar for a clean top; keep the navigation area so the
+            // tablet's gesture/nav bar doesn't sit on top of our bottom tabs.
+            hide(WindowInsetsCompat.Type.statusBars())
             systemBarsBehavior =
                 WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         }
     }
 }
 
+/**
+ * GroundLink-style bottom bar: expanded, bordered pill buttons. Each tab always
+ * shows its icon AND label; the selected one fills lime (no disappearing icon /
+ * indicator swap like the default Material nav).
+ */
 @Composable
 private fun AllStarsBottomBar(tabs: List<Tab>, selected: Int, onSelect: (Int) -> Unit) {
-    val gold = MaterialTheme.colorScheme.primary
-    Column {
+    val lime = MaterialTheme.colorScheme.primary
+    val field = Color(0xFF0B0E13)
+    val unselectedFill = Color(0xFF18223A)
+    val shape = RoundedCornerShape(12.dp)
+    Column(Modifier.background(NavBarColor).navigationBarsPadding()) {
         // Hairline accent above the bar for the broadcast look.
         Box(Modifier.fillMaxWidth().height(1.dp).background(NavHairline))
-        NavigationBar(containerColor = NavBarColor, tonalElevation = 0.dp) {
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 9.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             tabs.forEachIndexed { i, tab ->
-                NavigationBarItem(
-                    selected = i == selected,
-                    onClick = { onSelect(i) },
-                    icon = { Icon(tab.icon, contentDescription = tab.label) },
-                    label = { Text(tab.label) },
-                    alwaysShowLabel = true,
-                    colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = gold,
-                        selectedTextColor = gold,
-                        indicatorColor = gold.copy(alpha = 0.16f),
-                        unselectedIconColor = Sage,
-                        unselectedTextColor = Sage,
-                    ),
-                )
+                val sel = i == selected
+                Row(
+                    Modifier
+                        .weight(1f)
+                        .clip(shape)
+                        .background(if (sel) lime else unselectedFill)
+                        .border(2.dp, if (sel) lime else NavHairline, shape)
+                        .clickable { onSelect(i) }
+                        .padding(vertical = 12.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        tab.icon,
+                        contentDescription = tab.label,
+                        tint = if (sel) field else Sage,
+                        modifier = Modifier.size(20.dp),
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        tab.label,
+                        color = if (sel) field else Sage,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp,
+                    )
+                }
             }
+        }
+    }
+}
+
+/** Video tab: choose the live SRT camera, or the M2 compositor test (pattern + scorebug + record). */
+@Composable
+private fun VideoTab() {
+    var mode by rememberSaveable { mutableStateOf(0) }   // 0 = Live camera, 1 = M2 test
+    Column(Modifier.fillMaxSize()) {
+        Row(
+            Modifier.fillMaxWidth().background(NavBarColor).padding(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            val gold = MaterialTheme.colorScheme.primary
+            Button(
+                onClick = { mode = 0 },
+                modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (mode == 0) gold else NavBarColor,
+                    contentColor = if (mode == 0) Color(0xFF0B0E13) else Sage,
+                ),
+            ) { Text("Live camera") }
+            Button(
+                onClick = { mode = 1 },
+                modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (mode == 1) gold else NavBarColor,
+                    contentColor = if (mode == 1) Color(0xFF0B0E13) else Sage,
+                ),
+            ) { Text("M2 test") }
+        }
+        Box(Modifier.fillMaxWidth().weight(1f)) {
+            if (mode == 0) SrtIngestScreen() else CompositorTestScreen()
         }
     }
 }

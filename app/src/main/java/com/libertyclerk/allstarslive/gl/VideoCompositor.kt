@@ -70,6 +70,31 @@ class VideoCompositor {
         if (width > 0 && height > 0) videoAspect = width.toFloat() / height
     }
 
+    /**
+     * Size the buffers the [inputSurface] produces. Required when a *Canvas* producer
+     * (the test-pattern source) draws into it; a MediaCodec decoder sets its own size.
+     */
+    fun setInputSize(width: Int, height: Int) {
+        handler.post {
+            if (::surfaceTexture.isInitialized && width > 0 && height > 0) {
+                surfaceTexture.setDefaultBufferSize(width, height)
+            }
+        }
+    }
+
+    /**
+     * Detach the encoder and run [finish] — both on the GL thread, so every
+     * MediaCodec/muxer call (draw, drain, stop) stays on the one owning thread.
+     */
+    fun detachEncoder(finish: () -> Unit) {
+        handler.post {
+            encoderSurface?.let { egl.releaseSurface(it) }
+            encoderSurface = null
+            onEncoderFrame = null
+            runCatching { finish() }
+        }
+    }
+
     /** Replace the scorebug bitmap (premultiplied alpha). Pass null to hide it. */
     fun setOverlay(bitmap: Bitmap?) {
         handler.post {

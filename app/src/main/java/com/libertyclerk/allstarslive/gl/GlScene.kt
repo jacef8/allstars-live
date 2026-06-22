@@ -73,7 +73,10 @@ class GlScene {
         GLES20.glEnable(GLES20.GL_BLEND)
         GLES20.glBlendFunc(GLES20.GL_ONE, GLES20.GL_ONE_MINUS_SRC_ALPHA)
         texProgram.use()
-        texProgram.setTexMatrix(IDENTITY)
+        // The shared quad's v is set up for the OES video (whose SurfaceTexture matrix
+        // re-flips it). A plain Bitmap has no such matrix, so flip v here or it draws
+        // upside-down. FLIP_V maps v -> 1-v.
+        texProgram.setTexMatrix(FLIP_V)
         GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
         GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, texId)
         texProgram.bindQuadAndDraw(quad)
@@ -109,6 +112,13 @@ class GlScene {
 
     companion object {
         private val IDENTITY = FloatArray(16).also { android.opengl.Matrix.setIdentityM(it, 0) }
+
+        // v -> 1 - v, so a normal top-down Bitmap isn't drawn upside-down.
+        private val FLIP_V = FloatArray(16).also {
+            android.opengl.Matrix.setIdentityM(it, 0)
+            android.opengl.Matrix.translateM(it, 0, 0f, 1f, 0f)
+            android.opengl.Matrix.scaleM(it, 0, 1f, -1f, 1f)
+        }
 
         private const val VERTEX = """
             uniform mat4 uTexMatrix;
