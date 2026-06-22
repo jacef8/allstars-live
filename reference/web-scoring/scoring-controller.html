@@ -487,6 +487,7 @@ const LINK=(()=>{
 let _seq=0,_event=null,_eventId=0,_pitch=null;
 let phonePane="score";   // phone-only paging: "score" | "video" (large screens show both)
 let monitorOn=(()=>{try{return localStorage.getItem("al-monitor-on")!=="0";}catch(e){return true;}})();  // wide: video shown/hidden
+let viewMode=(()=>{try{return localStorage.getItem("al-view-mode")||"scorer";}catch(e){return "scorer";}})();  // "scorer" | "viewer"
 const PLAYHEAD={single:"SINGLE",double:"DOUBLE",triple:"TRIPLE",hr:"HOME RUN",error:"REACHED ON ERROR",
   fc:"FIELDER'S CHOICE",out1:"GROUND OUT",flyout:"FLY OUT",lineout:"LINE OUT",popout:"POP OUT",
   dp:"DOUBLE PLAY",sacfly:"SAC FLY",sacbunt:"SAC BUNT",walk:"WALK",hbp:"HIT BY PITCH",strikeout:"STRIKEOUT"};
@@ -1281,7 +1282,11 @@ function render(){
       ${mode==="idle"?wideBtn("home","⌂ Home")+wideBtn("lineup","Lineup")+wideBtn("endgame","End",`color:${T.out};border-color:${T.out}`):""}
     </div>`;
   let body;
-  if(wide && monitorOn){
+  if(wide && viewMode==="viewer"){
+    // Viewer: maximum video + scorebug, no scoring tools (use the monitor's
+    // fullscreen control for true full screen).
+    body=`<div style="flex:1;min-height:0;display:flex;flex-direction:column">${monitorPane()}</div>`;
+  } else if(wide && monitorOn){
     body=`<div id="console-row" style="flex:1;min-height:0;display:flex;flex-direction:row;gap:12px">
         <div id="mon-col" style="flex:0 0 64%;max-width:64%;min-width:0;min-height:0;display:flex;flex-direction:column;gap:10px">
           ${monitorPane()}${wideBar}
@@ -1295,10 +1300,10 @@ function render(){
     // decisions get the rest of the width — more room, less scrolling.
     body=`<div id="console-row" class="video-off" style="flex:1;min-height:0;display:flex;flex-direction:row;gap:12px">
         <div style="flex:0 0 46%;max-width:46%;min-width:0;min-height:0;display:flex;flex-direction:column;gap:8px">
-          ${miniCount()}${batterCard()}<div style="flex:1;min-height:0;display:flex;align-items:center;justify-content:center;position:relative">${diamondSVG()}${toastEl}</div>${wideBar}
+          ${miniCount()}${batterCard()}<div style="flex:1;min-height:0;display:flex;align-items:center;justify-content:center;position:relative">${diamondSVG()}${toastEl}</div>
         </div>
         <div style="flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;gap:8px">
-          ${actionEl}
+          ${actionEl}${wideBar}
         </div>
       </div>`;
   } else {
@@ -1361,6 +1366,12 @@ document.getElementById("app").addEventListener("click",e=>{
     monitorOn=!monitorOn;
     try{localStorage.setItem("al-monitor-on", monitorOn?"1":"0");}catch(e){}
     render();   // re-emits the layout from monitorOn (collapsed col + mini score, or full monitor)
+    return;
+  }
+  if(act==="role"){
+    viewMode=arg;
+    try{localStorage.setItem("al-view-mode",viewMode);}catch(e){}
+    renderToolbar(); render();
     return;
   }
   if(act==="fullscreen"){ const m=document.getElementById("monitor"); const r=m&&(m.requestFullscreen||m.webkitRequestFullscreen); if(r)r.call(m); return; }
@@ -1440,9 +1451,15 @@ document.getElementById("app").addEventListener("click",e=>{
 function renderToolbar(){
   const tb=document.getElementById("toolbar"); if(!tb)return;
   const inGame=!["home","teams","team","pickteam"].includes(mode);
-  const chip=inGame
-    ? `${OUR.short||"US"} <span style="color:${T.sageDim};font-weight:600">vs</span> ${OPP.short||"OPP"}`
-    : `ALL-STARS <span style="color:${T.lime}">LIVE</span>`;
+  const playMode2=!["home","teams","team","pickteam","newgame","lineup","pickplayer","pickpos","editplayer","summary"].includes(mode);
+  // In a live game the title slot becomes the Scorer/Viewer role toggle (the matchup
+  // already shows in the scorebug below — no need to repeat it here).
+  const roleSeg=(r,lbl)=>`<button data-act="role" data-arg="${r}" style="padding:8px 14px;border:none;font-family:${MONO};font-weight:800;font-size:13px;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;background:${viewMode===r?T.lime:"transparent"};color:${viewMode===r?T.field:T.sage}">${lbl}</button>`;
+  const chip=playMode2
+    ? `<div style="display:inline-flex;background:${T.surface};border:1px solid ${T.line};border-radius:10px;overflow:hidden">${roleSeg("scorer","Scorer")}${roleSeg("viewer","Viewer")}</div>`
+    : inGame
+      ? `${OUR.short||"US"} <span style="color:${T.sageDim};font-weight:600">vs</span> ${OPP.short||"OPP"}`
+      : `ALL-STARS <span style="color:${T.lime}">LIVE</span>`;
   const conn=LINK.connected(), hasRelay=LINK.hasRelay();
   const dot = !hasRelay ? {c:T.sageDim,l:"LOCAL"} : conn ? {c:T.safe,l:"LIVE"} : {c:T.out,l:"OFFLINE"};
   // Wide-only: slide the video monitor in/out for distraction-free scoring.
