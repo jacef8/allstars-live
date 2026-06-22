@@ -77,6 +77,10 @@ private class ScorerBridge(private val appContext: Context) {
     @JavascriptInterface
     fun stopStream() { main.post { Broadcast.stop() } }
 
+    /** The web tells us when a game/console is on screen (vs the menus). */
+    @JavascriptInterface
+    fun setInGame(inGame: Boolean) { com.libertyclerk.allstarslive.AppUi.setInGame(inGame) }
+
     /** Open a link (e.g. the YouTube watch page) in the external app/browser. */
     @JavascriptInterface
     fun openExternal(url: String) {

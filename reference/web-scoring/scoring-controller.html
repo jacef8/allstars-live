@@ -1197,6 +1197,7 @@ function isWide(){return window.innerWidth>=760 && window.innerWidth>window.inne
 function render(){
   renderToolbar();
   const menu=(mode==="home"||mode==="teams"||mode==="team"||mode==="pickteam"||mode==="newgame"||mode==="lineup"||mode==="pickplayer"||mode==="pickpos"||mode==="editplayer"||mode==="summary");
+  if(IS_APP&&window.AllStars.setInGame){ try{ AllStars.setInGame(!menu); }catch(e){} }   // hide native tabs during a game
   if(menu){
     const scroll=mode!=="lineup";
     document.getElementById("content").innerHTML=`<div class="${mode!==_lastMode?"screen-in":""}" style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px;${scroll?"overflow-y:auto;-webkit-overflow-scrolling:touch":""}">${actionArea()}</div>`;
@@ -1243,14 +1244,24 @@ function render(){
       ${mode==="idle"?wideBtn("home","⌂ Home")+wideBtn("lineup","Lineup")+wideBtn("endgame","End",`color:${T.out};border-color:${T.out}`):""}
     </div>`;
   let body;
-  if(wide){
-    const monColCollapsed=";flex-basis:0;max-width:0;min-width:0;opacity:0;margin-right:-12px;overflow:hidden;pointer-events:none";
-    body=`<div id="console-row"${monitorOn?"":" class=\"video-off\""} style="flex:1;min-height:0;display:flex;flex-direction:row;gap:12px">
-        <div id="mon-col" style="flex:0 0 60%;max-width:60%;min-width:0;min-height:0;display:flex;flex-direction:column;justify-content:center;gap:10px${monitorOn?"":monColCollapsed}">
+  if(wide && monitorOn){
+    body=`<div id="console-row" style="flex:1;min-height:0;display:flex;flex-direction:row;gap:12px">
+        <div id="mon-col" style="flex:0 0 60%;max-width:60%;min-width:0;min-height:0;display:flex;flex-direction:column;justify-content:center;gap:10px">
           ${monitorPane()}${wideBar}
         </div>
         <div style="flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;gap:8px">
           ${miniCount()}${batterCard()}${fieldEl}${actionEl}
+        </div>
+      </div>`;
+  } else if(wide){
+    // Video hidden: the field takes the space the video had (left), and the scoring
+    // decisions get the rest of the width — more room, less scrolling.
+    body=`<div id="console-row" class="video-off" style="flex:1;min-height:0;display:flex;flex-direction:row;gap:12px">
+        <div style="flex:0 0 46%;max-width:46%;min-width:0;min-height:0;display:flex;flex-direction:column;gap:8px">
+          ${miniCount()}${batterCard()}${fieldEl}${wideBar}
+        </div>
+        <div style="flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;gap:8px">
+          ${actionEl}
         </div>
       </div>`;
   } else {

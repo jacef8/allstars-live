@@ -26,6 +26,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Scoreboard
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Videocam
@@ -90,11 +91,18 @@ class MainActivity : ComponentActivity() {
                 val ctx = androidx.compose.ui.platform.LocalContext.current
                 // Created once + kept alive so switching tabs doesn't reload a live game.
                 val scorerWeb = androidx.compose.runtime.remember { createScorerWebView(ctx) }
+                // During a game the tabs are seldom used — hide the bar and tuck it behind a
+                // small floating "Menu" toggle so the scorer/video get the full screen.
+                val inGame by AppUi.inGame.collectAsStateWithLifecycle()
+                var tabsOpen by rememberSaveable { mutableStateOf(false) }
+                val hideTabs = tabs[tabIndex] == Tab.GAME && inGame && !tabsOpen
 
                 Box(Modifier.fillMaxSize()) {
                     Scaffold(
                         containerColor = MaterialTheme.colorScheme.background,
-                        bottomBar = { AllStarsBottomBar(tabs, tabIndex, onSelect = { tabIndex = it }) },
+                        bottomBar = {
+                            if (!hideTabs) AllStarsBottomBar(tabs, tabIndex, onSelect = { tabsOpen = false; tabIndex = it })
+                        },
                     ) { inner ->
                         Box(Modifier.fillMaxSize().padding(inner)) {
                             when (tabs[tabIndex]) {
@@ -103,6 +111,14 @@ class MainActivity : ComponentActivity() {
                                 Tab.SETTINGS -> SettingsScreen()
                             }
                         }
+                    }
+
+                    // Floating toggle to bring the tab bar back during a game.
+                    if (hideTabs) {
+                        TabsPeekButton(
+                            onClick = { tabsOpen = true },
+                            modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 6.dp),
+                        )
                     }
 
                     // App-level "Start game stream" dialog — raised from the Video tab
@@ -170,6 +186,24 @@ private fun AllStarsBottomBar(tabs: List<Tab>, selected: Int, onSelect: (Int) ->
                 }
             }
         }
+    }
+}
+
+/** Small floating pill shown during a game to reveal the hidden tab bar. */
+@Composable
+private fun TabsPeekButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Row(
+        modifier
+            .clip(RoundedCornerShape(999.dp))
+            .background(NavBarColor)
+            .border(1.dp, NavHairline, RoundedCornerShape(999.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(7.dp),
+    ) {
+        Icon(Icons.Filled.KeyboardArrowUp, contentDescription = "Show tabs", tint = Sage, modifier = Modifier.size(18.dp))
+        Text("Menu", color = Sage, fontWeight = FontWeight.Bold, fontSize = 13.sp)
     }
 }
 
