@@ -835,9 +835,24 @@ function actionArea(){
     // Wide (tablet): two columns so the key actions fit without scrolling — only a long
     // team list scrolls, inside its own column. Narrow (phone): the classic vertical stack.
     if(isWide()){
-      return `<div style="flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr;gap:16px;align-content:center">
-          <div style="display:flex;flex-direction:column;gap:14px;justify-content:center;min-width:0">${hero}${resumeBtn}${newGameBtn}</div>
-          <div style="display:flex;flex-direction:column;gap:10px;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch">${teamsBlock}${manageBtn}</div>
+      // Title full-width on top; two equal tiles fill the rest evenly (no scrolling).
+      const tile=(act,label,bg,fg,svg,sub)=>`<button data-act="${act}" style="flex:1;min-height:0;width:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:${bg};color:${fg};border:none;border-radius:16px;cursor:pointer;box-shadow:0 8px 22px rgba(0,0,0,.35)">
+          <svg viewBox="0 0 24 24" width="42" height="42" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${svg}</svg>
+          <span style="font-family:${MONO};font-weight:800;font-size:27px;letter-spacing:.6px">${label}</span>
+          ${sub?`<span style="font-size:13px;font-weight:600;opacity:.85">${sub}</span>`:""}</button>`;
+      const newTile=tile('newgamestart','New Game',T.lime,T.field,'<path d="M8 5l11 7-11 7z" fill="currentColor" stroke="none"/>','Score + stream a game');
+      const manageTile=tile('gototeams','Manage Teams',T.surface2,T.ink,'<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>','Rosters · records · stats');
+      const rightCell = DB.teams.length
+        ? `<div style="display:flex;flex-direction:column;gap:10px;min-height:0">
+             <div style="flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;display:flex;flex-direction:column;gap:10px">${teamsBlock}</div>
+             ${manageBtn}</div>`
+        : manageTile;
+      return `<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:14px">
+          ${hero}
+          <div style="flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr;gap:14px">
+            <div style="display:flex;flex-direction:column;gap:14px;min-height:0">${resumeBtn}${newTile}</div>
+            <div style="display:flex;flex-direction:column;min-height:0">${rightCell}</div>
+          </div>
         </div>`;
     }
     return `<div style="display:flex;flex-direction:column;gap:14px">${hero}${resumeBtn}${newGameBtn}${teamsBlock}${manageBtn}</div>`;
@@ -1248,9 +1263,9 @@ function render(){
   // Wide (tablet): a single compact row under a BIGGER monitor — instead of a full-width
   // Share button plus a separate controls row stacked beneath, which crowded the player.
   const wideBtn=(act,label,extra)=>`<button data-act="${act}" style="background:${T.surface2};border:1px solid ${T.line};color:${T.chalk};border-radius:9px;padding:10px 13px;font-family:${SANS};font-size:14px;font-weight:700;white-space:nowrap;${extra||""}">${label}</button>`;
-  const wideBar=playing?"":`<div style="display:flex;gap:8px;align-items:center;flex:none">
-      <button data-act="share" style="flex:1;min-width:0;background:${T.surface2};border:2px solid ${T.line};color:${T.chalk};border-radius:9px;padding:11px;font-family:${SANS};font-size:15px;font-weight:800;display:flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="${T.lime}" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="19" r="2.6"/><path d="M8.3 10.8 15.7 6.4M8.3 13.2l7.4 4.4"/></svg>Share</button>
+  const wideBar=playing?"":`<div style="display:flex;gap:8px;align-items:center;flex:none;flex-wrap:wrap">
+      <button data-act="share" style="display:flex;align-items:center;gap:7px;background:${T.surface2};border:1px solid ${T.line};color:${T.chalk};border-radius:9px;padding:10px 13px;font-family:${SANS};font-size:14px;font-weight:700;white-space:nowrap">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${T.lime}" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="19" r="2.6"/><path d="M8.3 10.8 15.7 6.4M8.3 13.2l7.4 4.4"/></svg>Share</button>
       ${wideBtn("undo","↶ Undo")}
       ${mode==="idle"?wideBtn("home","⌂ Home")+wideBtn("lineup","Lineup")+wideBtn("endgame","End",`color:${T.out};border-color:${T.out}`):""}
     </div>`;
