@@ -456,6 +456,7 @@ const LINK=(()=>{
   };
 })();
 let _seq=0,_event=null,_eventId=0,_pitch=null;
+let phonePane="score";   // phone-only paging: "score" | "video" (large screens show both)
 const PLAYHEAD={single:"SINGLE",double:"DOUBLE",triple:"TRIPLE",hr:"HOME RUN",error:"REACHED ON ERROR",
   fc:"FIELDER'S CHOICE",out1:"GROUND OUT",flyout:"FLY OUT",lineout:"LINE OUT",popout:"POP OUT",
   dp:"DOUBLE PLAY",sacfly:"SAC FLY",sacbunt:"SAC BUNT",walk:"WALK",hbp:"HIT BY PITCH",strikeout:"STRIKEOUT"};
@@ -684,12 +685,21 @@ function monitorPane(){
         <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="${T.sageDim}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
         <div style="font-family:${MONO};font-weight:800;letter-spacing:2px;font-size:14px;color:${T.sage}">CAMERA FEED</div>
         <div style="font-size:11px;color:${T.sageDim};max-width:250px;line-height:1.45">Your broadcast monitor — what streams to YouTube with the scorebug burned in.</div></div>`;
-  return `<div style="position:relative;width:100%;aspect-ratio:16/9;background:#0b0f15;border:2px solid ${T.line};border-radius:14px;overflow:hidden;flex:none;box-shadow:0 6px 22px rgba(0,0,0,.4)">
+  const monBtn="width:32px;height:32px;border-radius:8px;background:rgba(8,11,16,.6);border:1px solid rgba(255,255,255,.2);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer";
+  const fsIcon=`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>`;
+  const ytIcon=`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M9 7h8v8"/></svg>`;
+  const ctrls=yt
+    ? `<div style="position:absolute;top:9px;right:10px;display:flex;gap:6px;z-index:3">
+        <button data-act="ytopen" title="Open in YouTube" style="${monBtn}">${ytIcon}</button>
+        <button data-act="fullscreen" title="Fullscreen" style="${monBtn}">${fsIcon}</button></div>`
+    : "";
+  return `<div id="monitor" style="position:relative;width:100%;aspect-ratio:16/9;background:#0b0f15;border:2px solid ${T.line};border-radius:14px;overflow:hidden;flex:none;box-shadow:0 6px 22px rgba(0,0,0,.4)">
       ${feed}
-      <div style="position:absolute;top:9px;left:10px;display:flex;align-items:center;gap:6px;background:rgba(8,11,16,.62);border-radius:999px;padding:4px 11px">
+      <div style="position:absolute;top:9px;left:10px;display:flex;align-items:center;gap:6px;background:rgba(8,11,16,.62);border-radius:999px;padding:4px 11px;z-index:3">
         <span style="width:8px;height:8px;border-radius:50%;background:${T.live};box-shadow:0 0 8px ${T.live}"></span>
         <span style="font-family:${MONO};font-weight:800;font-size:11px;letter-spacing:1.6px;color:#fff">LIVE</span></div>
-      <div style="position:absolute;left:8px;right:8px;bottom:8px">${statusBar()}</div>
+      ${ctrls}
+      <div style="position:absolute;left:8px;right:8px;bottom:8px;z-index:2;pointer-events:none">${statusBar()}</div>
     </div>`;
 }
 
@@ -1139,24 +1149,37 @@ function render(){
       ${mode==="idle"?`<button data-act="home" style="background:${T.surface};border:1px solid ${T.line};color:${T.chalk};border-radius:8px;padding:7px 12px;font-size:13px;font-weight:700">⌂ Home</button>
       <button data-act="lineup" style="background:${T.surface2};border:1px solid ${T.line};color:${T.chalk};border-radius:8px;padding:7px 13px;font-size:13px;font-weight:700">Lineup</button>
       <button data-act="endgame" style="background:transparent;border:1px solid ${T.out};color:${T.out};border-radius:8px;padding:7px 12px;font-size:13px;font-weight:700">End game</button>`:""}</div>`;
-  // All-in-one console: broadcast monitor (with scorebug) beside the scoring tools.
-  // Side-by-side on the tablet (landscape), stacked on a phone. The scorebug lives
-  // on the monitor — the scorer column carries the batter + field + controls.
+  // All-in-one console. Large screen (tablet/PC, wide) = monitor + scorebug BESIDE the
+  // scoring tools on one page. Phone (narrow) = too small for both, so PAGE between a
+  // Video page and a Scoring page with a toggle (phonePane).
   const controls=footer;   // undo + (idle: home/lineup/endgame); empty during transient picker steps
   const shareBtn=`<button data-act="share" style="${bigBtn(T.surface2,"border:2px solid "+T.line+";font-size:16px",T.chalk)}">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="${T.lime}" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="19" r="2.6"/><path d="M8.3 10.8 15.7 6.4M8.3 13.2l7.4 4.4"/></svg>Share with fans</button>`;
-  const monitorCol=`<div style="${wide?"flex:0 0 47%;max-width:47%":"flex:none"};min-height:0;display:flex;flex-direction:column;gap:10px">
-      ${monitorPane()}
-      ${wide?`<div style="flex:1;min-height:0;display:flex;flex-direction:column;justify-content:flex-end;gap:9px">${shareBtn}${controls}</div>`:""}</div>`;
-  const scorerCol=`<div style="flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;gap:8px">
-      ${batterCard()}
-      <div style="${fieldStyle};display:flex;align-items:center;justify-content:center;position:relative">${diamondSVG()}${toastEl}</div>
-      ${pickerModal?"":`<div id="action-area" style="display:flex;flex-direction:column;gap:8px;${actionStyle}">${actionArea()}</div>`}
-      ${wide?"":controls}</div>`;
+  const fieldEl=`<div style="${fieldStyle};display:flex;align-items:center;justify-content:center;position:relative">${diamondSVG()}${toastEl}</div>`;
+  const actionEl=pickerModal?"":`<div id="action-area" style="display:flex;flex-direction:column;gap:8px;${actionStyle}">${actionArea()}</div>`;
+  let body;
+  if(wide){
+    body=`<div style="flex:1;min-height:0;display:flex;flex-direction:row;gap:10px">
+        <div style="flex:0 0 47%;max-width:47%;min-height:0;display:flex;flex-direction:column;gap:10px">
+          ${monitorPane()}
+          <div style="flex:1;min-height:0;display:flex;flex-direction:column;justify-content:flex-end;gap:9px">${shareBtn}${controls}</div>
+        </div>
+        <div style="flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;gap:8px">
+          ${batterCard()}${fieldEl}${actionEl}
+        </div>
+      </div>`;
+  } else {
+    const tab=(id,label)=>`<button data-act="pane" data-arg="${id}" style="flex:1;background:${phonePane===id?T.lime:T.surface};border:2px solid ${phonePane===id?T.lime:T.line};color:${phonePane===id?T.field:T.sage};border-radius:10px;padding:9px;font-family:${MONO};font-weight:800;font-size:14px;letter-spacing:.6px;text-transform:uppercase">${label}</button>`;
+    const pane=phonePane==="video"
+      ? `<div style="flex:1;min-height:0;display:flex;flex-direction:column;justify-content:center;gap:11px">${monitorPane()}${shareBtn}</div>`
+      : `<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px">${statusBar()}${batterCard()}${fieldEl}${actionEl}${controls}</div>`;
+    body=`<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:9px">
+        <div style="display:flex;gap:8px;flex:none">${tab("score","● Scoring")}${tab("video","▶ Video")}</div>
+        ${pane}
+      </div>`;
+  }
   document.getElementById("content").innerHTML=`
-    <div style="flex:1;min-height:0;display:flex;${wide?"flex-direction:row":"flex-direction:column"};gap:10px">
-      ${monitorCol}${scorerCol}
-    </div>${confirmOverlay()}
+    ${body}${confirmOverlay()}
     ${pickerModal?`<div style="${sheetWrap}">
         <div id="action-area" style="${sheetCard};overflow-y:auto;-webkit-overflow-scrolling:touch;background:${T.surface};padding:16px;display:flex;flex-direction:column;gap:8px">${actionArea()}</div></div>`:""}`;
   animateStatusBar();
@@ -1200,6 +1223,9 @@ document.getElementById("app").addEventListener("click",e=>{
   }
   const el=e.target.closest("[data-act]"); if(!el)return;
   const act=el.dataset.act,arg=el.dataset.arg;
+  if(act==="pane"){ phonePane=arg; render(); return; }
+  if(act==="fullscreen"){ const m=document.getElementById("monitor"); const r=m&&(m.requestFullscreen||m.webkitRequestFullscreen); if(r)r.call(m); return; }
+  if(act==="ytopen"){ const ytv=new URLSearchParams(location.search).get("yt"); if(ytv)window.open("https://www.youtube.com/watch?v="+encodeURIComponent(ytv),"_blank","noopener"); return; }
   if(act==="ball"||act==="strike"||act==="foul")pitch(act);
   else if(act==="inplay")startInPlay();
   else if(act==="walk")manual("walk","Walk");
