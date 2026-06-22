@@ -54,6 +54,27 @@ object YouTubeLive {
         return Live(key, broadcastId, "https://www.youtube.com/watch?v=$broadcastId")
     }
 
+    /** Broadcast lifecycle: created → ready → (testing) → live → complete. Blocking. */
+    fun lifeCycleStatus(token: String, broadcastId: String): String {
+        val json = get(token, "liveBroadcasts?part=status&id=$broadcastId")
+        val items = json.optJSONArray("items") ?: return ""
+        if (items.length() == 0) return ""
+        return items.getJSONObject(0).optJSONObject("status")?.optString("lifeCycleStatus") ?: ""
+    }
+
+    private fun get(token: String, path: String): JSONObject {
+        val conn = (URL("https://www.googleapis.com/youtube/v3/$path").openConnection() as HttpURLConnection).apply {
+            requestMethod = "GET"
+            setRequestProperty("Authorization", "Bearer $token")
+            connectTimeout = 15000; readTimeout = 20000
+        }
+        val code = conn.responseCode
+        val resp = (if (code in 200..299) conn.inputStream else conn.errorStream)
+            ?.bufferedReader()?.use { it.readText() } ?: ""
+        if (code !in 200..299) throw RuntimeException("YouTube GET ${path.substringBefore('?')} → $code: ${resp.take(180)}")
+        return if (resp.isBlank()) JSONObject() else JSONObject(resp)
+    }
+
     private fun api(token: String, path: String, body: JSONObject?): JSONObject {
         val conn = (URL("https://www.googleapis.com/youtube/v3/$path").openConnection() as HttpURLConnection).apply {
             requestMethod = "POST"

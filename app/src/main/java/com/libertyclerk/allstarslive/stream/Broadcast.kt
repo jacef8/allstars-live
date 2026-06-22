@@ -75,7 +75,7 @@ object Broadcast {
                 }
                 Thread {
                     runCatching { YouTubeLive.startBroadcast(token, title.ifBlank { "All-Stars Live" }, privacy) }
-                        .onSuccess { live -> main.post { beginPush(comp, live) } }
+                        .onSuccess { live -> main.post { beginPush(comp, live, token) } }
                         .onFailure { e ->
                             Log.e(TAG, "broadcast setup failed", e)
                             main.post { _state.value = _state.value.copy(phase = Phase.ERROR, status = "YouTube setup failed: ${e.message}") }
@@ -85,12 +85,15 @@ object Broadcast {
             .addOnFailureListener { _state.value = _state.value.copy(phase = Phase.ERROR, status = "YouTube sign-in failed: ${it.message}") }
     }
 
-    private fun beginPush(comp: VideoCompositor, live: YouTubeLive.Live) {
+    private fun beginPush(comp: VideoCompositor, live: YouTubeLive.Live, token: String) {
         val s = YouTubeStreamer(PROG_W, PROG_H, onStatus = { status ->
             main.post {
                 val cur = _state.value
                 _state.value = when {
-                    status == "LIVE" -> cur.copy(phase = Phase.LIVE, status = "LIVE")
+                    // RTMP connected — but DON'T flip to LIVE yet; YouTube takes a bit to
+                    // actually transition the broadcast. The poll below flips us to LIVE so
+                    // the monitor doesn't embed early (that's the error-153 flash).
+                    status == "LIVE" -> cur.copy(status = "Streaming — waiting for YouTube…")
                     status.startsWith("Failed") || status.startsWith("Auth") -> cur.copy(phase = Phase.ERROR, status = status)
                     else -> cur.copy(status = status)
                 }
@@ -99,7 +102,6 @@ object Broadcast {
         comp.setEncoderSurface(s.inputSurface, PROG_W, PROG_H) { s.drain() }
         s.start("rtmp://a.rtmp.youtube.com/live2/${live.streamKey}")
         streamer = s
-        // Video id is known now, so the monitor can load it even before the encoder fully connects.
         _state.value = _state.value.copy(
             phase = Phase.STARTING,
             videoId = live.broadcastId,
@@ -107,6 +109,21 @@ object Broadcast {
             status = "Connecting…",
         )
         Log.i(TAG, "pushing to YouTube: ${live.watchUrl}")
+
+        // Poll YouTube until the broadcast is actually live, THEN embed in the monitor.
+        Thread {
+            var tries = 0
+            while (isActive && tries < 40) {     // ~2 min
+                try { Thread.sleep(3000) } catch (_: InterruptedException) { return@Thread }
+                tries++
+                val st = runCatching { YouTubeLive.lifeCycleStatus(token, live.broadcastId) }.getOrNull() ?: continue
+                Log.i(TAG, "broadcast lifeCycle=$st")
+                when (st) {
+                    "live" -> { main.post { if (isActive) _state.value = _state.value.copy(phase = Phase.LIVE, status = "LIVE") }; return@Thread }
+                    "complete", "revoked" -> return@Thread
+                }
+            }
+        }.start()
     }
 
     /** End the broadcast — detach the encoder from the (still-running) camera compositor. */
