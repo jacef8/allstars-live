@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -86,8 +87,12 @@ fun SrtIngestScreen(onUseTestPattern: () -> Unit = {}) {
         Modifier
             .fillMaxSize()
             .background(Color.Black)
-            // Hidden setup access for admins: long-press anywhere on the screen.
-            .pointerInput(Unit) { detectTapGestures(onLongPress = { showSetup = true }) },
+            // Hidden setup access for admins: long-press anywhere — but NOT while the
+            // setup sheet is open, or it steals taps/focus from the text fields.
+            .then(
+                if (showSetup) Modifier
+                else Modifier.pointerInput(Unit) { detectTapGestures(onLongPress = { showSetup = true }) },
+            ),
         contentAlignment = Alignment.Center,
     ) {
         AndroidView(
@@ -179,7 +184,7 @@ private fun CameraSetupSheet(
     onConnect: () -> Unit, onClose: () -> Unit,
 ) {
     Box(
-        Modifier.fillMaxSize().background(Color(0xCC05080C)).clickable(onClick = onClose),
+        Modifier.fillMaxSize().background(Color(0xCC05080C)).clickable(onClick = onClose).imePadding(),
         contentAlignment = Alignment.Center,
     ) {
         Column(
@@ -189,8 +194,8 @@ private fun CameraSetupSheet(
                 .background(Color(0xFF141A22), RoundedCornerShape(16.dp))
                 .padding(20.dp)
                 .verticalScroll(rememberScrollState())
-                // Swallow taps so clicking inside the card doesn't close it.
-                .clickable(enabled = false) {},
+                // Swallow taps so tapping inside the card doesn't close it (must be enabled to consume).
+                .pointerInput(Unit) { detectTapGestures { } },
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text("Camera setup", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
