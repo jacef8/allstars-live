@@ -86,6 +86,11 @@ dependencies {
     // (libVLC removed — its Android build has no SRT module. SRT ingest is the
     //  native libsrt route under app/src/main/cpp.)
 
+    // M3: RTMP push to YouTube Live (RootEncoder's RTMP client, fed by our encoder).
+    // The "-1.8.22" build targets Kotlin 1.8.22 (our 1.9.10 compiler reads it) and
+    // compileSdk 34 — plain 2.5.9 needs Kotlin 2.1, and 2.6+/2.7+ need compileSdk 35/36.
+    implementation("com.github.pedroSG94.RootEncoder:library:2.5.4-1.8.22")
+
     debugImplementation("androidx.compose.ui:ui-tooling")
 }
 
