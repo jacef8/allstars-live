@@ -1,39 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp" android:height="108dp"
     android:viewportWidth="108" android:viewportHeight="108">
 
-    <!-- grounding shadow under the ball -->
-    <path android:fillColor="#33000000"
-        android:pathData="M24,56 a30,30 0 1,0 60,0 a30,30 0 1,0 -60,0"/>
+    <!-- glowing red ring (faint outer + bold main) -->
+    <path android:strokeColor="#FF4458" android:strokeWidth="2" android:strokeAlpha="0.35" android:fillColor="#00000000"
+        android:pathData="M18.5,54 a35.5,35.5 0 1,0 71,0 a35.5,35.5 0 1,0 -71,0"/>
+    <path android:strokeColor="#FF4458" android:strokeWidth="4.5" android:fillColor="#00000000"
+        android:pathData="M22,54 a32,32 0 1,0 64,0 a32,32 0 1,0 -64,0"/>
 
-    <!-- baseball: white with a subtle vertical sheen -->
-    <path android:pathData="M24,54 a30,30 0 1,0 60,0 a30,30 0 1,0 -60,0">
-        <aapt:attr name="android:fillColor">
-            <gradient android:type="linear"
-                android:startX="54" android:startY="24" android:endX="54" android:endY="84"
-                android:startColor="#FFFFFFFF" android:endColor="#FFE6E9EF"/>
-        </aapt:attr>
-    </path>
+    <!-- lime star (apex of the A) -->
+    <path android:fillColor="#A3E635"
+        android:pathData="M54,26 L57.29,35.47 L67.31,35.67 L59.33,41.73 L62.23,51.33 L54,45.6 L45.77,51.33 L48.67,41.73 L40.69,35.67 L50.71,35.47 Z"/>
 
-    <!-- left seam -->
-    <path android:strokeColor="#D8443B" android:strokeWidth="3" android:fillColor="#00000000"
-        android:strokeLineCap="round"
-        android:pathData="M42,26 Q27,54 42,82"/>
-    <!-- right seam -->
-    <path android:strokeColor="#D8443B" android:strokeWidth="3" android:fillColor="#00000000"
-        android:strokeLineCap="round"
-        android:pathData="M66,26 Q81,54 66,82"/>
-
-    <!-- left stitches (chevrons pointing toward center) -->
-    <group>
-        <path android:strokeColor="#E2574C" android:strokeWidth="2.2" android:strokeLineCap="round" android:fillColor="#00000000"
-            android:pathData="M35,30 l6,2 M34,40 l6,2 M33.5,50 l6,1.5 M33.5,58 l6,-1.5 M34,68 l6,-2 M35,78 l6,-2"/>
-    </group>
-    <!-- right stitches -->
-    <group>
-        <path android:strokeColor="#E2574C" android:strokeWidth="2.2" android:strokeLineCap="round" android:fillColor="#00000000"
-            android:pathData="M73,30 l-6,2 M74,40 l-6,2 M74.5,50 l-6,1.5 M74.5,58 l-6,-1.5 M74,68 l-6,-2 M73,78 l-6,-2"/>
-    </group>
+    <!-- A monogram: two legs, crossbar, and a speed swoosh — lime -->
+    <path android:strokeColor="#A3E635" android:strokeWidth="7" android:strokeLineCap="round" android:strokeLineJoin="round" android:fillColor="#00000000"
+        android:pathData="M49,50 L39,76"/>
+    <path android:strokeColor="#A3E635" android:strokeWidth="7" android:strokeLineCap="round" android:strokeLineJoin="round" android:fillColor="#00000000"
+        android:pathData="M59,50 Q69,64 62,76"/>
+    <path android:strokeColor="#A3E635" android:strokeWidth="6" android:strokeLineCap="round" android:fillColor="#00000000"
+        android:pathData="M45,64 L61,64"/>
+    <path android:strokeColor="#B8F24A" android:strokeWidth="4" android:strokeLineCap="round" android:strokeAlpha="0.92" android:fillColor="#00000000"
+        android:pathData="M60,44 Q79,56 66,74"/>
 </vector>
