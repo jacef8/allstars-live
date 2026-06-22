@@ -10,9 +10,9 @@
 <style>
   :root{
     /* GroundLink-style dark theme: charcoal base, navy + lime-green accents. */
-    --field:#10141A; --ink:#EAEDF2; --surface:#1B212B; --surface2:#262E3A; --line:#41506A;
-    --clay:#C97B3C; --chalk:#EAEDF2; --grass:#1F5C3A; --grassLt:#2C7D4E;
-    --safe:#3FB950; --out:#F0513A; --sage:#B6C2D6; --sageDim:#8E9BB2; --amber:#E0A33A;
+    --field:#10141A; --ink:#F2F5FA; --surface:#212A38; --surface2:#324056; --line:#6A7EA6;
+    --clay:#E0974F; --chalk:#F2F5FA; --grass:#1F5C3A; --grassLt:#2C7D4E;
+    --safe:#4ED070; --out:#FF6B52; --sage:#CFDAEC; --sageDim:#AEBBD4; --amber:#F0B43E;
     --live:#FF3B5C; --navy:#1D3A66; --lime:#A3E635;
     --mono:"Saira Condensed",system-ui,-apple-system,sans-serif;
     --sans:"Barlow",system-ui,-apple-system,sans-serif;
@@ -141,9 +141,9 @@
 /* ----------------------------------------------------------------------
    Field-as-input baseball scoring controller — interaction prototype
 ---------------------------------------------------------------------- */
-const T={field:"#10141A",ink:"#EAEDF2",surface:"#1B212B",surface2:"#262E3A",line:"#41506A",
-  clay:"#C97B3C",chalk:"#EAEDF2",grass:"#1F5C3A",grassLt:"#2C7D4E",safe:"#3FB950",
-  out:"#F0513A",sage:"#B6C2D6",sageDim:"#8E9BB2",amber:"#E0A33A",live:"#FF3B5C",
+const T={field:"#10141A",ink:"#F2F5FA",surface:"#212A38",surface2:"#324056",line:"#6A7EA6",
+  clay:"#E0974F",chalk:"#F2F5FA",grass:"#1F5C3A",grassLt:"#2C7D4E",safe:"#4ED070",
+  out:"#FF6B52",sage:"#CFDAEC",sageDim:"#AEBBD4",amber:"#F0B43E",live:"#FF3B5C",
   navy:"#1D3A66",lime:"#A3E635"};
 const FIELDLINE="#F4F8FC";  // white chalk for the field graphic (stays light on the green diamond)
 const MONO="'Saira Condensed',system-ui,-apple-system,sans-serif";  // condensed display — scoreboard numbers & headers
@@ -1283,9 +1283,18 @@ function render(){
     </div>`;
   let body;
   if(wide && viewMode==="viewer"){
-    // Viewer: maximum video + scorebug, no scoring tools (use the monitor's
-    // fullscreen control for true full screen).
-    body=`<div style="flex:1;min-height:0;display:flex;flex-direction:column">${monitorPane()}</div>`;
+    // Viewer: watch the game with NO scoring tools. Video + the digital ball field /
+    // pitch-&-hit feed side by side; "Hide video" minimizes the feed so the field fills.
+    const feedPane=`<div style="flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;gap:8px">
+        ${miniCount()}${batterCard()}
+        <div style="flex:1;min-height:0;display:flex;align-items:center;justify-content:center;position:relative">${diamondSVG()}${toastEl}</div>
+      </div>`;
+    body=monitorOn
+      ? `<div style="flex:1;min-height:0;display:flex;flex-direction:row;gap:12px">
+          <div style="flex:0 0 55%;max-width:55%;min-width:0;min-height:0;display:flex;flex-direction:column">${monitorPane()}</div>
+          ${feedPane}
+        </div>`
+      : `<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px">${feedPane}</div>`;
   } else if(wide && monitorOn){
     body=`<div id="console-row" style="flex:1;min-height:0;display:flex;flex-direction:row;gap:12px">
         <div id="mon-col" style="flex:0 0 64%;max-width:64%;min-width:0;min-height:0;display:flex;flex-direction:column;gap:10px">
