@@ -1198,6 +1198,11 @@ function render(){
   renderToolbar();
   const menu=(mode==="home"||mode==="teams"||mode==="team"||mode==="pickteam"||mode==="newgame"||mode==="lineup"||mode==="pickplayer"||mode==="pickpos"||mode==="editplayer"||mode==="summary");
   if(IS_APP&&window.AllStars.setInGame){ try{ AllStars.setInGame(!menu); }catch(e){} }   // hide native tabs during a game
+  // Push the live score to the native compositor so it's burned into the broadcast.
+  if(IS_APP&&!menu&&window.AllStars.setScore){ try{
+    AllStars.setScore(TEAMS.away.short||"AWAY", TEAMS.home.short||"HOME",
+      G.away|0, G.home|0, G.inning|0, G.half==="T", G.balls|0, G.strikes|0, G.outs|0);
+  }catch(e){} }
   if(menu){
     const scroll=mode!=="lineup";
     document.getElementById("content").innerHTML=`<div class="${mode!==_lastMode?"screen-in":""}" style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px;${scroll?"overflow-y:auto;-webkit-overflow-scrolling:touch":""}">${actionArea()}</div>`;

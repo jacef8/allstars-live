@@ -18,6 +18,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.libertyclerk.allstarslive.ingest.RtmpHub
+import com.libertyclerk.allstarslive.ingest.buildScorebugOverlay
 import com.libertyclerk.allstarslive.stream.Broadcast
 
 /**
@@ -79,7 +81,26 @@ private class ScorerBridge(private val appContext: Context) {
 
     /** The web tells us when a game/console is on screen (vs the menus). */
     @JavascriptInterface
-    fun setInGame(inGame: Boolean) { com.libertyclerk.allstarslive.AppUi.setInGame(inGame) }
+    fun setInGame(inGame: Boolean) {
+        com.libertyclerk.allstarslive.AppUi.setInGame(inGame)
+        if (!inGame) RtmpHub.videoCompositor?.setOverlay(null)   // hide the scorebug off-console
+    }
+
+    /**
+     * Live score from the web scorer — rendered to a scorebug bitmap and laid over the
+     * camera feed (preview AND the YouTube broadcast) via the persistent compositor.
+     */
+    @JavascriptInterface
+    fun setScore(
+        away: String, home: String, awayScore: Int, homeScore: Int,
+        inning: Int, topHalf: Boolean, balls: Int, strikes: Int, outs: Int,
+    ) {
+        val comp = RtmpHub.videoCompositor ?: return
+        val bmp = runCatching {
+            buildScorebugOverlay(1280, 720, away, home, awayScore, homeScore, inning, topHalf, balls, strikes, outs)
+        }.getOrNull() ?: return
+        comp.setOverlay(bmp)
+    }
 
     /** Open a link (e.g. the YouTube watch page) in the external app/browser. */
     @JavascriptInterface
