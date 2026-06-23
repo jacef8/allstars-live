@@ -1628,7 +1628,7 @@ function render(){
   } else if(wide && monitorOn){
     body=`<div id="console-row" style="flex:1;min-height:0;display:flex;flex-direction:row;gap:12px">
         <div id="mon-col" style="flex:0 0 64%;max-width:64%;min-width:0;min-height:0;display:flex;flex-direction:column;gap:10px">
-          ${monitorPane()}${wideBar}
+          ${monitorPane()}
         </div>
         <div style="flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;gap:8px">
           ${focusPlay?"":miniCount()}${batterCard()}${fieldEl}${actionEl}
@@ -1642,7 +1642,7 @@ function render(){
           ${focusPlay?"":miniCount()}${batterCard()}<div style="flex:1;min-height:0;display:flex;align-items:center;justify-content:center;position:relative">${diamondSVG()}${toastEl}</div>
         </div>
         <div style="flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;gap:8px">
-          ${actionEl}${feedPanel()}${wideBar}
+          ${actionEl}${feedPanel()}
         </div>
       </div>`;
   } else {
@@ -1825,14 +1825,23 @@ function renderToolbar(){
   const playMode=!["home","teams","team","pickteam","newgame","lineup","pickplayer","pickpos","editplayer","summary"].includes(mode);
   const vidToggle=(isWide()&&playMode)?`<button data-act="togglevideo" title="${monitorOn?"Hide video":"Show video"}" style="display:flex;align-items:center;gap:7px;background:${monitorOn?T.surface2:T.lime};border:1px solid ${monitorOn?T.line:T.lime};color:${monitorOn?T.chalk:T.field};border-radius:10px;padding:9px 13px;font-size:14px;font-weight:800">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>${monitorOn?"Hide video":"Show video"}</button>`:"";
-  tb.innerHTML=`<div style="display:flex;align-items:center;gap:8px;padding:4px 2px 2px">
-    <div style="flex:1;min-width:0;font-family:${MONO};font-weight:700;font-size:16px;letter-spacing:.5px;color:${T.chalk};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${chip}</div>
-    ${vidToggle}
-    <button data-act="share" style="display:flex;align-items:center;gap:7px;background:${T.surface2};border:1px solid ${T.line};color:${T.chalk};border-radius:10px;padding:9px 15px;font-size:15px;font-weight:800">
-      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="${T.lime}" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="19" r="2.6"/><path d="M8.3 10.8 15.7 6.4M8.3 13.2l7.4 4.4"/></svg>Share</button>
-    <div title="${dot.l}" style="display:flex;align-items:center;gap:5px;background:${T.surface};border:1px solid ${T.line};border-radius:999px;padding:5px 9px">
-      <span class="${conn?'livedot':''}" style="width:8px;height:8px;border-radius:50%;background:${dot.c};${conn?`box-shadow:0 0 7px ${dot.c}`:""}"></span>
-      <span style="font-family:${MONO};font-size:10px;font-weight:700;letter-spacing:1px;color:${dot.c}">${dot.l}</span></div>
+  // Game controls moved UP into the top bar (wide + scorer + idle) so the bottom row is
+  // freed for a bigger video + field. Phone keeps its own bottom footer.
+  const tbBtn=(act,label,extra)=>`<button data-act="${act}" style="background:${T.surface2};border:1px solid ${T.line};color:${T.chalk};border-radius:9px;padding:8px 12px;font-family:${SANS};font-size:13px;font-weight:700;white-space:nowrap;${extra||""}">${label}</button>`;
+  const gc=(isWide()&&mode==="idle"&&viewMode==="scorer")
+    ? `${tbBtn("undo","↶ Undo")}${tbBtn("home","⌂ Home")}${tbBtn("lineup","Lineup")}${tbBtn("endgame","End",`color:${T.out};border-color:${T.out}`)}`
+    : "";
+  tb.innerHTML=`<div style="display:flex;align-items:center;gap:8px;padding:4px 2px 2px;flex-wrap:wrap">
+    <div style="flex:none;min-width:0;font-family:${MONO};font-weight:700;font-size:16px;letter-spacing:.5px;color:${T.chalk};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${chip}</div>
+    ${gc}
+    <div style="margin-left:auto;display:flex;align-items:center;gap:8px">
+      ${vidToggle}
+      <button data-act="share" style="display:flex;align-items:center;gap:7px;background:${T.surface2};border:1px solid ${T.line};color:${T.chalk};border-radius:10px;padding:9px 15px;font-size:15px;font-weight:800">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="${T.lime}" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="19" r="2.6"/><path d="M8.3 10.8 15.7 6.4M8.3 13.2l7.4 4.4"/></svg>Share</button>
+      <div title="${dot.l}" style="display:flex;align-items:center;gap:5px;background:${T.surface};border:1px solid ${T.line};border-radius:999px;padding:5px 9px">
+        <span class="${conn?'livedot':''}" style="width:8px;height:8px;border-radius:50%;background:${dot.c};${conn?`box-shadow:0 0 7px ${dot.c}`:""}"></span>
+        <span style="font-family:${MONO};font-size:10px;font-weight:700;letter-spacing:1px;color:${dot.c}">${dot.l}</span></div>
+    </div>
   </div>`;
 }
 window.onLinkChange=renderToolbar;   // relay open/close → repaint the dot
