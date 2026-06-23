@@ -41,11 +41,10 @@
        Readability comes from the frosted "windows" below, not from darkening the turf.
        The native app overrides this to transparent (IS_APP) and paints the turf natively. */
     background:linear-gradient(rgba(7,11,19,.28),rgba(7,11,19,.50)), url("bg-turf.jpg") center center / cover no-repeat #0B0E13;}
-  /* Frosted-glass "windows": the inline solid card/panel surfaces become translucent with a
-     heavy blur, so the turf shows (blurred) behind them and stays sharp in the open areas. */
+  /* "Windows": the inline solid card/panel surfaces become translucent (NO blur) so the
+     sharp striped turf shows through and around them; opacity is high enough for readable text. */
   [style*="background:#212A38"],[style*="background:#324056"],[style*="background:#1D3A66"]{
-    background-color:rgba(15,23,38,.55)!important;
-    -webkit-backdrop-filter:blur(16px) saturate(1.15);backdrop-filter:blur(16px) saturate(1.15);}
+    background-color:rgba(15,23,38,.72)!important;}
   button{font-family:var(--sans);cursor:pointer;
     transition:transform .12s var(--ease-soft), filter .15s ease, box-shadow .18s ease, background .15s ease;}
   button:active{transform:scale(.94);filter:brightness(1.14) drop-shadow(0 0 7px rgba(163,230,53,.32));}
@@ -1910,8 +1909,41 @@ let _rsz; window.addEventListener("resize",function(){clearTimeout(_rsz);_rsz=se
 /* ---- PWA: service worker + install button ---- */
 (function(){
   // Register the service worker only on http/https (skips file:// inside the native app).
+  // FORCED UPDATES: when a new version is pushed, the new SW is detected, told to
+  // skipWaiting, takes control (controllerchange), and the page reloads ONCE — so the
+  // installed PWA self-updates within ~a minute, no manual cache-clearing needed.
   if ("serviceWorker" in navigator && location.protocol.indexOf("http")===0) {
-    window.addEventListener("load", function(){ navigator.serviceWorker.register("sw.js").catch(function(){}); });
+    var swRefreshing=false;
+    navigator.serviceWorker.addEventListener("controllerchange", function(){
+      if(swRefreshing) return; swRefreshing=true;
+      try{ var t=document.createElement("div"); t.textContent="Updating to the latest version…";
+        t.setAttribute("style","position:fixed;z-index:99999;left:50%;top:14px;transform:translateX(-50%);background:#A3E635;color:#0B0E13;font-family:system-ui,sans-serif;font-weight:800;font-size:13px;padding:8px 16px;border-radius:999px;box-shadow:0 6px 20px rgba(0,0,0,.5)");
+        document.body.appendChild(t); }catch(e){}
+      setTimeout(function(){ location.reload(); }, 350);
+    });
+    function watch(reg){
+      if(!reg) return;
+      reg.addEventListener("updatefound", function(){
+        var nw=reg.installing; if(!nw) return;
+        nw.addEventListener("statechange", function(){
+          // New version installed alongside the running one → activate it now.
+          if(nw.state==="installed" && navigator.serviceWorker.controller){ try{ nw.postMessage({type:"SKIP_WAITING"}); }catch(e){} }
+        });
+      });
+    }
+    window.addEventListener("load", function(){
+      navigator.serviceWorker.register("sw.js").then(function(reg){
+        watch(reg);
+        reg.update();                                   // check immediately on launch
+        setInterval(function(){ reg.update(); }, 60000); // …and once a minute while open
+      }).catch(function(){});
+    });
+    // Also re-check whenever the app is brought back to the foreground.
+    document.addEventListener("visibilitychange", function(){
+      if(document.visibilityState==="visible" && navigator.serviceWorker.controller){
+        navigator.serviceWorker.getRegistration().then(function(r){ if(r) r.update(); }).catch(function(){});
+      }
+    });
   }
   // Show a small "Install app" pill only when the browser reports the app is installable.
   var deferred=null;

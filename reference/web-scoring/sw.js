@@ -3,7 +3,9 @@
  * connection at the field. The live game data (relay WebSocket, Firebase, the
  * YouTube player) is cross-origin / non-GET, so it always goes straight to the
  * network — only the static shell is cached here. Bump CACHE to ship an update. */
-const CACHE = "allstars-v4";
+// ⬆️ BUMP THIS STRING ON EVERY DEPLOY. Changing it is what makes the installed PWA
+// notice a new version, activate it, and auto-reload (see the SW-update code in the page).
+const CACHE = "allstars-v5";
 const SHELL = [
   "./",
   "./scoring-controller.html",
@@ -20,6 +22,11 @@ const SHELL = [
 self.addEventListener("install", (e) => {
   self.skipWaiting();
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL).catch(() => {})));
+});
+
+// Page tells a freshly-installed SW to take over immediately → triggers the auto-reload.
+self.addEventListener("message", (e) => {
+  if (e.data && e.data.type === "SKIP_WAITING") self.skipWaiting();
 });
 
 self.addEventListener("activate", (e) => {
