@@ -2042,11 +2042,24 @@ applySetupParams();
 render();broadcast();
 setTimeout(function(){var s=document.getElementById("splash");if(s)s.remove();},2000);
 // Re-render on rotate/resize so the event picker swaps between bottom-sheet and side panel.
-let _rsz; window.addEventListener("resize",function(){clearTimeout(_rsz);_rsz=setTimeout(render,150);});
+// Re-render on resize ONLY when the wide/narrow breakpoint actually flips (e.g. rotation) — and
+// never while a text field is focused. Otherwise the soft keyboard (which resizes the viewport)
+// would trigger a re-render that destroys the focused input and dismisses the keyboard.
+let _rsz, _lastWide=isWide();
+window.addEventListener("resize",function(){
+  clearTimeout(_rsz);
+  _rsz=setTimeout(function(){
+    const ae=document.activeElement;
+    if(ae && (ae.tagName==="INPUT"||ae.tagName==="TEXTAREA"||ae.tagName==="SELECT")) return;  // typing → leave it alone
+    const w=isWide();
+    if(w===_lastWide) return;   // same layout → no re-render needed (CSS handles minor resizes)
+    _lastWide=w; render();
+  },200);
+});
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v23";
+var APP_VERSION="v24";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
