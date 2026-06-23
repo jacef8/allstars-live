@@ -68,6 +68,15 @@
 
     _unsub.forEach(function (f) { try { f(); } catch (e) {} });
     _unsub = [];
+    // Re-render for a cloud change ONLY when the user isn't interacting — a snapshot landing
+    // mid-tap would rebuild the DOM and instantly close a native <select>/date dropdown (phones).
+    function cloudRenderSoon() {
+      if (window._cloudRT) return;
+      window._cloudRT = setTimeout(function tick() {
+        if (typeof uiBusy === "function" && uiBusy()) { window._cloudRT = setTimeout(tick, 600); return; }
+        window._cloudRT = null; try { render(); } catch (e) {}
+      }, 350);
+    }
     function sansTimestamp(o) { var x = Object.assign({}, o); delete x.updatedAt; return JSON.stringify(x); }
     function merge(docs) {
       var changed = false;
@@ -96,11 +105,7 @@
       window._cloudApplying = true;
       try { saveDB(); } catch (e) {}   // persist locally WITHOUT re-pushing (guarded above)
       window._cloudApplying = false;
-      // Never re-render while the user is typing / has a date-or-time picker open — it would
-      // steal focus and dismiss the picker. The local DB is already updated; UI refreshes next.
-      var ae = document.activeElement;
-      if (ae && (ae.tagName === "INPUT" || ae.tagName === "TEXTAREA" || ae.tagName === "SELECT")) return;
-      try { render(); } catch (e) {}
+      cloudRenderSoon();               // deferred + interaction-aware (won't kill an open dropdown)
     }
     _unsub.push(d.collection("teams").where("ownerUid", "==", u)
       .onSnapshot(function (s) { merge(s.docs); }, function (e) { console.warn("teams(owned):", e.message); }));
