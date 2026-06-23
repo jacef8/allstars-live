@@ -394,6 +394,10 @@ const initGame=()=>({inning:1,half:"T",away:0,home:0,outs:0,balls:0,strikes:0,
   ourSide:"home",
   innings:6,       // regulation innings (from game setup) — drives the viewer line-score width
   runCap:5,        // runs allowed per half-inning (tournament rule); 0 = no cap
+  league:"custom", // selected league preset (drives default rules + the rule-alert popups)
+  mercy:null,      // {r15:innings,r10:innings} run-rule thresholds from the league; null = off
+  pitchMax:0,      // per-pitcher daily pitch limit from the league; 0 = no pitch-limit alert
+  alerts:{on:true,runRule:true,runCap:true,pitch:true,inning:true}, // rule-reminder popups
   halfRuns:0,      // runs scored so far in the current half-inning
   oppBatters:9,    // opponent's batting-order size (continuous order support)
   stats:{},        // per-batter box-score stats, keyed "o"+rosterIdx (ours) / "p"+spot (opp)
@@ -489,12 +493,15 @@ function endGame(){snapshot();G.final=true;
   resetUI();mode="summary";render();broadcast();}
 /* New Game: reset scores/innings/in-play state but keep the chosen rules, side, and lineup. */
 function startNewGame(){
-  const keep={runCap:G.runCap,oppBatters:G.oppBatters,ourSide:G.ourSide,innings:G.innings,lineup:JSON.parse(JSON.stringify(G.lineup))};
+  const keep={runCap:G.runCap,oppBatters:G.oppBatters,ourSide:G.ourSide,innings:G.innings,lineup:JSON.parse(JSON.stringify(G.lineup)),
+    league:G.league,mercy:G.mercy,pitchMax:G.pitchMax,alerts:G.alerts};
   G=initGame();
   G.runCap=keep.runCap; G.oppBatters=keep.oppBatters; G.ourSide=keep.ourSide; G.innings=keep.innings; G.lineup=keep.lineup;
+  G.league=keep.league; G.mercy=keep.mercy; G.pitchMax=keep.pitchMax; if(keep.alerts)G.alerts=keep.alerts;
   const ot=oppTeamId&&teamById(oppTeamId);
   G.oppLineup = ot ? ot.players.map(p=>({num:p.num,name:p.name})) : Array.from({length:Math.max(1,G.oppBatters)},(_,i)=>({num:String(i+1),name:""}));
   if(ot) G.oppBatters=G.oppLineup.length;
+  settingsMode=false; resetAlerts();
   lineupTab="us"; hist=[]; gameFeed=[]; resetUI(); mode="lineup"; render(); broadcast();
 }
 /* Opponent name from the New Game text field (no re-render, so typing keeps focus). */
@@ -505,6 +512,65 @@ window.edNum=function(v){const ri=G.lineup.order[editSlot]; if(ROSTER[ri]){ROSTE
 window.ngOppName=function(v){const s=(v||"").trim(); OPP.name=s||"Opponent"; OPP.short=(s||"OPP").slice(0,3).toUpperCase();};
 window.ngRunCap=function(v){const n=parseInt(v,10); G.runCap=(isNaN(n)||n<0)?0:Math.min(n,30);};        // 0 = no cap
 window.ngOppBatters=function(v){const n=parseInt(v,10); G.oppBatters=(isNaN(n)||n<1)?9:Math.min(n,15);};
+
+/* ===== League presets (Diamond Youth Baseball 2026 + custom) — set default rules & alerts ===== */
+const LEAGUES=[
+  {id:"custom",  name:"Custom (set manually)", innings:6, runCap:5, mercy:null,          pitch:0,  note:"Set every rule yourself."},
+  {id:"dyb-tb",  name:"DYB Tee Ball",          innings:4, runCap:5, mercy:null,          pitch:0,  note:"Tee/coach pitch · no pitch limits."},
+  {id:"dyb-cp",  name:"DYB 6U/8U Coach Pitch", innings:6, runCap:5, mercy:{r15:3,r10:4}, pitch:0,  note:"Coaches pitch · 15-run after 3, 10-run after 4 innings."},
+  {id:"dyb-a",   name:"DYB A / AA",            innings:6, runCap:7, mercy:{r15:3,r10:4}, pitch:75, note:"6 inn · 15-after-3 / 10-after-4 · opt. 7 runs/half · 75 pitches/day (≤10U)."},
+  {id:"dyb-aaa", name:"DYB AAA (10U)",         innings:6, runCap:0, mercy:{r15:3,r10:4}, pitch:75, note:"6 inn · 15-after-3 / 10-after-4 · opt. 10 runs/half · 75 pitches/day."},
+  {id:"dyb-maj", name:"DYB Majors (12U)",      innings:6, runCap:0, mercy:{r15:3,r10:4}, pitch:85, note:"6 inn · 15-after-3 / 10-after-4 · opt. 10 runs/half · 85 pitches/day (11-12U)."},
+  {id:"dyb-oz",  name:"DYB \"O\"Zone",         innings:6, runCap:0, mercy:{r15:3,r10:4}, pitch:85, note:"6 inn · 15-after-3 / 10-after-4 · 85 pitches/day."},
+];
+const leagueById=id=>LEAGUES.find(l=>l.id===id)||LEAGUES[0];
+window.ngLeague=function(v){ const L=leagueById(v); G.league=L.id; G.innings=L.innings; G.runCap=L.runCap; G.mercy=L.mercy?{r15:L.mercy.r15,r10:L.mercy.r10}:null; G.pitchMax=L.pitch||0; render(); };
+let settingsMode=false;   // true = Game Setup opened mid-game (Done returns to play, never resets)
+
+/* ===== rule-reminder popups (run cap / run rule / pitch limit / final inning) ===== */
+let activeAlert=null, firedAlerts=new Set(), dismissedAlerts=new Set();
+function resetAlerts(){ activeAlert=null; firedAlerts=new Set(); dismissedAlerts=new Set(); }
+function alertsCfg(){ if(!G.alerts)G.alerts={on:true,runRule:true,runCap:true,pitch:true,inning:true}; return G.alerts; }
+function fireAlert(key,title,msg,tone){ const c=alertsCfg(); if(!c.on)return; if(firedAlerts.has(key)||dismissedAlerts.has(key))return; firedAlerts.add(key); activeAlert={key,title,msg,tone:tone||"info"}; }
+function maybeAlert(){
+  if(!gameActive||G.final||mode==="summary"||mode==="newgame") return;
+  const c=alertsCfg(); if(!c.on) return;
+  if(c.runCap && G.runCap>0 && (G.halfRuns||0)>=G.runCap)
+    fireAlert("cap-"+G.inning+G.half,"Run cap reached",`${G.runCap} runs scored this half-inning — that's the cap. Retire the side.`,"warn");
+  if(c.runRule && G.mercy){
+    const diff=Math.abs((G.away|0)-(G.home|0));
+    if(G.mercy.r15 && diff>=15 && G.inning>=(G.mercy.r15+1)) fireAlert("merc15","15-run rule",`A team leads by ${diff} after ${G.mercy.r15} innings — the 15-run rule applies. The game may be called.`,"warn");
+    else if(G.mercy.r10 && diff>=10 && G.inning>=(G.mercy.r10+1)) fireAlert("merc10","10-run rule",`A team leads by ${diff} after ${G.mercy.r10} innings — the 10-run rule applies. The game may be called.`,"warn");
+  }
+  if(c.pitch && G.pitchMax>0){
+    const pc=currentPitchCount()|0, nm=currentPitcherName()||"The pitcher", max=G.pitchMax;
+    if(pc>=max) fireAlert("pmax-"+nm+"-"+max,"Pitch limit reached",`${nm} has thrown ${pc} pitches — the ${max}-pitch daily limit. They may finish the current batter, then must come out.`,"warn");
+    else if(pc>=max-10) fireAlert("pnear-"+nm+"-"+max,"Pitch limit approaching",`${nm} is at ${pc} of ${max} pitches.`,"info");
+  }
+  if(c.inning && G.innings>0 && G.inning>=G.innings && G.half==="B")
+    fireAlert("final-"+G.inning,"Final inning",`Bottom of the ${ordinal(G.inning)} — the last scheduled inning.`,"info");
+}
+function alertOverlay(){
+  if(!activeAlert) return "";
+  const a=activeAlert, accent=a.tone==="warn"?T.amber:T.lime;
+  return `<div data-act="alertbackdrop" style="position:fixed;inset:0;z-index:120;display:flex;align-items:center;justify-content:center;background:rgba(6,9,14,.6);padding:18px">
+      <div data-act="noop" style="max-width:380px;width:100%;background:#0E1420;border:2px solid ${accent};border-radius:16px;box-shadow:0 18px 50px rgba(0,0,0,.6);padding:20px 22px">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px"><span style="font-size:22px">${a.tone==="warn"?"⚠️":"🔔"}</span>
+          <div style="font-family:${MONO};font-size:20px;font-weight:800;color:${accent};letter-spacing:.4px">${a.title}</div></div>
+        <div style="font-size:15px;color:${T.chalk};line-height:1.45">${a.msg}</div>
+        <div style="display:flex;gap:8px;margin-top:16px">
+          <button data-act="alertdismiss" style="flex:1;background:${accent};color:${T.field};border:none;border-radius:10px;padding:12px;font-family:${MONO};font-weight:800;font-size:15px">Got it</button>
+          <button data-act="alertsilence" style="flex:none;background:transparent;border:1px solid ${T.line};color:${T.sage};border-radius:10px;padding:12px 14px;font-weight:700;font-size:13px">Don't show again</button>
+        </div></div></div>`;
+}
+
+/* ===== Tools: quick-access league rule documents (editable list, opens externally) ===== */
+function defaultDocs(){ return [{name:"Diamond Youth Baseball — 2026 Official Rules",url:"https://dt5602vnjxv0c.cloudfront.net/portals/13637/docs/2026-dyb-official-playing-rules.pdf"}]; }
+function ruleDocs(){ try{ const s=JSON.parse(localStorage.getItem("al-rule-docs")||"null"); return (Array.isArray(s)&&s.length)?s:defaultDocs(); }catch(e){ return defaultDocs(); } }
+function saveDocs(d){ try{ localStorage.setItem("al-rule-docs",JSON.stringify(d)); }catch(e){} }
+window.addDoc=function(){ const n=document.getElementById("docName"),u=document.getElementById("docUrl"); if(!n||!u)return; const name=(n.value||"").trim(),url=(u.value||"").trim(); if(!name||!url){flash("Enter a name and a link");return;} const d=ruleDocs(); d.push({name,url:/^https?:/i.test(url)?url:"https://"+url}); saveDocs(d); n.value="";u.value=""; render(); };
+window.removeDoc=function(i){ const d=ruleDocs(); d.splice(i,1); saveDocs(d); render(); };
+function openDoc(url){ try{ if(IS_APP&&window.AllStars&&window.AllStars.openExternal)AllStars.openExternal(url); else window.open(url,"_blank","noopener"); }catch(e){ try{location.href=url;}catch(_){} } }
 
 /* ===== per-batter box-score stats (both teams) ===== */
 const batterKeyOf=b=>b.ours?("o"+b.ri):("p"+b.spot);
@@ -1166,8 +1232,7 @@ function actionArea(){
           <div style="display:flex;align-items:center;gap:8px;margin-top:6px;font-family:${MONO};font-size:15px;color:${T.sage}">
             <span style="font-weight:800;color:${t.color}">${rec}</span><span style="opacity:.45">·</span><span>${games} game${games===1?"":"s"}</span><span style="opacity:.45">·</span><span>${t.players.length} players</span></div>
           <div style="display:flex;gap:8px;margin-top:14px">
-            <button data-act="homestart" data-arg="${t.id}" style="flex:1;background:${t.color};color:#fff;border:none;border-radius:9px;padding:13px;font-family:${MONO};font-weight:800;font-size:17px;letter-spacing:.8px;display:flex;align-items:center;justify-content:center;gap:8px">${IC(PLAY)} START</button>
-            <button data-act="opent" data-arg="${t.id}" style="background:${T.surface2};border:1px solid ${T.line};color:${T.sage};border-radius:9px;padding:11px 14px;display:flex;align-items:center">${IC(GEAR)}</button>
+            <button data-act="opent" data-arg="${t.id}" style="flex:1;background:${t.color};color:#fff;border:none;border-radius:9px;padding:13px;font-family:${MONO};font-weight:800;font-size:16px;letter-spacing:.8px;display:flex;align-items:center;justify-content:center;gap:8px">${IC(GEAR)} MANAGE TEAM</button>
           </div></div>`;};
     const teamsBlock = DB.teams.length
       ? `<div style="display:flex;align-items:center;justify-content:space-between;margin:4px 2px -2px">
@@ -1186,6 +1251,7 @@ function actionArea(){
     const resumeBtn = gameActive?`<button data-act="resume" style="${bigBtn(T.safe)};font-size:17px;padding:16px;display:flex;align-items:center;justify-content:center;gap:8px">${IC(PLAY)} Resume &middot; ${OUR.short} vs ${OPP.short}</button>`:"";
     const newGameBtn = `<button data-act="newgamestart" style="${bigBtn(T.lime,"font-size:21px;padding:17px;box-shadow:0 8px 22px rgba(163,230,53,.22)",T.field)}">${IC(PLAY)} New Game</button>`;
     const manageBtn = `<button data-act="gototeams" style="${ghost};padding:17px;font-size:17px;border:2px solid #3F6CA8;color:${T.ink};display:flex;align-items:center;justify-content:center;gap:9px">${IC('<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>')} Manage teams &amp; rosters</button>`;
+    const toolsBtn = `<button data-act="tools" style="${ghost};padding:12px;font-size:14px;display:flex;align-items:center;justify-content:center;gap:8px">&#128296; Tools &amp; league rules</button>`;
     // Share only makes sense once a game (and its stream link) exists.
     const shareBtnHome = `<button data-act="share" style="flex:none;display:flex;align-items:center;justify-content:center;gap:9px;background:${T.surface};border:1px solid ${T.line};color:${T.chalk};border-radius:12px;padding:13px;font-family:${SANS};font-weight:800;font-size:15px">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="${T.lime}" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="19" r="2.6"/><path d="M8.3 10.8 15.7 6.4M8.3 13.2l7.4 4.4"/></svg>Share game link</button>`;
@@ -1231,10 +1297,11 @@ function actionArea(){
               <div style="display:flex;flex-direction:column;min-height:0">${rightCell}</div>
             </div>
             ${gameActive?shareBtnHome:""}
+            ${toolsBtn}
           </div>
         </div>`;
     }
-    return `<div style="min-height:100%;display:flex;flex-direction:column;justify-content:safe center;gap:14px;padding:6px 0">${hero}${authBar}${resumeBtn}${newGameBtn}${teamsBlock}${manageBtn}${gameActive?shareBtnHome:""}</div>`;
+    return `<div style="min-height:100%;display:flex;flex-direction:column;justify-content:safe center;gap:14px;padding:6px 0">${hero}${authBar}${resumeBtn}${newGameBtn}${teamsBlock}${manageBtn}${gameActive?shareBtnHome:""}${toolsBtn}</div>`;
   }
   if(mode==="teams"){
     const sorted=DB.teams.slice().sort((a,b)=>(b.fav?1:0)-(a.fav?1:0));
@@ -1315,6 +1382,7 @@ function actionArea(){
         <button data-act="ngback" style="${ghost}">&lsaquo; Back</button></div>`);
   }
   if(mode==="newgame"){
+    const setMode=settingsMode;   // mid-game Game Setup (Done returns to play, no reset)
     const lbl=`font-size:13px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin:0 2px 8px`;
     const inpSm=`width:98px;flex:none;background:${T.surface2};border:1px solid ${T.line};color:${T.ink};border-radius:10px;padding:14px 10px;font-family:${MONO};font-size:27px;font-weight:800;text-align:center;outline:none`;
     const rowCard=`display:flex;align-items:center;justify-content:space-between;gap:12px;background:${T.surface};border:1px solid ${T.line};border-radius:12px;padding:18px 20px;box-shadow:0 2px 6px rgba(15,30,60,.07)`;
@@ -1323,10 +1391,23 @@ function actionArea(){
         <div><div style="${lbl};margin:0 0 4px">${who}</div><div style="font-family:${MONO};font-size:25px;font-weight:800;color:${T.ink}">${name}</div></div>
         <span style="color:${color};font-weight:800;font-size:15px;letter-spacing:.5px">CHANGE &rsaquo;</span></button>`;
     const header=`<div style="display:flex;align-items:center;gap:10px;flex:none">
-          <button data-act="gohome" style="${ghost};padding:9px 11px">&lsaquo; Home</button>
-          <div style="font-family:${MONO};font-size:23px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:${T.lime}">New Game</div></div>`;
+          <button data-act="${setMode?"settingsdone":"gohome"}" style="${ghost};padding:9px 11px">&lsaquo; ${setMode?"Done":"Home"}</button>
+          <div style="font-family:${MONO};font-size:23px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:${T.lime}">${setMode?"Game Settings":"New Game"}</div></div>`;
     const sideSel=`<div><div style="${lbl}">Is ${OUR.name} home or away?</div>
           <div style="display:flex;gap:8px">${sideBtn("home","Home")}${sideBtn("away","Away")}</div></div>`;
+    const selStyle=`background:${T.surface2};border:1px solid ${T.line};color:${T.ink};border-radius:10px;padding:13px 12px;font-family:${MONO};font-size:16px;font-weight:800;outline:none;max-width:190px`;
+    const curL=leagueById(G.league);
+    const leagueCard=`<div style="${rowCard};flex-wrap:wrap">
+          <div style="flex:1;min-width:150px"><div style="font-weight:800;color:${T.ink};font-size:19px">League</div>
+            <div style="color:${T.sage};font-size:13px;margin-top:3px;line-height:1.35">${curL.note}</div></div>
+          <select onchange="ngLeague(this.value)" style="${selStyle}">${LEAGUES.map(l=>`<option value="${l.id}"${G.league===l.id?" selected":""}>${l.name}</option>`).join("")}</select></div>`;
+    const ac=alertsCfg();
+    const aChip=(k,lbl)=>`<button data-act="alerttoggle" data-arg="${k}" style="background:${ac[k]?T.lime:T.surface2};border:1px solid ${ac[k]?T.lime:T.line};color:${ac[k]?T.field:T.sage};border-radius:999px;padding:7px 13px;font-family:${MONO};font-weight:800;font-size:12px">${lbl}</button>`;
+    const alertsCard=`<div style="${rowCard};flex-wrap:wrap">
+          <div style="flex:1;min-width:150px"><div style="font-weight:800;color:${T.ink};font-size:19px">Rule alerts</div>
+            <div style="color:${T.sage};font-size:13px;margin-top:3px">Pop-up reminders during the game</div></div>
+          <button data-act="alerttoggle" data-arg="on" style="background:${ac.on?T.lime:T.surface2};border:1px solid ${ac.on?T.lime:T.line};color:${ac.on?T.field:T.sage};border-radius:999px;padding:10px 20px;font-family:${MONO};font-weight:800;font-size:15px;min-width:66px">${ac.on?"ON":"OFF"}</button>
+          ${ac.on?`<div style="width:100%;display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">${aChip("runRule","Run rule")}${aChip("runCap","Run cap")}${aChip("pitch","Pitch limit")}${aChip("inning","Final inning")}</div>`:""}</div>`;
     const runCapCard=`<div style="${rowCard}">
           <div><div style="font-weight:800;color:${T.ink};font-size:19px">Run cap</div>
             <div style="color:${T.sage};font-size:14px;margin-top:3px">Per half-inning · 0 = no cap</div></div>
@@ -1345,7 +1426,15 @@ function actionArea(){
             <div style="color:${T.sage};font-size:14px;margin-top:3px">Adds FB/CB/CH/SL/OTH per pitch while scoring</div></div>
           <button data-act="advtoggle" style="background:${advPitch?T.lime:T.surface2};border:1px solid ${advPitch?T.lime:T.line};color:${advPitch?T.field:T.sage};border-radius:999px;padding:10px 20px;font-family:${MONO};font-weight:800;font-size:15px;min-width:66px">${advPitch?"ON":"OFF"}</button></div>`;
     const startBtn=`<button data-act="ng-start" style="${bigBtn(T.lime,"width:100%;font-size:25px;padding:24px;box-shadow:0 8px 22px rgba(163,230,53,.22)",T.field)};flex:none;margin-top:2px">Start game &rarr;</button>`;
+    // In settings mode (mid-game) we show ONLY the rule cards + Done — no team/side pickers,
+    // and no "Start game" (that would reset the live game).
+    const ruleCards=`${leagueCard}${runCapCard}${hittersCard}${pitchTypeCard}${alertsCard}${startCard}`;
+    const doneBtn=`<button data-act="settingsdone" style="${bigBtn(T.lime,"width:100%;font-size:22px;padding:20px",T.field)};flex:none;margin-top:2px">Done &#10003;</button>`;
     if(isWide()){
+      if(setMode) return `<div style="min-height:100%;display:flex;flex-direction:column;gap:16px;justify-content:safe center">
+            ${header}
+            <div style="width:100%;max-width:700px;margin:0 auto;display:flex;flex-direction:column;gap:14px">${ruleCards}${doneBtn}</div>
+          </div>`;
       // Centered (safe) + width-capped so the form fills the space but still scrolls from the
       // top when it's taller than the screen.
       return `<div style="min-height:100%;display:flex;flex-direction:column;gap:16px;justify-content:safe center">
@@ -1353,17 +1442,41 @@ function actionArea(){
           <div style="display:flex;flex-direction:column;gap:20px">
             <div style="width:100%;max-width:1100px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:18px;align-content:center">
               <div style="display:flex;flex-direction:column;gap:14px">${teamRow("Your team",OUR.name,OUR.color,"pickour")}${teamRow("Opponent",OPP.name,OPP.color,"pickopp")}${sideSel}</div>
-              <div style="display:flex;flex-direction:column;gap:14px">${runCapCard}${hittersCard}${pitchTypeCard}${startCard}</div>
+              <div style="display:flex;flex-direction:column;gap:14px">${ruleCards}</div>
             </div>
             <div style="width:100%;max-width:1100px;margin:0 auto">${startBtn}</div>
           </div>
         </div>`;
     }
+    if(setMode) return `<div style="display:flex;flex-direction:column;gap:14px">${header}${ruleCards}${doneBtn}</div>`;
     return `<div style="display:flex;flex-direction:column;gap:14px">
         ${header}
         ${teamRow("Your team",OUR.name,OUR.color,"pickour")}
         ${teamRow("Opponent",OPP.name,OPP.color,"pickopp")}
-        ${sideSel}${runCapCard}${hittersCard}${pitchTypeCard}${startCard}${startBtn}
+        ${sideSel}${ruleCards}${startBtn}
+      </div>`;
+  }
+  if(mode==="tools"){
+    const docs=ruleDocs();
+    const cell2=`background:${T.surface2};border:1px solid ${T.line};color:${T.ink};border-radius:8px;padding:11px 12px;font-weight:700;outline:none`;
+    const rows=docs.map((d,i)=>`<div style="display:flex;align-items:center;gap:8px;background:${T.surface};border:1px solid ${T.line};border-radius:10px;padding:12px 14px">
+        <button data-act="opendoc" data-arg="${i}" style="flex:1;min-width:0;text-align:left;background:none;border:none;color:${T.chalk};cursor:pointer">
+          <div style="font-weight:800;font-size:16px;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">&#128196; ${(d.name||"Document").replace(/</g,"")}</div>
+          <div style="font-size:12px;color:${T.sage};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px">${(d.url||"").replace(/</g,"")}</div></button>
+        <span style="color:${T.lime};font-weight:800;font-size:13px">OPEN &rsaquo;</span>
+        <button data-act="rmdoc" data-arg="${i}" style="background:none;border:1px solid ${T.line};color:${T.out};border-radius:7px;padding:8px 10px;font-weight:800">&times;</button></div>`).join("");
+    return `<div style="display:flex;flex-direction:column;gap:14px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <button data-act="gohome" style="${ghost};padding:9px 11px">&lsaquo; Home</button>
+          <div style="font-family:${MONO};font-size:23px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:${T.lime}">Tools</div></div>
+        <div style="font-size:13px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin:2px 2px -4px">League rule documents</div>
+        <div style="font-size:12px;color:${T.sage};margin:0 2px">Quick access to your league's rulebooks. Tap to open; add your own links.</div>
+        <div style="display:flex;flex-direction:column;gap:8px">${rows||`<div style="color:${T.sageDim};font-size:13px;text-align:center;padding:16px;border:1px dashed ${T.line};border-radius:10px">No documents yet.</div>`}</div>
+        <div style="background:${T.surface};border:1px solid ${T.line};border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:8px">
+          <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime}">Add a document</div>
+          <input id="docName" placeholder="Name (e.g. 2026 League Rules)" style="${cell2}">
+          <input id="docUrl" placeholder="https://link-to-pdf" inputmode="url" style="${cell2}">
+          <button data-act="adddoc" style="${bigBtn(T.lime,"",T.field)}">+ Add document</button></div>
       </div>`;
   }
   if(mode==="lineup"){
@@ -1648,7 +1761,7 @@ function setupLineupDrag(){
 function isWide(){return window.innerWidth>=760 && window.innerWidth>window.innerHeight;}
 function render(){
   renderToolbar();
-  const menu=(mode==="home"||mode==="teams"||mode==="team"||mode==="pickteam"||mode==="newgame"||mode==="lineup"||mode==="pickplayer"||mode==="pickpos"||mode==="editplayer"||mode==="summary");
+  const menu=(mode==="home"||mode==="teams"||mode==="team"||mode==="pickteam"||mode==="newgame"||mode==="lineup"||mode==="pickplayer"||mode==="pickpos"||mode==="editplayer"||mode==="summary"||mode==="tools");
   if(IS_APP&&window.AllStars.setInGame){ try{ AllStars.setInGame(!menu); }catch(e){} }   // hide native tabs during a game
   // Push the live score to the native compositor so it's burned into the broadcast.
   if(IS_APP&&!menu&&window.AllStars.setScore){ try{
@@ -1657,14 +1770,19 @@ function render(){
   }catch(e){} }
   if(menu){
     const scroll=mode!=="lineup";
+    // Preserve scroll position across a same-mode re-render (e.g. flipping a toggle), so the
+    // page doesn't jump back to the top. A genuine page change (mode changed) starts at top.
+    const prevScroll=(scroll&&mode===_lastMode)?(()=>{const c=document.querySelector("#content > div");return c?c.scrollTop:0;})():0;
     // page-zoom (scroll pages only) scales the UI up on big monitors; lineup is excluded so
     // its drag coordinates stay accurate.
     const cls=`${mode!==_lastMode?"screen-in ":""}${scroll?"page-zoom":""}`;
     document.getElementById("content").innerHTML=`<div class="${cls}" style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px;${scroll?"overflow-y:auto;-webkit-overflow-scrolling:touch":""}">${actionArea()}</div>`;
     _lastMode=mode;
+    if(prevScroll){ const c=document.querySelector("#content > div"); if(c)c.scrollTop=prevScroll; }
     if(mode==="lineup")setupLineupDrag();
     return;
   }
+  maybeAlert();   // rule-reminder popups (run cap / run rule / pitch limit / final inning)
   const playing=!(mode==="idle"||mode==="locate");
   const toastEl=toast?`<div style="position:absolute;bottom:12px;left:50%;transform:translateX(-50%);background:#0B0E13;color:${T.lime};border:1.5px solid ${T.lime};font-family:${MONO};font-weight:800;font-size:14px;letter-spacing:.5px;text-transform:uppercase;padding:7px 16px;border-radius:999px;white-space:nowrap;z-index:5;box-shadow:0 4px 16px rgba(0,0,0,.55)">${toast}</div>`:"";
   // GameChanger model: the field stays the big hero, and the pick-an-event steps
@@ -1688,6 +1806,7 @@ function render(){
       <button data-act="undo" style="background:transparent;border:1px solid ${T.line};color:${hist.length?T.chalk:T.sageDim};border-radius:8px;padding:7px 11px;font-size:13px;font-weight:600">↶ Undo</button>
       ${mode==="idle"?`<button data-act="home" style="background:${T.surface};border:1px solid ${T.line};color:${T.chalk};border-radius:8px;padding:7px 12px;font-size:13px;font-weight:700">⌂ Home</button>
       <button data-act="lineup" style="background:${T.surface2};border:1px solid ${T.line};color:${T.chalk};border-radius:8px;padding:7px 13px;font-size:13px;font-weight:700">Lineup</button>
+      <button data-act="ingamesettings" style="background:${T.surface2};border:1px solid ${T.line};color:${T.chalk};border-radius:8px;padding:7px 12px;font-size:13px;font-weight:700">⚙ Setup</button>
       <button data-act="endgame" style="background:transparent;border:1px solid ${T.out};color:${T.out};border-radius:8px;padding:7px 12px;font-size:13px;font-weight:700">End game</button>`:""}</div>`;
   // All-in-one console. Large screen (tablet/PC, wide) = monitor + scorebug BESIDE the
   // scoring tools on one page. Phone (narrow) = too small for both, so PAGE between a
@@ -1702,7 +1821,7 @@ function render(){
   const wideBtn=(act,label,extra)=>`<button data-act="${act}" style="background:${T.surface2};border:1px solid ${T.line};color:${T.chalk};border-radius:9px;padding:10px 13px;font-family:${SANS};font-size:14px;font-weight:700;white-space:nowrap;${extra||""}">${label}</button>`;
   const wideBar=playing?"":`<div style="display:flex;gap:8px;align-items:center;justify-content:center;flex:none;flex-wrap:wrap">
       ${wideBtn("undo","↶ Undo")}
-      ${mode==="idle"?wideBtn("home","⌂ Home")+wideBtn("lineup","Lineup")+wideBtn("endgame","End",`color:${T.out};border-color:${T.out}`):""}
+      ${mode==="idle"?wideBtn("home","⌂ Home")+wideBtn("lineup","Lineup")+wideBtn("ingamesettings","⚙ Setup")+wideBtn("endgame","End",`color:${T.out};border-color:${T.out}`):""}
     </div>`;
   let body;
   if(wide && focusPlay){
@@ -1805,7 +1924,7 @@ function render(){
       </div>`;
   }
   document.getElementById("content").innerHTML=`
-    ${body}${confirmOverlay()}
+    ${body}${confirmOverlay()}${alertOverlay()}
     ${reviewBatter?batterReviewModal():""}
     ${reviewInn?inningLogModal():""}
     ${(pickerModal&&wide)?`<div style="${sheetWrap}">
@@ -1859,6 +1978,15 @@ document.getElementById("app").addEventListener("click",e=>{
   if(act==="inninglog"){ reviewInn=true; render(); return; }
   if(act==="closeinnlog"){ reviewInn=false; render(); return; }
   if(act==="advtoggle"){ advPitch=!advPitch; try{localStorage.setItem("al-adv-pitch",advPitch?"1":"0");}catch(e){} render(); return; }
+  if(act==="alerttoggle"){ const c=alertsCfg(); c[arg]=!c[arg]; render(); return; }
+  if(act==="alertdismiss"||act==="alertbackdrop"){ activeAlert=null; render(); return; }
+  if(act==="alertsilence"){ if(activeAlert)dismissedAlerts.add(activeAlert.key); activeAlert=null; render(); return; }
+  if(act==="tools"){ mode="tools"; render(); return; }
+  if(act==="opendoc"){ const d=ruleDocs()[+arg]; if(d&&d.url)openDoc(d.url); return; }
+  if(act==="adddoc"){ if(window.addDoc)window.addDoc(); return; }
+  if(act==="rmdoc"){ if(window.removeDoc)window.removeDoc(+arg); return; }
+  if(act==="ingamesettings"){ settingsMode=true; mode="newgame"; render(); return; }
+  if(act==="settingsdone"){ settingsMode=false; mode="idle"; render(); broadcast(); return; }
   if(act==="ptype"){ pitchType=(pitchType===arg?null:arg); render(); return; }
   if(act==="pane"){ phonePane=arg; render(); return; }
   if(act==="swapviewer"){ viewerRight=viewerRight==="field"?"feed":"field"; try{localStorage.setItem("al-viewer-right",viewerRight);}catch(e){} render(); return; }
@@ -1966,7 +2094,7 @@ document.getElementById("app").addEventListener("click",e=>{
 function renderToolbar(){
   const tb=document.getElementById("toolbar"); if(!tb)return;
   const inGame=!["home","teams","team","pickteam"].includes(mode);
-  const playMode2=!["home","teams","team","pickteam","newgame","lineup","pickplayer","pickpos","editplayer","summary"].includes(mode);
+  const playMode2=!["home","teams","team","pickteam","newgame","lineup","pickplayer","pickpos","editplayer","summary","tools"].includes(mode);
   // No top bar on menu screens (home/teams/etc.) — it duplicated the page title and
   // showed a misleading "LIVE" relay dot before any game. Reclaims that space.
   if(!playMode2){ tb.innerHTML=""; return; }
@@ -1984,7 +2112,7 @@ function renderToolbar(){
   const conn=LINK.connected(), hasRelay=LINK.hasRelay();
   const dot = !hasRelay ? {c:T.sageDim,l:"LOCAL"} : conn ? {c:T.safe,l:"LIVE"} : {c:T.out,l:"OFFLINE"};
   // Wide-only: slide the video monitor in/out for distraction-free scoring.
-  const playMode=!["home","teams","team","pickteam","newgame","lineup","pickplayer","pickpos","editplayer","summary"].includes(mode);
+  const playMode=!["home","teams","team","pickteam","newgame","lineup","pickplayer","pickpos","editplayer","summary","tools"].includes(mode);
   const vidToggle=(isWide()&&playMode)?`<button data-act="togglevideo" title="${monitorOn?"Hide video":"Show video"}" style="display:flex;align-items:center;gap:7px;background:${monitorOn?T.surface2:T.lime};border:1px solid ${monitorOn?T.line:T.lime};color:${monitorOn?T.chalk:T.field};border-radius:10px;padding:9px 13px;font-size:14px;font-weight:800">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>${monitorOn?"Hide video":"Show video"}</button>`:"";
   // Game controls moved UP into the top bar (wide + scorer + idle) so the bottom row is
@@ -2003,7 +2131,7 @@ function renderToolbar(){
       <span class="${conn?'livedot':''}" style="width:8px;height:8px;border-radius:50%;background:${dot.c};${conn?`box-shadow:0 0 7px ${dot.c}`:""}"></span>
       <span style="font-family:${MONO};font-size:10px;font-weight:700;letter-spacing:1px;color:${dot.c}">${dot.l}</span></div>`;
   // Batter readout fills the empty middle of the top row (wide scorer in a live game).
-  const bstrip=(isWide()&&viewMode==="scorer"&&!["home","teams","team","pickteam","newgame","lineup","pickplayer","pickpos","editplayer","summary"].includes(mode))
+  const bstrip=(isWide()&&viewMode==="scorer"&&!["home","teams","team","pickteam","newgame","lineup","pickplayer","pickpos","editplayer","summary","tools"].includes(mode))
     ? `<div style="flex:1;min-width:0;display:flex;justify-content:center;padding:0 6px">${batterStrip()}</div>` : `<div style="flex:1"></div>`;
   // Hide-video + Share slid to the LEFT next to the controls; only LIVE stays on the far right.
   tb.innerHTML=`<div style="display:flex;align-items:center;gap:8px;padding:4px 2px 2px;flex-wrap:nowrap">
@@ -2026,8 +2154,10 @@ window.appBack=function(){
     if(["locate","contact","result","runners","errpos","outpos","dppick"].includes(mode)){ resetUI(); render(); return true; }
     if(mode==="editplayer"||mode==="pickpos"||mode==="pickplayer"){ mode="lineup"; render(); return true; }
     if(mode==="pickteam"){ mode="newgame"; render(); return true; }
+    if(mode==="newgame"&&settingsMode){ settingsMode=false; mode="idle"; render(); return true; }
     if(mode==="lineup"||mode==="newgame"){ mode=gameActive?"idle":"home"; render(); return true; }
     if(mode==="team"){ mode="teams"; render(); return true; }
+    if(mode==="tools"){ mode="home"; render(); return true; }
     if(mode==="teams"){ mode="home"; render(); return true; }
     if(mode==="summary"){ mode="idle"; render(); return true; }
     if(mode==="idle"){ mode="home"; render(); return true; }
@@ -2159,10 +2289,25 @@ window.addEventListener("resize",function(){
     _lastWide=w; render();
   },200);
 });
+
+// Phone/PWA OS back button: go back one screen instead of leaving the app. (The native tablet
+// app handles this via its own BackHandler; this covers the browser + installed PWA, where
+// Android back = browser back.) We keep one "trap" history entry armed; each back press pops it,
+// we navigate within the app, then re-arm. At home (appBack returns false) we let it really exit.
+(function(){
+  if(location.protocol.indexOf("http")!==0) return;   // file:// native → handled by BackHandler
+  try{ history.pushState({al:1},""); }catch(e){}
+  window.addEventListener("popstate",function(){
+    var handled=false;
+    try{ handled=!!(window.appBack && window.appBack()); }catch(e){}
+    if(handled){ try{ history.pushState({al:1},""); }catch(e){} }   // re-arm for the next back press
+    else { try{ history.back(); }catch(e){} }                        // at home → allow real exit
+  });
+})();
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v37";
+var APP_VERSION="v38";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
