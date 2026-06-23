@@ -14,6 +14,10 @@
  */
 (function () {
   window.Cloud = { enabled: false, ready: false, user: null, auth: null, db: null };
+  // Firebase Auth does NOT work on file:// (the native WebView) — it tries to load an auth
+  // iframe from firebaseapp.com and errors out, stalling launch. Stay local-only there. Cloud
+  // sign-in / team sync remain a web/PWA feature (served over https).
+  if (location.protocol === "file:") { window.Cloud.ready = true; return; }
   var cfg = window.FIREBASE_CONFIG;
   if (!cfg || !cfg.apiKey) { window.Cloud.ready = true; return; }   // not configured → stay off
 
