@@ -1166,9 +1166,14 @@ function actionArea(){
           ? `<div style="flex:none;display:flex;align-items:center;justify-content:center;gap:10px;font-size:13px;color:${T.sage}">
                <span>Signed in as <b style="color:${T.chalk}">${(C.user.email||"account").replace(/</g,"")}</b></span>
                <button data-act="signout" style="background:${T.surface};border:1px solid ${T.line};color:${T.chalk};border-radius:8px;padding:6px 12px;font-weight:800;font-size:12px">Sign out</button></div>`
-          : `<div style="flex:none;display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap">
-               <input id="authEmail" type="email" autocomplete="email" placeholder="you@email.com" style="flex:1;min-width:160px;max-width:260px;background:${T.surface2};border:1px solid ${T.line};color:${T.ink};border-radius:8px;padding:10px 12px;font-size:14px;outline:none">
-               <button data-act="signin" style="background:${T.lime};color:${T.field};border:none;border-radius:8px;padding:10px 16px;font-weight:800;font-size:13px">Sign in</button></div>`)
+          : `<div style="flex:none;display:flex;flex-direction:column;align-items:center;gap:9px">
+               ${IS_APP?"":`<button data-act="signingoogle" style="display:flex;align-items:center;justify-content:center;gap:10px;background:#fff;color:#1f1f1f;border:1px solid #dadce0;border-radius:8px;padding:11px 18px;font-family:${SANS};font-weight:700;font-size:14px;min-width:240px">
+                 <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.6l6.7-6.7C35.6 2.6 30.2 0 24 0 14.6 0 6.5 5.4 2.6 13.3l7.8 6.1C12.2 13.7 17.6 9.5 24 9.5z"/><path fill="#4285F4" d="M46.1 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.4c-.5 2.9-2.2 5.3-4.7 6.9l7.3 5.7c4.3-3.9 6.8-9.7 6.8-17.1z"/><path fill="#FBBC05" d="M10.4 28.6c-.5-1.5-.8-3-.8-4.6s.3-3.1.8-4.6l-7.8-6.1C1 16.5 0 20.1 0 24s1 7.5 2.6 10.7l7.8-6.1z"/><path fill="#34A853" d="M24 48c6.2 0 11.5-2 15.3-5.5l-7.3-5.7c-2 1.4-4.7 2.3-8 2.3-6.4 0-11.8-4.2-13.6-9.9l-7.8 6.1C6.5 42.6 14.6 48 24 48z"/></svg>
+                 Continue with Google</button>
+               <div style="display:flex;align-items:center;gap:8px;color:${T.sageDim};font-size:11px;font-weight:700;letter-spacing:1px"><span style="width:40px;height:1px;background:${T.line}"></span>OR<span style="width:40px;height:1px;background:${T.line}"></span></div>`}
+               <div style="display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap">
+                 <input id="authEmail" type="email" autocomplete="email" placeholder="you@email.com" style="flex:1;min-width:160px;max-width:240px;background:${T.surface2};border:1px solid ${T.line};color:${T.ink};border-radius:8px;padding:10px 12px;font-size:14px;outline:none">
+                 <button data-act="signin" style="background:${T.lime};color:${T.field};border:none;border-radius:8px;padding:10px 16px;font-weight:800;font-size:13px">Email link</button></div></div>`)
       : "";
     // Wide (tablet): two columns so the key actions fit without scrolling — only a long
     // team list scrolls, inside its own column. Narrow (phone): the classic vertical stack.
@@ -1802,6 +1807,7 @@ document.getElementById("app").addEventListener("click",e=>{
   if(act==="ptype"){ pitchType=(pitchType===arg?null:arg); render(); return; }
   if(act==="pane"){ phonePane=arg; render(); return; }
   if(act==="swapviewer"){ viewerRight=viewerRight==="field"?"feed":"field"; try{localStorage.setItem("al-viewer-right",viewerRight);}catch(e){} render(); return; }
+  if(act==="signingoogle"){ if(window.cloudSignInGoogle)window.cloudSignInGoogle(); return; }
   if(act==="signin"){ const e=document.getElementById("authEmail"); if(e&&window.cloudSignIn)window.cloudSignIn(e.value); return; }
   if(act==="signout"){ if(window.cloudSignOut)window.cloudSignOut(); return; }
   if(act==="togglevideo"){
@@ -2040,7 +2046,7 @@ let _rsz; window.addEventListener("resize",function(){clearTimeout(_rsz);_rsz=se
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v22";
+var APP_VERSION="v23";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;

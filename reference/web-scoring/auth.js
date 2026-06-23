@@ -54,6 +54,7 @@
         }
       } catch (e) {}
 
+      try { auth.getRedirectResult().catch(function () {}); } catch (e) {}   // complete Google redirect flow
       auth.onAuthStateChanged(function (u) {
         window.Cloud.user = u; window.Cloud.ready = true;
         try { if (typeof window.onCloudAuth === "function") window.onCloudAuth(u); } catch (e) {}
@@ -76,6 +77,19 @@
         cloudToast("Sign-in link sent to " + email + " — open it on this device.");
       })
       .catch(function (e) { cloudToast("Couldn't send link: " + e.message); });
+  };
+
+  // Google one-tap (browser / PWA). NOTE: Google blocks OAuth inside embedded WebViews, so the
+  // app hides this button in the native tablet app — magic-link is used there instead.
+  window.cloudSignInGoogle = function () {
+    if (!window.Cloud.auth || typeof firebase === "undefined") return;
+    var p = new firebase.auth.GoogleAuthProvider();
+    window.Cloud.auth.signInWithPopup(p).catch(function (e) {
+      var code = e && e.code;
+      if (code === "auth/popup-blocked" || code === "auth/cancelled-popup-request" || code === "auth/operation-not-supported-in-this-environment") {
+        try { window.Cloud.auth.signInWithRedirect(p); } catch (_) { cloudToast("Google sign-in failed: " + (e.message || code)); }
+      } else if (e) { cloudToast("Google sign-in failed: " + (e.message || code)); }
+    });
   };
 
   window.cloudSignOut = function () { if (window.Cloud.auth) window.Cloud.auth.signOut(); };
