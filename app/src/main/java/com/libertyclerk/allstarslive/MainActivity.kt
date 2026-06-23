@@ -3,6 +3,7 @@ package com.libertyclerk.allstarslive
 import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.AnimatedVisibility
@@ -108,7 +109,7 @@ class MainActivity : ComponentActivity() {
                 // Branded splash: hold the A logo briefly, then fade to the app (the system
                 // launch splash already shows the same logo on the dark bg, so it's seamless).
                 var showSplash by rememberSaveable { mutableStateOf(true) }
-                LaunchedEffect(Unit) { delay(1600); showSplash = false }
+                LaunchedEffect(Unit) { delay(1200); showSplash = false }
                 var tabIndex by rememberSaveable { mutableStateOf(0) }
                 val tabs = Tab.entries
                 val ctx = androidx.compose.ui.platform.LocalContext.current
@@ -119,6 +120,16 @@ class MainActivity : ComponentActivity() {
                 val inGame by AppUi.inGame.collectAsStateWithLifecycle()
                 var tabsOpen by rememberSaveable { mutableStateOf(false) }
                 val hideTabs = tabs[tabIndex] == Tab.GAME && inGame && !tabsOpen
+
+                // OS back: go back a page inside the app instead of exiting. Video tab → Game tab;
+                // otherwise ask the web page (window.appBack) to pop a screen; only when it's at
+                // the home screen do we send the app to the background (never destroy it).
+                BackHandler {
+                    if (tabIndex != 0) { tabIndex = 0 }
+                    else scorerWeb.evaluateJavascript("(window.appBack && window.appBack()) ? true : false") { r ->
+                        if (r != "true") this@MainActivity.moveTaskToBack(true)
+                    }
+                }
 
                 Box(Modifier.fillMaxSize()) {
                     Scaffold(

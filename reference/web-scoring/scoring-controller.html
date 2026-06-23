@@ -1025,6 +1025,7 @@ function miniCount(){
 function diamondNoChip(){ noFieldChip=true; const s=diamondSVG(); noFieldChip=false; return s; }
 function fieldOverlays(){
   if(noFieldChip) return "";
+  if(!isWide()) return "";   // phone: no in-field pitch chip (it crowded the small field); pitch count shows in the scorer's pitch line
   if(["locate","contact","result","runners","errpos","outpos","dppick"].includes(mode)) return "";
   const pc=currentPitchCount(),pn=currentPitcherName();
   const aH=sideHits("away"),hH=sideHits("home");
@@ -1123,7 +1124,7 @@ const IC=(p)=>`<svg viewBox="0 0 24 24" width="17" height="17" fill="none" strok
 const ICN={
   ball:IC(`<circle cx="12" cy="12" r="8.5"/><path d="M5.5 6.5c2.4 1.8 2.4 9.2 0 11M18.5 6.5c-2.4 1.8-2.4 9.2 0 11"/>`),
   strike:IC(`<path d="M6 6l12 12M18 6 6 18"/>`),
-  foul:IC(`<path d="M12 20 4 5"/><path d="M12 20 20 5"/><circle cx="12" cy="20.5" r="1.7" fill="currentColor" stroke="none"/>`),  // foul lines fanning out from home plate
+  foul:IC(`<path d="M10.5 5.4a1.5 1.5 0 0 1 3 0l-.55 8.2a.95.95 0 0 1-1.9 0z" fill="currentColor" stroke="none"/><circle cx="12" cy="18.7" r="1.8" fill="currentColor" stroke="none"/>`),  // tapered exclamation point
   inplay:IC(`<path d="M12 2.5 21.5 12 12 21.5 2.5 12z"/>`),
   walk:IC(`<path d="M4 12h12"/><path d="M13 6l6 6-6 6"/>`),
   hbp:IC(`<circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5"/><path d="M12 16.5h.01"/>`),
@@ -1212,7 +1213,7 @@ function actionArea(){
         : manageTile;
       // Centered, width-capped so on a big PC monitor the tiles stay a sane size and the
       // logo reads large — instead of two giant buttons filling the screen.
-      return `<div style="flex:1;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:clamp(16px,3vh,30px);padding:12px;overflow-y:auto">
+      return `<div style="min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:safe center;gap:clamp(16px,3vh,30px);padding:12px">
           <div style="width:100%;max-width:1000px;display:flex;flex-direction:column;gap:clamp(14px,2.4vh,26px)">
             ${hero}${authBar}
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;height:min(46vh,360px)">
@@ -1223,7 +1224,7 @@ function actionArea(){
           </div>
         </div>`;
     }
-    return `<div style="flex:1;min-height:0;display:flex;flex-direction:column;justify-content:space-evenly;gap:10px;padding:4px 0">${hero}${authBar}${resumeBtn}${newGameBtn}${teamsBlock}${manageBtn}${gameActive?shareBtnHome:""}</div>`;
+    return `<div style="min-height:100%;display:flex;flex-direction:column;justify-content:safe center;gap:14px;padding:6px 0">${hero}${authBar}${resumeBtn}${newGameBtn}${teamsBlock}${manageBtn}${gameActive?shareBtnHome:""}</div>`;
   }
   if(mode==="teams"){
     const sorted=DB.teams.slice().sort((a,b)=>(b.fav?1:0)-(a.fav?1:0));
@@ -1325,16 +1326,20 @@ function actionArea(){
           <div><div style="font-weight:800;color:${T.ink};font-size:19px">Actual start time</div>
             <div style="color:${T.sage};font-size:14px;margin-top:3px">When the game really started${G.startedAt?"":" — auto-set when you start"}</div></div>
           <input type="time" value="${startVal}" onchange="ngStartTime(this.value)" style="background:${T.surface2};border:1px solid ${T.line};color:${T.ink};border-radius:10px;padding:13px 12px;font-family:${MONO};font-size:20px;font-weight:800;outline:none"></div>`;
+    const pitchTypeCard=`<div style="${rowCard}">
+          <div><div style="font-weight:800;color:${T.ink};font-size:19px">Track pitch types</div>
+            <div style="color:${T.sage};font-size:14px;margin-top:3px">Adds FB/CB/CH/SL/OTH per pitch while scoring</div></div>
+          <button data-act="advtoggle" style="background:${advPitch?T.lime:T.surface2};border:1px solid ${advPitch?T.lime:T.line};color:${advPitch?T.field:T.sage};border-radius:999px;padding:10px 20px;font-family:${MONO};font-weight:800;font-size:15px;min-width:66px">${advPitch?"ON":"OFF"}</button></div>`;
     const startBtn=`<button data-act="ng-start" style="${bigBtn(T.lime,"width:100%;font-size:25px;padding:24px;box-shadow:0 8px 22px rgba(163,230,53,.22)",T.field)};flex:none;margin-top:2px">Start game &rarr;</button>`;
     if(isWide()){
-      // Centered + width-capped so the form fills the space instead of hugging the top with
-      // a big empty gap above the Start button.
-      return `<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:16px">
+      // Centered (safe) + width-capped so the form fills the space but still scrolls from the
+      // top when it's taller than the screen.
+      return `<div style="min-height:100%;display:flex;flex-direction:column;gap:16px;justify-content:safe center">
           ${header}
-          <div style="flex:1;min-height:0;display:flex;flex-direction:column;justify-content:center;gap:20px">
+          <div style="display:flex;flex-direction:column;gap:20px">
             <div style="width:100%;max-width:1100px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:18px;align-content:center">
               <div style="display:flex;flex-direction:column;gap:14px">${teamRow("Your team",OUR.name,OUR.color,"pickour")}${teamRow("Opponent",OPP.name,OPP.color,"pickopp")}${sideSel}</div>
-              <div style="display:flex;flex-direction:column;gap:14px">${runCapCard}${hittersCard}${startCard}</div>
+              <div style="display:flex;flex-direction:column;gap:14px">${runCapCard}${hittersCard}${pitchTypeCard}${startCard}</div>
             </div>
             <div style="width:100%;max-width:1100px;margin:0 auto">${startBtn}</div>
           </div>
@@ -1344,7 +1349,7 @@ function actionArea(){
         ${header}
         ${teamRow("Your team",OUR.name,OUR.color,"pickour")}
         ${teamRow("Opponent",OPP.name,OPP.color,"pickopp")}
-        ${sideSel}${runCapCard}${hittersCard}${startCard}${startBtn}
+        ${sideSel}${runCapCard}${hittersCard}${pitchTypeCard}${startCard}${startBtn}
       </div>`;
   }
   if(mode==="lineup"){
@@ -1461,8 +1466,7 @@ function actionArea(){
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
         <button data-act="walk" style="${flatBtn}"><span style="color:${T.sage}">${ICN.walk}</span>Walk</button>
         <button data-act="hbp" style="${flatBtn}"><span style="color:${T.sage}">${ICN.hbp}</span>HBP</button></div>
-      <button data-act="endinning" style="${flatBtn};border-left:4px solid ${T.amber}"><span style="color:${T.amber}">${ICN.inning}</span>End Inning <span style="color:${T.sage};font-weight:600;font-size:11px;text-transform:none;letter-spacing:0">${halfLabel} · ${G.outs} out${G.outs===1?"":"s"}</span></button>
-      <button data-act="advtoggle" style="${miniBtn};width:100%${advPitch?`;border-color:${T.amber};color:${T.amber}`:""}">${advPitch?"● ":""}Pitch types</button>`;
+      <button data-act="endinning" style="${flatBtn};border-left:4px solid ${T.amber}"><span style="color:${T.amber}">${ICN.inning}</span>End Inning <span style="color:${T.sage};font-weight:600;font-size:11px;text-transform:none;letter-spacing:0">${halfLabel} · ${G.outs} out${G.outs===1?"":"s"}</span></button>`;
   }
   if(mode==="locate"){
     return step("Where did it go?","Tap the field above — the fielder is set automatically.",
@@ -1990,6 +1994,23 @@ function renderToolbar(){
 }
 window.onLinkChange=renderToolbar;   // relay open/close → repaint the dot
 window.onCloudAuth=function(u){ try{ if(u&&window.cloudSyncTeams)window.cloudSyncTeams(); }catch(e){} try{ if(u&&window.cloudClaimInvite)window.cloudClaimInvite(); }catch(e){} try{ render(); }catch(e){} };   // sign-in → sync teams, claim texted invite, repaint
+// OS back button (native): go BACK one screen instead of exiting. Returns true if it handled
+// the back (navigated); false only at the root (home) so the app can background, not close.
+window.appBack=function(){
+  try{
+    if(reviewBatter){reviewBatter=null;render();return true;}
+    if(reviewInn){reviewInn=false;render();return true;}
+    if(["locate","contact","result","runners","errpos","outpos","dppick"].includes(mode)){ resetUI(); render(); return true; }
+    if(mode==="editplayer"||mode==="pickpos"||mode==="pickplayer"){ mode="lineup"; render(); return true; }
+    if(mode==="pickteam"){ mode="newgame"; render(); return true; }
+    if(mode==="lineup"||mode==="newgame"){ mode=gameActive?"idle":"home"; render(); return true; }
+    if(mode==="team"){ mode="teams"; render(); return true; }
+    if(mode==="teams"){ mode="home"; render(); return true; }
+    if(mode==="summary"){ mode="idle"; render(); return true; }
+    if(mode==="idle"){ mode="home"; render(); return true; }
+  }catch(e){}
+  return false;   // home / unknown → let the OS send the app to the background
+};
 
 /* ===== fan share: fans watch the YouTube broadcast (scorebug burned into video).
    Share that link — no separate fan page. Pass the stream via ?yt=VIDEO_ID. ===== */
@@ -2118,7 +2139,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v34";
+var APP_VERSION="v35";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
