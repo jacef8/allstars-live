@@ -1097,11 +1097,11 @@ function actionArea(){
 
     // Home header = the transparent "A" logo floating over the turf (no banner box).
     // Falls back to the text wordmark until icons/logo-mark.png (transparent) is added.
-    const hero = `<div style="display:flex;align-items:center;justify-content:center;padding:4px 0 2px;flex:none">
-          <img src="icons/logo-mark.png" alt="All-Stars Live"
-            onerror="if(this.src.indexOf('icon-512')<0){this.onerror2=1;this.src='icons/icon-512.png';this.style.borderRadius='22px';}else{this.style.display='none';this.nextElementSibling.style.display='block';}"
-            style="height:clamp(76px,14vh,132px);width:auto;display:block;filter:drop-shadow(0 8px 20px rgba(0,0,0,.55))">
-          <div style="display:none;font-family:${MONO};font-size:38px;font-weight:800;letter-spacing:1.5px;line-height:1;color:#fff">ALL-STARS <span style="color:${T.lime}">LIVE</span></div></div>`;
+    const hero = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:6px 0 2px;flex:none">
+          <img src="icons/logo-mark.png" alt=""
+            onerror="if(this.src.indexOf('icon-512')<0){this.src='icons/icon-512.png';this.style.borderRadius='20px';}else{this.style.display='none';}"
+            style="height:clamp(64px,12vh,112px);width:auto;display:block;filter:drop-shadow(0 6px 16px rgba(0,0,0,.55))">
+          <div style="font-family:${MONO};font-size:34px;font-weight:800;letter-spacing:1.5px;line-height:1;color:#fff">ALL-STARS <span style="color:${T.lime}">LIVE</span></div></div>`;
     const resumeBtn = gameActive?`<button data-act="resume" style="${bigBtn(T.safe)};font-size:17px;padding:16px;display:flex;align-items:center;justify-content:center;gap:8px">${IC(PLAY)} Resume &middot; ${OUR.short} vs ${OPP.short}</button>`:"";
     const newGameBtn = `<button data-act="newgamestart" style="${bigBtn(T.lime,"font-size:24px;padding:24px;box-shadow:0 8px 22px rgba(163,230,53,.22)",T.field)}">${IC(PLAY)} New Game</button>`;
     const manageBtn = `<button data-act="gototeams" style="${ghost};padding:17px;font-size:17px;border:2px solid #3F6CA8;color:${T.ink};display:flex;align-items:center;justify-content:center;gap:9px">${IC('<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>')} Manage teams &amp; rosters</button>`;
