@@ -566,7 +566,7 @@ function alertOverlay(){
 
 /* ===== Tools: quick-access league rule documents (editable list, opens externally) ===== */
 function defaultDocs(){ return [{name:"Diamond Youth Baseball — 2026 Official Rules",url:"https://dt5602vnjxv0c.cloudfront.net/portals/13637/docs/2026-dyb-official-playing-rules.pdf"}]; }
-function ruleDocs(){ try{ const s=JSON.parse(localStorage.getItem("al-rule-docs")||"null"); return (Array.isArray(s)&&s.length)?s:defaultDocs(); }catch(e){ return defaultDocs(); } }
+function ruleDocs(){ try{ const raw=localStorage.getItem("al-rule-docs"); if(raw==null) return defaultDocs(); const s=JSON.parse(raw); return Array.isArray(s)?s:defaultDocs(); }catch(e){ return defaultDocs(); } }  // once saved, respect an empty list (so deletes stick)
 function saveDocs(d){ try{ localStorage.setItem("al-rule-docs",JSON.stringify(d)); }catch(e){} }
 window.addDoc=function(){ const n=document.getElementById("docName"),u=document.getElementById("docUrl"); if(!n||!u)return; const name=(n.value||"").trim(),url=(u.value||"").trim(); if(!name||!url){flash("Enter a name and a link");return;} const d=ruleDocs(); d.push({name,url:/^https?:/i.test(url)?url:"https://"+url}); saveDocs(d); n.value="";u.value=""; render(); };
 window.removeDoc=function(i){ const d=ruleDocs(); d.splice(i,1); saveDocs(d); render(); };
@@ -579,6 +579,14 @@ function canManageDocs(){
   if(!C.user) return false;                      // signed-out on a cloud-enabled web app
   const em=(C.user.email||"").toLowerCase();
   return (DB.teams||[]).some(t=> (window.cloudIsOwner&&window.cloudIsOwner(t)) || (Array.isArray(t.scorers)&&t.scorers.indexOf(em)>=0) );
+}
+// Deleting a league document is owner-only (stricter than adding).
+function canDeleteDocs(){
+  if(viewerLocked) return false;
+  const C=window.Cloud;
+  if(!C||!C.enabled) return true;                // local-only device = the owner's own app
+  if(!C.user) return false;
+  return (DB.teams||[]).some(t=> window.cloudIsOwner&&window.cloudIsOwner(t) );
 }
 
 /* ===== per-batter box-score stats (both teams) ===== */
@@ -728,6 +736,7 @@ let viewerRight=(()=>{try{return localStorage.getItem("al-viewer-right")||"field
 // Opened via a watch/share link → this person is ONLY a viewer (no scoring). Lock them to viewer
 // mode and hide the Scorer/Viewer toggle (and reuse that space for the matchup they're watching).
 let viewerLocked=(()=>{try{ const p=new URLSearchParams(location.search); return p.get("view")==="viewer"||p.get("feed")==="1"||!!p.get("watch"); }catch(e){return false;}})();
+let watchTeamName=(()=>{try{ return new URLSearchParams(location.search).get("tn")||""; }catch(e){return "";}})();  // team name carried on a watch link (for the "no game yet" lobby)
 let noFieldChip=false;  // when true, diamondSVG draws no in-field pitch chip (used for the tiny viewer thumbnail)
 let gameFeed=[];   // live play-by-play (most recent last) for the viewer feed
 // Advanced pitch tracking: when on, the scorer arms a pitch type that's recorded with
@@ -1529,13 +1538,14 @@ function actionArea(){
   if(mode==="tools"){
     const docs=ruleDocs();
     const canMng=canManageDocs();
+    const canDel=canDeleteDocs();
     const cell2=`background:${T.surface2};border:1px solid ${T.line};color:${T.ink};border-radius:8px;padding:11px 12px;font-weight:700;outline:none`;
     const rows=docs.map((d,i)=>`<div style="display:flex;align-items:center;gap:8px;background:${T.surface};border:1px solid ${T.line};border-radius:10px;padding:12px 14px">
         <button data-act="opendoc" data-arg="${i}" style="flex:1;min-width:0;text-align:left;background:none;border:none;color:${T.chalk};cursor:pointer">
           <div style="font-weight:800;font-size:16px;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">&#128196; ${(d.name||"Document").replace(/</g,"")}</div>
           <div style="font-size:12px;color:${T.sage};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px">${(d.url||"").replace(/</g,"")}</div></button>
         <span style="color:${T.lime};font-weight:800;font-size:13px">OPEN &rsaquo;</span>
-        ${canMng?`<button data-act="rmdoc" data-arg="${i}" style="background:none;border:1px solid ${T.line};color:${T.out};border-radius:7px;padding:8px 10px;font-weight:800">&times;</button>`:""}</div>`).join("");
+        ${canDel?`<button data-act="rmdoc" data-arg="${i}" title="Delete (owner only)" style="background:none;border:1px solid ${T.line};color:${T.out};border-radius:7px;padding:8px 10px;font-weight:800">&times;</button>`:""}</div>`).join("");
     return `<div style="display:flex;flex-direction:column;gap:14px">
         <div style="display:flex;align-items:center;gap:10px">
           <button data-act="gohome" style="${ghost};padding:9px 11px">&lsaquo; Home</button>
@@ -1832,6 +1842,21 @@ function setupLineupDrag(){
 /* Tablet-in-landscape = wide enough for a side panel instead of a bottom sheet. */
 function isWide(){return window.innerWidth>=760 && window.innerWidth>window.innerHeight;}
 function render(){
+  // Watch-link viewer, but no live game yet → show a friendly lobby instead of the Home screen
+  // (a fan opening "Invite to watch" before first pitch shouldn't land on New Game / Manage Teams).
+  // It auto-switches to the live game the moment the scorer's broadcast arrives (see applyRemote).
+  if(viewerLocked && !gameActive && !_remoteLive){
+    renderToolbar();
+    const nm=(watchTeamName||"").replace(/</g,"");
+    document.getElementById("content").innerHTML=`<div style="flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding:24px">
+        <div class="frost-card" style="max-width:440px;text-align:center;background:rgba(13,19,32,.82);border:1px solid ${T.line};border-radius:18px;padding:30px 26px">
+          <div style="font-size:44px;line-height:1;margin-bottom:10px">⚾</div>
+          <div style="font-family:${MONO};font-size:22px;font-weight:800;color:#fff;letter-spacing:.4px">${nm?nm+" — ":""}No game in progress</div>
+          <div style="font-size:14px;color:${T.sage};margin-top:10px;line-height:1.5">The game hasn't started yet. This page switches to the live game automatically the moment the scorer begins — keep it open.</div>
+          <div style="margin-top:18px;display:inline-flex;align-items:center;gap:6px;font-size:11px;letter-spacing:1.4px;color:${T.lime};font-weight:800;background:${T.surface};border:1px solid ${T.line};border-radius:999px;padding:6px 13px">👁 WATCHING LIVE</div>
+        </div></div>`;
+    return;
+  }
   renderToolbar();
   const menu=(mode==="home"||mode==="teams"||mode==="team"||mode==="pickteam"||mode==="newgame"||mode==="lineup"||mode==="pickplayer"||mode==="pickpos"||mode==="editplayer"||mode==="summary"||mode==="tools");
   if(IS_APP&&window.AllStars.setInGame){ try{ AllStars.setInGame(!menu); }catch(e){} }   // hide native tabs during a game
@@ -2254,8 +2279,12 @@ function appBaseUrl(){
 let shareMode="feed";   // "feed" = scorebug + play-by-play only (no video); "video" = include the stream
 function shareUrl(){
   const base=appBaseUrl();
-  if(shareMode==="video"){ const yt=streamYt(); if(yt) return base+"?view=viewer&yt="+encodeURIComponent(yt); }
-  return base+"?view=viewer&feed=1";   // feed-only viewer
+  // Carry the team (id + short name) so a viewer who opens the link before the game starts sees a
+  // "waiting for <team>" lobby instead of a blank/Home screen.
+  const t=teamById(openTeamId)||curTeam();
+  const teamQ=t?("&team="+encodeURIComponent(t.id)+"&tn="+encodeURIComponent(t.short||t.name||"")):"";
+  if(shareMode==="video"){ const yt=streamYt(); if(yt) return base+"?view=viewer&yt="+encodeURIComponent(yt)+teamQ; }
+  return base+"?view=viewer&feed=1"+teamQ;   // feed-only viewer
 }
 function openShare(){
   const hasVid=!!streamYt();
@@ -2385,7 +2414,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v41";
+var APP_VERSION="v42";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
