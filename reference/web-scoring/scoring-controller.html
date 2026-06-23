@@ -37,9 +37,15 @@
      to transparent at runtime (see IS_APP below) so the native camera-preview layer shows
      through the monitor region; the app paints a matching #0B0E13 backdrop behind it. */
   html,body{margin:0;height:100%;font-family:var(--sans);
-    /* Blue turf behind everything, dark-scrimmed so the cards/text stay readable.
+    /* Blue turf shows in the open areas; only a light scrim so it's clearly visible.
+       Readability comes from the frosted "windows" below, not from darkening the turf.
        The native app overrides this to transparent (IS_APP) and paints the turf natively. */
-    background:linear-gradient(rgba(8,13,22,.82),rgba(6,10,18,.88)), url("bg-turf.jpg") center center / cover no-repeat #0B0E13;}
+    background:linear-gradient(rgba(7,11,19,.28),rgba(7,11,19,.50)), url("bg-turf.jpg") center center / cover no-repeat #0B0E13;}
+  /* Frosted-glass "windows": the inline solid card/panel surfaces become translucent with a
+     heavy blur, so the turf shows (blurred) behind them and stays sharp in the open areas. */
+  [style*="background:#212A38"],[style*="background:#324056"],[style*="background:#1D3A66"]{
+    background-color:rgba(15,23,38,.55)!important;
+    -webkit-backdrop-filter:blur(16px) saturate(1.15);backdrop-filter:blur(16px) saturate(1.15);}
   button{font-family:var(--sans);cursor:pointer;
     transition:transform .12s var(--ease-soft), filter .15s ease, box-shadow .18s ease, background .15s ease;}
   button:active{transform:scale(.94);filter:brightness(1.14) drop-shadow(0 0 7px rgba(163,230,53,.32));}
@@ -729,6 +735,15 @@ function diamondSVG(){
   const marker=tap?`<g><circle cx="${tap.x}" cy="${tap.y}" r="9" fill="none" stroke="${FIELDLINE}" stroke-width="3"/><circle cx="${tap.x}" cy="${tap.y}" r="9" fill="none" stroke="${T.clay}" stroke-width="1.5"/>
       <circle cx="${tap.x}" cy="${tap.y}" r="3" fill="${T.clay}"/></g>`:"";
   const ballFly="";
+  // Mower/lawn stripes: radiating wedges from home plate across the outfield fan,
+  // alternating subtle light/dark like a groomed field (echoes the turf background).
+  const lawnStripes=(()=>{
+    const P0=[8,108],P1=[150,-12],P2=[292,108],H=[150,250],N=9; let s="";
+    const B=t=>{const u=1-t;return [u*u*P0[0]+2*u*t*P1[0]+t*t*P2[0], u*u*P0[1]+2*u*t*P1[1]+t*t*P2[1]];};
+    for(let i=0;i<N;i++){const a=B(i/N),b=B((i+1)/N);const fill=i%2?"rgba(0,0,0,.10)":"rgba(255,255,255,.07)";
+      s+=`<path d="M${H[0]},${H[1]} L${a[0].toFixed(1)},${a[1].toFixed(1)} L${b[0].toFixed(1)},${b[1].toFixed(1)} Z" fill="${fill}"/>`;}
+    return s;
+  })();
   const zoneSVG=showZones?zonesOverlay():"";
   const banner=armed?`<div style="position:absolute;inset:0;display:flex;align-items:flex-start;justify-content:center;pointer-events:none;padding-top:8px">
       <span style="background:${T.clay};color:#FFFFFF;font-size:11px;font-weight:800;padding:4px 10px;border-radius:999px;letter-spacing:.3px">Tap where the ball went</span></div>`:"";
@@ -736,6 +751,7 @@ function diamondSVG(){
     <svg id="field-svg" viewBox="0 0 300 280" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" style="display:block">
       <defs>${markerDefs}</defs>
       <path d="M150,250 L292,108 Q150,-12 8,108 Z" fill="${T.grass}"/>
+      ${lawnStripes}
       <path d="M150,250 L246,154 Q150,70 54,154 Z" fill="${T.grassLt}" opacity="0.45"/>
       <polygon points="150,256 218,186 150,116 82,186" fill="${T.clay}" opacity="0.92"/>
       <polygon points="150,250 214,186 150,122 86,186" fill="${T.grassLt}" opacity="0.7"/>
