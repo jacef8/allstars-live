@@ -82,6 +82,31 @@
       .onSnapshot(function (s) { merge(s.docs); }, function (e) { console.warn("teams(scorer):", e.message); }));
   };
 
+  // Claim a texted invite: ?invite=<teamId> in the URL → add me as a scorer on that team.
+  // (Rules allow a signed-in user to append ONLY their own email; the owner can remove anyone.)
+  window.cloudClaimInvite = function () {
+    var d = fdb(), em = myEmail(); if (!d || !em) return;
+    var tid; try { tid = new URLSearchParams(location.search).get("invite"); } catch (e) {}
+    if (!tid) return;
+    d.collection("teams").doc(tid).update({
+      scorers: firebase.firestore.FieldValue.arrayUnion(em), updatedAt: Date.now(),
+    })
+      .then(function () { ctoast("You're now an authorized scorer for this team."); })
+      .catch(function (e) { ctoast("Couldn't join team: " + e.message); })
+      .finally(function () {
+        try { var u = new URL(location.href); u.searchParams.delete("invite"); history.replaceState(null, "", u.pathname + u.search); } catch (e) {}
+      });
+  };
+
+  function ctoast(msg) {
+    try {
+      var dv = document.createElement("div");
+      dv.textContent = msg;
+      dv.setAttribute("style", "position:fixed;left:50%;top:16px;transform:translateX(-50%);z-index:100000;background:#A3E635;color:#0B0E13;font-family:system-ui,sans-serif;font-weight:800;font-size:13px;padding:10px 16px;border-radius:999px;box-shadow:0 8px 24px rgba(0,0,0,.5);max-width:90vw;text-align:center");
+      document.body.appendChild(dv); setTimeout(function () { try { dv.remove(); } catch (e) {} }, 5000);
+    } catch (e) {}
+  }
+
   // Is the signed-in user the owner of (or first to claim) this team?
   window.cloudIsOwner = function (t) {
     var u = myUid(); if (!u || !t) return false;

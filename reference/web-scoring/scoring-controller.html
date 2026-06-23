@@ -1250,7 +1250,8 @@ function actionArea(){
         <div style="font-size:13px;color:${T.sage};margin-bottom:6px">Owner: <b style="color:${T.chalk};word-break:break-all">${(t.ownerEmail||C.user.email||"you").replace(/</g,"")}</b></div>
         ${(t.scorers&&t.scorers.length)?t.scorers.map(s=>`<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 0;border-top:1px solid ${T.line}"><span style="font-size:13px;color:${T.chalk};word-break:break-all">${s.replace(/</g,"")}</span>${owner?`<button data-act="rmscorer" data-arg="${s}" style="background:none;border:1px solid ${T.line};color:${T.out};border-radius:7px;padding:5px 10px;font-weight:800;font-size:12px">Remove</button>`:""}</div>`).join(""):`<div style="font-size:12px;color:${T.sageDim};padding:4px 0">No authorized scorers yet.</div>`}
         ${owner?`<div style="display:flex;gap:8px;margin-top:10px"><input id="scorerEmail" type="email" autocomplete="off" placeholder="scorer@email.com" style="${cell};flex:1;min-width:0"><button data-act="addscorer" style="background:${T.lime};color:${T.field};border:none;border-radius:8px;padding:9px 14px;font-weight:800;font-size:13px">Add</button></div>
-          <div style="font-size:11px;color:${T.sageDim};margin-top:6px">They sign in with this email to score this team's games.</div>`:`<div style="font-size:11px;color:${T.sageDim};margin-top:6px">Only the owner can add scorers.</div>`}</div>`;
+          <button data-act="invitetext" style="${ghost};width:100%;margin-top:8px;display:flex;align-items:center;justify-content:center;gap:8px">&#128241; Invite a scorer by text</button>
+          <div style="font-size:11px;color:${T.sageDim};margin-top:6px">Add by email, or text them a link — they tap it, sign in once, and they're in.</div>`:`<div style="font-size:11px;color:${T.sageDim};margin-top:6px">Only the owner can add scorers.</div>`}</div>`;
     return `<div style="display:flex;flex-direction:column;gap:12px">
         <div style="display:flex;align-items:center;gap:10px">
           <button data-act="teamsback" style="${ghost};padding:9px 11px">&lsaquo; Teams</button>
@@ -1826,6 +1827,7 @@ document.getElementById("app").addEventListener("click",e=>{
   if(act==="swapviewer"){ viewerRight=viewerRight==="field"?"feed":"field"; try{localStorage.setItem("al-viewer-right",viewerRight);}catch(e){} render(); return; }
   if(act==="addscorer"){ const e=document.getElementById("scorerEmail"); if(e&&window.cloudAddScorer){ window.cloudAddScorer(openTeamId,e.value); e.value=""; } return; }
   if(act==="rmscorer"){ if(window.cloudRemoveScorer)window.cloudRemoveScorer(openTeamId,arg); return; }
+  if(act==="invitetext"){ const t=teamById(openTeamId); const url=appBaseUrl()+"?invite="+encodeURIComponent(openTeamId); const body="You're invited to score "+(t&&t.name?t.name:"our team")+" on All-Stars Live. Tap to join (sign in once): "+url; location.href="sms:?&body="+encodeURIComponent(body); return; }
   if(act==="lineupback"){ mode=gameActive?"idle":"home"; render(); return; }
   if(act==="signingoogle"){ if(window.cloudSignInGoogle)window.cloudSignInGoogle(); return; }
   if(act==="signin"){ const e=document.getElementById("authEmail"); if(e&&window.cloudSignIn)window.cloudSignIn(e.value); return; }
@@ -1969,7 +1971,7 @@ function renderToolbar(){
   </div>`;
 }
 window.onLinkChange=renderToolbar;   // relay open/close → repaint the dot
-window.onCloudAuth=function(u){ try{ if(u&&window.cloudSyncTeams)window.cloudSyncTeams(); }catch(e){} try{ render(); }catch(e){} };   // sign-in → sync teams + repaint
+window.onCloudAuth=function(u){ try{ if(u&&window.cloudSyncTeams)window.cloudSyncTeams(); }catch(e){} try{ if(u&&window.cloudClaimInvite)window.cloudClaimInvite(); }catch(e){} try{ render(); }catch(e){} };   // sign-in → sync teams, claim texted invite, repaint
 
 /* ===== fan share: fans watch the YouTube broadcast (scorebug burned into video).
    Share that link — no separate fan page. Pass the stream via ?yt=VIDEO_ID. ===== */
@@ -2098,7 +2100,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v29";
+var APP_VERSION="v30";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;

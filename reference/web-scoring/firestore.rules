@@ -19,12 +19,25 @@ service cloud.firestore {
       // Create: must stamp yourself as the owner.
       allow create: if request.auth != null && request.resource.data.ownerUid == request.auth.uid;
 
-      // Update: owner = anything. Scorer = anything EXCEPT changing owner or the scorers list.
-      allow update: if isOwner() || (
-        isScorer() &&
-        request.resource.data.ownerUid == resource.data.ownerUid &&
-        request.resource.data.scorers == resource.data.scorers
-      );
+      // Update:
+      //  • Owner = anything.
+      //  • Scorer = anything EXCEPT changing owner or the scorers list.
+      //  • Self-join (texted invite): any signed-in user may append ONLY their own email to
+      //    `scorers` (adds exactly one entry, their email, which wasn't there before) and
+      //    touch nothing else. The owner can remove anyone.
+      allow update: if isOwner()
+        || (
+          isScorer() &&
+          request.resource.data.ownerUid == resource.data.ownerUid &&
+          request.resource.data.scorers == resource.data.scorers
+        )
+        || (
+          request.auth != null &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['scorers', 'updatedAt']) &&
+          !(request.auth.token.email in resource.data.scorers) &&
+          (request.auth.token.email in request.resource.data.scorers) &&
+          request.resource.data.scorers.size() == resource.data.scorers.size() + 1
+        );
 
       allow delete: if isOwner();
     }
