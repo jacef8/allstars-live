@@ -3,15 +3,17 @@
  * connection at the field. The live game data (relay WebSocket, Firebase, the
  * YouTube player) is cross-origin / non-GET, so it always goes straight to the
  * network — only the static shell is cached here. Bump CACHE to ship an update. */
-const CACHE = "allstars-v1";
+const CACHE = "allstars-v2";
 const SHELL = [
   "./",
   "./scoring-controller.html",
   "./manifest.webmanifest",
+  "./bg-turf.jpg",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
   "./icons/icon-maskable-512.png",
   "./icons/apple-touch-icon.png",
+  "./icons/favicon-32.png",
   "./lib/qrcode.min.js",
 ];
 

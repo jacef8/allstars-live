@@ -15,6 +15,8 @@
 <meta name="application-name" content="All-Stars" />
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
 <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png" />
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png" />
+<link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16.png" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@500;600;700;800&family=Barlow:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -34,7 +36,10 @@
   /* Dark theme background everywhere (browser/PWA). Inside the NATIVE app we switch this
      to transparent at runtime (see IS_APP below) so the native camera-preview layer shows
      through the monitor region; the app paints a matching #0B0E13 backdrop behind it. */
-  html,body{margin:0;height:100%;background:#0B0E13;font-family:var(--sans);}
+  html,body{margin:0;height:100%;font-family:var(--sans);
+    /* Blue turf behind everything, dark-scrimmed so the cards/text stay readable.
+       The native app overrides this to transparent (IS_APP) and paints the turf natively. */
+    background:linear-gradient(rgba(8,13,22,.82),rgba(6,10,18,.88)), url("bg-turf.jpg") center center / cover no-repeat #0B0E13;}
   button{font-family:var(--sans);cursor:pointer;
     transition:transform .12s var(--ease-soft), filter .15s ease, box-shadow .18s ease, background .15s ease;}
   button:active{transform:scale(.94);filter:brightness(1.14) drop-shadow(0 0 7px rgba(163,230,53,.32));}
