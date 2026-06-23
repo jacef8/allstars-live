@@ -242,6 +242,16 @@ function teamRemovePlayer(t,pid){if(t.players.length<=9)return;t.players=t.playe
 /* Make a saved team the active "our" team for a game. */
 function selectTeam(id){const t=teamById(id);if(!t)return;curTeamId=id;ROSTER=t.players;
   OUR.name=t.name;OUR.short=t.short||t.name.slice(0,3).toUpperCase();OUR.color=t.color||OUR.color;}
+let lineupManageTeamId=null;   // when set, the lineup editor is editing a TEAM's saved lineup (Done = save, not start a game)
+/* Load a team's saved batting order/positions into G.lineup (used when a game starts). */
+function loadTeamLineup(t){ if(t&&t.lineup&&t.lineup.order&&t.lineup.order.length){ G.lineup={order:t.lineup.order.slice(), pos:Object.assign({},t.lineup.pos||{})}; } }
+/* ===== export / import (JSON files) — backup & move teams/games between devices ===== */
+function downloadJSON(filename,obj){ try{ const blob=new Blob([JSON.stringify(obj,null,2)],{type:"application/json"}); const url=URL.createObjectURL(blob); const a=document.createElement("a"); a.href=url; a.download=filename; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>{try{URL.revokeObjectURL(url);}catch(e){}},1500); }catch(e){ try{alert("Export failed: "+e.message);}catch(x){} } }
+function pickJSON(onObj){ const inp=document.createElement("input"); inp.type="file"; inp.accept=".json,application/json"; inp.onchange=function(){ const f=inp.files&&inp.files[0]; if(!f)return; const r=new FileReader(); r.onload=function(){ try{ onObj(JSON.parse(r.result)); }catch(e){ try{alert("Couldn't read that file: "+e.message);}catch(x){} } }; r.readAsText(f); }; inp.click(); }
+window.exportTeam=function(id){ const t=teamById(id); if(!t)return; downloadJSON(((t.name||"team").replace(/[^a-z0-9]+/gi,"_"))+".allstars-team.json",{kind:"allstars-team",v:1,team:t}); };
+window.importTeam=function(){ pickJSON(function(o){ const t=(o&&o.team&&o.team.players)?o.team:(o&&o.players?o:null); if(!t||!t.players){try{alert("That's not a team file.");}catch(e){} return;} t.id=nextId("t"); delete t.ownerUid; delete t.ownerEmail; delete t.scorers; (t.players||[]).forEach(ensureName); if(!t.record)t.record={w:0,l:0,t:0}; if(!t.season)t.season={}; DB.teams.push(t); saveDB(); openTeamId=t.id; mode="team"; render(); }); };
+window.exportGame=function(){ downloadJSON("game-"+((OUR.short||"home"))+"-vs-"+((OPP.short||"opp"))+".allstars-game.json",{kind:"allstars-game",v:1,G,OUR,OPP,curTeamId,oppTeamId}); };
+window.importGame=function(){ pickJSON(function(o){ if(!o||!o.G){try{alert("That's not a game file.");}catch(e){} return;} G=o.G; if(o.OUR)Object.assign(OUR,o.OUR); if(o.OPP)Object.assign(OPP,o.OPP); curTeamId=o.curTeamId||null; oppTeamId=o.oppTeamId||null; const t=curTeamId&&teamById(curTeamId); if(t)ROSTER=t.players; gameActive=true; resetUI(); render(); try{broadcast();}catch(e){} }); };
 /* Season accumulation row, keyed by player id (full box). */
 function seasonRow(t,pid){if(!t.season[pid])t.season[pid]={bat:{ab:0,r:0,h:0,rbi:0,bb:0,k:0},pitch:{ip:0,k:0,bb:0,h:0,r:0},field:{po:0,a:0,e:0}};return t.season[pid];}
 const ourRuns=()=>G.ourSide==="home"?G.home:G.away, oppRuns=()=>G.ourSide==="home"?G.away:G.home;
@@ -1243,6 +1253,7 @@ function actionArea(){
         <div style="font-size:12px;color:${T.sage};margin-top:-6px">Manage rosters &amp; season stats.</div>
         <div style="display:flex;flex-direction:column;gap:8px">${cards}</div>
         <button data-act="newteam" style="${bigBtn(OUR.color)}">${IC('<path d="M12 5v14M5 12h14"/>')} New team</button>
+        <div style="display:flex;gap:8px"><button data-act="importteam" style="${ghost};flex:1">&#8682; Import team</button><button data-act="importgame" style="${ghost};flex:1">&#8682; Import game</button></div>
       </div>`;
   }
   if(mode==="team"){
@@ -1285,6 +1296,9 @@ function actionArea(){
         <button data-act="addteamp" style="${ghost}">+ Add player</button>
         ${statTable}
         ${scorersSection}
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button data-act="editlineup" style="${ghost};flex:1;min-width:140px">&#9776; Edit lineup</button>
+          <button data-act="exportteam" style="${ghost};flex:1;min-width:140px">&#8681; Export team</button></div>
         <button data-act="startteam" style="${bigBtn(t.color)}">${IC('<path d="M8 5l11 7-11 7z" fill="currentColor" stroke="none"/>')} Start game with ${t.short}</button>
       </div>`;
   }
@@ -1367,7 +1381,7 @@ function actionArea(){
         ${luToggle}
         <div style="flex:1 1 auto;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:6px">${orows}</div>
         <button data-act="oppadd" style="${ghost};flex-shrink:0">+ Add hitter</button>
-        <button data-act="lineupdone" style="${bigBtn(T.lime,"",T.field)}flex-shrink:0">Done</button>`;
+        <button data-act="lineupdone" style="${bigBtn(T.lime,"",T.field)}flex-shrink:0">${lineupManageTeamId?"Save lineup":"Done"}</button>`;
     }
     const rows=G.lineup.order.map((ri,slot)=>{const p=ROSTER[ri],pos=posOfPlayer(ri)||"—",isP=pos==="P";
       return `<div data-row data-ri="${ri}" style="display:flex;align-items:center;gap:6px;background:${T.surface};border:1px solid ${T.line};border-radius:9px;padding:8px 8px">
@@ -1449,6 +1463,7 @@ function actionArea(){
           <div style="overflow-x:auto;background:${T.surface};border:1px solid ${T.line};border-radius:10px;padding:4px 6px"><table style="width:100%;border-collapse:collapse;font-family:${MONO};font-size:17px;text-align:center;color:${T.chalk}"><thead><tr style="color:${T.sageDim};font-size:13px"><th style="text-align:left;padding:4px 6px">Batter</th><th>AB</th><th>R</th><th>H</th><th>RBI</th><th>BB</th><th>K</th></tr></thead><tbody>${bb||`<tr><td colspan="7" style="padding:8px;color:${T.sageDim}">No at-bats recorded</td></tr>`}</tbody></table></div></div>
         <div style="display:flex;gap:10px">
           <button data-act="resumegame" style="${ghost};flex:1;padding:14px">&lsaquo; Resume game</button>
+          <button data-act="exportgame" style="${ghost};flex:1;padding:14px">&#8681; Export</button>
           <button data-act="summary-done" style="${bigBtn(OUR.color)};flex:2">Done</button></div>
       </div>`;
   }
@@ -1850,7 +1865,11 @@ document.getElementById("app").addEventListener("click",e=>{
   if(act==="addscorer"){ const e=document.getElementById("scorerEmail"); if(e&&window.cloudAddScorer){ window.cloudAddScorer(openTeamId,e.value); e.value=""; } return; }
   if(act==="rmscorer"){ if(window.cloudRemoveScorer)window.cloudRemoveScorer(openTeamId,arg); return; }
   if(act==="invitetext"){ const t=teamById(openTeamId); const url=appBaseUrl()+"?invite="+encodeURIComponent(openTeamId); const body="You're invited to score "+(t&&t.name?t.name:"our team")+" on All-Stars Live. Tap to join (sign in once): "+url; location.href="sms:?&body="+encodeURIComponent(body); return; }
-  if(act==="lineupback"){ mode=gameActive?"idle":"home"; render(); return; }
+  if(act==="lineupback"){ if(lineupManageTeamId){ openTeamId=lineupManageTeamId; lineupManageTeamId=null; mode="team"; render(); return; } mode=gameActive?"idle":"home"; render(); return; }
+  if(act==="exportteam"){ if(window.exportTeam)window.exportTeam(openTeamId); return; }
+  if(act==="importteam"){ if(window.importTeam)window.importTeam(); return; }
+  if(act==="exportgame"){ if(window.exportGame)window.exportGame(); return; }
+  if(act==="importgame"){ if(window.importGame)window.importGame(); return; }
   if(act==="signingoogle"){ if(window.cloudSignInGoogle)window.cloudSignInGoogle(); return; }
   if(act==="signin"){ const e=document.getElementById("authEmail"); if(e&&window.cloudSignIn)window.cloudSignIn(e.value); return; }
   if(act==="signout"){ if(window.cloudSignOut)window.cloudSignOut(); return; }
@@ -1891,7 +1910,11 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="confirm")commit(result,plan);
   else if(act==="zones"){showZones=!showZones;render();}
   else if(act==="lineup"){mode="lineup";render();}
-  else if(act==="lineupdone"){gameActive=true;mode="idle";render();broadcast();}   // timer does NOT start here — it starts on the first pitch (see recordPitch)
+  else if(act==="lineupdone"){
+    if(lineupManageTeamId){ const t=teamById(lineupManageTeamId); if(t){ t.lineup={order:G.lineup.order.slice(), pos:Object.assign({},G.lineup.pos||{})}; saveDB(); } openTeamId=lineupManageTeamId; lineupManageTeamId=null; mode="team"; render(); return; }   // editing a saved team lineup → save & back, NOT start a game
+    gameActive=true;mode="idle";render();broadcast();   // timer does NOT start here — it starts on the first pitch (see recordPitch)
+  }
+  else if(act==="editlineup"){ const t=teamById(openTeamId); if(!t)return; lineupManageTeamId=t.id; ROSTER=t.players; if(t.lineup&&t.lineup.order&&t.lineup.order.length){G.lineup={order:t.lineup.order.slice(),pos:Object.assign({},t.lineup.pos||{})};} else {G.lineup={order:t.players.map((_,i)=>i).slice(0,Math.min(9,t.players.length)),pos:{P:0,C:1,"1B":2,"2B":3,"3B":4,SS:5,LF:6,CF:7,RF:8}};} lineupTab="us"; mode="lineup"; render(); }
   else if(act==="lutab"){lineupTab=arg;render();}
   else if(act==="oppadd"){if(!G.oppLineup)G.oppLineup=[];G.oppLineup.push({num:String(G.oppLineup.length+1),name:""});G.oppBatters=G.oppLineup.length;render();}
   else if(act==="opprem"){if(G.oppLineup&&G.oppLineup.length>1){G.oppLineup.splice(+arg,1);G.oppBatters=G.oppLineup.length;render();broadcast();}}
@@ -1914,7 +1937,7 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="newgame"){mode="newgame";render();}
   else if(act==="gohome"){mode="home";render();}
   else if(act==="newgamestart"){mode="newgame";render();}
-  else if(act==="homestart"){selectTeam(arg);G=initGame();hist=[];resetUI();mode="newgame";render();broadcast();}
+  else if(act==="homestart"){selectTeam(arg);G=initGame();loadTeamLineup(teamById(curTeamId));hist=[];resetUI();mode="newgame";render();broadcast();}
   else if(act==="gototeams"){mode="teams";render();}
   else if(act==="opent"){openTeamId=arg;mode="team";render();}
   else if(act==="favteam"){const t=teamById(arg);if(t){t.fav=!t.fav;saveDB();}render();}
@@ -1923,7 +1946,7 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="teamsback"){mode="teams";render();}
   else if(act==="addteamp"){const t=teamById(openTeamId);if(t)teamAddPlayer(t);render();}
   else if(act==="rmteamp"){const t=teamById(openTeamId);if(t)teamRemovePlayer(t,arg);render();}
-  else if(act==="startteam"){selectTeam(openTeamId);G=initGame();hist=[];resetUI();mode="newgame";render();broadcast();}
+  else if(act==="startteam"){selectTeam(openTeamId);G=initGame();loadTeamLineup(teamById(curTeamId));hist=[];resetUI();mode="newgame";render();broadcast();}
   else if(act==="pickour"){pickFor="our";mode="pickteam";render();}
   else if(act==="pickopp"){pickFor="opp";mode="pickteam";render();}
   else if(act==="setteam"){const id=arg;if(pickFor==="our"){selectTeam(id);}else{const t=teamById(id);oppTeamId=id;if(t){OPP.name=t.name;OPP.short=t.short;OPP.color=t.color;}}mode="newgame";render();broadcast();}
@@ -2139,7 +2162,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v36";
+var APP_VERSION="v37";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
