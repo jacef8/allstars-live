@@ -376,6 +376,7 @@ const initGame=()=>({inning:1,half:"T",away:0,home:0,outs:0,balls:0,strikes:0,
   line:{away:{},home:{}},   // runs per inning, e.g. line.away[3]=2  (drives the R-H-E line score)
   errors:{away:0,home:0},   // team errors (E column)
   final:false,     // set true by "End Game" so the viewer shows the Final summary
+  startedAt:null,  // wall-clock ms when the game ACTUALLY started (auto-set at first pitch / game start; editable in Game Setup) — drives the game timer
   lineup:{ order:[0,1,2,3,4,5,6,7,8],   // batting order: 9-12 entries (slots 10+ = extra hitters)
            pos:{P:0,C:1,"1B":2,"2B":3,"3B":4,SS:5,LF:6,CF:7,RF:8} }});
 let G=initGame(),hist=[],mode="home",tap=null,contact=null,result=null,plan=null,toast=null,toastTimer=null,curResults=[],showAll=false,showZones=false,editSlot=null,confirmAct=null,gameActive=false,lineupTab="us";
@@ -790,6 +791,18 @@ function diamondSVG(){
     </svg>${banner}${fieldOverlays()}</div>`;
 }
 
+/* ===== game timer: elapsed since the ACTUAL start (G.startedAt) ===== */
+function gameClockStr(){
+  if(!G.startedAt) return "—";
+  let s=Math.max(0,Math.floor((Date.now()-G.startedAt)/1000));
+  const h=Math.floor(s/3600); s-=h*3600; const m=Math.floor(s/60); s-=m*60;
+  const p=n=>String(n).padStart(2,"0");
+  return h>0?`${h}:${p(m)}:${p(s)}`:`${m}:${p(s)}`;
+}
+let _clockTimer=null;
+function startClock(){ if(_clockTimer)return; _clockTimer=setInterval(function(){ const t=gameClockStr(); document.querySelectorAll(".game-clock").forEach(el=>{el.textContent=t;}); },1000); }
+window.ngStartTime=function(v){ if(!v)return; const a=v.split(":"); const d=new Date(); d.setHours(+a[0]||0,+a[1]||0,0,0); G.startedAt=d.getTime(); try{saveGame();}catch(e){} render(); };
+
 function statusBar(){
   const tabRow=(t,val,act)=>`<div style="display:flex;align-items:center;height:34px">
       <span style="width:5px;height:100%;background:${TEAMS[t].color};border-radius:2px;opacity:${act?1:.45}"></span>
@@ -807,7 +820,8 @@ function statusBar(){
       ${tabRow("away",G.away,G.half==="T")}${tabRow("home",G.home,G.half==="B")}</div>
     <div style="display:flex;align-items:center;justify-content:center;padding:0 12px;flex:1;gap:clamp(10px,4.5vw,38px)">
       <div style="text-align:center"><div style="font-family:${MONO};font-size:13px;font-weight:700;color:${T.sage};letter-spacing:.6px">${G.half==="T"?"TOP":"BOT"}</div>
-        <div style="font-family:${MONO};font-size:34px;font-weight:800;color:${T.chalk};line-height:.95">${G.inning}</div></div>
+        <div style="font-family:${MONO};font-size:34px;font-weight:800;color:${T.chalk};line-height:.95">${G.inning}</div>
+        ${G.startedAt?`<div style="font-family:${MONO};font-size:11px;font-weight:700;color:${T.sage};margin-top:5px;white-space:nowrap" title="Game time">&#9201; <span class="game-clock">${gameClockStr()}</span></div>`:""}</div>
       ${diamond}
       <div style="display:flex;flex-direction:column;gap:6px">
         ${pipRow("B","b",G.balls,3,"sb-balls")}
@@ -1254,6 +1268,11 @@ function actionArea(){
           <div><div style="font-weight:800;color:${T.ink};font-size:19px">Number of hitters</div>
             <div style="color:${T.sage};font-size:14px;margin-top:3px">In the opponent's lineup</div></div>
           <input type="number" inputmode="numeric" min="1" max="15" value="${G.oppBatters}" oninput="ngOppBatters(this.value)" style="${inpSm}"></div>`;
+    const startVal=G.startedAt?(()=>{const d=new Date(G.startedAt),p=n=>String(n).padStart(2,"0");return p(d.getHours())+":"+p(d.getMinutes());})():"";
+    const startCard=`<div style="${rowCard}">
+          <div><div style="font-weight:800;color:${T.ink};font-size:19px">Actual start time</div>
+            <div style="color:${T.sage};font-size:14px;margin-top:3px">When the game really started${G.startedAt?"":" — auto-set when you start"}</div></div>
+          <input type="time" value="${startVal}" onchange="ngStartTime(this.value)" style="background:${T.surface2};border:1px solid ${T.line};color:${T.ink};border-radius:10px;padding:13px 12px;font-family:${MONO};font-size:20px;font-weight:800;outline:none"></div>`;
     const startBtn=`<button data-act="ng-start" style="${bigBtn(T.lime,"width:100%;font-size:25px;padding:24px;box-shadow:0 8px 22px rgba(163,230,53,.22)",T.field)};flex:none;margin-top:2px">Start game &rarr;</button>`;
     if(isWide()){
       // Centered + width-capped so the form fills the space instead of hugging the top with
@@ -1263,7 +1282,7 @@ function actionArea(){
           <div style="flex:1;min-height:0;display:flex;flex-direction:column;justify-content:center;gap:20px">
             <div style="width:100%;max-width:1100px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:18px;align-content:center">
               <div style="display:flex;flex-direction:column;gap:14px">${teamRow("Your team",OUR.name,OUR.color,"pickour")}${teamRow("Opponent",OPP.name,OPP.color,"pickopp")}${sideSel}</div>
-              <div style="display:flex;flex-direction:column;gap:14px">${runCapCard}${hittersCard}</div>
+              <div style="display:flex;flex-direction:column;gap:14px">${runCapCard}${hittersCard}${startCard}</div>
             </div>
             <div style="width:100%;max-width:1100px;margin:0 auto">${startBtn}</div>
           </div>
@@ -1273,7 +1292,7 @@ function actionArea(){
         ${header}
         ${teamRow("Your team",OUR.name,OUR.color,"pickour")}
         ${teamRow("Opponent",OPP.name,OPP.color,"pickopp")}
-        ${sideSel}${runCapCard}${hittersCard}${startBtn}
+        ${sideSel}${runCapCard}${hittersCard}${startCard}${startBtn}
       </div>`;
   }
   if(mode==="lineup"){
@@ -1717,6 +1736,7 @@ function render(){
     ${(pickerModal&&wide)?`<div style="${sheetWrap}">
         <div id="action-area" style="${sheetCard};overflow-y:auto;-webkit-overflow-scrolling:touch;background:${T.surface};padding:16px;display:flex;flex-direction:column;gap:8px">${actionArea()}</div></div>`:""}`;
   animateStatusBar();
+  try{ startClock(); }catch(e){}
   if(mode!==_lastMode){ const a=document.getElementById("action-area"); if(a)a.classList.add("screen-in"); _lastMode=mode; }
   try{ alignPreview(); }catch(e){}   // keep the native camera preview aligned to the monitor region
 }
@@ -1804,7 +1824,7 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="confirm")commit(result,plan);
   else if(act==="zones"){showZones=!showZones;render();}
   else if(act==="lineup"){mode="lineup";render();}
-  else if(act==="lineupdone"){gameActive=true;mode="idle";render();broadcast();}
+  else if(act==="lineupdone"){gameActive=true;if(!G.startedAt)G.startedAt=Date.now();mode="idle";render();broadcast();}
   else if(act==="lutab"){lineupTab=arg;render();}
   else if(act==="oppadd"){if(!G.oppLineup)G.oppLineup=[];G.oppLineup.push({num:String(G.oppLineup.length+1),name:""});G.oppBatters=G.oppLineup.length;render();}
   else if(act==="opprem"){if(G.oppLineup&&G.oppLineup.length>1){G.oppLineup.splice(+arg,1);G.oppBatters=G.oppLineup.length;render();broadcast();}}
@@ -2002,7 +2022,7 @@ let _rsz; window.addEventListener("resize",function(){clearTimeout(_rsz);_rsz=se
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v19";
+var APP_VERSION="v20";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
