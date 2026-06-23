@@ -803,9 +803,9 @@ function statusBar(){
       <span style="font-family:${MONO};font-size:13px;font-weight:800;color:${T.sageDim};width:12px">${label}</span>
       ${Array.from({length:max},(_,i)=>`<span class="bso-pip ${cls}${i<n?" on":""}"></span>`).join("")}</div>`;
   return `<div style="display:flex;align-items:stretch;background:${T.surface};border:1px solid ${T.line};border-radius:12px;overflow:hidden;flex-shrink:0;box-shadow:0 1px 0 rgba(15,30,60,.04)">
-    <div style="display:flex;flex-direction:column;justify-content:center;gap:7px;padding:13px 16px;min-width:176px;max-width:210px;border-right:1px solid ${T.line}">
+    <div style="display:flex;flex-direction:column;justify-content:center;gap:7px;padding:13px 14px;min-width:140px;max-width:210px;border-right:1px solid ${T.line}">
       ${tabRow("away",G.away,G.half==="T")}${tabRow("home",G.home,G.half==="B")}</div>
-    <div style="display:flex;align-items:center;justify-content:center;padding:0 18px;flex:1;gap:38px">
+    <div style="display:flex;align-items:center;justify-content:center;padding:0 12px;flex:1;gap:clamp(10px,4.5vw,38px)">
       <div style="text-align:center"><div style="font-family:${MONO};font-size:13px;font-weight:700;color:${T.sage};letter-spacing:.6px">${G.half==="T"?"TOP":"BOT"}</div>
         <div style="font-family:${MONO};font-size:34px;font-weight:800;color:${T.chalk};line-height:.95">${G.inning}</div></div>
       ${diamond}
@@ -1315,7 +1315,7 @@ function actionArea(){
         <button data-act="rembatter" style="${ghost};flex:1" ${n<=9?"disabled":""}>&minus; Remove last</button></div>
       <div style="flex-shrink:0"><div style="font-size:10px;color:${T.sageDim};letter-spacing:.6px;margin:0 2px 5px">BENCH</div>
         <div style="display:flex;flex-wrap:wrap;gap:5px">${bench||`<span style="font-size:12px;color:${T.sageDim}">No bench players</span>`}</div></div>
-      <button data-act="lineupdone" style="${bigBtn(OUR.color)}flex-shrink:0">Done</button>`;
+      <button data-act="lineupdone" style="${bigBtn(T.lime,"",T.field)}flex-shrink:0">Done</button>`;
   }
   if(mode==="pickplayer"){
     const pitcherPick=editSlot===-1, cur=pitcherPick?G.lineup.pos.P:G.lineup.order[editSlot];
@@ -1681,6 +1681,14 @@ function render(){
           ${actionEl}${feedPanel()}
         </div>
       </div>`;
+  } else if(pickerModal){
+    // Phone outcome picker (contact/result/fielder/etc.): full-screen — batter card on top,
+    // big tappable buttons fill the rest. The field is hidden (not needed here) and there's no
+    // bottom-sheet, so no wasted space and no scrolling.
+    body=`<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:10px">
+        ${batterCard()}
+        <div id="action-area" style="flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;display:flex;flex-direction:column;gap:8px">${actionArea()}</div>
+      </div>`;
   } else {
     const isView=viewMode==="viewer";   // viewer = watch only: field + feed, NO scoring tools
     const tab=(id,label)=>`<button data-act="pane" data-arg="${id}" style="flex:1;background:${phonePane===id?T.lime:T.surface};border:2px solid ${phonePane===id?T.lime:T.line};color:${phonePane===id?T.field:T.sage};border-radius:10px;padding:9px;font-family:${MONO};font-weight:800;font-size:14px;letter-spacing:.6px;text-transform:uppercase">${label}</button>`;
@@ -1698,7 +1706,7 @@ function render(){
     ${body}${confirmOverlay()}
     ${reviewBatter?batterReviewModal():""}
     ${reviewInn?inningLogModal():""}
-    ${pickerModal?`<div style="${sheetWrap}">
+    ${(pickerModal&&wide)?`<div style="${sheetWrap}">
         <div id="action-area" style="${sheetCard};overflow-y:auto;-webkit-overflow-scrolling:touch;background:${T.surface};padding:16px;display:flex;flex-direction:column;gap:8px">${actionArea()}</div></div>`:""}`;
   animateStatusBar();
   if(mode!==_lastMode){ const a=document.getElementById("action-area"); if(a)a.classList.add("screen-in"); _lastMode=mode; }
@@ -1986,7 +1994,7 @@ let _rsz; window.addEventListener("resize",function(){clearTimeout(_rsz);_rsz=se
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v16";
+var APP_VERSION="v17";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
