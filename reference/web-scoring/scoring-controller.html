@@ -1252,7 +1252,7 @@ function actionArea(){
           <div><div style="font-weight:800;color:${T.ink};font-size:19px">Number of hitters</div>
             <div style="color:${T.sage};font-size:14px;margin-top:3px">In the opponent's lineup</div></div>
           <input type="number" inputmode="numeric" min="1" max="15" value="${G.oppBatters}" oninput="ngOppBatters(this.value)" style="${inpSm}"></div>`;
-    const startBtn=`<button data-act="ng-start" style="${bigBtn(OUR.color)};flex:none;margin-top:2px">Start game &rarr;</button>`;
+    const startBtn=`<button data-act="ng-start" style="${bigBtn(T.lime,"width:100%;font-size:25px;padding:24px;box-shadow:0 8px 22px rgba(163,230,53,.22)",T.field)};flex:none;margin-top:2px">Start game &rarr;</button>`;
     if(isWide()){
       // Centered + width-capped so the form fills the space instead of hugging the top with
       // a big empty gap above the Start button.
@@ -1289,12 +1289,12 @@ function actionArea(){
         ${luToggle}
         <div style="flex:1 1 auto;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:6px">${orows}</div>
         <button data-act="oppadd" style="${ghost};flex-shrink:0">+ Add hitter</button>
-        <button data-act="lineupdone" style="${bigBtn(OUR.color)}flex-shrink:0">Done</button>`;
+        <button data-act="lineupdone" style="${bigBtn(T.lime,"",T.field)}flex-shrink:0">Done</button>`;
     }
     const rows=G.lineup.order.map((ri,slot)=>{const p=ROSTER[ri],pos=posOfPlayer(ri)||"—",isP=pos==="P";
       return `<div data-row data-ri="${ri}" style="display:flex;align-items:center;gap:6px;background:${T.surface};border:1px solid ${T.line};border-radius:9px;padding:8px 8px">
         <span data-drag style="cursor:grab;color:${T.sageDim};display:flex;align-items:center;padding:4px 2px;touch-action:none">${IC('<path d="M4 7h16M4 12h16M4 17h16"/>')}</span>
-        <span style="font-family:${MONO};font-size:16px;font-weight:700;color:${T.sageDim};width:18px;text-align:center">${slot+1}</span>
+        <span style="font-family:${MONO};font-size:17px;font-weight:800;color:${T.lime};width:18px;text-align:center">${slot+1}</span>
         <button data-act="editplayer" data-arg="${slot}" style="flex:1;min-width:0;text-align:left;background:transparent;border:none;color:${T.chalk};font-size:18px;font-weight:700;display:flex;align-items:center;gap:8px;overflow:hidden"><span style="font-family:${MONO};color:${OUR.color};min-width:34px">#${p.num}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.name}</span></button>
         <button data-act="pickpos" data-arg="${slot}" style="background:${isP?OUR.color:T.surface2};border:1px solid ${isP?OUR.color:T.line};color:${isP?"#FFFFFF":T.chalk};border-radius:7px;padding:8px 12px;font-family:${MONO};font-size:16px;font-weight:800;min-width:50px">${pos}</button></div>`;}).join("");
     const bench=benchIdx().map(ri=>`<span style="font-family:${MONO};font-size:14px;color:${T.sage};background:${T.surface};border:1px solid ${T.line};border-radius:6px;padding:5px 10px;white-space:nowrap">#${ROSTER[ri].num} ${ROSTER[ri].name}</span>`).join(" ");
@@ -1975,7 +1975,7 @@ let _rsz; window.addEventListener("resize",function(){clearTimeout(_rsz);_rsz=se
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v13";
+var APP_VERSION="v14";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
