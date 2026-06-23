@@ -45,8 +45,11 @@
      INSIDE the window, so the text stays readable while the turf is blurred behind them and
      sharp everywhere outside. */
   [style*="background:#212A38"],[style*="background:#324056"],[style*="background:#1D3A66"]{
-    background-color:rgba(15,23,38,.62)!important;
-    -webkit-backdrop-filter:blur(15px) saturate(1.1);backdrop-filter:blur(15px) saturate(1.1);}
+    background-color:rgba(13,19,32,.82)!important;
+    -webkit-backdrop-filter:blur(13px) saturate(1.1);backdrop-filter:blur(13px) saturate(1.1);}
+  /* Team-color tinted cards (batter card, team tiles): same frosted dark backing so text is
+     readable over the turf, with the team color kept as the left accent (set inline). */
+  .frost-card{ -webkit-backdrop-filter:blur(13px) saturate(1.1);backdrop-filter:blur(13px) saturate(1.1); }
   button{font-family:var(--sans);cursor:pointer;
     transition:transform .12s var(--ease-soft), filter .15s ease, box-shadow .18s ease, background .15s ease;}
   button:active{transform:scale(.94);filter:brightness(1.14) drop-shadow(0 0 7px rgba(163,230,53,.32));}
@@ -491,6 +494,7 @@ const LOB_OUTS=["strikeout","out1","flyout","lineout","popout","dp","sacfly","sa
 /* Credit the current batter for a completed plate appearance. Call AFTER resolve()
    (so G.bases reflects who's left on) and BEFORE nextBatter(). */
 function creditBatter(kind,rbi){
+  if(!G.startedAt)G.startedAt=Date.now();   // backstop: any completed plate appearance starts the clock
   const b=batter(),s=statFor(batterKeyOf(b));
   s.num=b.num; s.name=b.name||("Batter "+b.num); s.team=b.ours?"our":"opp";
   s.slot=b.ours?G.lineup.order.indexOf(b.ri):(b.spot-1);
@@ -514,6 +518,7 @@ function currentPitchCount(){ return (G.pitches&&G.pitches[currentPitcherKey()])
 /* Record one pitch: bump the pitcher's count + the half-inning count, and append it to
    the current at-bat's sequence (res = ball/strike/foul/inplay/hbp, + armed type). */
 function recordPitch(res){
+  if(!G.startedAt)G.startedAt=Date.now();   // game clock starts on the FIRST pitch, not at setup
   countPitch();
   if(!G.ab)G.ab={pitches:[],loc:null};
   G.ab.pitches.push({res,type:advPitch?pitchType:null});
@@ -848,7 +853,7 @@ function batterCard(){
   const sub=b.ours
     ? `${TEAMS[k].short}${b.pos?` · ${b.pos}`:""} &middot; ${ord} in order`
     : `${ord} batter`;   // opponent: the big name already shows the team — don't repeat it
-  return `<div data-act="reviewbatter" data-arg="${batterKeyOf(b)}" style="display:flex;align-items:center;gap:13px;background:${c}14;border:1px solid ${c}40;border-left:5px solid ${c};border-radius:10px;padding:9px 14px;flex-shrink:0;cursor:pointer">
+  return `<div data-act="reviewbatter" data-arg="${batterKeyOf(b)}" class="frost-card" style="display:flex;align-items:center;gap:13px;background:rgba(13,19,32,.82);border:1px solid ${c}66;border-left:5px solid ${c};border-radius:10px;padding:9px 14px;flex-shrink:0;cursor:pointer">
     <span style="font-family:${MONO};font-size:34px;font-weight:700;color:${c};line-height:1;min-width:46px;text-align:center">${big}</span>
     <div style="flex:1;min-width:0">
       <div style="font-family:${MONO};font-size:23px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;line-height:1;color:${T.chalk};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${nameLine}</div>
@@ -869,7 +874,7 @@ function batterStrip(){
   const ord=ordinal(battingSlot()+1);
   const nameLine=b.ours?b.name:TEAMS[k].name.toUpperCase();
   const sub=b.ours?`${TEAMS[k].short}${b.pos?` · ${b.pos}`:""} · ${ord}`:`${TEAMS[k].short} · ${ord}`;
-  return `<button data-act="reviewbatter" data-arg="${batterKeyOf(b)}" style="display:flex;align-items:center;gap:10px;background:${c}1f;border:1px solid ${c}55;border-left:5px solid ${c};border-radius:10px;padding:6px 12px;cursor:pointer;max-width:100%;min-width:0">
+  return `<button data-act="reviewbatter" data-arg="${batterKeyOf(b)}" class="frost-card" style="display:flex;align-items:center;gap:10px;background:rgba(13,19,32,.72);border:1px solid ${c}66;border-left:5px solid ${c};border-radius:10px;padding:6px 12px;cursor:pointer;max-width:100%;min-width:0">
     <span style="font-family:${MONO};font-size:22px;font-weight:700;color:${c};line-height:1;flex:none">${b.num}</span>
     <div style="min-width:0;text-align:left">
       <div style="font-family:${MONO};font-size:15px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;line-height:1;color:${T.chalk};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${nameLine}</div>
@@ -1288,7 +1293,7 @@ function actionArea(){
     const inpSm=`width:98px;flex:none;background:${T.surface2};border:1px solid ${T.line};color:${T.ink};border-radius:10px;padding:14px 10px;font-family:${MONO};font-size:27px;font-weight:800;text-align:center;outline:none`;
     const rowCard=`display:flex;align-items:center;justify-content:space-between;gap:12px;background:${T.surface};border:1px solid ${T.line};border-radius:12px;padding:18px 20px;box-shadow:0 2px 6px rgba(15,30,60,.07)`;
     const sideBtn=(s,lbl2)=>{const on=G.ourSide===s;return `<button data-act="ng-side" data-arg="${s}" style="flex:1;padding:18px;border-radius:11px;font-family:${MONO};font-weight:800;font-size:19px;text-transform:uppercase;letter-spacing:.5px;border:2px solid ${on?OUR.color:T.line};background:${on?OUR.color:T.surface};color:${on?"#FFFFFF":T.ink}">${lbl2}</button>`;};
-    const teamRow=(who,name,color,act)=>`<button data-act="${act}" style="display:flex;align-items:center;justify-content:space-between;background:${color}1f;border:1px solid ${color}55;border-left:7px solid ${color};border-radius:12px;padding:18px 20px;width:100%;text-align:left">
+    const teamRow=(who,name,color,act)=>`<button data-act="${act}" class="frost-card" style="display:flex;align-items:center;justify-content:space-between;background:rgba(13,19,32,.82);border:1px solid ${color}66;border-left:7px solid ${color};border-radius:12px;padding:18px 20px;width:100%;text-align:left">
         <div><div style="${lbl};margin:0 0 4px">${who}</div><div style="font-family:${MONO};font-size:25px;font-weight:800;color:${T.ink}">${name}</div></div>
         <span style="color:${color};font-weight:800;font-size:15px;letter-spacing:.5px">CHANGE &rsaquo;</span></button>`;
     const header=`<div style="display:flex;align-items:center;gap:10px;flex:none">
@@ -1869,7 +1874,7 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="confirm")commit(result,plan);
   else if(act==="zones"){showZones=!showZones;render();}
   else if(act==="lineup"){mode="lineup";render();}
-  else if(act==="lineupdone"){gameActive=true;if(!G.startedAt)G.startedAt=Date.now();mode="idle";render();broadcast();}
+  else if(act==="lineupdone"){gameActive=true;mode="idle";render();broadcast();}   // timer does NOT start here — it starts on the first pitch (see recordPitch)
   else if(act==="lutab"){lineupTab=arg;render();}
   else if(act==="oppadd"){if(!G.oppLineup)G.oppLineup=[];G.oppLineup.push({num:String(G.oppLineup.length+1),name:""});G.oppBatters=G.oppLineup.length;render();}
   else if(act==="opprem"){if(G.oppLineup&&G.oppLineup.length>1){G.oppLineup.splice(+arg,1);G.oppBatters=G.oppLineup.length;render();broadcast();}}
@@ -2100,7 +2105,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v31";
+var APP_VERSION="v32";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
