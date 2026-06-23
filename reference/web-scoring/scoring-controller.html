@@ -590,6 +590,7 @@ let phonePane="score";   // phone-only paging: "score" | "video" (large screens 
 let monitorOn=(()=>{try{return localStorage.getItem("al-monitor-on")!=="0";}catch(e){return true;}})();  // wide: video shown/hidden
 let viewMode=(()=>{try{return localStorage.getItem("al-view-mode")||"scorer";}catch(e){return "scorer";}})();  // "scorer" | "viewer"
 let viewerRight=(()=>{try{return localStorage.getItem("al-viewer-right")||"field";}catch(e){return "field";}})();  // viewer + video on: which of field/feed is the big one
+let noFieldChip=false;  // when true, diamondSVG draws no in-field pitch chip (used for the tiny viewer thumbnail)
 let gameFeed=[];   // live play-by-play (most recent last) for the viewer feed
 // Advanced pitch tracking: when on, the scorer arms a pitch type that's recorded with
 // each pitch. reviewBatter / reviewInn drive the tap-to-review modals (read-only).
@@ -984,7 +985,9 @@ function miniCount(){
 /* At-a-glance stats drawn INTO the field's empty corners (no separate strip): the
    current pitcher's pitch count (top-left) and a compact R-H-E line (top-right). Hidden
    while the scorer is working a play (locate/picker/runners) so the field is unobstructed. */
+function diamondNoChip(){ noFieldChip=true; const s=diamondSVG(); noFieldChip=false; return s; }
 function fieldOverlays(){
+  if(noFieldChip) return "";
   if(["locate","contact","result","runners","errpos","outpos","dppick"].includes(mode)) return "";
   const pc=currentPitchCount(),pn=currentPitcherName();
   const aH=sideHits("away"),hH=sideHits("home");
@@ -1635,14 +1638,20 @@ function render(){
     // Viewer: watch only, NO scoring tools. With video ON, the RIGHT side stacks the ball
     // field + a trimmed game feed; the ⇅ toggle flips which one is the big one. Video OFF =
     // field beside the full feed.
-    const swapBtn=`<button data-act="swapviewer" style="flex:none;align-self:flex-end;background:${T.surface2};border:1px solid ${T.line};color:${T.chalk};border-radius:8px;padding:6px 12px;font-family:${SANS};font-size:12px;font-weight:800;display:flex;align-items:center;gap:6px;cursor:pointer">⇅ ${viewerRight==="field"?"Feed larger":"Field larger"}</button>`;
-    const fieldBlock=big=>`<div style="${big?"flex:1":"flex:none;height:150px"};min-height:0;display:flex;flex-direction:column;gap:8px">
-        ${big?`${miniCount()}${batterCard()}`:""}
+    const fieldBig=`<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px">
+        ${miniCount()}${batterCard()}
         <div style="flex:1;min-height:0;display:flex;align-items:center;justify-content:center;position:relative">${diamondSVG()}${toastEl}</div></div>`;
+    // Thumbnail field: pitch count sits in the empty space to the LEFT (out of the field box).
+    const pcSide=`<div style="flex:none;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(9,13,19,.6);border:1px solid ${T.line};border-radius:11px;padding:8px 14px;line-height:1">
+        <div style="font-family:${MONO};font-size:30px;font-weight:800;color:${T.amber}">${currentPitchCount()}</div>
+        <div style="font-size:9px;font-weight:800;letter-spacing:1.4px;color:${T.sageDim};margin-top:3px">PITCHES</div>
+        <div style="font-size:11px;font-weight:600;color:${T.sage};max-width:130px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${currentPitcherName()}</div></div>`;
+    const fieldThumb=`<div style="flex:none;height:164px;min-height:0;display:flex;align-items:center;justify-content:center;gap:14px">
+        ${pcSide}
+        <div style="flex:0 1 auto;height:100%;display:flex;align-items:center;justify-content:center;position:relative">${diamondNoChip()}${toastEl}</div></div>`;
     const feedBlock=big=>`<div style="${big?"flex:1":"flex:none;height:168px"};min-height:0;display:flex">${feedPanel()}</div>`;
     const rightCol=`<div style="flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;gap:8px">
-        ${swapBtn}
-        ${viewerRight==="field"?fieldBlock(true)+feedBlock(false):feedBlock(true)+fieldBlock(false)}</div>`;
+        ${viewerRight==="field"?fieldBig+feedBlock(false):feedBlock(true)+fieldThumb}</div>`;
     body=monitorOn
       ? `<div style="flex:1;min-height:0;display:flex;flex-direction:row;gap:12px">
           <div style="flex:0 0 55%;max-width:55%;min-width:0;min-height:0;display:flex;flex-direction:column">${monitorPane()}</div>
@@ -1858,6 +1867,10 @@ function renderToolbar(){
   const gc=(isWide()&&mode==="idle"&&viewMode==="scorer")
     ? `${tbBtn("undo","↶ Undo")}${tbBtn("home","⌂ Home")}${tbBtn("lineup","Lineup")}${tbBtn("inninglog","Inning log")}${tbBtn("endgame","END GAME",`color:${T.out};border-color:${T.out}`)}`
     : "";
+  // Viewer (video on): the field/feed swap lives in the top bar, labeled with what you switch TO.
+  const vsw=(isWide()&&viewMode==="viewer"&&monitorOn)
+    ? tbBtn("swapviewer",`⇅ ${viewerRight==="field"?"Game feed":"Field view"}`)
+    : "";
   const shareBtnTop=`<button data-act="share" style="flex:none;display:flex;align-items:center;gap:7px;background:${T.surface2};border:1px solid ${T.line};color:${T.chalk};border-radius:10px;padding:9px 15px;font-size:15px;font-weight:800">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="${T.lime}" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="19" r="2.6"/><path d="M8.3 10.8 15.7 6.4M8.3 13.2l7.4 4.4"/></svg>Share</button>`;
   const liveDot=`<div title="${dot.l}" style="flex:none;display:flex;align-items:center;gap:5px;background:${T.surface};border:1px solid ${T.line};border-radius:999px;padding:5px 9px">
@@ -1869,7 +1882,7 @@ function renderToolbar(){
   // Hide-video + Share slid to the LEFT next to the controls; only LIVE stays on the far right.
   tb.innerHTML=`<div style="display:flex;align-items:center;gap:8px;padding:4px 2px 2px;flex-wrap:nowrap">
     <div style="flex:none;min-width:0;font-family:${MONO};font-weight:700;font-size:16px;letter-spacing:.5px;color:${T.chalk};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${chip}</div>
-    ${gc}
+    ${gc}${vsw}
     ${vidToggle}
     ${shareBtnTop}
     ${bstrip}
@@ -1973,7 +1986,7 @@ let _rsz; window.addEventListener("resize",function(){clearTimeout(_rsz);_rsz=se
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v15";
+var APP_VERSION="v16";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
