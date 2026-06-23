@@ -96,7 +96,7 @@ function serveStatic(req, res) {
     const type = MIME[ext] || "application/octet-stream";
     // sw.js + HTML must stay fresh; icons/lib can cache hard.
     let cache = "public, max-age=3600";
-    if (ext === ".html" || /(^|\/)sw\.js$/.test(urlPath)) cache = "no-cache";
+    if (ext === ".html" || /(^|\/)(sw|firebase-config)\.js$/.test(urlPath)) cache = "no-cache";
     else if (urlPath.startsWith("/icons/") || urlPath.startsWith("/lib/")) cache = "public, max-age=86400";
     res.writeHead(200, { "Content-Type": type, "Cache-Control": cache });
     fs.createReadStream(safe).pipe(res);
