@@ -84,9 +84,13 @@
   window.cloudSignInGoogle = function () {
     if (!window.Cloud.auth || typeof firebase === "undefined") return;
     var p = new firebase.auth.GoogleAuthProvider();
+    // Phones: popups are unreliable (blocked / can't post back), so go straight to redirect.
+    var mobile = (window.matchMedia && window.matchMedia("(pointer:coarse)").matches) ||
+                 /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || "");
+    if (mobile) { try { window.Cloud.auth.signInWithRedirect(p); return; } catch (e) {} }
     window.Cloud.auth.signInWithPopup(p).catch(function (e) {
       var code = e && e.code;
-      if (code === "auth/popup-blocked" || code === "auth/cancelled-popup-request" || code === "auth/operation-not-supported-in-this-environment") {
+      if (code === "auth/popup-blocked" || code === "auth/cancelled-popup-request" || code === "auth/operation-not-supported-in-this-environment" || code === "auth/popup-closed-by-user") {
         try { window.Cloud.auth.signInWithRedirect(p); } catch (_) { cloudToast("Google sign-in failed: " + (e.message || code)); }
       } else if (e) { cloudToast("Google sign-in failed: " + (e.message || code)); }
     });

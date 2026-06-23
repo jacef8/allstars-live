@@ -40,7 +40,7 @@
     /* Blue turf shows in the open areas; only a light scrim so it's clearly visible.
        Readability comes from the frosted "windows" below, not from darkening the turf.
        The native app overrides this to transparent (IS_APP) and paints the turf natively. */
-    background:linear-gradient(rgba(7,11,19,.28),rgba(7,11,19,.50)), url("bg-turf.jpg") center center / cover no-repeat #0B0E13;}
+    background:linear-gradient(rgba(7,11,19,.12),rgba(7,11,19,.34)), url("bg-turf.jpg") center center / cover no-repeat #0B0E13;}
   /* "Windows": the inline solid card/panel surfaces become translucent (NO blur) so the
      sharp striped turf shows through and around them; opacity is high enough for readable text. */
   [style*="background:#212A38"],[style*="background:#324056"],[style*="background:#1D3A66"]{
@@ -50,12 +50,11 @@
   button:active{transform:scale(.94);filter:brightness(1.14) drop-shadow(0 0 7px rgba(163,230,53,.32));}
   button:disabled{opacity:.4;filter:none;cursor:default;}
   #wrap{position:fixed;inset:0;display:flex;justify-content:center;
+    /* Only subtle, semi-transparent accent glows — NO opaque base — so the body's blue turf
+       shows through. (The native app makes #wrap transparent too; see IS_APP below.) */
     background:
-      radial-gradient(42% 38% at 8% 2%, rgba(29,58,102,.55), transparent 70%),
-      radial-gradient(46% 40% at 98% 0%, rgba(29,58,102,.30), transparent 72%),
-      radial-gradient(60% 55% at 92% 104%, rgba(163,230,53,.10), transparent 70%),
-      radial-gradient(55% 50% at -5% 102%, rgba(163,230,53,.05), transparent 70%),
-      linear-gradient(180deg, #12161D 0%, #0B0E13 100%);
+      radial-gradient(42% 38% at 8% 2%, rgba(29,58,102,.22), transparent 70%),
+      radial-gradient(60% 55% at 92% 104%, rgba(163,230,53,.06), transparent 70%);
     padding:10px;overflow:hidden;}
   #app{width:100%;max-width:400px;height:100%;display:flex;flex-direction:column;gap:8px;color:var(--chalk);}
   .num{font-family:var(--mono);font-variant-numeric:tabular-nums;}
@@ -894,7 +893,7 @@ function parseYouTubeId(s){
 const IS_APP = !!(window.AllStars && window.AllStars.isApp);
 // In the native app only: go transparent so the native camera-preview layer shows through
 // the monitor region. In a browser/PWA the dark #0B0E13 background (CSS) stays.
-if(IS_APP){ document.documentElement.style.background="transparent"; document.body.style.background="transparent"; }
+if(IS_APP){ document.documentElement.style.background="transparent"; document.body.style.background="transparent"; var _w=document.getElementById("wrap"); if(_w)_w.style.background="transparent"; }
 window.__bcastPhase = "OFFLINE";
 window.__bcast = function(phase, videoId){
   window.__bcastPhase = phase || "OFFLINE";
@@ -1106,7 +1105,7 @@ const IC=(p)=>`<svg viewBox="0 0 24 24" width="17" height="17" fill="none" strok
 const ICN={
   ball:IC(`<circle cx="12" cy="12" r="8.5"/><path d="M5.5 6.5c2.4 1.8 2.4 9.2 0 11M18.5 6.5c-2.4 1.8-2.4 9.2 0 11"/>`),
   strike:IC(`<path d="M6 6l12 12M18 6 6 18"/>`),
-  foul:IC(`<path d="M6 3v18"/><path d="M6 4h12l-3 4 3 4H6"/>`),
+  foul:IC(`<path d="M12 20 4 5"/><path d="M12 20 20 5"/><circle cx="12" cy="20.5" r="1.7" fill="currentColor" stroke="none"/>`),  // foul lines fanning out from home plate
   inplay:IC(`<path d="M12 2.5 21.5 12 12 21.5 2.5 12z"/>`),
   walk:IC(`<path d="M4 12h12"/><path d="M13 6l6 6-6 6"/>`),
   hbp:IC(`<circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5"/><path d="M12 16.5h.01"/>`),
@@ -1344,10 +1343,12 @@ function actionArea(){
     const bench=benchIdx().map(ri=>`<span style="font-family:${MONO};font-size:14px;color:${T.sage};background:${T.surface};border:1px solid ${T.line};border-radius:6px;padding:5px 10px;white-space:nowrap">#${ROSTER[ri].num} ${ROSTER[ri].name}</span>`).join(" ");
     const pit=playerAtPos("P");
     const n=G.lineup.order.length;
-    return `<div style="flex-shrink:0"><div style="font-family:${MONO};font-size:20px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:${T.lime}">Lineups</div>
-        <div style="font-size:11px;color:${T.sage};margin-top:2px">${OUR.name} &middot; batting ${n}${n>9?" (continuous)":""} &middot; drag &#9776; to reorder, tap a name to edit</div></div>
+    return `<div style="flex-shrink:0;display:flex;align-items:center;gap:10px">
+        <button data-act="lineupback" style="${ghost};padding:9px 13px;flex:none">&lsaquo; Back</button>
+        <div style="flex:1;min-width:0"><div style="font-family:${MONO};font-size:20px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:${T.lime}">Lineups</div>
+          <div style="font-size:11px;color:${T.sage};margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${OUR.name} &middot; batting ${n}${n>9?" (continuous)":""} &middot; drag to reorder</div></div>
+        <button data-act="newgame" title="Game setup & rules" style="${ghost};padding:9px 13px;flex:none;font-size:18px">&#9881;</button></div>
       ${luToggle}
-      <button data-act="newgame" style="${ghost};flex-shrink:0;display:flex;align-items:center;justify-content:center;gap:7px;color:${T.sage}">&#9881; Game setup &amp; rules</button>
       <div style="flex-shrink:0;display:flex;align-items:center;justify-content:space-between;background:${T.surface2};border:1px solid ${T.line};border-radius:9px;padding:9px 12px">
         <span style="font-size:14px;color:${T.sage}">Pitcher</span>
         <button data-act="pickpitch" style="background:transparent;border:none;color:${T.chalk};font-size:18px;font-weight:700;display:flex;align-items:center;gap:8px"><span style="font-family:${MONO};color:${OUR.color}">#${pit.num}</span>${pit.name}<span style="font-size:12px;color:${OUR.color};font-weight:700;margin-left:4px">CHANGE</span></button></div>
@@ -1810,6 +1811,7 @@ document.getElementById("app").addEventListener("click",e=>{
   if(act==="ptype"){ pitchType=(pitchType===arg?null:arg); render(); return; }
   if(act==="pane"){ phonePane=arg; render(); return; }
   if(act==="swapviewer"){ viewerRight=viewerRight==="field"?"feed":"field"; try{localStorage.setItem("al-viewer-right",viewerRight);}catch(e){} render(); return; }
+  if(act==="lineupback"){ mode=gameActive?"idle":"home"; render(); return; }
   if(act==="signingoogle"){ if(window.cloudSignInGoogle)window.cloudSignInGoogle(); return; }
   if(act==="signin"){ const e=document.getElementById("authEmail"); if(e&&window.cloudSignIn)window.cloudSignIn(e.value); return; }
   if(act==="signout"){ if(window.cloudSignOut)window.cloudSignOut(); return; }
@@ -2081,7 +2083,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v26";
+var APP_VERSION="v27";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;

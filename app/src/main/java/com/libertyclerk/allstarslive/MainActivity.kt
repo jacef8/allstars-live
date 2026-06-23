@@ -5,6 +5,10 @@ import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -36,6 +40,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -45,6 +50,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -60,6 +66,7 @@ import com.libertyclerk.allstarslive.scorer.createScorerWebView
 import com.libertyclerk.allstarslive.stream.Broadcast
 import com.libertyclerk.allstarslive.stream.GoLiveDialog
 import com.libertyclerk.allstarslive.ui.theme.AllStarsLiveTheme
+import kotlinx.coroutines.delay
 
 /** Bottom-bar destinations. Game = scoring (next), Video = live ingest (working). */
 // Persistent app sections only. Lineup is per-game, so it lives inside the scorer
@@ -97,6 +104,10 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             AllStarsLiveTheme {
+                // Branded splash: hold the A logo briefly, then fade to the app (the system
+                // launch splash already shows the same logo on the dark bg, so it's seamless).
+                var showSplash by rememberSaveable { mutableStateOf(true) }
+                LaunchedEffect(Unit) { delay(1600); showSplash = false }
                 var tabIndex by rememberSaveable { mutableStateOf(0) }
                 val tabs = Tab.entries
                 val ctx = androidx.compose.ui.platform.LocalContext.current
@@ -158,6 +169,20 @@ class MainActivity : ComponentActivity() {
                             onConfirm = { Broadcast.stop(); Broadcast.dismissStop() },
                             onCancel = { Broadcast.dismissStop() },
                         )
+                    }
+
+                    // Branded splash overlay — on top of everything, fades out after the hold.
+                    AnimatedVisibility(visible = showSplash, exit = fadeOut(animationSpec = tween(450))) {
+                        Box(
+                            Modifier.fillMaxSize().background(Color(0xFF0B0E13)),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Image(
+                                painter = painterResource(R.drawable.splash_logo),
+                                contentDescription = "All-Stars Live",
+                                modifier = Modifier.size(150.dp),
+                            )
+                        }
                     }
                 }
             }
