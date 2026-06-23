@@ -582,6 +582,7 @@ let _seq=0,_event=null,_eventId=0,_pitch=null;
 let phonePane="score";   // phone-only paging: "score" | "video" (large screens show both)
 let monitorOn=(()=>{try{return localStorage.getItem("al-monitor-on")!=="0";}catch(e){return true;}})();  // wide: video shown/hidden
 let viewMode=(()=>{try{return localStorage.getItem("al-view-mode")||"scorer";}catch(e){return "scorer";}})();  // "scorer" | "viewer"
+let viewerRight=(()=>{try{return localStorage.getItem("al-viewer-right")||"field";}catch(e){return "field";}})();  // viewer + video on: which of field/feed is the big one
 let gameFeed=[];   // live play-by-play (most recent last) for the viewer feed
 // Advanced pitch tracking: when on, the scorer arms a pitch type that's recorded with
 // each pitch. reviewBatter / reviewInn drive the tap-to-review modals (read-only).
@@ -1594,19 +1595,24 @@ function render(){
         </div>
       </div>`;
   } else if(wide && viewMode==="viewer"){
-    // Viewer: watch the game with NO scoring tools. Video + the digital ball field /
-    // pitch-&-hit feed side by side; "Hide video" minimizes the feed so the field fills.
-    const fieldCol=`<div style="flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;gap:8px">
-        ${focusPlay?"":miniCount()}${batterCard()}
-        <div style="flex:1;min-height:0;display:flex;align-items:center;justify-content:center;position:relative">${diamondSVG()}${toastEl}</div>
-      </div>`;
+    // Viewer: watch only, NO scoring tools. With video ON, the RIGHT side stacks the ball
+    // field + a trimmed game feed; the ⇅ toggle flips which one is the big one. Video OFF =
+    // field beside the full feed.
+    const swapBtn=`<button data-act="swapviewer" style="flex:none;align-self:flex-end;background:${T.surface2};border:1px solid ${T.line};color:${T.chalk};border-radius:8px;padding:6px 12px;font-family:${SANS};font-size:12px;font-weight:800;display:flex;align-items:center;gap:6px;cursor:pointer">⇅ ${viewerRight==="field"?"Feed larger":"Field larger"}</button>`;
+    const fieldBlock=big=>`<div style="${big?"flex:1":"flex:none;height:150px"};min-height:0;display:flex;flex-direction:column;gap:8px">
+        ${big?`${miniCount()}${batterCard()}`:""}
+        <div style="flex:1;min-height:0;display:flex;align-items:center;justify-content:center;position:relative">${diamondSVG()}${toastEl}</div></div>`;
+    const feedBlock=big=>`<div style="${big?"flex:1":"flex:none;height:168px"};min-height:0;display:flex">${feedPanel()}</div>`;
+    const rightCol=`<div style="flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;gap:8px">
+        ${swapBtn}
+        ${viewerRight==="field"?fieldBlock(true)+feedBlock(false):feedBlock(true)+fieldBlock(false)}</div>`;
     body=monitorOn
       ? `<div style="flex:1;min-height:0;display:flex;flex-direction:row;gap:12px">
           <div style="flex:0 0 55%;max-width:55%;min-width:0;min-height:0;display:flex;flex-direction:column">${monitorPane()}</div>
-          ${fieldCol}
+          ${rightCol}
         </div>`
       : `<div style="flex:1;min-height:0;display:flex;flex-direction:row;gap:12px">
-          <div style="flex:0 0 52%;max-width:52%;min-width:0;min-height:0;display:flex;flex-direction:column;gap:8px">${focusPlay?"":miniCount()}${batterCard()}<div style="flex:1;min-height:0;display:flex;align-items:center;justify-content:center;position:relative">${diamondSVG()}${toastEl}</div></div>
+          <div style="flex:0 0 52%;max-width:52%;min-width:0;min-height:0;display:flex;flex-direction:column;gap:8px">${miniCount()}${batterCard()}<div style="flex:1;min-height:0;display:flex;align-items:center;justify-content:center;position:relative">${diamondSVG()}${toastEl}</div></div>
           ${feedPanel()}
         </div>`;
   } else if(wide && monitorOn){
@@ -1698,6 +1704,7 @@ document.getElementById("app").addEventListener("click",e=>{
   if(act==="advtoggle"){ advPitch=!advPitch; try{localStorage.setItem("al-adv-pitch",advPitch?"1":"0");}catch(e){} render(); return; }
   if(act==="ptype"){ pitchType=(pitchType===arg?null:arg); render(); return; }
   if(act==="pane"){ phonePane=arg; render(); return; }
+  if(act==="swapviewer"){ viewerRight=viewerRight==="field"?"feed":"field"; try{localStorage.setItem("al-viewer-right",viewerRight);}catch(e){} render(); return; }
   if(act==="togglevideo"){
     monitorOn=!monitorOn;
     try{localStorage.setItem("al-monitor-on", monitorOn?"1":"0");}catch(e){}
