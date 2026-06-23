@@ -131,7 +131,8 @@
 <div id="qrmodal" style="display:none;position:fixed;inset:0;z-index:200;background:rgba(8,11,16,.84);align-items:center;justify-content:center;padding:20px">
   <div style="max-width:330px;width:100%;background:#212A38;border:1px solid #4A5870;border-radius:18px;padding:20px;text-align:center;box-shadow:0 24px 60px rgba(0,0,0,.6)">
     <div style="font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:20px;letter-spacing:.5px;color:#EAEDF2">SHARE THE GAME</div>
-    <div style="font-size:12px;color:#B7C2D6;margin:3px 0 14px">Nearby? Have them <b style="color:#A3E635">scan</b>. Far away? Send the link.</div>
+    <div style="font-size:12px;color:#B7C2D6;margin:3px 0 12px">Nearby? Have them <b style="color:#A3E635">scan</b>. Far away? Send the link.</div>
+    <div id="shareToggle"></div>
     <div id="qrbox" style="background:#fff;border-radius:12px;padding:12px;width:244px;height:244px;margin:0 auto;display:flex;align-items:center;justify-content:center;color:#677281;font-size:12px"></div>
     <div id="qrurl" style="font-size:11px;color:#B7C2D6;word-break:break-all;margin:12px 4px 14px"></div>
     <div style="display:flex;gap:8px">
@@ -593,7 +594,7 @@ const LINK=(()=>{
 })();
 let _seq=0,_event=null,_eventId=0,_pitch=null;
 let phonePane="score";   // phone-only paging: "score" | "video" (large screens show both)
-let monitorOn=(()=>{try{return localStorage.getItem("al-monitor-on")!=="0";}catch(e){return true;}})();  // wide: video shown/hidden
+let monitorOn=(()=>{try{ const p=new URLSearchParams(location.search); if(p.get("feed")==="1") return false; if(p.get("yt")) return true; return localStorage.getItem("al-monitor-on")!=="0";}catch(e){return true;}})();  // wide: video shown/hidden; shared ?feed=1 opens feed-only
 let viewMode=(()=>{try{ const p=new URLSearchParams(location.search); if(p.get("view")==="viewer") return "viewer"; return localStorage.getItem("al-view-mode")||"scorer";}catch(e){return "scorer";}})();  // "scorer" | "viewer"; shared links (?view=viewer) open as viewer
 let viewerRight=(()=>{try{return localStorage.getItem("al-viewer-right")||"field";}catch(e){return "field";}})();  // viewer + video on: which of field/feed is the big one
 let noFieldChip=false;  // when true, diamondSVG draws no in-field pitch chip (used for the tiny viewer thumbnail)
@@ -1961,12 +1962,22 @@ function appBaseUrl(){
   if(location.protocol==="http:"||location.protocol==="https:") return location.origin+location.pathname;
   return "https://web-production-77d34.up.railway.app/scoring-controller.html";   // native app (file://) → public URL
 }
+let shareMode="feed";   // "feed" = scorebug + play-by-play only (no video); "video" = include the stream
 function shareUrl(){
-  const yt=streamYt(), p=["view=viewer"];
-  if(yt) p.push("yt="+encodeURIComponent(yt));
-  return appBaseUrl()+"?"+p.join("&");
+  const base=appBaseUrl();
+  if(shareMode==="video"){ const yt=streamYt(); if(yt) return base+"?view=viewer&yt="+encodeURIComponent(yt); }
+  return base+"?view=viewer&feed=1";   // feed-only viewer
 }
 function openShare(){
+  const hasVid=!!streamYt();
+  if(!hasVid) shareMode="feed";
+  const tog=document.getElementById("shareToggle");
+  if(tog){
+    const pill=(m,lbl)=>`<button data-act="sharemode" data-arg="${m}" style="padding:8px 16px;border:none;font-family:'Barlow',sans-serif;font-weight:800;font-size:13px;cursor:pointer;background:${shareMode===m?"#A3E635":"transparent"};color:${shareMode===m?"#0B0E13":"#B7C2D6"}">${lbl}</button>`;
+    tog.innerHTML = hasVid
+      ? `<div style="display:inline-flex;background:#10141A;border:1px solid #4A5870;border-radius:9px;overflow:hidden;margin-bottom:12px">${pill("feed","Game feed")}${pill("video","Feed + video")}</div>`
+      : "";
+  }
   const url=shareUrl();
   document.getElementById("qrurl").textContent=url;
   const box=document.getElementById("qrbox"); box.innerHTML="";
@@ -1991,6 +2002,7 @@ document.getElementById("qrmodal").addEventListener("click",e=>{
     const u=shareUrl(); if(!u)return;
     location.href="sms:?body="+encodeURIComponent("Watch All-Stars Live: "+u);
   }
+  else if(a.dataset.act==="sharemode"){ shareMode=a.dataset.arg; openShare(); return; }
   else if(a.dataset.act==="sharecopy"){
     const u=shareUrl(); if(!u)return;
     const done=()=>{ const o=a.innerHTML; a.innerHTML="Copied &#10003;"; setTimeout(()=>{ a.innerHTML=o; },1500); };
@@ -2069,7 +2081,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v25";
+var APP_VERSION="v26";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
