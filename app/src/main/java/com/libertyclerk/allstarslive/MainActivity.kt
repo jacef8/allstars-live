@@ -55,6 +55,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -194,7 +195,13 @@ class MainActivity : ComponentActivity() {
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
-        if (hasFocus) hideSystemBars()   // re-hide after dialogs / transient swipe-reveal
+        if (!hasFocus) return
+        // Re-hide bars after dialogs / a transient swipe-reveal — BUT NOT while the soft
+        // keyboard is up. Re-hiding during IME causes a relayout that bounces the keyboard
+        // closed (the lineup/name fields couldn't be typed into).
+        val imeUp = ViewCompat.getRootWindowInsets(window.decorView)
+            ?.isVisible(WindowInsetsCompat.Type.ime()) == true
+        if (!imeUp) hideSystemBars()
     }
 
     private fun hideSystemBars() {
