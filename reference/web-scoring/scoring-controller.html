@@ -130,8 +130,8 @@
 <!-- Share / QR modal: fans scan to open the live viewer -->
 <div id="qrmodal" style="display:none;position:fixed;inset:0;z-index:200;background:rgba(8,11,16,.84);align-items:center;justify-content:center;padding:20px">
   <div style="max-width:330px;width:100%;background:#212A38;border:1px solid #4A5870;border-radius:18px;padding:20px;text-align:center;box-shadow:0 24px 60px rgba(0,0,0,.6)">
-    <div style="font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:20px;letter-spacing:.5px;color:#EAEDF2">WATCH LIVE</div>
-    <div style="font-size:12px;color:#B7C2D6;margin:3px 0 14px">Fans scan this to follow the game</div>
+    <div style="font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:20px;letter-spacing:.5px;color:#EAEDF2">SHARE THE GAME</div>
+    <div style="font-size:12px;color:#B7C2D6;margin:3px 0 14px">Nearby? Have them <b style="color:#A3E635">scan</b>. Far away? Send the link.</div>
     <div id="qrbox" style="background:#fff;border-radius:12px;padding:12px;width:244px;height:244px;margin:0 auto;display:flex;align-items:center;justify-content:center;color:#677281;font-size:12px"></div>
     <div id="qrurl" style="font-size:11px;color:#B7C2D6;word-break:break-all;margin:12px 4px 14px"></div>
     <div style="display:flex;gap:8px">
@@ -139,6 +139,8 @@
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#0B0E13" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M22 7l-10 6L2 7"/></svg>Email</button>
       <button data-act="sharetext" style="flex:1;display:flex;align-items:center;justify-content:center;gap:8px;background:#324056;border:1px solid #4A5870;color:#EAEDF2;border-radius:10px;padding:13px;font-family:'Barlow',sans-serif;font-size:15px;font-weight:800;cursor:pointer">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#EAEDF2" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Text</button>
+      <button data-act="sharecopy" style="flex:1;display:flex;align-items:center;justify-content:center;gap:8px;background:#324056;border:1px solid #4A5870;color:#EAEDF2;border-radius:10px;padding:13px;font-family:'Barlow',sans-serif;font-size:15px;font-weight:800;cursor:pointer">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#EAEDF2" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>Copy</button>
     </div>
     <button data-act="closeshare" style="width:100%;margin-top:8px;background:transparent;border:none;color:#B7C2D6;padding:8px;font-family:'Barlow',sans-serif;font-size:13px;font-weight:700;cursor:pointer">Done</button>
   </div>
@@ -592,7 +594,7 @@ const LINK=(()=>{
 let _seq=0,_event=null,_eventId=0,_pitch=null;
 let phonePane="score";   // phone-only paging: "score" | "video" (large screens show both)
 let monitorOn=(()=>{try{return localStorage.getItem("al-monitor-on")!=="0";}catch(e){return true;}})();  // wide: video shown/hidden
-let viewMode=(()=>{try{return localStorage.getItem("al-view-mode")||"scorer";}catch(e){return "scorer";}})();  // "scorer" | "viewer"
+let viewMode=(()=>{try{ const p=new URLSearchParams(location.search); if(p.get("view")==="viewer") return "viewer"; return localStorage.getItem("al-view-mode")||"scorer";}catch(e){return "scorer";}})();  // "scorer" | "viewer"; shared links (?view=viewer) open as viewer
 let viewerRight=(()=>{try{return localStorage.getItem("al-viewer-right")||"field";}catch(e){return "field";}})();  // viewer + video on: which of field/feed is the big one
 let noFieldChip=false;  // when true, diamondSVG draws no in-field pitch chip (used for the tiny viewer thumbnail)
 let gameFeed=[];   // live play-by-play (most recent last) for the viewer feed
@@ -1953,24 +1955,27 @@ window.onCloudAuth=function(){ try{ render(); }catch(e){} };   // sign-in/out �
 
 /* ===== fan share: fans watch the YouTube broadcast (scorebug burned into video).
    Share that link — no separate fan page. Pass the stream via ?yt=VIDEO_ID. ===== */
+// The live viewer link — the app itself, opened in VIEWER mode (+ the video id if streaming).
+// Always available (works before/without YouTube), so nearby folks can just scan to follow.
+function appBaseUrl(){
+  if(location.protocol==="http:"||location.protocol==="https:") return location.origin+location.pathname;
+  return "https://web-production-77d34.up.railway.app/scoring-controller.html";   // native app (file://) → public URL
+}
 function shareUrl(){
-  const yt=streamYt();
-  return yt ? ("https://www.youtube.com/watch?v="+encodeURIComponent(yt)) : "";
+  const yt=streamYt(), p=["view=viewer"];
+  if(yt) p.push("yt="+encodeURIComponent(yt));
+  return appBaseUrl()+"?"+p.join("&");
 }
 function openShare(){
   const url=shareUrl();
   document.getElementById("qrurl").textContent=url;
   const box=document.getElementById("qrbox"); box.innerHTML="";
-  if(!url){
-    box.style.background="transparent";
-    box.innerHTML=`<div style="color:#B7C2D6;font-size:13px;line-height:1.5;text-align:center;padding:0 8px">No YouTube stream set yet.<br>Once you're live on YouTube, your fans' watch link and QR code show up here.</div>`;
-  } else if(window.QRCode){
+  if(window.QRCode){
     box.style.background="#fff";
     try{ new QRCode(box,{text:url,width:220,height:220,colorDark:"#10141A",colorLight:"#FFFFFF",correctLevel:QRCode.CorrectLevel.M}); }
-    catch(e){ box.textContent="Couldn't render QR — copy the link below."; }
-  } else { box.textContent="QR library didn't load — copy the link below."; }
-  // Native share sheet (SMS/messaging) only on devices that support it.
-  const nb=document.getElementById("navShareBtn"); if(nb) nb.style.display = (navigator.share && url) ? "flex" : "none";
+    catch(e){ box.style.background="transparent"; box.textContent="Couldn't render QR — copy the link below."; }
+  } else { box.style.background="transparent"; box.textContent="QR didn't load — copy the link below."; }
+  const nb=document.getElementById("navShareBtn"); if(nb) nb.style.display = navigator.share ? "flex" : "none";
   document.getElementById("qrmodal").style.display="flex";
 }
 function closeShare(){ document.getElementById("qrmodal").style.display="none"; }
@@ -1985,6 +1990,11 @@ document.getElementById("qrmodal").addEventListener("click",e=>{
   else if(a.dataset.act==="sharetext"){
     const u=shareUrl(); if(!u)return;
     location.href="sms:?body="+encodeURIComponent("Watch All-Stars Live: "+u);
+  }
+  else if(a.dataset.act==="sharecopy"){
+    const u=shareUrl(); if(!u)return;
+    const done=()=>{ const o=a.innerHTML; a.innerHTML="Copied &#10003;"; setTimeout(()=>{ a.innerHTML=o; },1500); };
+    if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(u).then(done).catch(done); } else { done(); }
   }
 });
 
@@ -2059,7 +2069,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v24";
+var APP_VERSION="v25";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
