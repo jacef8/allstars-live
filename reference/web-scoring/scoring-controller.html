@@ -1253,9 +1253,9 @@ function actionArea(){
         <input value="${(p.last||"").replace(/"/g,"&quot;")}" oninput="teamPLast('${p.id}',this.value)" placeholder="Last" style="${cell};flex:1;min-width:0">
         <button data-act="rmteamp" data-arg="${p.id}" style="background:none;border:1px solid ${T.line};color:${T.out};border-radius:7px;padding:8px 10px;font-weight:800"${t.players.length<=9?" disabled":""}>&times;</button></div>`).join("");
     const sRows=t.players.map(p=>{const s=(t.season[p.id]||{}).bat||{};const ab=s.ab||0,h=s.h||0;const avg=ab?(h/ab).toFixed(3).replace(/^0/,""):"—";
-      return `<tr style="border-top:1px solid ${T.line}"><td style="text-align:left;padding:6px 6px;font-weight:700;white-space:nowrap">#${p.num} ${p.name}</td><td style="padding:6px 4px">${ab}</td><td style="padding:6px 4px">${s.r||0}</td><td style="padding:6px 4px">${h}</td><td style="padding:6px 4px">${s.rbi||0}</td><td style="padding:6px 4px">${s.bb||0}</td><td style="padding:6px 4px">${s.k||0}</td><td style="padding:6px 4px;font-weight:800">${avg}</td></tr>`;}).join("");
-    const statTable=`<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-family:${MONO};font-size:12px;color:${T.chalk};text-align:center">
-        <thead><tr style="color:${T.sageDim};font-size:10px;letter-spacing:.5px"><th style="text-align:left;padding:0 6px 4px">SEASON · BATTING</th><th>AB</th><th>R</th><th>H</th><th>RBI</th><th>BB</th><th>K</th><th>AVG</th></tr></thead>
+      return `<tr style="border-top:1px solid ${T.line}"><td style="text-align:left;padding:10px 8px;font-weight:700;white-space:nowrap">#${p.num} ${p.name}</td><td style="padding:10px 6px">${ab}</td><td style="padding:10px 6px">${s.r||0}</td><td style="padding:10px 6px">${h}</td><td style="padding:10px 6px">${s.rbi||0}</td><td style="padding:10px 6px">${s.bb||0}</td><td style="padding:10px 6px">${s.k||0}</td><td style="padding:10px 6px;font-weight:800">${avg}</td></tr>`;}).join("");
+    const statTable=`<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-family:${MONO};font-size:16px;color:${T.chalk};text-align:center">
+        <thead><tr style="color:${T.sageDim};font-size:13px;letter-spacing:.5px"><th style="text-align:left;padding:0 8px 6px">SEASON · BATTING</th><th>AB</th><th>R</th><th>H</th><th>RBI</th><th>BB</th><th>K</th><th>AVG</th></tr></thead>
         <tbody>${sRows}</tbody></table>
       <div style="font-size:11px;color:${T.sageDim};margin-top:8px;padding:0 4px">Pitching &amp; fielding season stats are stored too — they fill in as in-game tracking expands.</div></div>`;
     // Team access (cloud) — owner + authorized scorers. Only when signed in.
@@ -2118,7 +2118,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v33";
+var APP_VERSION="v34";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
