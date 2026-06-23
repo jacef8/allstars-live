@@ -838,6 +838,23 @@ function batterCard(){
   </div>`;
 }
 
+/* Compact one-line batter readout for the TOP BAR (wide scorer) — frees the right column
+   so the field grows into its wasted side margins. Tappable for the at-bat review. */
+function batterStrip(){
+  const b=batter(),k=battingKey(),c=TEAMS[k].color;
+  const lp=batterLineParts();
+  const ord=ordinal(battingSlot()+1);
+  const nameLine=b.ours?b.name:TEAMS[k].name.toUpperCase();
+  const sub=b.ours?`${TEAMS[k].short}${b.pos?` · ${b.pos}`:""} · ${ord}`:`${TEAMS[k].short} · ${ord}`;
+  return `<button data-act="reviewbatter" data-arg="${batterKeyOf(b)}" style="display:flex;align-items:center;gap:10px;background:${c}1f;border:1px solid ${c}55;border-left:5px solid ${c};border-radius:10px;padding:6px 12px;cursor:pointer;max-width:100%;min-width:0">
+    <span style="font-family:${MONO};font-size:22px;font-weight:700;color:${c};line-height:1;flex:none">${b.num}</span>
+    <div style="min-width:0;text-align:left">
+      <div style="font-family:${MONO};font-size:15px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;line-height:1;color:${T.chalk};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${nameLine}</div>
+      <div style="font-size:10px;color:${T.sage};font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${sub}</div></div>
+    <span style="font-family:${MONO};font-size:16px;font-weight:800;color:${T.chalk};margin-left:2px;white-space:nowrap;flex:none">${lp.line}</span>
+  </button>`;
+}
+
 /* Which YouTube stream the monitor shows: ?yt= wins, else the device-saved one. */
 function streamYt(){ try{ return new URLSearchParams(location.search).get("yt") || localStorage.getItem("al-stream-yt") || ""; }catch(e){ return new URLSearchParams(location.search).get("yt")||""; } }
 /* Accept a full YouTube link (watch?v=, youtu.be/, /live/, /embed/) or a bare id. */
@@ -1634,7 +1651,7 @@ function render(){
           ${monitorPane()}
         </div>
         <div style="flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;gap:8px">
-          ${focusPlay?"":miniCount()}${batterCard()}${fieldEl}${actionEl}
+          ${focusPlay?"":miniCount()}${fieldEl}${actionEl}
         </div>
       </div>`;
   } else if(wide){
@@ -1642,7 +1659,7 @@ function render(){
     // decisions get the rest of the width — more room, less scrolling.
     body=`<div id="console-row" class="video-off" style="flex:1;min-height:0;display:flex;flex-direction:row;gap:12px">
         <div style="flex:0 0 46%;max-width:46%;min-width:0;min-height:0;display:flex;flex-direction:column;gap:8px">
-          ${focusPlay?"":miniCount()}${batterCard()}<div style="flex:1;min-height:0;display:flex;align-items:center;justify-content:center;position:relative">${diamondSVG()}${toastEl}</div>
+          ${focusPlay?"":miniCount()}<div style="flex:1;min-height:0;display:flex;align-items:center;justify-content:center;position:relative">${diamondSVG()}${toastEl}</div>
         </div>
         <div style="flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;gap:8px">
           ${actionEl}${feedPanel()}
@@ -1834,10 +1851,14 @@ function renderToolbar(){
   const gc=(isWide()&&mode==="idle"&&viewMode==="scorer")
     ? `${tbBtn("undo","↶ Undo")}${tbBtn("home","⌂ Home")}${tbBtn("lineup","Lineup")}${tbBtn("endgame","End",`color:${T.out};border-color:${T.out}`)}`
     : "";
-  tb.innerHTML=`<div style="display:flex;align-items:center;gap:8px;padding:4px 2px 2px;flex-wrap:wrap">
+  // Batter readout fills the empty middle of the top row (wide scorer in a live game).
+  const bstrip=(isWide()&&viewMode==="scorer"&&!["home","teams","team","pickteam","newgame","lineup","pickplayer","pickpos","editplayer","summary"].includes(mode))
+    ? `<div style="flex:1;min-width:0;display:flex;justify-content:center;padding:0 6px">${batterStrip()}</div>` : `<div style="flex:1"></div>`;
+  tb.innerHTML=`<div style="display:flex;align-items:center;gap:8px;padding:4px 2px 2px;flex-wrap:nowrap">
     <div style="flex:none;min-width:0;font-family:${MONO};font-weight:700;font-size:16px;letter-spacing:.5px;color:${T.chalk};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${chip}</div>
     ${gc}
-    <div style="margin-left:auto;display:flex;align-items:center;gap:8px">
+    ${bstrip}
+    <div style="flex:none;display:flex;align-items:center;gap:8px">
       ${vidToggle}
       <button data-act="share" style="display:flex;align-items:center;gap:7px;background:${T.surface2};border:1px solid ${T.line};color:${T.chalk};border-radius:10px;padding:9px 15px;font-size:15px;font-weight:800">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="${T.lime}" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="19" r="2.6"/><path d="M8.3 10.8 15.7 6.4M8.3 13.2l7.4 4.4"/></svg>Share</button>
