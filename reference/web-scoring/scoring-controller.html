@@ -966,10 +966,11 @@ function fieldOverlays(){
   const aH=sideHits("away"),hH=sideHits("home");
   const aE=(G.errors&&G.errors.away)||0,hE=(G.errors&&G.errors.home)||0;
   const box=`position:absolute;z-index:4;background:rgba(9,13,19,.74);border:1px solid ${T.line};border-radius:11px;box-shadow:0 3px 12px rgba(0,0,0,.45)`;
-  const pcChip=`<div style="${box};top:9px;left:9px;padding:7px 14px;display:flex;flex-direction:column;align-items:center;line-height:1">
-      <div style="font-family:${MONO};font-size:34px;font-weight:800;color:${T.amber}">${pc}</div>
-      <div style="font-size:10px;font-weight:800;letter-spacing:1.4px;color:${T.sageDim};margin-top:2px">PITCHES</div>
-      <div style="font-size:11px;font-weight:600;color:${T.sage};max-width:110px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center">${pn}</div></div>`;
+  const pcChip=`<div style="${box};top:8px;left:8px;padding:5px 11px 5px 9px;display:flex;align-items:center;gap:9px;line-height:1">
+      <div style="font-family:${MONO};font-size:23px;font-weight:800;color:${T.amber}">${pc}</div>
+      <div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+        <div style="font-size:9px;font-weight:800;letter-spacing:1.2px;color:${T.sageDim}">PITCHES</div>
+        <div style="font-size:10px;font-weight:600;color:${T.sage};max-width:92px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${pn}</div></div></div>`;
   const hdr=t=>`<th style="padding:0 8px;font-family:${MONO};font-size:10px;font-weight:700;letter-spacing:.5px;color:${T.sageDim}">${t}</th>`;
   const nm=(t,act)=>`<td style="text-align:left;padding:1px 9px 1px 2px;font-family:${MONO};font-size:12px;font-weight:800;color:${act?T.chalk:T.sage}">${t}</td>`;
   const cell=(v,act)=>`<td style="text-align:center;padding:1px 8px;font-family:${MONO};font-size:16px;font-weight:800;color:${act?T.chalk:T.sage}">${v}</td>`;
@@ -1105,8 +1106,8 @@ function actionArea(){
     const hero = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:6px 0 2px;flex:none">
           <img src="icons/logo-mark.png" alt=""
             onerror="if(this.src.indexOf('icon-512')<0){this.src='icons/icon-512.png';this.style.borderRadius='20px';}else{this.style.display='none';}"
-            style="height:clamp(64px,12vh,112px);width:auto;display:block;filter:drop-shadow(0 6px 16px rgba(0,0,0,.55))">
-          <div style="font-family:${MONO};font-size:34px;font-weight:800;letter-spacing:1.5px;line-height:1;color:#fff">ALL-STARS <span style="color:${T.lime}">LIVE</span></div></div>`;
+            style="height:clamp(92px,17vh,176px);width:auto;display:block;filter:drop-shadow(0 8px 20px rgba(0,0,0,.55))">
+          <div style="font-family:${MONO};font-size:clamp(30px,4vw,46px);font-weight:800;letter-spacing:1.5px;line-height:1;color:#fff">ALL-STARS <span style="color:${T.lime}">LIVE</span></div></div>`;
     const resumeBtn = gameActive?`<button data-act="resume" style="${bigBtn(T.safe)};font-size:17px;padding:16px;display:flex;align-items:center;justify-content:center;gap:8px">${IC(PLAY)} Resume &middot; ${OUR.short} vs ${OPP.short}</button>`:"";
     const newGameBtn = `<button data-act="newgamestart" style="${bigBtn(T.lime,"font-size:24px;padding:24px;box-shadow:0 8px 22px rgba(163,230,53,.22)",T.field)}">${IC(PLAY)} New Game</button>`;
     const manageBtn = `<button data-act="gototeams" style="${ghost};padding:17px;font-size:17px;border:2px solid #3F6CA8;color:${T.ink};display:flex;align-items:center;justify-content:center;gap:9px">${IC('<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>')} Manage teams &amp; rosters</button>`;
@@ -1128,13 +1129,17 @@ function actionArea(){
              <div style="flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;display:flex;flex-direction:column;gap:10px">${teamsBlock}</div>
              ${manageBtn}</div>`
         : manageTile;
-      return `<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:14px">
-          ${hero}
-          <div style="flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr;gap:14px">
-            <div style="display:flex;flex-direction:column;gap:14px;min-height:0">${resumeBtn}${newTile}</div>
-            <div style="display:flex;flex-direction:column;min-height:0">${rightCell}</div>
+      // Centered, width-capped so on a big PC monitor the tiles stay a sane size and the
+      // logo reads large — instead of two giant buttons filling the screen.
+      return `<div style="flex:1;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:clamp(16px,3vh,30px);padding:12px;overflow-y:auto">
+          <div style="width:100%;max-width:1000px;display:flex;flex-direction:column;gap:clamp(14px,2.4vh,26px)">
+            ${hero}
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;height:min(46vh,360px)">
+              <div style="display:flex;flex-direction:column;gap:14px;min-height:0">${resumeBtn}${newTile}</div>
+              <div style="display:flex;flex-direction:column;min-height:0">${rightCell}</div>
+            </div>
+            ${gameActive?shareBtnHome:""}
           </div>
-          ${gameActive?shareBtnHome:""}
         </div>`;
     }
     return `<div style="display:flex;flex-direction:column;gap:14px">${hero}${resumeBtn}${newGameBtn}${teamsBlock}${manageBtn}${gameActive?shareBtnHome:""}</div>`;
@@ -1625,12 +1630,15 @@ function render(){
         </div>
       </div>`;
   } else {
+    const isView=viewMode==="viewer";   // viewer = watch only: field + feed, NO scoring tools
     const tab=(id,label)=>`<button data-act="pane" data-arg="${id}" style="flex:1;background:${phonePane===id?T.lime:T.surface};border:2px solid ${phonePane===id?T.lime:T.line};color:${phonePane===id?T.field:T.sage};border-radius:10px;padding:9px;font-family:${MONO};font-weight:800;font-size:14px;letter-spacing:.6px;text-transform:uppercase">${label}</button>`;
     const pane=phonePane==="video"
-      ? `<div style="flex:1;min-height:0;display:flex;flex-direction:column;justify-content:center;gap:11px">${monitorPane()}${shareBtn}</div>`
-      : `<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px">${focusPlay?"":statusBar()}${batterCard()}${fieldEl}${actionEl}${controls}</div>`;
+      ? `<div style="flex:1;min-height:0;display:flex;flex-direction:column;justify-content:center;gap:11px">${monitorPane()}${isView?"":shareBtn}</div>`
+      : isView
+        ? `<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px">${statusBar()}${batterCard()}${fieldEl}${feedPanel()}</div>`
+        : `<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px">${focusPlay?"":statusBar()}${batterCard()}${fieldEl}${actionEl}${controls}</div>`;
     body=`<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:9px">
-        ${focusPlay?"":`<div style="display:flex;gap:8px;flex:none">${tab("score","● Scoring")}${tab("video","▶ Video")}</div>`}
+        ${focusPlay?"":`<div style="display:flex;gap:8px;flex:none">${tab("score",isView?"◆ Field":"● Scoring")}${tab("video","▶ Video")}</div>`}
         ${pane}
       </div>`;
   }
