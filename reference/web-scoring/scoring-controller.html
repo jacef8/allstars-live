@@ -825,7 +825,7 @@ function batterCard(){
   const nameLine=b.ours?b.name:TEAMS[k].name.toUpperCase();
   const sub=b.ours
     ? `${TEAMS[k].short}${b.pos?` · ${b.pos}`:""} &middot; ${ord} in order`
-    : `${TEAMS[k].name} &middot; ${ord} batter`;
+    : `${ord} batter`;   // opponent: the big name already shows the team — don't repeat it
   return `<div data-act="reviewbatter" data-arg="${batterKeyOf(b)}" style="display:flex;align-items:center;gap:13px;background:${c}14;border:1px solid ${c}40;border-left:5px solid ${c};border-radius:10px;padding:9px 14px;flex-shrink:0;cursor:pointer">
     <span style="font-family:${MONO};font-size:34px;font-weight:700;color:${c};line-height:1;min-width:46px;text-align:center">${big}</span>
     <div style="flex:1;min-width:0">
@@ -1691,12 +1691,20 @@ function render(){
       </div>`;
   } else {
     const isView=viewMode==="viewer";   // viewer = watch only: field + feed, NO scoring tools
+    // Phone scoring: the field would collapse to a useless sliver here (it's the only flex
+    // item), and the bases already show in the scorebug — so in idle we drop it for a slim
+    // pitch-count line and push the buttons to the thumb zone. The field returns full-screen
+    // for locate/runners (focusPlay).
+    const pcLine=`<div style="flex:none;display:flex;align-items:center;gap:10px;background:${T.surface};border:1px solid ${T.line};border-radius:10px;padding:9px 14px">
+        <span style="font-family:${MONO};font-size:24px;font-weight:800;color:${T.amber}">${currentPitchCount()}</span>
+        <span style="font-size:11px;font-weight:800;letter-spacing:1.2px;color:${T.sageDim}">PITCHES</span>
+        <span style="font-size:12px;color:${T.sage};font-weight:600;margin-left:auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${currentPitcherName()}</span></div>`;
     const tab=(id,label)=>`<button data-act="pane" data-arg="${id}" style="flex:1;background:${phonePane===id?T.lime:T.surface};border:2px solid ${phonePane===id?T.lime:T.line};color:${phonePane===id?T.field:T.sage};border-radius:10px;padding:9px;font-family:${MONO};font-weight:800;font-size:14px;letter-spacing:.6px;text-transform:uppercase">${label}</button>`;
     const pane=phonePane==="video"
       ? `<div style="flex:1;min-height:0;display:flex;flex-direction:column;justify-content:center;gap:11px">${monitorPane()}${isView?"":shareBtn}</div>`
       : isView
         ? `<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px">${statusBar()}${batterCard()}${fieldEl}${feedPanel()}</div>`
-        : `<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px">${focusPlay?"":statusBar()}${batterCard()}${fieldEl}${actionEl}${controls}</div>`;
+        : `<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px">${focusPlay?"":statusBar()}${batterCard()}${focusPlay?fieldEl:pcLine+'<div style="flex:1;min-height:0"></div>'}${actionEl}${controls}</div>`;
     body=`<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:9px">
         ${focusPlay?"":`<div style="display:flex;gap:8px;flex:none">${tab("score",isView?"◆ Field":"● Scoring")}${tab("video","▶ Video")}</div>`}
         ${pane}
@@ -1994,7 +2002,7 @@ let _rsz; window.addEventListener("resize",function(){clearTimeout(_rsz);_rsz=se
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v17";
+var APP_VERSION="v18";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
