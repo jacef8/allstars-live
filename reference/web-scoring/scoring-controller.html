@@ -166,6 +166,9 @@
 
 <!-- Bundled locally so the QR renders even on spotty field internet. -->
 <script src="lib/qrcode.min.js"></script>
+<!-- Cloud accounts/sync config + loader. DORMANT until firebase-config.js has an apiKey. -->
+<script src="firebase-config.js"></script>
+<script src="auth.js"></script>
 <script>
 /* ----------------------------------------------------------------------
    Field-as-input baseball scoring controller — interaction prototype
@@ -1155,6 +1158,18 @@ function actionArea(){
     // Share only makes sense once a game (and its stream link) exists.
     const shareBtnHome = `<button data-act="share" style="flex:none;display:flex;align-items:center;justify-content:center;gap:9px;background:${T.surface};border:1px solid ${T.line};color:${T.chalk};border-radius:12px;padding:13px;font-family:${SANS};font-weight:800;font-size:15px">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="${T.lime}" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="19" r="2.6"/><path d="M8.3 10.8 15.7 6.4M8.3 13.2l7.4 4.4"/></svg>Share game link</button>`;
+    // Cloud sign-in bar — only appears once Firebase is configured (firebase-config.js apiKey).
+    // Until then it's empty and the home looks/works exactly as the local-only version.
+    const C=window.Cloud;
+    const authBar = (C&&C.enabled)
+      ? (C.user
+          ? `<div style="flex:none;display:flex;align-items:center;justify-content:center;gap:10px;font-size:13px;color:${T.sage}">
+               <span>Signed in as <b style="color:${T.chalk}">${(C.user.email||"account").replace(/</g,"")}</b></span>
+               <button data-act="signout" style="background:${T.surface};border:1px solid ${T.line};color:${T.chalk};border-radius:8px;padding:6px 12px;font-weight:800;font-size:12px">Sign out</button></div>`
+          : `<div style="flex:none;display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap">
+               <input id="authEmail" type="email" autocomplete="email" placeholder="you@email.com" style="flex:1;min-width:160px;max-width:260px;background:${T.surface2};border:1px solid ${T.line};color:${T.ink};border-radius:8px;padding:10px 12px;font-size:14px;outline:none">
+               <button data-act="signin" style="background:${T.lime};color:${T.field};border:none;border-radius:8px;padding:10px 16px;font-weight:800;font-size:13px">Sign in</button></div>`)
+      : "";
     // Wide (tablet): two columns so the key actions fit without scrolling — only a long
     // team list scrolls, inside its own column. Narrow (phone): the classic vertical stack.
     if(isWide()){
@@ -1174,7 +1189,7 @@ function actionArea(){
       // logo reads large — instead of two giant buttons filling the screen.
       return `<div style="flex:1;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:clamp(16px,3vh,30px);padding:12px;overflow-y:auto">
           <div style="width:100%;max-width:1000px;display:flex;flex-direction:column;gap:clamp(14px,2.4vh,26px)">
-            ${hero}
+            ${hero}${authBar}
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;height:min(46vh,360px)">
               <div style="display:flex;flex-direction:column;gap:14px;min-height:0">${resumeBtn}${newTile}</div>
               <div style="display:flex;flex-direction:column;min-height:0">${rightCell}</div>
@@ -1183,7 +1198,7 @@ function actionArea(){
           </div>
         </div>`;
     }
-    return `<div style="display:flex;flex-direction:column;gap:14px">${hero}${resumeBtn}${newGameBtn}${teamsBlock}${manageBtn}${gameActive?shareBtnHome:""}</div>`;
+    return `<div style="display:flex;flex-direction:column;gap:14px">${hero}${authBar}${resumeBtn}${newGameBtn}${teamsBlock}${manageBtn}${gameActive?shareBtnHome:""}</div>`;
   }
   if(mode==="teams"){
     const sorted=DB.teams.slice().sort((a,b)=>(b.fav?1:0)-(a.fav?1:0));
@@ -1787,6 +1802,8 @@ document.getElementById("app").addEventListener("click",e=>{
   if(act==="ptype"){ pitchType=(pitchType===arg?null:arg); render(); return; }
   if(act==="pane"){ phonePane=arg; render(); return; }
   if(act==="swapviewer"){ viewerRight=viewerRight==="field"?"feed":"field"; try{localStorage.setItem("al-viewer-right",viewerRight);}catch(e){} render(); return; }
+  if(act==="signin"){ const e=document.getElementById("authEmail"); if(e&&window.cloudSignIn)window.cloudSignIn(e.value); return; }
+  if(act==="signout"){ if(window.cloudSignOut)window.cloudSignOut(); return; }
   if(act==="togglevideo"){
     monitorOn=!monitorOn;
     try{localStorage.setItem("al-monitor-on", monitorOn?"1":"0");}catch(e){}
@@ -1926,6 +1943,7 @@ function renderToolbar(){
   </div>`;
 }
 window.onLinkChange=renderToolbar;   // relay open/close → repaint the dot
+window.onCloudAuth=function(){ try{ render(); }catch(e){} };   // sign-in/out → repaint the home auth bar
 
 /* ===== fan share: fans watch the YouTube broadcast (scorebug burned into video).
    Share that link — no separate fan page. Pass the stream via ?yt=VIDEO_ID. ===== */
@@ -2022,7 +2040,7 @@ let _rsz; window.addEventListener("resize",function(){clearTimeout(_rsz);_rsz=se
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v20";
+var APP_VERSION="v21";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
