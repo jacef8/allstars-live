@@ -571,6 +571,15 @@ function saveDocs(d){ try{ localStorage.setItem("al-rule-docs",JSON.stringify(d)
 window.addDoc=function(){ const n=document.getElementById("docName"),u=document.getElementById("docUrl"); if(!n||!u)return; const name=(n.value||"").trim(),url=(u.value||"").trim(); if(!name||!url){flash("Enter a name and a link");return;} const d=ruleDocs(); d.push({name,url:/^https?:/i.test(url)?url:"https://"+url}); saveDocs(d); n.value="";u.value=""; render(); };
 window.removeDoc=function(i){ const d=ruleDocs(); d.splice(i,1); saveDocs(d); render(); };
 function openDoc(url){ try{ if(IS_APP&&window.AllStars&&window.AllStars.openExternal)AllStars.openExternal(url); else window.open(url,"_blank","noopener"); }catch(e){ try{location.href=url;}catch(_){} } }
+// Only a team owner or an authorized scorer may add/remove league documents (viewers can read).
+function canManageDocs(){
+  if(viewerLocked) return false;                 // watch-link viewer
+  const C=window.Cloud;
+  if(!C||!C.enabled) return true;                // local-only device (native / cloud off) = the owner's own app
+  if(!C.user) return false;                      // signed-out on a cloud-enabled web app
+  const em=(C.user.email||"").toLowerCase();
+  return (DB.teams||[]).some(t=> (window.cloudIsOwner&&window.cloudIsOwner(t)) || (Array.isArray(t.scorers)&&t.scorers.indexOf(em)>=0) );
+}
 
 /* ===== per-batter box-score stats (both teams) ===== */
 const batterKeyOf=b=>b.ours?("o"+b.ri):("p"+b.spot);
@@ -716,6 +725,9 @@ let phonePane="score";   // phone-only paging: "score" | "video" (large screens 
 let monitorOn=(()=>{try{ const p=new URLSearchParams(location.search); if(p.get("feed")==="1") return false; if(p.get("yt")) return true; return localStorage.getItem("al-monitor-on")!=="0";}catch(e){return true;}})();  // wide: video shown/hidden; shared ?feed=1 opens feed-only
 let viewMode=(()=>{try{ const p=new URLSearchParams(location.search); if(p.get("view")==="viewer") return "viewer"; return localStorage.getItem("al-view-mode")||"scorer";}catch(e){return "scorer";}})();  // "scorer" | "viewer"; shared links (?view=viewer) open as viewer
 let viewerRight=(()=>{try{return localStorage.getItem("al-viewer-right")||"field";}catch(e){return "field";}})();  // viewer + video on: which of field/feed is the big one
+// Opened via a watch/share link → this person is ONLY a viewer (no scoring). Lock them to viewer
+// mode and hide the Scorer/Viewer toggle (and reuse that space for the matchup they're watching).
+let viewerLocked=(()=>{try{ const p=new URLSearchParams(location.search); return p.get("view")==="viewer"||p.get("feed")==="1"||!!p.get("watch"); }catch(e){return false;}})();
 let noFieldChip=false;  // when true, diamondSVG draws no in-field pitch chip (used for the tiny viewer thumbnail)
 let gameFeed=[];   // live play-by-play (most recent last) for the viewer feed
 // Advanced pitch tracking: when on, the scorer arms a pitch type that's recorded with
@@ -1385,15 +1397,19 @@ function actionArea(){
           ${fld("Type",`<select id="schType" style="${cell}"><option value="game">Game</option><option value="practice">Practice</option></select>`)}
           ${fld("Date",`<input id="schDate" type="date" style="${cell}">`)}
           ${fld("Time",`<input id="schTime" type="time" style="${cell}">`)}</div>
-        ${fld("Opponent (games only)",`<input id="schOpp" placeholder="e.g. Bryceville Tigers" style="${cell}">`)}
+        ${fld("Opponent (games only)",`<select id="schOppSel" style="${cell};margin-bottom:6px"><option value="">— pick a saved team —</option>${(DB.teams||[]).filter(x=>x.id!==t.id).map(x=>`<option value="${(x.name||'').replace(/"/g,'&quot;')}">${(x.name||'').replace(/</g,'')}</option>`).join("")}</select><input id="schOpp" placeholder="…or type a new opponent" style="${cell}">`)}
         ${fld("Location",`<input id="schLoc" placeholder="e.g. City Park — Field 2" style="${cell}">`)}
         ${fld("Notes (optional)",`<input id="schNotes" placeholder="e.g. arrive 45 min early, white jerseys" style="${cell}">`)}
         <button data-act="schedadd" style="${bigBtn(T.lime,'',T.field)};margin-top:4px">+ Add to schedule</button></div>`;
     // Team access (cloud) — owner + authorized scorers. Only when signed in.
     const C=window.Cloud, signedIn=!!(C&&C.enabled&&C.user);
     const owner=signedIn && typeof window.cloudIsOwner==="function" && window.cloudIsOwner(t);
-    const scorersSection = !signedIn ? "" : `<div style="background:${T.surface};border:1px solid ${T.line};border-radius:10px;padding:12px 14px">
-        <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin-bottom:6px">Team access</div>
+    const scorersSection = !(C&&C.enabled) ? ""
+      : !signedIn ? `<div style="background:${T.surface};border:1px solid ${T.line};border-radius:10px;padding:12px 14px">
+          <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin-bottom:6px">Team access — authorized scorers</div>
+          <div style="font-size:12px;color:${T.sageDim}">Sign in on the Home screen to see and manage who can score this team.</div></div>`
+      : `<div style="background:${T.surface};border:1px solid ${T.line};border-radius:10px;padding:12px 14px">
+        <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin-bottom:6px">Team access — authorized scorers</div>
         <div style="font-size:13px;color:${T.sage};margin-bottom:6px">Owner: <b style="color:${T.chalk};word-break:break-all">${(t.ownerEmail||C.user.email||"you").replace(/</g,"")}</b></div>
         ${(t.scorers&&t.scorers.length)?t.scorers.map(s=>`<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 0;border-top:1px solid ${T.line}"><span style="font-size:13px;color:${T.chalk};word-break:break-all">${s.replace(/</g,"")}</span>${owner?`<button data-act="rmscorer" data-arg="${s}" style="background:none;border:1px solid ${T.line};color:${T.out};border-radius:7px;padding:5px 10px;font-weight:800;font-size:12px">Remove</button>`:""}</div>`).join(""):`<div style="font-size:12px;color:${T.sageDim};padding:4px 0">No authorized scorers yet.</div>`}
         ${owner?`<div style="display:flex;gap:8px;margin-top:10px"><input id="scorerEmail" type="email" autocomplete="off" placeholder="scorer@email.com" style="${cell};flex:1;min-width:0"><button data-act="addscorer" style="background:${T.lime};color:${T.field};border:none;border-radius:8px;padding:9px 14px;font-weight:800;font-size:13px">Add</button></div>
@@ -1512,25 +1528,27 @@ function actionArea(){
   }
   if(mode==="tools"){
     const docs=ruleDocs();
+    const canMng=canManageDocs();
     const cell2=`background:${T.surface2};border:1px solid ${T.line};color:${T.ink};border-radius:8px;padding:11px 12px;font-weight:700;outline:none`;
     const rows=docs.map((d,i)=>`<div style="display:flex;align-items:center;gap:8px;background:${T.surface};border:1px solid ${T.line};border-radius:10px;padding:12px 14px">
         <button data-act="opendoc" data-arg="${i}" style="flex:1;min-width:0;text-align:left;background:none;border:none;color:${T.chalk};cursor:pointer">
           <div style="font-weight:800;font-size:16px;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">&#128196; ${(d.name||"Document").replace(/</g,"")}</div>
           <div style="font-size:12px;color:${T.sage};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px">${(d.url||"").replace(/</g,"")}</div></button>
         <span style="color:${T.lime};font-weight:800;font-size:13px">OPEN &rsaquo;</span>
-        <button data-act="rmdoc" data-arg="${i}" style="background:none;border:1px solid ${T.line};color:${T.out};border-radius:7px;padding:8px 10px;font-weight:800">&times;</button></div>`).join("");
+        ${canMng?`<button data-act="rmdoc" data-arg="${i}" style="background:none;border:1px solid ${T.line};color:${T.out};border-radius:7px;padding:8px 10px;font-weight:800">&times;</button>`:""}</div>`).join("");
     return `<div style="display:flex;flex-direction:column;gap:14px">
         <div style="display:flex;align-items:center;gap:10px">
           <button data-act="gohome" style="${ghost};padding:9px 11px">&lsaquo; Home</button>
           <div style="font-family:${MONO};font-size:23px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:${T.lime}">Tools</div></div>
         <div style="font-size:13px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin:2px 2px -4px">League rule documents</div>
-        <div style="font-size:12px;color:${T.sage};margin:0 2px">Quick access to your league's rulebooks. Tap to open; add your own links.</div>
+        <div style="font-size:12px;color:${T.sage};margin:0 2px">Quick access to your league's rulebooks. Tap any to open.</div>
         <div style="display:flex;flex-direction:column;gap:8px">${rows||`<div style="color:${T.sageDim};font-size:13px;text-align:center;padding:16px;border:1px dashed ${T.line};border-radius:10px">No documents yet.</div>`}</div>
-        <div style="background:${T.surface};border:1px solid ${T.line};border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:8px">
+        ${canMng?`<div style="background:${T.surface};border:1px solid ${T.line};border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:8px">
           <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime}">Add a document</div>
           <input id="docName" placeholder="Name (e.g. 2026 League Rules)" style="${cell2}">
           <input id="docUrl" placeholder="https://link-to-pdf" inputmode="url" style="${cell2}">
-          <button data-act="adddoc" style="${bigBtn(T.lime,"",T.field)}">+ Add document</button></div>
+          <button data-act="adddoc" style="${bigBtn(T.lime,"",T.field)}">+ Add document</button></div>`
+        :`<div style="font-size:12px;color:${T.sageDim};text-align:center;padding:10px 8px;border:1px dashed ${T.line};border-radius:10px">Only a team owner or authorized scorer can add documents.</div>`}
       </div>`;
   }
   if(mode==="lineup"){
@@ -2039,7 +2057,7 @@ document.getElementById("app").addEventListener("click",e=>{
   if(act==="opendoc"){ const d=ruleDocs()[+arg]; if(d&&d.url)openDoc(d.url); return; }
   if(act==="adddoc"){ if(window.addDoc)window.addDoc(); return; }
   if(act==="rmdoc"){ if(window.removeDoc)window.removeDoc(+arg); return; }
-  if(act==="schedadd"){ const t=teamById(openTeamId); if(!t)return; const g=id=>{const e=document.getElementById(id);return e?(e.value||""):"";}; const date=g("schDate"); if(!date){flash("Pick a date");return;} if(!Array.isArray(t.schedule))t.schedule=[]; t.schedule.push({id:"s"+Date.now().toString(36),type:g("schType")||"game",date:date,time:g("schTime"),opp:g("schOpp").trim(),loc:g("schLoc").trim(),notes:g("schNotes").trim()}); saveDB(); render(); return; }
+  if(act==="schedadd"){ const t=teamById(openTeamId); if(!t)return; const g=id=>{const e=document.getElementById(id);return e?(e.value||""):"";}; const date=g("schDate"); if(!date){flash("Pick a date");return;} const opp=g("schOpp").trim()||g("schOppSel").trim(); if(!Array.isArray(t.schedule))t.schedule=[]; t.schedule.push({id:"s"+Date.now().toString(36),type:g("schType")||"game",date:date,time:g("schTime"),opp:opp,loc:g("schLoc").trim(),notes:g("schNotes").trim()}); saveDB(); render(); return; }
   if(act==="schedrm"){ const t=teamById(openTeamId); if(t&&Array.isArray(t.schedule)){ t.schedule=t.schedule.filter(s=>s.id!==arg); saveDB(); render(); } return; }
   if(act==="invitewatch"){ openShare(); return; }
   if(act==="ingamesettings"){ settingsMode=true; mode="newgame"; render(); return; }
@@ -2065,6 +2083,7 @@ document.getElementById("app").addEventListener("click",e=>{
     return;
   }
   if(act==="role"){
+    if(viewerLocked) return;   // watch-link viewers can't switch to scorer
     viewMode=arg;
     try{localStorage.setItem("al-view-mode",viewMode);}catch(e){}
     renderToolbar(); render();
@@ -2161,7 +2180,9 @@ function renderToolbar(){
   // In a live game the title slot becomes the Scorer/Viewer role toggle (the matchup
   // already shows in the scorebug below — no need to repeat it here).
   const roleSeg=(r,lbl)=>`<button data-act="role" data-arg="${r}" style="padding:8px 14px;border:none;font-family:${MONO};font-weight:800;font-size:13px;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;background:${viewMode===r?T.lime:"transparent"};color:${viewMode===r?T.field:T.sage}">${lbl}</button>`;
-  const chip=playMode2
+  const chip=(playMode2&&viewerLocked)
+    ? `<div style="display:inline-flex;align-items:center;gap:8px"><span style="display:inline-flex;align-items:center;gap:5px;background:${T.surface};border:1px solid ${T.line};border-radius:999px;padding:5px 11px;font-family:${MONO};font-size:11px;font-weight:800;letter-spacing:1px;color:${T.lime}">👁 WATCHING</span><span style="font-family:${MONO};font-weight:700;font-size:15px;color:${T.chalk}">${OUR.short||"US"} <span style="color:${T.sageDim};font-weight:600">vs</span> ${OPP.short||"OPP"}</span></div>`
+    : playMode2
     ? `<div style="display:inline-flex;background:${T.surface};border:1px solid ${T.line};border-radius:10px;overflow:hidden">${roleSeg("scorer","Scorer")}${roleSeg("viewer","Viewer")}</div>`
     : inGame
       ? `${OUR.short||"US"} <span style="color:${T.sageDim};font-weight:600">vs</span> ${OPP.short||"OPP"}`
@@ -2364,7 +2385,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v40";
+var APP_VERSION="v41";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;

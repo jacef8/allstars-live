@@ -80,6 +80,18 @@
           if (sansTimestamp(merged) !== sansTimestamp(DB.teams[i])) { DB.teams[i] = merged; changed = true; }  // ignore updatedAt-only churn
         }
       });
+      // A just-accepted texted invite: jump to that team's management page + favorite it (follow).
+      if (window._joinTeamId) {
+        var jt = (DB.teams || []).find(function (x) { return x.id === window._joinTeamId; });
+        if (jt) {
+          window._joinTeamId = null;
+          if (!jt.fav) jt.fav = true;
+          try { openTeamId = jt.id; mode = "team"; } catch (e) {}
+          try { saveDB(); } catch (e) {}   // persist + push the favorite
+          try { render(); } catch (e) {}
+          return;
+        }
+      }
       if (!changed) return;
       window._cloudApplying = true;
       try { saveDB(); } catch (e) {}   // persist locally WITHOUT re-pushing (guarded above)
@@ -105,7 +117,7 @@
     d.collection("teams").doc(tid).update({
       scorers: firebase.firestore.FieldValue.arrayUnion(em), updatedAt: Date.now(),
     })
-      .then(function () { ctoast("You're now an authorized scorer for this team."); })
+      .then(function () { window._joinTeamId = tid; ctoast("You're now an authorized scorer for this team."); })
       .catch(function (e) { ctoast("Couldn't join team: " + e.message); })
       .finally(function () {
         try { var u = new URL(location.href); u.searchParams.delete("invite"); history.replaceState(null, "", u.pathname + u.search); } catch (e) {}
