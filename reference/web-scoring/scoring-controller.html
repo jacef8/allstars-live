@@ -1375,17 +1375,20 @@ function actionArea(){
             <div style="font-weight:800;color:${T.ink};font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${isG?"🏟️ "+(s.opp?("vs "+(s.opp||"").replace(/</g,"")):"Game"):"⚾ Practice"}</div>
             <div style="font-size:12px;color:${T.sage};margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${fmtSched(s)}${s.loc?(" · "+(s.loc||"").replace(/</g,"")):""}${s.notes?(" · "+(s.notes||"").replace(/</g,"")):""}</div></div>
           <button data-act="schedrm" data-arg="${s.id}" style="background:none;border:1px solid ${T.line};color:${T.out};border-radius:7px;padding:7px 9px;font-weight:800">&times;</button></div>`;}).join("");
+    const fLbl=`font-size:10px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:${T.sageDim};margin:0 2px 3px`;
+    const fld=(lbl,inner)=>`<div style="flex:1;min-width:120px;display:flex;flex-direction:column">${lbl?`<div style="${fLbl}">${lbl}</div>`:""}${inner}</div>`;
     const scheduleSection=`<div style="background:${T.surface};border:1px solid ${T.line};border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:8px">
         <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime}">Schedule — games &amp; practices</div>
         ${schedRows||`<div style="font-size:12px;color:${T.sageDim}">Nothing scheduled yet.</div>`}
-        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px">
-          <select id="schType" style="${cell};flex:1;min-width:96px"><option value="game">Game</option><option value="practice">Practice</option></select>
-          <input id="schDate" type="date" style="${cell};flex:1;min-width:140px">
-          <input id="schTime" type="time" style="${cell};flex:1;min-width:120px"></div>
-        <input id="schOpp" placeholder="Opponent (for games)" style="${cell}">
-        <input id="schLoc" placeholder="Location (field / address)" style="${cell}">
-        <input id="schNotes" placeholder="Notes (optional)" style="${cell}">
-        <button data-act="schedadd" style="${bigBtn(T.lime,'',T.field)}">+ Add to schedule</button></div>`;
+        <div style="font-size:11px;color:${T.sage};margin-top:4px">Add a game or practice:</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          ${fld("Type",`<select id="schType" style="${cell}"><option value="game">Game</option><option value="practice">Practice</option></select>`)}
+          ${fld("Date",`<input id="schDate" type="date" style="${cell}">`)}
+          ${fld("Time",`<input id="schTime" type="time" style="${cell}">`)}</div>
+        ${fld("Opponent (games only)",`<input id="schOpp" placeholder="e.g. Bryceville Tigers" style="${cell}">`)}
+        ${fld("Location",`<input id="schLoc" placeholder="e.g. City Park — Field 2" style="${cell}">`)}
+        ${fld("Notes (optional)",`<input id="schNotes" placeholder="e.g. arrive 45 min early, white jerseys" style="${cell}">`)}
+        <button data-act="schedadd" style="${bigBtn(T.lime,'',T.field)};margin-top:4px">+ Add to schedule</button></div>`;
     // Team access (cloud) — owner + authorized scorers. Only when signed in.
     const C=window.Cloud, signedIn=!!(C&&C.enabled&&C.user);
     const owner=signedIn && typeof window.cloudIsOwner==="function" && window.cloudIsOwner(t);
@@ -2361,7 +2364,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v39";
+var APP_VERSION="v40";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;

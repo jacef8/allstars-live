@@ -37,6 +37,7 @@
   var _pt;
   window.cloudPushSoon = function () {
     if (!fdb() || !myUid()) return;
+    if (window._cloudApplying) return;   // we're applying an inbound snapshot — don't echo it back (no write-loop)
     clearTimeout(_pt);
     _pt = setTimeout(function () { try { (DB.teams || []).forEach(window.cloudSaveTeam); } catch (e) {} }, 800);
   };
@@ -67,15 +68,27 @@
 
     _unsub.forEach(function (f) { try { f(); } catch (e) {} });
     _unsub = [];
+    function sansTimestamp(o) { var x = Object.assign({}, o); delete x.updatedAt; return JSON.stringify(x); }
     function merge(docs) {
       var changed = false;
       docs.forEach(function (doc) {
         var c = doc.data(); if (!c || !c.id) return;
         var i = (DB.teams || []).findIndex(function (x) { return x.id === c.id; });
         if (i < 0) { DB.teams.push(c); changed = true; }
-        else { DB.teams[i] = Object.assign({}, DB.teams[i], c); changed = true; }
+        else {
+          var merged = Object.assign({}, DB.teams[i], c);
+          if (sansTimestamp(merged) !== sansTimestamp(DB.teams[i])) { DB.teams[i] = merged; changed = true; }  // ignore updatedAt-only churn
+        }
       });
-      if (changed) { saveDB(); try { render(); } catch (e) {} }
+      if (!changed) return;
+      window._cloudApplying = true;
+      try { saveDB(); } catch (e) {}   // persist locally WITHOUT re-pushing (guarded above)
+      window._cloudApplying = false;
+      // Never re-render while the user is typing / has a date-or-time picker open — it would
+      // steal focus and dismiss the picker. The local DB is already updated; UI refreshes next.
+      var ae = document.activeElement;
+      if (ae && (ae.tagName === "INPUT" || ae.tagName === "TEXTAREA" || ae.tagName === "SELECT")) return;
+      try { render(); } catch (e) {}
     }
     _unsub.push(d.collection("teams").where("ownerUid", "==", u)
       .onSnapshot(function (s) { merge(s.docs); }, function (e) { console.warn("teams(owned):", e.message); }));
