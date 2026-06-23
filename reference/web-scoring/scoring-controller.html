@@ -947,7 +947,13 @@ function miniCount(){
   return `<div class="mini-count" style="align-items:center;gap:16px;background:${T.surface};border:1px solid ${T.line};border-radius:10px;padding:10px 14px;flex-shrink:0;font-family:${MONO}">
     <span style="font-weight:800;font-size:17px;color:${T.chalk}">${TEAMS.away.short} ${G.away} · ${TEAMS.home.short} ${G.home}</span>
     <span style="font-weight:700;color:${T.sage}">${G.half==="T"?"▲":"▼"}${G.inning}</span>
-    <span style="font-weight:700;color:${T.sage}">B ${G.balls} · S ${G.strikes} · O ${G.outs}</span>
+    <span style="display:inline-flex;align-items:baseline;gap:5px">
+      <b style="font-weight:800;font-size:17px;color:${T.chalk}">${G.balls}-${G.strikes}</b>
+      <span style="font-size:10px;font-weight:700;letter-spacing:1px;color:${T.sageDim}">COUNT</span>
+      <span style="color:${T.line};margin:0 3px">·</span>
+      <b style="font-weight:800;font-size:17px;color:${T.chalk}">${G.outs}</b>
+      <span style="font-size:10px;font-weight:700;letter-spacing:1px;color:${T.sageDim}">OUT${G.outs===1?"":"S"}</span>
+    </span>
     ${onb?`<span style="font-weight:700;color:${T.clay}">${onb} on</span>`:""}
   </div>`;
 }
@@ -972,7 +978,7 @@ function fieldOverlays(){
       <table style="border-collapse:collapse"><tr><th></th>${hdr("R")}${hdr("H")}${hdr("E")}</tr>
       <tr>${nm(TEAMS.away.short,G.half==="T")}${cell(G.away,G.half==="T")}${cell(aH,G.half==="T")}${cell(aE,G.half==="T")}</tr>
       <tr>${nm(TEAMS.home.short,G.half==="B")}${cell(G.home,G.half==="B")}${cell(hH,G.half==="B")}${cell(hE,G.half==="B")}</tr></table></div>`;
-  return pcChip+rheChip;
+  return pcChip;  // R/H/E box removed — the scorebug/top strip is the single scoreboard
 }
 
 /* ===== tap-to-review modals (batter at-bats, inning log) ===== */
