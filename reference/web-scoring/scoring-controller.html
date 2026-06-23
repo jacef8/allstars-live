@@ -520,7 +520,7 @@ function storePA(b,kind,rbi){
     pitches:(ab.pitches||[]).slice(), n:(ab.pitches||[]).length,
     balls:G.balls, strikes:G.strikes,
     kind, note:PLAYHEAD[kind]||kind, hit:HIT_KINDS.includes(kind),
-    loc:ab.loc||null, rbi:rbi||0,
+    loc:ab.loc||null, contact:contact||null, rbi:rbi||0,   // contact = batted-ball type (GB/LD/FB/PU/bunt) for advanced stats + AI
   });
   G.ab={pitches:[],loc:null};   // reset for the next batter
 }
@@ -2002,7 +2002,7 @@ let _rsz; window.addEventListener("resize",function(){clearTimeout(_rsz);_rsz=se
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v18";
+var APP_VERSION="v19";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
