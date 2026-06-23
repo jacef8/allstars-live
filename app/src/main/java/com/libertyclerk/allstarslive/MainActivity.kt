@@ -171,17 +171,20 @@ class MainActivity : ComponentActivity() {
                         )
                     }
 
-                    // Branded splash overlay — on top of everything, fades out after the hold.
+                    // Branded splash overlay — big A centered, wordmark near the bottom; fades out.
                     AnimatedVisibility(visible = showSplash, exit = fadeOut(animationSpec = tween(450))) {
-                        Box(
-                            Modifier.fillMaxSize().background(Color(0xFF0B0E13)),
-                            contentAlignment = Alignment.Center,
-                        ) {
+                        Box(Modifier.fillMaxSize().background(Color(0xFF0B0E13))) {
                             Image(
                                 painter = painterResource(R.drawable.splash_logo),
                                 contentDescription = "All-Stars Live",
-                                modifier = Modifier.size(150.dp),
+                                modifier = Modifier.size(240.dp).align(Alignment.Center),
                             )
+                            Row(
+                                Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 64.dp),
+                            ) {
+                                Text("ALL-STARS ", color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 30.sp, letterSpacing = 2.sp)
+                                Text("LIVE", color = Color(0xFFA3E635), fontWeight = FontWeight.ExtraBold, fontSize = 30.sp, letterSpacing = 2.sp)
+                            }
                         }
                     }
                 }

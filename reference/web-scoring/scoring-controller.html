@@ -1155,8 +1155,8 @@ function actionArea(){
     const hero = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:6px 0 2px;flex:none">
           <img src="icons/logo-mark.png" alt=""
             onerror="if(this.src.indexOf('icon-512')<0){this.src='icons/icon-512.png';this.style.borderRadius='20px';}else{this.style.display='none';}"
-            style="height:clamp(58px,11vh,132px);width:auto;display:block;filter:drop-shadow(0 8px 20px rgba(0,0,0,.55))">
-          <div style="font-family:${MONO};font-size:clamp(24px,3.6vw,42px);font-weight:800;letter-spacing:1.5px;line-height:1;color:#fff">ALL-STARS <span style="color:${T.lime}">LIVE</span></div></div>`;
+            style="height:clamp(84px,17vh,180px);width:auto;display:block;filter:drop-shadow(0 8px 20px rgba(0,0,0,.55))">
+          <div style="font-family:${MONO};font-size:clamp(26px,4.2vw,46px);font-weight:800;letter-spacing:1.5px;line-height:1;color:#fff">ALL-STARS <span style="color:${T.lime}">LIVE</span></div></div>`;
     const resumeBtn = gameActive?`<button data-act="resume" style="${bigBtn(T.safe)};font-size:17px;padding:16px;display:flex;align-items:center;justify-content:center;gap:8px">${IC(PLAY)} Resume &middot; ${OUR.short} vs ${OPP.short}</button>`:"";
     const newGameBtn = `<button data-act="newgamestart" style="${bigBtn(T.lime,"font-size:21px;padding:17px;box-shadow:0 8px 22px rgba(163,230,53,.22)",T.field)}">${IC(PLAY)} New Game</button>`;
     const manageBtn = `<button data-act="gototeams" style="${ghost};padding:17px;font-size:17px;border:2px solid #3F6CA8;color:${T.ink};display:flex;align-items:center;justify-content:center;gap:9px">${IC('<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>')} Manage teams &amp; rosters</button>`;
@@ -1208,7 +1208,7 @@ function actionArea(){
           </div>
         </div>`;
     }
-    return `<div style="display:flex;flex-direction:column;gap:9px">${hero}${authBar}${resumeBtn}${newGameBtn}${teamsBlock}${manageBtn}${gameActive?shareBtnHome:""}</div>`;
+    return `<div style="flex:1;min-height:0;display:flex;flex-direction:column;justify-content:space-evenly;gap:10px;padding:4px 0">${hero}${authBar}${resumeBtn}${newGameBtn}${teamsBlock}${manageBtn}${gameActive?shareBtnHome:""}</div>`;
   }
   if(mode==="teams"){
     const sorted=DB.teams.slice().sort((a,b)=>(b.fav?1:0)-(a.fav?1:0));
@@ -2100,7 +2100,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v30";
+var APP_VERSION="v31";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
