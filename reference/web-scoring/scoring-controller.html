@@ -804,7 +804,7 @@ function statusBar(){
   return `<div style="display:flex;align-items:stretch;background:${T.surface};border:1px solid ${T.line};border-radius:12px;overflow:hidden;flex-shrink:0;box-shadow:0 1px 0 rgba(15,30,60,.04)">
     <div style="display:flex;flex-direction:column;justify-content:center;gap:7px;padding:13px 16px;min-width:176px;max-width:210px;border-right:1px solid ${T.line}">
       ${tabRow("away",G.away,G.half==="T")}${tabRow("home",G.home,G.half==="B")}</div>
-    <div style="display:flex;align-items:center;justify-content:space-around;padding:0 18px;flex:1;gap:10px">
+    <div style="display:flex;align-items:center;justify-content:center;padding:0 18px;flex:1;gap:38px">
       <div style="text-align:center"><div style="font-family:${MONO};font-size:13px;font-weight:700;color:${T.sage};letter-spacing:.6px">${G.half==="T"?"TOP":"BOT"}</div>
         <div style="font-family:${MONO};font-size:34px;font-weight:800;color:${T.chalk};line-height:.95">${G.inning}</div></div>
       ${diamond}
@@ -851,7 +851,6 @@ function batterStrip(){
     <div style="min-width:0;text-align:left">
       <div style="font-family:${MONO};font-size:15px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;line-height:1;color:${T.chalk};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${nameLine}</div>
       <div style="font-size:10px;color:${T.sage};font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${sub}</div></div>
-    <span style="font-family:${MONO};font-size:16px;font-weight:800;color:${T.chalk};margin-left:2px;white-space:nowrap;flex:none">${lp.line}</span>
   </button>`;
 }
 
@@ -1068,13 +1067,13 @@ function inningLogModal(){
 
 /* Live play-by-play feed (viewer). Most recent on top. */
 function feedPanel(){
-  const rows=gameFeed.slice(-40).reverse().map(e=>`<div style="display:flex;align-items:baseline;gap:10px;padding:8px 12px;border-bottom:1px solid ${T.line}">
-      <span style="font-family:${MONO};font-size:12px;font-weight:800;color:${T.lime};min-width:34px">${e.half==="T"?"▲":"▼"}${e.inn}</span>
-      <span style="flex:1;min-width:0;color:${T.chalk};font-size:14px;font-weight:700">${e.head}${e.sub?` <span style="color:${T.sage};font-weight:600">— ${e.sub}</span>`:""}</span>
-      <span style="font-family:${MONO};font-size:12px;color:${T.sage};white-space:nowrap">${TEAMS.away.short} ${e.away}-${e.home} ${TEAMS.home.short}</span>
+  const rows=gameFeed.slice(-40).reverse().map(e=>`<div style="display:flex;align-items:baseline;gap:12px;padding:11px 15px;border-bottom:1px solid ${T.line}">
+      <span style="font-family:${MONO};font-size:15px;font-weight:800;color:${T.lime};min-width:38px">${e.half==="T"?"▲":"▼"}${e.inn}</span>
+      <span style="flex:1;min-width:0;color:${T.chalk};font-size:17px;font-weight:700">${e.head}${e.sub?` <span style="color:${T.sage};font-weight:600">— ${e.sub}</span>`:""}</span>
+      <span style="font-family:${MONO};font-size:15px;color:${T.sage};white-space:nowrap">${TEAMS.away.short} ${e.away}-${e.home} ${TEAMS.home.short}</span>
     </div>`).join("");
   return `<div style="flex:1;min-height:0;display:flex;flex-direction:column;background:${T.surface};border:1px solid ${T.line};border-radius:12px;overflow:hidden">
-      <div style="padding:10px 12px;font-family:${MONO};font-weight:800;font-size:13px;letter-spacing:1.4px;color:${T.lime};border-bottom:1px solid ${T.line};flex:none">GAME FEED</div>
+      <div style="padding:12px 15px;font-family:${MONO};font-weight:800;font-size:15px;letter-spacing:1.4px;color:${T.lime};border-bottom:1px solid ${T.line};flex:none">GAME FEED</div>
       <div style="flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch">${rows||`<div style="padding:16px;color:${T.sageDim};font-size:13px">Plays show here as the game happens.</div>`}</div>
     </div>`;
 }
@@ -1385,9 +1384,7 @@ function actionArea(){
         <button data-act="walk" style="${flatBtn}"><span style="color:${T.sage}">${ICN.walk}</span>Walk</button>
         <button data-act="hbp" style="${flatBtn}"><span style="color:${T.sage}">${ICN.hbp}</span>HBP</button></div>
       <button data-act="endinning" style="${flatBtn};border-left:4px solid ${T.amber}"><span style="color:${T.amber}">${ICN.inning}</span>End Inning <span style="color:${T.sage};font-weight:600;font-size:11px;text-transform:none;letter-spacing:0">${halfLabel} · ${G.outs} out${G.outs===1?"":"s"}</span></button>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        <button data-act="advtoggle" style="${miniBtn}${advPitch?`;border-color:${T.amber};color:${T.amber}`:""}">${advPitch?"● ":""}Pitch types</button>
-        <button data-act="inninglog" style="${miniBtn}">${ICN.inning} Inning log</button></div>`;
+      <button data-act="advtoggle" style="${miniBtn};width:100%${advPitch?`;border-color:${T.amber};color:${T.amber}`:""}">${advPitch?"● ":""}Pitch types</button>`;
   }
   if(mode==="locate"){
     return step("Where did it go?","Tap the field above — the fielder is set automatically.",
@@ -1859,23 +1856,24 @@ function renderToolbar(){
   // freed for a bigger video + field. Phone keeps its own bottom footer.
   const tbBtn=(act,label,extra)=>`<button data-act="${act}" style="background:${T.surface2};border:1px solid ${T.line};color:${T.chalk};border-radius:9px;padding:8px 12px;font-family:${SANS};font-size:13px;font-weight:700;white-space:nowrap;${extra||""}">${label}</button>`;
   const gc=(isWide()&&mode==="idle"&&viewMode==="scorer")
-    ? `${tbBtn("undo","↶ Undo")}${tbBtn("home","⌂ Home")}${tbBtn("lineup","Lineup")}${tbBtn("endgame","End",`color:${T.out};border-color:${T.out}`)}`
+    ? `${tbBtn("undo","↶ Undo")}${tbBtn("home","⌂ Home")}${tbBtn("lineup","Lineup")}${tbBtn("inninglog","Inning log")}${tbBtn("endgame","END GAME",`color:${T.out};border-color:${T.out}`)}`
     : "";
+  const shareBtnTop=`<button data-act="share" style="flex:none;display:flex;align-items:center;gap:7px;background:${T.surface2};border:1px solid ${T.line};color:${T.chalk};border-radius:10px;padding:9px 15px;font-size:15px;font-weight:800">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="${T.lime}" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="19" r="2.6"/><path d="M8.3 10.8 15.7 6.4M8.3 13.2l7.4 4.4"/></svg>Share</button>`;
+  const liveDot=`<div title="${dot.l}" style="flex:none;display:flex;align-items:center;gap:5px;background:${T.surface};border:1px solid ${T.line};border-radius:999px;padding:5px 9px">
+      <span class="${conn?'livedot':''}" style="width:8px;height:8px;border-radius:50%;background:${dot.c};${conn?`box-shadow:0 0 7px ${dot.c}`:""}"></span>
+      <span style="font-family:${MONO};font-size:10px;font-weight:700;letter-spacing:1px;color:${dot.c}">${dot.l}</span></div>`;
   // Batter readout fills the empty middle of the top row (wide scorer in a live game).
   const bstrip=(isWide()&&viewMode==="scorer"&&!["home","teams","team","pickteam","newgame","lineup","pickplayer","pickpos","editplayer","summary"].includes(mode))
     ? `<div style="flex:1;min-width:0;display:flex;justify-content:center;padding:0 6px">${batterStrip()}</div>` : `<div style="flex:1"></div>`;
+  // Hide-video + Share slid to the LEFT next to the controls; only LIVE stays on the far right.
   tb.innerHTML=`<div style="display:flex;align-items:center;gap:8px;padding:4px 2px 2px;flex-wrap:nowrap">
     <div style="flex:none;min-width:0;font-family:${MONO};font-weight:700;font-size:16px;letter-spacing:.5px;color:${T.chalk};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${chip}</div>
     ${gc}
+    ${vidToggle}
+    ${shareBtnTop}
     ${bstrip}
-    <div style="flex:none;display:flex;align-items:center;gap:8px">
-      ${vidToggle}
-      <button data-act="share" style="display:flex;align-items:center;gap:7px;background:${T.surface2};border:1px solid ${T.line};color:${T.chalk};border-radius:10px;padding:9px 15px;font-size:15px;font-weight:800">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="${T.lime}" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="19" r="2.6"/><path d="M8.3 10.8 15.7 6.4M8.3 13.2l7.4 4.4"/></svg>Share</button>
-      <div title="${dot.l}" style="display:flex;align-items:center;gap:5px;background:${T.surface};border:1px solid ${T.line};border-radius:999px;padding:5px 9px">
-        <span class="${conn?'livedot':''}" style="width:8px;height:8px;border-radius:50%;background:${dot.c};${conn?`box-shadow:0 0 7px ${dot.c}`:""}"></span>
-        <span style="font-family:${MONO};font-size:10px;font-weight:700;letter-spacing:1px;color:${dot.c}">${dot.l}</span></div>
-    </div>
+    ${liveDot}
   </div>`;
 }
 window.onLinkChange=renderToolbar;   // relay open/close → repaint the dot
@@ -1975,7 +1973,7 @@ let _rsz; window.addEventListener("resize",function(){clearTimeout(_rsz);_rsz=se
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v14";
+var APP_VERSION="v15";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
