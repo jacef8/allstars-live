@@ -198,6 +198,11 @@ let ROSTER=genericRoster();
 const DB_KEY="allstars-scorer-db";
 function loadDB(){try{const r=localStorage.getItem(DB_KEY);if(r){const d=JSON.parse(r);if(d&&d.teams)return d;}}catch(e){}return {teams:[],seq:1};}
 function saveDB(){try{localStorage.setItem(DB_KEY,JSON.stringify(DB));}catch(e){}}
+// Persist the in-progress game (lineup, positions, score, everything in G) so it survives
+// reloads and app updates — the operator never re-enters a lineup. Teams/roster persist in
+// DB above; this also stores the selected team so the lineup's roster re-links on restore.
+const GAME_KEY="al-game";
+function saveGame(){try{localStorage.setItem(GAME_KEY,JSON.stringify({G,curTeamId,oppTeamId,gameActive,OUR,OPP}));}catch(e){}}
 let DB=loadDB(), curTeamId=null, openTeamId=null, oppTeamId=null, pickFor="our";
 const curTeam=()=>DB.teams.find(t=>t.id===curTeamId)||null;
 const teamById=id=>DB.teams.find(t=>t.id===id)||null;
@@ -368,6 +373,14 @@ const initGame=()=>({inning:1,half:"T",away:0,home:0,outs:0,balls:0,strikes:0,
   lineup:{ order:[0,1,2,3,4,5,6,7,8],   // batting order: 9-12 entries (slots 10+ = extra hitters)
            pos:{P:0,C:1,"1B":2,"2B":3,"3B":4,SS:5,LF:6,CF:7,RF:8} }});
 let G=initGame(),hist=[],mode="home",tap=null,contact=null,result=null,plan=null,toast=null,toastTimer=null,curResults=[],showAll=false,showZones=false,editSlot=null,confirmAct=null,gameActive=false,lineupTab="us";
+// Resume the last in-progress game (saved by saveGame) across reloads/app updates, so the
+// lineup/score is never lost. Stays on the home screen → shows "Resume". Re-links ROSTER
+// to the saved team so the lineup's player indices resolve correctly.
+(function(){try{const s=localStorage.getItem(GAME_KEY);if(!s)return;const o=JSON.parse(s);
+  if(o&&o.G){G=o.G;curTeamId=o.curTeamId||null;oppTeamId=o.oppTeamId||null;gameActive=!!o.gameActive;
+    if(o.OUR)Object.assign(OUR,o.OUR);if(o.OPP)Object.assign(OPP,o.OPP);
+    const t=curTeamId&&teamById(curTeamId);if(t)ROSTER=t.players;}
+}catch(e){}})();
 window.oppPNum=function(i,v){if(G.oppLineup&&G.oppLineup[i])G.oppLineup[i].num=v;};
 window.oppPName=function(i,v){if(G.oppLineup&&G.oppLineup[i])G.oppLineup[i].name=v;};
 
@@ -449,8 +462,8 @@ function startNewGame(){
 }
 /* Opponent name from the New Game text field (no re-render, so typing keeps focus). */
 window.ngOurName=function(v){const s=(v||"").trim(); OUR.name=s||"Your Team"; OUR.short=(s||"YOU").slice(0,3).toUpperCase();};
-window.edName=function(v){const ri=G.lineup.order[editSlot]; if(ROSTER[ri])ROSTER[ri].name=v;};
-window.edNum=function(v){const ri=G.lineup.order[editSlot]; if(ROSTER[ri])ROSTER[ri].num=v;};
+window.edName=function(v){const ri=G.lineup.order[editSlot]; if(ROSTER[ri]){ROSTER[ri].name=v; saveDB();}};
+window.edNum=function(v){const ri=G.lineup.order[editSlot]; if(ROSTER[ri]){ROSTER[ri].num=v; saveDB();}};
 window.ngOppName=function(v){const s=(v||"").trim(); OPP.name=s||"Opponent"; OPP.short=(s||"OPP").slice(0,3).toUpperCase();};
 window.ngRunCap=function(v){const n=parseInt(v,10); G.runCap=(isNaN(n)||n<0)?0:Math.min(n,30);};        // 0 = no cap
 window.ngOppBatters=function(v){const n=parseInt(v,10); G.oppBatters=(isNaN(n)||n<1)?9:Math.min(n,15);};
@@ -602,6 +615,7 @@ function buildBox(){
     home:{r:G.home,h:sum(home,"h"),e:G.errors.home}}};
 }
 function broadcast(){
+  try{ saveGame(); }catch(e){}   // persist the in-progress game on every change (resume after reload/update)
   _seq++; const k=battingKey(),b=batter();
   LINK.send({type:"state",seq:_seq,
     away:G.away,home:G.home,inning:G.inning,half:G.half,balls:G.balls,strikes:G.strikes,outs:G.outs,
@@ -1081,9 +1095,13 @@ function actionArea(){
           <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px">${list.map(card).join("")}</div>`
       : `<button data-act="gototeams" style="text-align:center;color:${T.sage};font-size:15px;padding:22px;border:1px dashed ${T.line};border-radius:12px;background:none;width:100%;cursor:pointer">No teams yet — <span style="color:${T.lime};font-weight:800">create one</span> to track rosters, records &amp; season stats.</button>`;
 
-    const hero = `<div style="position:relative;border-radius:16px;padding:22px;text-align:center;overflow:hidden;background:linear-gradient(135deg,${T.navy},#101B30 78%);border:2px solid ${T.lime};box-shadow:0 0 0 1px rgba(0,0,0,.4), 0 14px 34px rgba(0,0,0,.5)">
-          <div style="position:absolute;left:0;top:0;bottom:0;width:7px;background:${T.lime};box-shadow:0 0 18px rgba(163,230,53,.7)"></div>
-          <div style="font-family:${MONO};font-size:38px;font-weight:800;letter-spacing:1.5px;line-height:1;color:#fff">ALL-STARS <span style="color:${T.lime}">LIVE</span></div></div>`;
+    // Home header = the transparent "A" logo floating over the turf (no banner box).
+    // Falls back to the text wordmark until icons/logo-mark.png (transparent) is added.
+    const hero = `<div style="display:flex;align-items:center;justify-content:center;padding:4px 0 2px;flex:none">
+          <img src="icons/logo-mark.png" alt="All-Stars Live"
+            onerror="if(this.src.indexOf('icon-512')<0){this.onerror2=1;this.src='icons/icon-512.png';this.style.borderRadius='22px';}else{this.style.display='none';this.nextElementSibling.style.display='block';}"
+            style="height:clamp(76px,14vh,132px);width:auto;display:block;filter:drop-shadow(0 8px 20px rgba(0,0,0,.55))">
+          <div style="display:none;font-family:${MONO};font-size:38px;font-weight:800;letter-spacing:1.5px;line-height:1;color:#fff">ALL-STARS <span style="color:${T.lime}">LIVE</span></div></div>`;
     const resumeBtn = gameActive?`<button data-act="resume" style="${bigBtn(T.safe)};font-size:17px;padding:16px;display:flex;align-items:center;justify-content:center;gap:8px">${IC(PLAY)} Resume &middot; ${OUR.short} vs ${OPP.short}</button>`:"";
     const newGameBtn = `<button data-act="newgamestart" style="${bigBtn(T.lime,"font-size:24px;padding:24px;box-shadow:0 8px 22px rgba(163,230,53,.22)",T.field)}">${IC(PLAY)} New Game</button>`;
     const manageBtn = `<button data-act="gototeams" style="${ghost};padding:17px;font-size:17px;border:2px solid #3F6CA8;color:${T.ink};display:flex;align-items:center;justify-content:center;gap:9px">${IC('<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>')} Manage teams &amp; rosters</button>`;
@@ -1224,7 +1242,7 @@ function actionArea(){
     if(lineupTab==="opp"){
       if(!G.oppLineup)G.oppLineup=Array.from({length:Math.max(1,G.oppBatters)},(_,i)=>({num:String(i+1),name:""}));
       const orows=G.oppLineup.map((e,i)=>`<div style="display:flex;align-items:center;gap:6px;background:${T.surface};border:1px solid ${T.line};border-radius:9px;padding:6px 8px">
-          <span style="font-family:${MONO};font-size:13px;font-weight:700;color:${T.sageDim};width:16px;text-align:center">${i+1}</span>
+          <span style="font-family:${MONO};font-size:16px;font-weight:700;color:${T.sageDim};width:20px;text-align:center">${i+1}</span>
           <input value="${(e.num||"").replace(/"/g,"&quot;")}" oninput="oppPNum(${i},this.value)" inputmode="numeric" maxlength="3" style="width:46px;text-align:center;font-family:${MONO};font-weight:800;background:${T.surface2};border:1px solid ${T.line};color:${T.ink};border-radius:7px;padding:8px 4px;outline:none">
           <input value="${(e.name||"").replace(/"/g,"&quot;")}" oninput="oppPName(${i},this.value)" placeholder="Opponent hitter" style="flex:1;min-width:0;background:${T.surface2};border:1px solid ${T.line};color:${T.ink};border-radius:7px;padding:8px 10px;font-weight:700;outline:none">
           <button data-act="opprem" data-arg="${i}" style="background:none;border:1px solid ${T.line};color:${T.out};border-radius:7px;padding:8px 10px;font-weight:800"${G.oppLineup.length<=1?" disabled":""}>&times;</button></div>`).join("");
@@ -1238,10 +1256,10 @@ function actionArea(){
     const rows=G.lineup.order.map((ri,slot)=>{const p=ROSTER[ri],pos=posOfPlayer(ri)||"—",isP=pos==="P";
       return `<div data-row data-ri="${ri}" style="display:flex;align-items:center;gap:6px;background:${T.surface};border:1px solid ${T.line};border-radius:9px;padding:8px 8px">
         <span data-drag style="cursor:grab;color:${T.sageDim};display:flex;align-items:center;padding:4px 2px;touch-action:none">${IC('<path d="M4 7h16M4 12h16M4 17h16"/>')}</span>
-        <span style="font-family:${MONO};font-size:13px;font-weight:700;color:${T.sageDim};width:14px;text-align:center">${slot+1}</span>
-        <button data-act="editplayer" data-arg="${slot}" style="flex:1;min-width:0;text-align:left;background:transparent;border:none;color:${T.chalk};font-size:15px;font-weight:700;display:flex;align-items:center;gap:8px;overflow:hidden"><span style="font-family:${MONO};color:${OUR.color};min-width:30px">#${p.num}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.name}</span></button>
-        <button data-act="pickpos" data-arg="${slot}" style="background:${isP?OUR.color:T.surface2};border:1px solid ${isP?OUR.color:T.line};color:${isP?"#FFFFFF":T.chalk};border-radius:7px;padding:6px 9px;font-family:${MONO};font-size:13px;font-weight:800;min-width:42px">${pos}</button></div>`;}).join("");
-    const bench=benchIdx().map(ri=>`<span style="font-family:${MONO};font-size:12px;color:${T.sage};background:${T.surface};border:1px solid ${T.line};border-radius:6px;padding:3px 8px;white-space:nowrap">#${ROSTER[ri].num} ${ROSTER[ri].name}</span>`).join(" ");
+        <span style="font-family:${MONO};font-size:16px;font-weight:700;color:${T.sageDim};width:18px;text-align:center">${slot+1}</span>
+        <button data-act="editplayer" data-arg="${slot}" style="flex:1;min-width:0;text-align:left;background:transparent;border:none;color:${T.chalk};font-size:18px;font-weight:700;display:flex;align-items:center;gap:8px;overflow:hidden"><span style="font-family:${MONO};color:${OUR.color};min-width:34px">#${p.num}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.name}</span></button>
+        <button data-act="pickpos" data-arg="${slot}" style="background:${isP?OUR.color:T.surface2};border:1px solid ${isP?OUR.color:T.line};color:${isP?"#FFFFFF":T.chalk};border-radius:7px;padding:8px 12px;font-family:${MONO};font-size:16px;font-weight:800;min-width:50px">${pos}</button></div>`;}).join("");
+    const bench=benchIdx().map(ri=>`<span style="font-family:${MONO};font-size:14px;color:${T.sage};background:${T.surface};border:1px solid ${T.line};border-radius:6px;padding:5px 10px;white-space:nowrap">#${ROSTER[ri].num} ${ROSTER[ri].name}</span>`).join(" ");
     const pit=playerAtPos("P");
     const n=G.lineup.order.length;
     return `<div style="flex-shrink:0"><div style="font-family:${MONO};font-size:20px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:${T.lime}">Lineups</div>
@@ -1249,8 +1267,8 @@ function actionArea(){
       ${luToggle}
       <button data-act="newgame" style="${ghost};flex-shrink:0;display:flex;align-items:center;justify-content:center;gap:7px;color:${T.sage}">&#9881; Game setup &amp; rules</button>
       <div style="flex-shrink:0;display:flex;align-items:center;justify-content:space-between;background:${T.surface2};border:1px solid ${T.line};border-radius:9px;padding:9px 12px">
-        <span style="font-size:12px;color:${T.sage}">Pitcher</span>
-        <button data-act="pickpitch" style="background:transparent;border:none;color:${T.chalk};font-size:15px;font-weight:700;display:flex;align-items:center;gap:8px"><span style="font-family:${MONO};color:${OUR.color}">#${pit.num}</span>${pit.name}<span style="font-size:11px;color:${OUR.color};font-weight:700;margin-left:4px">CHANGE</span></button></div>
+        <span style="font-size:14px;color:${T.sage}">Pitcher</span>
+        <button data-act="pickpitch" style="background:transparent;border:none;color:${T.chalk};font-size:18px;font-weight:700;display:flex;align-items:center;gap:8px"><span style="font-family:${MONO};color:${OUR.color}">#${pit.num}</span>${pit.name}<span style="font-size:12px;color:${OUR.color};font-weight:700;margin-left:4px">CHANGE</span></button></div>
       <div id="lineup-list" style="flex:1 1 auto;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:6px">${rows}</div>
       <div style="flex-shrink:0;display:flex;gap:8px">
         <button data-act="addbatter" style="${ghost};flex:1" ${n>=12?"disabled":""}>+ Add batter (EH)</button>
@@ -1273,7 +1291,7 @@ function actionArea(){
   if(mode==="pickpos"){
     const ri=G.lineup.order[editSlot],cur=posOfPlayer(ri);
     const cells=POSLIST.map(p=>{const who=playerAtPos(p),sel=p===cur;
-      return `<button data-act="setpos" data-arg="${p}" style="display:flex;flex-direction:column;gap:3px;align-items:center;background:${sel?OUR.color:T.surface};border:1px solid ${sel?OUR.color:T.line};color:${sel?"#08111f":T.chalk};border-radius:9px;padding:11px 4px;font-family:${MONO};font-weight:800;font-size:15px">${p}<span style="font-size:9px;font-weight:600;color:${sel?"#08111f":T.sage};max-width:46px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${who?who.name:"—"}</span></button>`;}).join("");
+      return `<button data-act="setpos" data-arg="${p}" style="display:flex;flex-direction:column;gap:4px;align-items:center;background:${sel?OUR.color:T.surface};border:1px solid ${sel?OUR.color:T.line};color:${sel?"#08111f":T.chalk};border-radius:9px;padding:16px 6px;font-family:${MONO};font-weight:800;font-size:23px">${p}<span style="font-size:13px;font-weight:600;color:${sel?"#08111f":T.sage};max-width:96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${who?who.name:"—"}</span></button>`;}).join("");
     return step(`${ROSTER[ri].name} — position`,"Tap a spot. It swaps with whoever's there now.",
       `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">${cells}</div><button data-act="backlineup" style="${ghost};margin-top:8px;width:100%">Back</button>`);
   }
