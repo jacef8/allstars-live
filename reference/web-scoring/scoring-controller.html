@@ -214,7 +214,7 @@ let ROSTER=genericRoster();
 function pFull(p){ if(!p)return ""; const f=(p.first||"").trim(), l=(p.last||"").trim(); const n=(f+" "+l).trim(); return n||p.name||""; }
 function pBug(p){ if(!p)return ""; const f=(p.first||"").trim(), l=(p.last||"").trim(); if(l) return (f?f.charAt(0).toUpperCase()+". ":"")+l; return f||p.name||""; }
 function ensureName(p){ if(!p)return; if(p.first===undefined&&p.last===undefined){ const parts=(p.name||"").trim().split(/\s+/).filter(Boolean); if(parts.length>=2){ p.last=parts.pop(); p.first=parts.join(" "); } else { p.first=p.name||""; p.last=""; } } if(p.first===undefined)p.first=""; if(p.last===undefined)p.last=""; p.name=pFull(p); }
-function migrateTeam(t){ if(t&&t.players)t.players.forEach(ensureName); }
+function migrateTeam(t){ if(t&&t.players)t.players.forEach(ensureName); if(t&&!Array.isArray(t.schedule))t.schedule=[]; }
 
 /* ====================== persistent team DB (browser localStorage) ======================
    Teams, rosters, and FULL-BOX season stats (batting / pitching / fielding) persist
@@ -670,11 +670,15 @@ const LINK=(()=>{
   function setConn(v){ if(connected===v)return; connected=v; if(window.onLinkChange)window.onLinkChange(); }
   (function connect(){ if(!wsUrl)return;
     try{ ws=new WebSocket(wsUrl);
-      ws.onopen=()=>setConn(true);
+      ws.onopen=()=>{ setConn(true); try{ if(viewMode==="viewer") ws.send(JSON.stringify({type:"hello"})); }catch(e){} };  // a joining viewer asks the scorer to resend
       ws.onclose=()=>{ setConn(false); setTimeout(connect,2000); };
       ws.onerror=()=>{ try{ws.close()}catch(e){} };
+      ws.onmessage=(ev)=>{ try{ applyRemote(ev.data); }catch(e){} };
     }catch(e){ setTimeout(connect,2000); }
   })();
+  // Same-origin tabs (split screen / second tab) sync via BroadcastChannel + localStorage too.
+  if(bc) bc.onmessage=(ev)=>{ try{ applyRemote(ev.data); }catch(e){} };
+  try{ window.addEventListener("storage",(ev)=>{ if(ev.key==="liberty-league-msg"&&ev.newValue){ try{ applyRemote(ev.newValue); }catch(e){} } }); }catch(e){}
   return {
     send(obj){ const msg=JSON.stringify(obj);
       if(bc)try{bc.postMessage(msg)}catch(e){}
@@ -685,6 +689,28 @@ const LINK=(()=>{
     viewerWsUrl:()=>wsUrl||"",
   };
 })();
+// A viewer (watch link / viewer role) hydrates its game state from the scorer's broadcast, so a
+// shared link follows the game LIVE on any device. The scorer is always the source of truth and
+// ignores inbound state (it only answers a joining viewer's "hello" with a fresh broadcast).
+let _remoteLive=false;
+function applyRemote(raw){
+  let msg; try{ msg=(typeof raw==="string")?JSON.parse(raw):raw; }catch(e){ return; }
+  if(!msg) return;
+  if(viewMode!=="viewer"){ if(msg.type==="hello"){ try{ broadcast(); }catch(e){} } return; }
+  if(msg.type!=="full"||!msg.G) return;
+  try{
+    G=msg.G;
+    if(Array.isArray(msg.ROSTER)) ROSTER=msg.ROSTER;
+    if(msg.OUR) Object.assign(OUR,msg.OUR);
+    if(msg.OPP) Object.assign(OPP,msg.OPP);
+    if(Array.isArray(msg.gameFeed)) gameFeed=msg.gameFeed;
+    if(msg.curTeamId!=null) curTeamId=msg.curTeamId;
+    if(msg.oppTeamId!=null) oppTeamId=msg.oppTeamId;
+    gameActive=true; _remoteLive=true;
+    if(["home","teams","team","pickteam","newgame","lineup","pickplayer","pickpos","editplayer","summary","tools"].includes(mode)) mode="idle";
+    render();
+  }catch(e){}
+}
 let _seq=0,_event=null,_eventId=0,_pitch=null;
 let phonePane="score";   // phone-only paging: "score" | "video" (large screens show both)
 let monitorOn=(()=>{try{ const p=new URLSearchParams(location.search); if(p.get("feed")==="1") return false; if(p.get("yt")) return true; return localStorage.getItem("al-monitor-on")!=="0";}catch(e){return true;}})();  // wide: video shown/hidden; shared ?feed=1 opens feed-only
@@ -723,7 +749,10 @@ function buildBox(){
     home:{r:G.home,h:sum(home,"h"),e:G.errors.home}}};
 }
 function broadcast(){
+  if(viewMode==="viewer") return;   // viewers are read-only — they receive state, never send it
   try{ saveGame(); }catch(e){}   // persist the in-progress game on every change (resume after reload/update)
+  // Full snapshot for remote viewers (watch link): lets any device render the game identically.
+  try{ LINK.send({type:"full",G:G,ROSTER:ROSTER,OUR:OUR,OPP:OPP,curTeamId:curTeamId,oppTeamId:oppTeamId,gameFeed:gameFeed}); }catch(e){}
   _seq++; const k=battingKey(),b=batter();
   LINK.send({type:"state",seq:_seq,
     away:G.away,home:G.home,inning:G.inning,half:G.half,balls:G.balls,strikes:G.strikes,outs:G.outs,
@@ -1337,6 +1366,26 @@ function actionArea(){
         <thead><tr style="color:${T.sageDim};font-size:13px;letter-spacing:.5px"><th style="text-align:left;padding:0 8px 6px">SEASON · BATTING</th><th>AB</th><th>R</th><th>H</th><th>RBI</th><th>BB</th><th>K</th><th>AVG</th></tr></thead>
         <tbody>${sRows}</tbody></table>
       <div style="font-size:11px;color:${T.sageDim};margin-top:8px;padding:0 4px">Pitching &amp; fielding season stats are stored too — they fill in as in-game tracking expands.</div></div>`;
+    // Schedule — games & practices stored on the team (syncs to the cloud with the team).
+    const fmtSched=(s)=>{ try{ const dt=new Date((s.date||"")+"T"+(s.time||"00:00")); if(isNaN(dt))return s.date||""; let o=dt.toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"}); if(s.time)o+=" · "+dt.toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"}); return o; }catch(e){ return s.date||""; } };
+    const sched=(t.schedule||[]).slice().sort((a,b)=>(((a.date||"")+(a.time||""))<((b.date||"")+(b.time||""))?-1:1));
+    const schedRows=sched.map(s=>{const isG=s.type!=="practice";
+      return `<div style="display:flex;align-items:center;gap:8px;background:${T.surface2};border:1px solid ${T.line};border-left:5px solid ${isG?OUR.color:T.sage};border-radius:9px;padding:9px 11px">
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:800;color:${T.ink};font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${isG?"🏟️ "+(s.opp?("vs "+(s.opp||"").replace(/</g,"")):"Game"):"⚾ Practice"}</div>
+            <div style="font-size:12px;color:${T.sage};margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${fmtSched(s)}${s.loc?(" · "+(s.loc||"").replace(/</g,"")):""}${s.notes?(" · "+(s.notes||"").replace(/</g,"")):""}</div></div>
+          <button data-act="schedrm" data-arg="${s.id}" style="background:none;border:1px solid ${T.line};color:${T.out};border-radius:7px;padding:7px 9px;font-weight:800">&times;</button></div>`;}).join("");
+    const scheduleSection=`<div style="background:${T.surface};border:1px solid ${T.line};border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:8px">
+        <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime}">Schedule — games &amp; practices</div>
+        ${schedRows||`<div style="font-size:12px;color:${T.sageDim}">Nothing scheduled yet.</div>`}
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px">
+          <select id="schType" style="${cell};flex:1;min-width:96px"><option value="game">Game</option><option value="practice">Practice</option></select>
+          <input id="schDate" type="date" style="${cell};flex:1;min-width:140px">
+          <input id="schTime" type="time" style="${cell};flex:1;min-width:120px"></div>
+        <input id="schOpp" placeholder="Opponent (for games)" style="${cell}">
+        <input id="schLoc" placeholder="Location (field / address)" style="${cell}">
+        <input id="schNotes" placeholder="Notes (optional)" style="${cell}">
+        <button data-act="schedadd" style="${bigBtn(T.lime,'',T.field)}">+ Add to schedule</button></div>`;
     // Team access (cloud) — owner + authorized scorers. Only when signed in.
     const C=window.Cloud, signedIn=!!(C&&C.enabled&&C.user);
     const owner=signedIn && typeof window.cloudIsOwner==="function" && window.cloudIsOwner(t);
@@ -1362,9 +1411,11 @@ function actionArea(){
         <div style="display:flex;flex-direction:column;gap:6px">${roster}</div>
         <button data-act="addteamp" style="${ghost}">+ Add player</button>
         ${statTable}
+        ${scheduleSection}
         ${scorersSection}
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <button data-act="editlineup" style="${ghost};flex:1;min-width:140px">&#9776; Edit lineup</button>
+          <button data-act="invitewatch" style="${ghost};flex:1;min-width:140px">&#128227; Invite to watch</button>
           <button data-act="exportteam" style="${ghost};flex:1;min-width:140px">&#8681; Export team</button></div>
         <button data-act="startteam" style="${bigBtn(t.color)}">${IC('<path d="M8 5l11 7-11 7z" fill="currentColor" stroke="none"/>')} Start game with ${t.short}</button>
       </div>`;
@@ -1985,6 +2036,9 @@ document.getElementById("app").addEventListener("click",e=>{
   if(act==="opendoc"){ const d=ruleDocs()[+arg]; if(d&&d.url)openDoc(d.url); return; }
   if(act==="adddoc"){ if(window.addDoc)window.addDoc(); return; }
   if(act==="rmdoc"){ if(window.removeDoc)window.removeDoc(+arg); return; }
+  if(act==="schedadd"){ const t=teamById(openTeamId); if(!t)return; const g=id=>{const e=document.getElementById(id);return e?(e.value||""):"";}; const date=g("schDate"); if(!date){flash("Pick a date");return;} if(!Array.isArray(t.schedule))t.schedule=[]; t.schedule.push({id:"s"+Date.now().toString(36),type:g("schType")||"game",date:date,time:g("schTime"),opp:g("schOpp").trim(),loc:g("schLoc").trim(),notes:g("schNotes").trim()}); saveDB(); render(); return; }
+  if(act==="schedrm"){ const t=teamById(openTeamId); if(t&&Array.isArray(t.schedule)){ t.schedule=t.schedule.filter(s=>s.id!==arg); saveDB(); render(); } return; }
+  if(act==="invitewatch"){ openShare(); return; }
   if(act==="ingamesettings"){ settingsMode=true; mode="newgame"; render(); return; }
   if(act==="settingsdone"){ settingsMode=false; mode="idle"; render(); broadcast(); return; }
   if(act==="ptype"){ pitchType=(pitchType===arg?null:arg); render(); return; }
@@ -2307,7 +2361,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v38";
+var APP_VERSION="v39";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;

@@ -18,6 +18,7 @@
     return {
       id: t.id, name: t.name || "", short: t.short || "", color: t.color || "#2E6BE6",
       players: t.players || [], record: t.record || { w: 0, l: 0, t: 0 }, season: t.season || {}, fav: !!t.fav,
+      schedule: t.schedule || [], lineup: t.lineup || null,
       ownerUid: t.ownerUid || myUid(), ownerEmail: t.ownerEmail || myEmail(),
       scorers: t.scorers || [], updatedAt: Date.now(),
     };
