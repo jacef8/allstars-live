@@ -966,7 +966,7 @@ function fieldOverlays(){
   const aH=sideHits("away"),hH=sideHits("home");
   const aE=(G.errors&&G.errors.away)||0,hE=(G.errors&&G.errors.home)||0;
   const box=`position:absolute;z-index:4;background:rgba(9,13,19,.74);border:1px solid ${T.line};border-radius:11px;box-shadow:0 3px 12px rgba(0,0,0,.45)`;
-  const pcChip=`<div style="${box};top:8px;left:8px;padding:5px 11px 5px 9px;display:flex;align-items:center;gap:9px;line-height:1">
+  const pcChip=`<div style="${box};bottom:8px;left:8px;padding:5px 11px 5px 9px;display:flex;align-items:center;gap:9px;line-height:1">
       <div style="font-family:${MONO};font-size:23px;font-weight:800;color:${T.amber}">${pc}</div>
       <div style="display:flex;flex-direction:column;gap:2px;min-width:0">
         <div style="font-size:9px;font-weight:800;letter-spacing:1.2px;color:${T.sageDim}">PITCHES</div>
@@ -1072,8 +1072,8 @@ const ghost=`background:${T.surface};border:1px solid ${T.line};color:${T.sage};
 function pitchBtn(act,label,icon,accent){
   const bg=accent?T.lime:T.surface, bd=accent?T.lime:"#3F6CA8", txt=accent?T.field:T.ink;
   const circ=accent?"rgba(0,0,0,.16)":T.surface2, ic=accent?T.field:T.lime;
-  return `<button data-act="${act}" style="background:${bg};border:2px solid ${bd};color:${txt};border-radius:13px;padding:12px 4px;display:flex;flex-direction:column;align-items:center;gap:7px;font-family:${SANS};font-size:13px;font-weight:800;line-height:1.05;text-align:center;letter-spacing:.2px">
-    <span style="width:44px;height:44px;border-radius:50%;background:${circ};display:flex;align-items:center;justify-content:center;color:${ic}">${icon}</span>${label}</button>`;
+  return `<button data-act="${act}" style="background:${bg};border:2px solid ${bd};color:${txt};border-radius:12px;padding:8px 4px;display:flex;flex-direction:column;align-items:center;gap:5px;font-family:${SANS};font-size:12.5px;font-weight:800;line-height:1.05;text-align:center;letter-spacing:.2px">
+    <span style="width:34px;height:34px;border-radius:50%;background:${circ};display:flex;align-items:center;justify-content:center;color:${ic}">${icon}</span>${label}</button>`;
 }
 function chip(c){const a=contact===c;return `<button data-act="contact" data-arg="${c}" style="background:${a?T.clay:T.surface};border:1px solid ${a?T.clay:T.line};color:${a?"#FFFFFF":T.chalk};border-radius:8px;padding:12px 6px;font-family:${MONO};font-size:14px;font-weight:800;letter-spacing:.5px;text-transform:uppercase">${c}</button>`;}
 
