@@ -36,15 +36,17 @@
   /* Dark theme background everywhere (browser/PWA). Inside the NATIVE app we switch this
      to transparent at runtime (see IS_APP below) so the native camera-preview layer shows
      through the monitor region; the app paints a matching #0B0E13 backdrop behind it. */
-  html,body{margin:0;height:100%;font-family:var(--sans);
+  html,body{margin:0;height:100%;font-family:var(--sans);overscroll-behavior:none;
     /* Blue turf shows in the open areas; only a light scrim so it's clearly visible.
        Readability comes from the frosted "windows" below, not from darkening the turf.
        The native app overrides this to transparent (IS_APP) and paints the turf natively. */
     background:linear-gradient(rgba(7,11,19,.12),rgba(7,11,19,.34)), url("bg-turf.jpg") center center / cover no-repeat #0B0E13;}
-  /* "Windows": the inline solid card/panel surfaces become translucent (NO blur) so the
-     sharp striped turf shows through and around them; opacity is high enough for readable text. */
+  /* Frosted "windows": the inline solid card/panel surfaces become translucent with a blur
+     INSIDE the window, so the text stays readable while the turf is blurred behind them and
+     sharp everywhere outside. */
   [style*="background:#212A38"],[style*="background:#324056"],[style*="background:#1D3A66"]{
-    background-color:rgba(15,23,38,.72)!important;}
+    background-color:rgba(15,23,38,.62)!important;
+    -webkit-backdrop-filter:blur(15px) saturate(1.1);backdrop-filter:blur(15px) saturate(1.1);}
   button{font-family:var(--sans);cursor:pointer;
     transition:transform .12s var(--ease-soft), filter .15s ease, box-shadow .18s ease, background .15s ease;}
   button:active{transform:scale(.94);filter:brightness(1.14) drop-shadow(0 0 7px rgba(163,230,53,.32));}
@@ -1153,10 +1155,10 @@ function actionArea(){
     const hero = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:6px 0 2px;flex:none">
           <img src="icons/logo-mark.png" alt=""
             onerror="if(this.src.indexOf('icon-512')<0){this.src='icons/icon-512.png';this.style.borderRadius='20px';}else{this.style.display='none';}"
-            style="height:clamp(92px,17vh,176px);width:auto;display:block;filter:drop-shadow(0 8px 20px rgba(0,0,0,.55))">
-          <div style="font-family:${MONO};font-size:clamp(30px,4vw,46px);font-weight:800;letter-spacing:1.5px;line-height:1;color:#fff">ALL-STARS <span style="color:${T.lime}">LIVE</span></div></div>`;
+            style="height:clamp(58px,11vh,132px);width:auto;display:block;filter:drop-shadow(0 8px 20px rgba(0,0,0,.55))">
+          <div style="font-family:${MONO};font-size:clamp(24px,3.6vw,42px);font-weight:800;letter-spacing:1.5px;line-height:1;color:#fff">ALL-STARS <span style="color:${T.lime}">LIVE</span></div></div>`;
     const resumeBtn = gameActive?`<button data-act="resume" style="${bigBtn(T.safe)};font-size:17px;padding:16px;display:flex;align-items:center;justify-content:center;gap:8px">${IC(PLAY)} Resume &middot; ${OUR.short} vs ${OPP.short}</button>`:"";
-    const newGameBtn = `<button data-act="newgamestart" style="${bigBtn(T.lime,"font-size:24px;padding:24px;box-shadow:0 8px 22px rgba(163,230,53,.22)",T.field)}">${IC(PLAY)} New Game</button>`;
+    const newGameBtn = `<button data-act="newgamestart" style="${bigBtn(T.lime,"font-size:21px;padding:17px;box-shadow:0 8px 22px rgba(163,230,53,.22)",T.field)}">${IC(PLAY)} New Game</button>`;
     const manageBtn = `<button data-act="gototeams" style="${ghost};padding:17px;font-size:17px;border:2px solid #3F6CA8;color:${T.ink};display:flex;align-items:center;justify-content:center;gap:9px">${IC('<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>')} Manage teams &amp; rosters</button>`;
     // Share only makes sense once a game (and its stream link) exists.
     const shareBtnHome = `<button data-act="share" style="flex:none;display:flex;align-items:center;justify-content:center;gap:9px;background:${T.surface};border:1px solid ${T.line};color:${T.chalk};border-radius:12px;padding:13px;font-family:${SANS};font-weight:800;font-size:15px">
@@ -1206,7 +1208,7 @@ function actionArea(){
           </div>
         </div>`;
     }
-    return `<div style="display:flex;flex-direction:column;gap:14px">${hero}${authBar}${resumeBtn}${newGameBtn}${teamsBlock}${manageBtn}${gameActive?shareBtnHome:""}</div>`;
+    return `<div style="display:flex;flex-direction:column;gap:9px">${hero}${authBar}${resumeBtn}${newGameBtn}${teamsBlock}${manageBtn}${gameActive?shareBtnHome:""}</div>`;
   }
   if(mode==="teams"){
     const sorted=DB.teams.slice().sort((a,b)=>(b.fav?1:0)-(a.fav?1:0));
@@ -2096,7 +2098,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v28";
+var APP_VERSION="v29";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
