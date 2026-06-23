@@ -102,6 +102,13 @@
   /* Tablet in landscape: use the width — wider column so the field is big and the
      event picker can sit as a side panel (no scrolling). Phones/portrait stay narrow. */
   @media (min-width:760px) and (orientation:landscape){ #app{max-width:1280px;} }
+  /* Big monitors: the menu/stat pages (home, summary, teams, lineup…) carry fixed
+     tablet-sized fonts that look tiny on a large screen, so scale those pages up. The
+     live console is excluded (it must stay no-scroll). width:calc(100%/zoom) cancels the
+     horizontal growth zoom adds, so nothing clips sideways — only the vertical grows (and
+     those pages already scroll). Wider #app too so the bigger UI has room. */
+  @media (min-width:1500px){ #app{max-width:1480px;} .page-zoom{zoom:1.18;width:calc(100% / 1.18);} }
+  @media (min-width:1920px){ #app{max-width:1680px;} .page-zoom{zoom:1.32;width:calc(100% / 1.32);} }
 
   /* Monitor slide in/out (wide layout) — hide the video for distraction-free scoring.
      Toggling .video-off on #console-row animates the monitor column away; the scorer
@@ -1536,7 +1543,10 @@ function render(){
   }catch(e){} }
   if(menu){
     const scroll=mode!=="lineup";
-    document.getElementById("content").innerHTML=`<div class="${mode!==_lastMode?"screen-in":""}" style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px;${scroll?"overflow-y:auto;-webkit-overflow-scrolling:touch":""}">${actionArea()}</div>`;
+    // page-zoom (scroll pages only) scales the UI up on big monitors; lineup is excluded so
+    // its drag coordinates stay accurate.
+    const cls=`${mode!==_lastMode?"screen-in ":""}${scroll?"page-zoom":""}`;
+    document.getElementById("content").innerHTML=`<div class="${cls}" style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px;${scroll?"overflow-y:auto;-webkit-overflow-scrolling:touch":""}">${actionArea()}</div>`;
     _lastMode=mode;
     if(mode==="lineup")setupLineupDrag();
     return;
