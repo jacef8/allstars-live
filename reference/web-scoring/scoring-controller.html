@@ -206,8 +206,15 @@ function teamData(side){return side===G.ourSide?OUR:OPP;}
 const TEAMS={get away(){return teamData("away");},get home(){return teamData("home");}};
 
 /* ===== active roster (index = player id within the current team / quick game) ===== */
-function genericRoster(){return Array.from({length:12},(_,i)=>({id:"g"+i,num:String(i+1),name:"Player "+(i+1),first:""}));}
+function genericRoster(){return Array.from({length:12},(_,i)=>({id:"g"+i,num:String(i+1),name:"Player "+(i+1),first:"Player "+(i+1),last:""}));}
 let ROSTER=genericRoster();
+
+/* ===== player names: separate first/last; `name` stays the full name for display/back-compat.
+   Scorebug/batter readout uses pBug() = "F. Last" (the number is shown separately). ===== */
+function pFull(p){ if(!p)return ""; const f=(p.first||"").trim(), l=(p.last||"").trim(); const n=(f+" "+l).trim(); return n||p.name||""; }
+function pBug(p){ if(!p)return ""; const f=(p.first||"").trim(), l=(p.last||"").trim(); if(l) return (f?f.charAt(0).toUpperCase()+". ":"")+l; return f||p.name||""; }
+function ensureName(p){ if(!p)return; if(p.first===undefined&&p.last===undefined){ const parts=(p.name||"").trim().split(/\s+/).filter(Boolean); if(parts.length>=2){ p.last=parts.pop(); p.first=parts.join(" "); } else { p.first=p.name||""; p.last=""; } } if(p.first===undefined)p.first=""; if(p.last===undefined)p.last=""; p.name=pFull(p); }
+function migrateTeam(t){ if(t&&t.players)t.players.forEach(ensureName); }
 
 /* ====================== persistent team DB (browser localStorage) ======================
    Teams, rosters, and FULL-BOX season stats (batting / pitching / fielding) persist
@@ -221,15 +228,16 @@ function saveDB(){try{localStorage.setItem(DB_KEY,JSON.stringify(DB));}catch(e){
 const GAME_KEY="al-game";
 function saveGame(){try{localStorage.setItem(GAME_KEY,JSON.stringify({G,curTeamId,oppTeamId,gameActive,OUR,OPP}));}catch(e){}}
 let DB=loadDB(), curTeamId=null, openTeamId=null, oppTeamId=null, pickFor="our";
+DB.teams.forEach(migrateTeam);   // split legacy single-name players into first/last
 const curTeam=()=>DB.teams.find(t=>t.id===curTeamId)||null;
 const teamById=id=>DB.teams.find(t=>t.id===id)||null;
 function nextId(p){return p+(DB.seq++);}
 function newTeam(name){name=(name||"").trim()||"New Team";
   const t={id:nextId("t"),name,short:name.slice(0,3).toUpperCase(),color:"#2E6BE6",
-    players:Array.from({length:9},(_,i)=>({id:nextId("p"),num:String(i+1),name:"Player "+(i+1),first:""})),
+    players:Array.from({length:9},(_,i)=>({id:nextId("p"),num:String(i+1),name:"Player "+(i+1),first:"",last:""})),
     season:{},record:{w:0,l:0,t:0}};
   DB.teams.push(t);saveDB();return t;}
-function teamAddPlayer(t){if(t.players.length>=20)return;t.players.push({id:nextId("p"),num:"",name:"Player "+(t.players.length+1),first:""});saveDB();}
+function teamAddPlayer(t){if(t.players.length>=20)return;t.players.push({id:nextId("p"),num:"",name:"Player "+(t.players.length+1),first:"",last:""});saveDB();}
 function teamRemovePlayer(t,pid){if(t.players.length<=9)return;t.players=t.players.filter(p=>p.id!==pid);saveDB();}
 /* Make a saved team the active "our" team for a game. */
 function selectTeam(id){const t=teamById(id);if(!t)return;curTeamId=id;ROSTER=t.players;
@@ -244,7 +252,8 @@ function rollupSeason(){const t=curTeam();if(!t)return;
     const r=seasonRow(t,p.id).bat;r.ab+=s.ab||0;r.r+=s.r||0;r.h+=s.h||0;r.rbi+=s.rbi||0;r.bb+=s.bb||0;r.k+=s.k||0;});
   saveDB();}
 window.teamPNum=function(id,v){const t=teamById(openTeamId);if(!t)return;const p=t.players.find(p=>p.id===id);if(p){p.num=v;saveDB();}};
-window.teamPName=function(id,v){const t=teamById(openTeamId);if(!t)return;const p=t.players.find(p=>p.id===id);if(p){p.name=v;saveDB();}};
+window.teamPFirst=function(id,v){const t=teamById(openTeamId);if(!t)return;const p=t.players.find(p=>p.id===id);if(p){p.first=v;ensureName(p);saveDB();}};
+window.teamPLast=function(id,v){const t=teamById(openTeamId);if(!t)return;const p=t.players.find(p=>p.id===id);if(p){p.last=v;ensureName(p);saveDB();}};
 window.edTeamName=function(v){const t=teamById(openTeamId);if(!t)return;t.name=(v||"").trim()||"New Team";saveDB();};
 window.edTeamAbbr=function(v){const t=teamById(openTeamId);if(!t)return;t.short=(v||"").toUpperCase().slice(0,6)||"TM";saveDB();};
 const POSLIST=["P","C","1B","2B","3B","SS","LF","CF","RF"];
@@ -415,7 +424,7 @@ const battingSlot=()=>ptr()%(battingKey()===G.ourSide?ourOrderLen():Math.max(1,G
 function batter(){
   const k=battingKey();
   if(k===G.ourSide){ const ri=G.lineup.order[ptr()%ourOrderLen()],p=ROSTER[ri];
-    return {num:p.num,name:p.name,first:p.first,bats:p.bats||"R",pos:posOfPlayer(ri),ri,ours:true}; }
+    return {num:p.num,name:p.name,first:p.first,last:p.last,bats:p.bats||"R",pos:posOfPlayer(ri),ri,ours:true}; }
   const ol=G.oppLineup||[]; const len=Math.max(1,ol.length||G.oppBatters); const i=ptr()%len; const e=ol[i]||{};
   return {num:e.num||String(i+1),name:e.name||"",bats:"",spot:i+1,opp:true};
 }
@@ -480,7 +489,8 @@ function startNewGame(){
 }
 /* Opponent name from the New Game text field (no re-render, so typing keeps focus). */
 window.ngOurName=function(v){const s=(v||"").trim(); OUR.name=s||"Your Team"; OUR.short=(s||"YOU").slice(0,3).toUpperCase();};
-window.edName=function(v){const ri=G.lineup.order[editSlot]; if(ROSTER[ri]){ROSTER[ri].name=v; saveDB();}};
+window.edFirst=function(v){const ri=G.lineup.order[editSlot]; if(ROSTER[ri]){ROSTER[ri].first=v; ensureName(ROSTER[ri]); saveDB();}};
+window.edLast=function(v){const ri=G.lineup.order[editSlot]; if(ROSTER[ri]){ROSTER[ri].last=v; ensureName(ROSTER[ri]); saveDB();}};
 window.edNum=function(v){const ri=G.lineup.order[editSlot]; if(ROSTER[ri]){ROSTER[ri].num=v; saveDB();}};
 window.ngOppName=function(v){const s=(v||"").trim(); OPP.name=s||"Opponent"; OPP.short=(s||"OPP").slice(0,3).toUpperCase();};
 window.ngRunCap=function(v){const n=parseInt(v,10); G.runCap=(isNaN(n)||n<0)?0:Math.min(n,30);};        // 0 = no cap
@@ -849,7 +859,7 @@ function batterCard(){
   const lp=batterLineParts();
   const ord=ordinal(battingSlot()+1);
   const big=b.ours?b.num:b.num;
-  const nameLine=b.ours?b.name:TEAMS[k].name.toUpperCase();
+  const nameLine=b.ours?pBug(b):TEAMS[k].name.toUpperCase();
   const sub=b.ours
     ? `${TEAMS[k].short}${b.pos?` · ${b.pos}`:""} &middot; ${ord} in order`
     : `${ord} batter`;   // opponent: the big name already shows the team — don't repeat it
@@ -872,7 +882,7 @@ function batterStrip(){
   const b=batter(),k=battingKey(),c=TEAMS[k].color;
   const lp=batterLineParts();
   const ord=ordinal(battingSlot()+1);
-  const nameLine=b.ours?b.name:TEAMS[k].name.toUpperCase();
+  const nameLine=b.ours?pBug(b):TEAMS[k].name.toUpperCase();
   const sub=b.ours?`${TEAMS[k].short}${b.pos?` · ${b.pos}`:""} · ${ord}`:`${TEAMS[k].short} · ${ord}`;
   return `<button data-act="reviewbatter" data-arg="${batterKeyOf(b)}" class="frost-card" style="display:flex;align-items:center;gap:10px;background:rgba(13,19,32,.72);border:1px solid ${c}66;border-left:5px solid ${c};border-radius:10px;padding:6px 12px;cursor:pointer;max-width:100%;min-width:0">
     <span style="font-family:${MONO};font-size:22px;font-weight:700;color:${c};line-height:1;flex:none">${b.num}</span>
@@ -1239,7 +1249,8 @@ function actionArea(){
     const cell=`background:${T.surface2};border:1px solid ${T.line};color:${T.ink};border-radius:7px;padding:8px 8px;font-weight:700;outline:none`;
     const roster=t.players.map(p=>`<div style="display:flex;align-items:center;gap:6px;background:${T.surface};border:1px solid ${T.line};border-radius:9px;padding:6px 8px">
         <input value="${(p.num||"").replace(/"/g,"&quot;")}" oninput="teamPNum('${p.id}',this.value)" inputmode="numeric" maxlength="3" style="${cell};width:46px;text-align:center;font-family:${MONO};font-weight:800">
-        <input value="${(p.name||"").replace(/"/g,"&quot;")}" oninput="teamPName('${p.id}',this.value)" placeholder="Player name" style="${cell};flex:1;min-width:0">
+        <input value="${(p.first||"").replace(/"/g,"&quot;")}" oninput="teamPFirst('${p.id}',this.value)" placeholder="First" style="${cell};flex:1;min-width:0">
+        <input value="${(p.last||"").replace(/"/g,"&quot;")}" oninput="teamPLast('${p.id}',this.value)" placeholder="Last" style="${cell};flex:1;min-width:0">
         <button data-act="rmteamp" data-arg="${p.id}" style="background:none;border:1px solid ${T.line};color:${T.out};border-radius:7px;padding:8px 10px;font-weight:800"${t.players.length<=9?" disabled":""}>&times;</button></div>`).join("");
     const sRows=t.players.map(p=>{const s=(t.season[p.id]||{}).bat||{};const ab=s.ab||0,h=s.h||0;const avg=ab?(h/ab).toFixed(3).replace(/^0/,""):"—";
       return `<tr style="border-top:1px solid ${T.line}"><td style="text-align:left;padding:6px 6px;font-weight:700;white-space:nowrap">#${p.num} ${p.name}</td><td style="padding:6px 4px">${ab}</td><td style="padding:6px 4px">${s.r||0}</td><td style="padding:6px 4px">${h}</td><td style="padding:6px 4px">${s.rbi||0}</td><td style="padding:6px 4px">${s.bb||0}</td><td style="padding:6px 4px">${s.k||0}</td><td style="padding:6px 4px;font-weight:800">${avg}</td></tr>`;}).join("");
@@ -1398,16 +1409,18 @@ function actionArea(){
       `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">${cells}</div><button data-act="backlineup" style="${ghost};margin-top:8px;width:100%">Back</button>`);
   }
   if(mode==="editplayer"){
-    const ri=G.lineup.order[editSlot],p=ROSTER[ri]||{num:"",name:""};
+    const ri=G.lineup.order[editSlot],p=ROSTER[ri]||{num:"",first:"",last:""};
     const fld=`background:${T.surface};border:1px solid ${T.line};color:${T.ink};border-radius:10px;padding:14px 16px;font-family:${SANS};font-size:16px;font-weight:700;outline:none;width:100%`;
     const lb=`font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin:0 2px 6px`;
-    return step("Edit player",`Batting ${editSlot+1} &middot; set number &amp; name.`,
+    return step("Edit player",`Batting ${editSlot+1} &middot; set number, first &amp; last name.`,
       `<div style="display:flex;flex-direction:column;gap:12px">
         <div style="display:flex;gap:10px">
           <div style="flex:none;width:92px"><div style="${lb}">Number</div>
             <input type="text" inputmode="numeric" maxlength="3" value="${(p.num||"").replace(/"/g,"&quot;")}" oninput="edNum(this.value)" style="${fld};text-align:center;font-family:${MONO};font-weight:800"></div>
-          <div style="flex:1"><div style="${lb}">Name</div>
-            <input type="text" value="${(p.name||"").replace(/"/g,"&quot;")}" placeholder="Player name" oninput="edName(this.value)" style="${fld}"></div></div>
+          <div style="flex:1"><div style="${lb}">First name</div>
+            <input type="text" value="${(p.first||"").replace(/"/g,"&quot;")}" placeholder="First" oninput="edFirst(this.value)" style="${fld}"></div></div>
+        <div><div style="${lb}">Last name</div>
+          <input type="text" value="${(p.last||"").replace(/"/g,"&quot;")}" placeholder="Last" oninput="edLast(this.value)" style="${fld}"></div>
         <button data-act="backlineup" style="${bigBtn(OUR.color)}">Done</button>
       </div>`);
   }
@@ -2105,7 +2118,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v32";
+var APP_VERSION="v33";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
