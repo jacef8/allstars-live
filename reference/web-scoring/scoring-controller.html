@@ -423,6 +423,7 @@ const initGame=()=>({inning:1,half:"T",away:0,home:0,outs:0,balls:0,strikes:0,
   oppBatters:9,    // opponent's batting-order size (continuous order support)
   stats:{},        // per-batter box-score stats, keyed "o"+rosterIdx (ours) / "p"+spot (opp)
   pitches:{},      // pitch count per pitcher, keyed "o"+rosterIdx (our P) / "oppP" (their P)
+  pstats:{},       // per-pitcher line, same keys: {k,bb,h,r,outs} (outs/3 = IP)
   pa:{},           // per-batter plate-appearance log (pitch sequence, count, outcome, location)
   ab:{pitches:[],loc:null},   // the in-progress at-bat's pitch sequence
   innLog:[],       // completed half-inning summaries (pitches/runs/hits) for review
@@ -596,6 +597,8 @@ const HIT_KINDS=["single","double","triple","hr"];
 const LOB_OUTS=["strikeout","out1","flyout","lineout","popout","dp","sacfly","sacbunt"];
 /* Credit the current batter for a completed plate appearance. Call AFTER resolve()
    (so G.bases reflects who's left on) and BEFORE nextBatter(). */
+/* Per-pitcher stat row (charged to whoever is pitching right now). outs/3 = innings pitched. */
+function pstat(key){ key=key||currentPitcherKey(); if(!G.pstats)G.pstats={}; if(!G.pstats[key])G.pstats[key]={k:0,bb:0,h:0,r:0,outs:0}; return G.pstats[key]; }
 function creditBatter(kind,rbi){
   if(!G.startedAt)G.startedAt=Date.now();   // backstop: any completed plate appearance starts the clock
   const b=batter(),s=statFor(batterKeyOf(b));
@@ -608,6 +611,12 @@ function creditBatter(kind,rbi){
   if(rbi) s.rbi+=rbi;
   if(LOB_OUTS.includes(kind)) s.lob+=[1,2,3].filter(x=>G.bases[x]).length;  // runners stranded on an out
   if(HIT_KINDS.includes(kind)) G.halfHits=(G.halfHits||0)+1;                 // hits this half-inning
+  // Charge the current pitcher: K / BB / H + the outs this PA recorded (outs/3 = IP).
+  const ps=pstat();
+  if(kind==="strikeout") ps.k++;
+  if(kind==="walk") ps.bb++;
+  if(HIT_KINDS.includes(kind)) ps.h++;
+  ps.outs += outsFromKind(kind) + (kind==="strikeout"?1:0);
   storePA(b,kind,rbi);                                                        // log the plate appearance for review
 }
 /* ===== pitch count (current pitcher) =====
@@ -665,7 +674,8 @@ function resolve(movers,extraOuts){
   const cap=G.runCap>0?G.runCap:Infinity;
   const allowed=Math.max(0,Math.min(runs,cap-G.halfRuns));
   for(let i=0;i<allowed&&i<scorers.length;i++){ const key=scorers[i].key; if(key) statFor(key).r++; }   // credit individual runs
-  if(allowed>0) G.line[k][G.inning]=(G.line[k][G.inning]||0)+allowed;   // before the flip, so the inning is right
+  if(allowed>0){ pstat().r+=allowed;                                    // runs charged to the current pitcher
+    G.line[k][G.inning]=(G.line[k][G.inning]||0)+allowed; }             // before the flip, so the inning is right
   G.halfRuns+=allowed;G.bases=bases;G[k]+=allowed;G.outs+=extraOuts;return allowed;}
 function applyPlanInline(kind){
   const runs=resolve(buildPlan(kind,G.bases,batterLabel(),batter().name,null,batterKeyOf(batter())),0);
@@ -1733,6 +1743,11 @@ function actionArea(){
     const lineHead=`<th style="text-align:left;padding:4px 6px">Team</th>`+Array.from({length:maxI},(_,i)=>`<th style="padding:10px 7px">${i+1}</th>`).join("")+`<th style="padding:10px 7px">R</th><th style="padding:10px 7px">H</th><th style="padding:10px 7px">E</th>`;
     const lineRow=side=>{let c=`<td style="text-align:left;padding:4px 6px;font-weight:800">${TEAMS[side].short}</td>`;for(let i=1;i<=maxI;i++)c+=`<td style="padding:10px 7px">${(G.line[side]&&G.line[side][i])||0}</td>`;c+=`<td style="padding:10px 7px;font-weight:800;color:${T.ink}">${box.totals[side].r}</td><td style="padding:10px 7px">${box.totals[side].h}</td><td style="padding:10px 7px">${box.totals[side].e}</td>`;return `<tr style="border-top:1px solid ${T.line}">${c}</tr>`;};
     const bb=(box[G.ourSide]||[]).map(b=>`<tr style="border-top:1px solid ${T.line}"><td style="text-align:left;padding:5px 6px;font-weight:700;white-space:nowrap">#${b.num} ${b.name}</td><td style="padding:11px 6px">${b.ab}</td><td style="padding:11px 6px">${b.r}</td><td style="padding:11px 6px">${b.h}</td><td style="padding:11px 6px">${b.rbi}</td><td style="padding:11px 6px">${b.bb}</td><td style="padding:11px 6px">${b.k}</td></tr>`).join("");
+    // Pitching: per-pitcher line for OUR pitchers (keys "o"+rosterIdx). outs/3 = IP; P = pitch count.
+    const pitchers=Object.keys(G.pstats||{}).filter(k=>k[0]==="o").map(k=>{const idx=+k.slice(1),pl=ROSTER[idx],ps=G.pstats[k]||{},pc=(G.pitches&&G.pitches[k])||0,outs=ps.outs||0;return {name:pl?("#"+pl.num+" "+pl.name):"Pitcher",ip:Math.floor(outs/3)+"."+(outs%3),pc:pc,h:ps.h||0,r:ps.r||0,bb:ps.bb||0,k:ps.k||0,outs:outs};}).filter(x=>x.outs>0||x.pc>0).sort((a,b)=>b.outs-a.outs);
+    const pp=pitchers.map(x=>`<tr style="border-top:1px solid ${T.line}"><td style="text-align:left;padding:5px 6px;font-weight:700;white-space:nowrap">${(x.name||'').replace(/</g,'')}</td><td style="padding:11px 6px">${x.ip}</td><td style="padding:11px 6px">${x.pc}</td><td style="padding:11px 6px">${x.h}</td><td style="padding:11px 6px">${x.r}</td><td style="padding:11px 6px">${x.bb}</td><td style="padding:11px 6px">${x.k}</td></tr>`).join("");
+    const pitchBlock=pitchers.length?`<div><div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin:0 2px 4px">${OUR.name} &mdash; pitching</div>
+          <div style="overflow-x:auto;background:${T.surface};border:1px solid ${T.line};border-radius:10px;padding:4px 6px"><table style="width:100%;border-collapse:collapse;font-family:${MONO};font-size:17px;text-align:center;color:${T.chalk}"><thead><tr style="color:${T.sageDim};font-size:13px"><th style="text-align:left;padding:4px 6px">Pitcher</th><th title="Innings pitched">IP</th><th title="Pitches">P</th><th>H</th><th>R</th><th>BB</th><th>K</th></tr></thead><tbody>${pp}</tbody></table></div></div>`:"";
     return `<div style="display:flex;flex-direction:column;gap:14px">
         <div style="text-align:center">
           <div style="font-family:${MONO};font-size:19px;font-weight:800;letter-spacing:1.5px;color:${resCol}">FINAL &middot; ${res}</div>
@@ -1744,6 +1759,7 @@ function actionArea(){
         <div style="overflow-x:auto;background:${T.surface};border:1px solid ${T.line};border-radius:10px;padding:6px"><table style="width:100%;border-collapse:collapse;font-family:${MONO};font-size:17px;text-align:center;color:${T.chalk}"><thead><tr style="color:${T.sageDim};font-size:13px">${lineHead}</tr></thead><tbody>${lineRow("away")}${lineRow("home")}</tbody></table></div>
         <div><div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin:0 2px 4px">${OUR.name} &mdash; batting</div>
           <div style="overflow-x:auto;background:${T.surface};border:1px solid ${T.line};border-radius:10px;padding:4px 6px"><table style="width:100%;border-collapse:collapse;font-family:${MONO};font-size:17px;text-align:center;color:${T.chalk}"><thead><tr style="color:${T.sageDim};font-size:13px"><th style="text-align:left;padding:4px 6px">Batter</th><th>AB</th><th>R</th><th>H</th><th>RBI</th><th>BB</th><th>K</th></tr></thead><tbody>${bb||`<tr><td colspan="7" style="padding:8px;color:${T.sageDim}">No at-bats recorded</td></tr>`}</tbody></table></div></div>
+        ${pitchBlock}
         <div style="display:flex;gap:10px">
           <button data-act="resumegame" style="${ghost};flex:1;padding:14px">&lsaquo; Resume game</button>
           <button data-act="exportgame" style="${ghost};flex:1;padding:14px">&#8681; Export</button>
@@ -2583,7 +2599,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v68";
+var APP_VERSION="v69";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
