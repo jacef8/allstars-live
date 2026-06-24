@@ -511,7 +511,12 @@ const capReached=()=>G.runCap>0&&G.halfRuns>=G.runCap;
 function endInning(){snapshot();doFlip();resetUI();flash("Inning ended");render();broadcast();}
 /* Mark the game final (toggle) so the viewer shows its Final summary. Undoable. */
 function endGame(){snapshot();G.final=true;
-  if(curTeam()&&!G.rolledUp){rollupSeason();const t=curTeam(),o=ourRuns(),p=oppRuns();if(o>p)t.record.w++;else if(o<p)t.record.l++;else t.record.t++;saveDB();G.rolledUp=true;}
+  if(curTeam()&&!G.rolledUp){rollupSeason();const t=curTeam(),o=ourRuns(),p=oppRuns();if(o>p)t.record.w++;else if(o<p)t.record.l++;else t.record.t++;
+    // Archive this game so it shows under the team's "Recent games" (final score, opponent, date).
+    if(!Array.isArray(t.games))t.games=[];
+    t.games.unshift({id:"g"+Date.now().toString(36),date:new Date().toISOString().slice(0,10),opp:(OPP.name||"Opponent"),oppShort:OPP.short||"OPP",us:o,them:p,result:(o>p?"W":o<p?"L":"T")});
+    if(t.games.length>100)t.games=t.games.slice(0,100);
+    saveDB();G.rolledUp=true;}
   resetUI();mode="summary";render();broadcast();}
 /* New Game: reset scores/innings/in-play state but keep the chosen rules, side, and lineup. */
 function startNewGame(){
@@ -1513,10 +1518,20 @@ function actionArea(){
         <button data-act="rmteamp" data-arg="${p.id}" style="background:none;border:1px solid ${T.line};color:${T.out};border-radius:7px;padding:8px 10px;font-weight:800"${t.players.length<=9?" disabled":""}>&times;</button></div>`).join("");
     const sRows=t.players.map(p=>{const s=(t.season[p.id]||{}).bat||{};const ab=s.ab||0,h=s.h||0;const avg=ab?(h/ab).toFixed(3).replace(/^0/,""):"—";
       return `<tr style="border-top:1px solid ${T.line}"><td style="text-align:left;padding:10px 8px;font-weight:700;white-space:nowrap">#${p.num} ${p.name}</td><td style="padding:10px 6px">${ab}</td><td style="padding:10px 6px">${s.r||0}</td><td style="padding:10px 6px">${h}</td><td style="padding:10px 6px">${s.rbi||0}</td><td style="padding:10px 6px">${s.bb||0}</td><td style="padding:10px 6px">${s.k||0}</td><td style="padding:10px 6px;font-weight:800">${avg}</td></tr>`;}).join("");
-    const statTable=`<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-family:${MONO};font-size:16px;color:${T.chalk};text-align:center">
-        <thead><tr style="color:${T.sageDim};font-size:13px;letter-spacing:.5px"><th style="text-align:left;padding:0 8px 6px">SEASON · BATTING</th><th>AB</th><th>R</th><th>H</th><th>RBI</th><th>BB</th><th>K</th><th>AVG</th></tr></thead>
+    const statTable=`<div class="frost-card" style="background:${T.surface};border:1px solid ${T.line};border-radius:14px;padding:14px 18px;overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-family:${MONO};font-size:18px;color:${T.chalk};text-align:center">
+        <thead><tr style="color:${T.sageDim};font-size:14px;letter-spacing:.5px"><th style="text-align:left;padding:0 8px 10px">SEASON · BATTING</th><th>AB</th><th>R</th><th>H</th><th>RBI</th><th>BB</th><th>K</th><th>AVG</th></tr></thead>
         <tbody>${sRows}</tbody></table>
-      <div style="font-size:11px;color:${T.sageDim};margin-top:8px;padding:0 4px">Pitching &amp; fielding season stats are stored too — they fill in as in-game tracking expands.</div></div>`;
+      <div style="font-size:12px;color:${T.sageDim};margin-top:10px;padding:0 4px">Pitching &amp; fielding season stats are stored too — they fill in as in-game tracking expands.</div></div>`;
+    // Recent games — the finished-game log, newest first (archived when a game ends).
+    const gamesList=(t.games||[]).slice(0,25).map(g=>{const rc=g.result==="W"?T.lime:(g.result==="L"?T.out:T.sage);
+      const dt=(()=>{try{return new Date((g.date||"")+"T00:00").toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"});}catch(e){return g.date||"";}})();
+      return `<div style="display:flex;align-items:center;gap:12px;padding:10px 2px;border-top:1px solid ${T.line}">
+          <span style="width:28px;height:28px;flex:none;display:flex;align-items:center;justify-content:center;border-radius:7px;background:${rc};color:${T.field};font-family:${MONO};font-weight:800;font-size:14px">${g.result||""}</span>
+          <div style="flex:1;min-width:0"><div style="font-weight:800;color:${T.ink};font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">vs ${(g.opp||"Opponent").replace(/</g,"&lt;")}</div><div style="font-size:12px;color:${T.sage};margin-top:1px">${dt}</div></div>
+          <div style="font-family:${MONO};font-weight:800;font-size:19px;color:${T.chalk}">${g.us}&ndash;${g.them}</div></div>`;}).join("");
+    const gamesBlock=`<div class="frost-card" style="background:${T.surface};border:1px solid ${T.line};border-radius:14px;padding:12px 16px">
+        <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin-bottom:2px">Recent games</div>
+        ${gamesList||`<div style="font-size:12px;color:${T.sageDim};padding:8px 0">No finished games yet — each game appears here once you end it.</div>`}</div>`;
     // Schedule — games & practices stored on the team (syncs to the cloud with the team).
     const fmtSched=(s)=>{ try{ const dt=new Date((s.date||"")+"T"+(s.time||"00:00")); if(isNaN(dt))return s.date||""; let o=dt.toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"}); if(s.time)o+=" · "+dt.toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"}); return o; }catch(e){ return s.date||""; } };
     const sched=(t.schedule||[]).slice().sort((a,b)=>(((a.date||"")+(a.time||""))<((b.date||"")+(b.time||""))?-1:1));
@@ -1585,6 +1600,9 @@ function actionArea(){
     const secHdr=(title)=>`<div class="frost-card" style="display:flex;align-items:center;gap:10px;background:${T.surface};border:1px solid ${T.line};border-radius:14px;padding:12px 14px">
         <button data-act="teamhub" style="${ghost};padding:9px 11px">&lsaquo; ${(t.name||"Team").replace(/</g,"")}</button>
         <div style="font-family:${MONO};font-size:20px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:${T.lime}">${title}</div></div>`;
+    // Cap sub-pages to a comfortable reading column, centered — on a wide PC the full-width
+    // #app (up to ~1680px) otherwise leaves a big dead zone in the middle of tables/forms.
+    const secWrap=(inner)=>`<div style="width:100%;max-width:880px;margin:0 auto;display:flex;flex-direction:column;gap:12px">${inner}</div>`;
     if(teamTab==="roster"){
       const detailsBlock=`<div style="display:flex;align-items:center;gap:10px">
             <input value="${(t.name||"").replace(/"/g,"&quot;")}" oninput="edTeamName(this.value)" placeholder="Team name" style="${cell};flex:1;font-family:${MONO};font-size:18px;font-weight:800;background:${T.surface};border-left:5px solid ${t.color}"></div>
@@ -1595,39 +1613,40 @@ function actionArea(){
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
             <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};width:100%;margin-bottom:2px">Team color</div>
             ${["#2E6BE6","#0EA5E9","#12A150","#E08A12","#E2574C","#EC4899","#8B5CF6","#0F172A"].map(c=>`<button data-act="teamcolor" data-arg="${c}" style="width:32px;height:32px;border-radius:8px;background:${c};border:3px solid ${t.color.toLowerCase()===c.toLowerCase()?T.ink:"transparent"};box-shadow:0 0 0 1px ${T.line}"></button>`).join("")}</div>`;
-      return `<div style="display:flex;flex-direction:column;gap:12px">${secHdr("Roster &amp; details")}${detailsBlock}
+      return secWrap(`${secHdr("Roster &amp; details")}${detailsBlock}
           <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin:2px 2px -2px">Roster — tap to edit #/name</div>
           <div class="frost-card" style="background:${T.surface};border:1px solid ${T.line};border-radius:12px;padding:4px 12px">${roster}</div>
-          <button data-act="addteamp" style="${ghost}">+ Add player</button></div>`;
+          <button data-act="addteamp" style="${ghost}">+ Add player</button>`);
     }
-    if(teamTab==="schedule") return `<div style="display:flex;flex-direction:column;gap:12px">${secHdr("Schedule")}${scheduleSection}</div>`;
-    if(teamTab==="stats") return `<div style="display:flex;flex-direction:column;gap:12px">${secHdr("Season stats")}${statTable}</div>`;
-    if(teamTab==="access") return `<div style="display:flex;flex-direction:column;gap:12px">${secHdr("Team access")}${scorersSection}${discoverySection}</div>`;
-    if(teamTab==="rules") return `<div style="display:flex;flex-direction:column;gap:12px">${secHdr("League rules")}${rulesSection}</div>`;
+    if(teamTab==="schedule") return secWrap(`${secHdr("Schedule")}${scheduleSection}`);
+    if(teamTab==="stats") return secWrap(`${secHdr("Stats &amp; games")}${gamesBlock}${statTable}`);
+    if(teamTab==="access") return secWrap(`${secHdr("Team access")}${scorersSection}${discoverySection}`);
+    if(teamTab==="rules") return secWrap(`${secHdr("League rules")}${rulesSection}`);
     // ----- HUB: team header + grid of sections + primary actions -----
     const rec=`${t.record.w}-${t.record.l}${t.record.t?"-"+t.record.t:""}`;
     const hb=(arg,icon,label)=>`<button data-act="teamtab" data-arg="${arg}" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;background:${T.surface};border:1px solid ${T.line};border-radius:14px;padding:18px 10px;min-height:96px;cursor:pointer"><span style="font-size:26px">${icon}</span><span style="font-weight:800;color:${T.ink};font-size:15px;text-align:center;line-height:1.2">${label}</span></button>`;
-    return `<div style="display:flex;flex-direction:column;gap:12px">
+    // Hub tile that fires a non-tab action (Share) — same look as hb() but its own data-act.
+    const hbAct=(act,icon,label)=>`<button data-act="${act}" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;background:${T.surface};border:1px solid ${T.line};border-radius:14px;padding:18px 10px;min-height:96px;cursor:pointer"><span style="font-size:26px">${icon}</span><span style="font-weight:800;color:${T.ink};font-size:15px;text-align:center;line-height:1.2">${label}</span></button>`;
+    return secWrap(`
         <div class="frost-card" style="display:flex;align-items:center;gap:10px;background:${T.surface};border:1px solid ${T.line};border-radius:14px;padding:12px 14px">
           <button data-act="teamsback" style="${ghost};padding:9px 11px">&lsaquo; Teams</button>
           <div style="flex:1;min-width:0;border-left:5px solid ${t.color};padding-left:10px">
             <div style="font-family:${MONO};font-size:22px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${(t.name||"Team").replace(/</g,"")}</div>
             <div style="font-family:${MONO};font-size:18px;color:${T.sage};margin-top:4px"><span style="color:${t.color};font-weight:800">${rec}</span> &middot; ${t.players.length} players</div></div></div>
         <button data-act="teamchat" style="${bigBtn(T.lime,'',T.field)};font-size:17px">&#128172; Team chat</button>
-        <button data-act="shareteam" style="${ghost};display:flex;align-items:center;justify-content:center;gap:9px">&#128279; Share team — let parents follow (watch &amp; chat)</button>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
           ${hb("roster","&#128101;","Roster &amp; details")}
           ${hb("schedule","&#128197;","Schedule")}
-          ${hb("stats","&#128202;","Season stats")}
-          ${hb("access","&#128273;","Team access")}
+          ${hb("stats","&#128202;","Stats &amp; games")}
           ${hb("rules","&#128214;","League rules")}
-          <button data-act="invitewatch" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;background:${T.surface};border:1px solid ${T.line};border-radius:14px;padding:18px 10px;min-height:96px;cursor:pointer"><span style="font-size:26px">&#128227;</span><span style="font-weight:800;color:${T.ink};font-size:15px;text-align:center;line-height:1.2">Invite to watch</span></button>
+          ${hb("access","&#128273;","Scorers &amp; co-owners")}
+          ${hbAct("shareteam","&#128279;","Share &amp; invite")}
         </div>
         <button data-act="startteam" style="${bigBtn(t.color)}">${IC('<path d="M8 5l11 7-11 7z" fill="currentColor" stroke="none"/>')} Start game with ${t.short}</button>
         <div style="display:flex;gap:8px">
           <button data-act="exportteam" style="${ghost};flex:1">&#8681; Export team</button>
           <button data-act="deleteteam" style="background:none;border:1px solid ${T.out};color:${T.out};border-radius:8px;padding:11px 16px;font-family:${MONO};font-size:13px;font-weight:700;letter-spacing:.5px;text-transform:uppercase">&#x1F5D1; Delete</button></div>
-      </div>`;
+      `);
   }
   if(mode==="pickteam"){
     const sortedTeams=DB.teams.slice().sort((a,b)=>((a.name||"").toLowerCase()<(b.name||"").toLowerCase()?-1:1));
@@ -2762,7 +2781,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v74";
+var APP_VERSION="v75";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;

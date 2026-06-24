@@ -26,6 +26,7 @@
       scorers: t.scorers || [], followers: t.followers || [], coOwners: t.coOwners || [], updatedAt: Date.now(),
       public: !!t.public, statsPublic: !!t.statsPublic,   // owner-controlled discoverability
       lastMsgAt: t.lastMsgAt || 0,                        // newest chat ts → powers home unread badge
+      games: t.games || [],                               // finished-game log (Recent games list)
     };
   }
 
