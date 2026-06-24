@@ -32,6 +32,12 @@ object AppUi {
     val googleSignIn: SharedFlow<Unit> = _googleSignIn
     fun requestGoogleSignIn() { _googleSignIn.tryEmit(Unit) }
 
+    /** Web invite field → open the native contact picker so the operator can pick an email/phone
+     *  instead of typing it. Result is handed back to the web via window.__contactPicked(value). */
+    private val _pickContact = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val pickContact: SharedFlow<Unit> = _pickContact
+    fun requestPickContact() { _pickContact.tryEmit(Unit) }
+
     /** Monitor rectangle in dp (CSS px ≈ dp at default WebView scale), or null = hide preview. */
     data class PreviewRect(val x: Float, val y: Float, val w: Float, val h: Float)
 

@@ -1,5 +1,6 @@
 package com.libertyclerk.allstarslive
 
+import android.content.Intent
 import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
@@ -150,6 +151,34 @@ class MainActivity : ComponentActivity() {
                             googleLauncher.launch(client.signInIntent)
                         } catch (e: Exception) {
                             scorerWeb.evaluateJavascript("window.__googleFail && window.__googleFail('Could not start Google sign-in')", null)
+                        }
+                    }
+                }
+
+                // Web invite field → pick a contact's EMAIL. ACTION_PICK on the Email CONTENT_URI
+                // grants one-time read of just the chosen row, so NO READ_CONTACTS permission is
+                // needed. The picked address is handed back to the web (window.__contactPicked).
+                val contactLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+                    val uri = result.data?.data
+                    if (uri != null) {
+                        runCatching {
+                            contentResolver.query(uri, arrayOf(android.provider.ContactsContract.CommonDataKinds.Email.ADDRESS), null, null, null)?.use { c ->
+                                if (c.moveToFirst()) {
+                                    val email = c.getString(0)
+                                    if (!email.isNullOrBlank()) {
+                                        scorerWeb.evaluateJavascript("window.__contactPicked && window.__contactPicked(" + org.json.JSONObject.quote(email) + ")", null)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                LaunchedEffect(Unit) {
+                    AppUi.pickContact.collect {
+                        runCatching {
+                            contactLauncher.launch(
+                                Intent(Intent.ACTION_PICK, android.provider.ContactsContract.CommonDataKinds.Email.CONTENT_URI),
+                            )
                         }
                     }
                 }

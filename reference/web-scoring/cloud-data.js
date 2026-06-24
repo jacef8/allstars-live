@@ -23,8 +23,9 @@
       players: t.players || [], record: t.record || { w: 0, l: 0, t: 0 }, season: t.season || {}, fav: !!t.fav,
       schedule: t.schedule || [], lineup: t.lineup || null, rulesUrl: t.rulesUrl || "",
       ownerUid: t.ownerUid || myUid(), ownerEmail: t.ownerEmail || myEmail(),
-      scorers: t.scorers || [], followers: t.followers || [], updatedAt: Date.now(),
+      scorers: t.scorers || [], followers: t.followers || [], coOwners: t.coOwners || [], updatedAt: Date.now(),
       public: !!t.public, statsPublic: !!t.statsPublic,   // owner-controlled discoverability
+      lastMsgAt: t.lastMsgAt || 0,                        // newest chat ts → powers home unread badge
     };
   }
 
@@ -47,11 +48,24 @@
       .catch(function (e) { console.warn("cloudSearchTeams:", e.message); return []; });
   };
 
+  // Fetch one public team's FULL doc (roster + record + season) for the stats viewer.
+  // Returns null if it isn't public (rules also enforce this server-side).
+  window.cloudGetTeam = function (id) {
+    var d = fdb(); if (!d || !id) return Promise.resolve(null);
+    return d.collection("teams").doc(id).get()
+      .then(function (doc) {
+        if (!doc.exists) return null;
+        var c = doc.data(); if (!c || !c.public) return null;
+        return c;
+      })
+      .catch(function (e) { console.warn("cloudGetTeam:", e.message); return null; });
+  };
+
   // Push one team up (claims ownership if it has none / is mine).
   window.cloudSaveTeam = function (t) {
     var d = fdb(), u = myUid();
     if (!d || !u || !t || !t.id) return;
-    if (t.ownerUid && t.ownerUid !== u && (t.scorers || []).indexOf(myEmail()) < 0) return; // not mine
+    if (t.ownerUid && t.ownerUid !== u && (t.scorers || []).indexOf(myEmail()) < 0 && (t.coOwners || []).indexOf(myEmail()) < 0) return; // not mine
     d.collection("teams").doc(t.id).set(teamDoc(t), { merge: true })
       .catch(function (e) { console.warn("cloudSaveTeam:", e.message); });
   };
@@ -91,6 +105,22 @@
     return d.collection("teams").doc(teamId)
       .update({ scorers: firebase.firestore.FieldValue.arrayRemove((email || "").toLowerCase()) })
       .catch(function (e) { console.warn("cloudRemoveScorer:", e.message); });
+  };
+
+  // Owner adds/removes a CO-OWNER by email (full management access — like a second owner,
+  // but can't delete the team or manage co-owners). Rules let the primary owner edit coOwners.
+  window.cloudAddCoOwner = function (teamId, email) {
+    var d = fdb(); email = (email || "").trim().toLowerCase();
+    if (!d || !teamId || !email || email.indexOf("@") < 0) return Promise.resolve();
+    return d.collection("teams").doc(teamId)
+      .update({ coOwners: firebase.firestore.FieldValue.arrayUnion(email), updatedAt: Date.now() })
+      .catch(function (e) { try { alert("Couldn't add co-owner: " + e.message); } catch (x) {} });
+  };
+  window.cloudRemoveCoOwner = function (teamId, email) {
+    var d = fdb(); if (!d || !teamId) return Promise.resolve();
+    return d.collection("teams").doc(teamId)
+      .update({ coOwners: firebase.firestore.FieldValue.arrayRemove((email || "").toLowerCase()), updatedAt: Date.now() })
+      .catch(function (e) { console.warn("cloudRemoveCoOwner:", e.message); });
   };
 
   // On sign-in: claim + push local teams, then live-subscribe to my owned + scorer teams.
@@ -151,11 +181,21 @@
       .onSnapshot(function (s) { merge(s.docs); }, function (e) { console.warn("teams(scorer):", e.message); }));
     if (em) _unsub.push(d.collection("teams").where("followers", "array-contains", em)
       .onSnapshot(function (s) { merge(s.docs); }, function (e) { console.warn("teams(follower):", e.message); }));
+    if (em) _unsub.push(d.collection("teams").where("coOwners", "array-contains", em)
+      .onSnapshot(function (s) { merge(s.docs); }, function (e) { console.warn("teams(coOwner):", e.message); }));
   };
 
   // Membership helpers (used to gate the chat composer + game scoring on the web).
+  window.cloudIsCoOwner = function (t) {
+    var em = myEmail(); return !!(t && Array.isArray(t.coOwners) && em && t.coOwners.indexOf(em) >= 0);
+  };
+  // Full management access: the primary owner OR a co-owner. Gates rulebook/scorers/discovery
+  // edits. (Deleting the team + adding/removing co-owners stays primary-owner-only — cloudIsOwner.)
+  window.cloudCanManage = function (t) {
+    return !!(t && (window.cloudIsOwner(t) || window.cloudIsCoOwner(t)));
+  };
   window.cloudIsScorer = function (t) {
-    var em = myEmail(); return !!(t && (window.cloudIsOwner(t) || (Array.isArray(t.scorers) && t.scorers.indexOf(em) >= 0)));
+    var em = myEmail(); return !!(t && (window.cloudIsOwner(t) || window.cloudIsCoOwner(t) || (Array.isArray(t.scorers) && t.scorers.indexOf(em) >= 0)));
   };
   window.cloudIsMember = function (t) {
     var em = myEmail(); return !!(t && (window.cloudIsScorer(t) || (Array.isArray(t.followers) && t.followers.indexOf(em) >= 0)));
@@ -193,6 +233,11 @@
     return d.collection("teams").doc(teamId).collection("messages").add({
       text: text.slice(0, 2000), authorUid: u, authorName: (window.cloudMyName ? window.cloudMyName() : myEmail()) || "Someone",
       authorEmail: myEmail(), ts: Date.now(),
+    }).then(function () {
+      // Stamp the team doc so other members' home screens can show an unread badge without
+      // each subscribing to the whole messages subcollection. (Rules let any member bump
+      // ONLY lastMsgAt/updatedAt.) Best-effort — a failure here never blocks the message.
+      try { d.collection("teams").doc(teamId).update({ lastMsgAt: Date.now(), updatedAt: Date.now() }).catch(function () {}); } catch (e) {}
     }).catch(function (e) { ctoast("Couldn't send: " + e.message); });
   };
   window.cloudDeleteMessage = function (teamId, msgId) {

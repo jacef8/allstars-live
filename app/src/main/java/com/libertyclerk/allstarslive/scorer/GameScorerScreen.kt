@@ -112,6 +112,11 @@ private class ScorerBridge(private val appContext: Context) {
     @JavascriptInterface
     fun googleSignIn() { AppUi.requestGoogleSignIn() }
 
+    /** Invite field "Contacts" button → open the native contact picker; the chosen email is
+     *  handed back to the web via window.__contactPicked(value). No permission needed. */
+    @JavascriptInterface
+    fun pickContact() { AppUi.requestPickContact() }
+
     /** "End broadcast" from the Game page — asks for confirmation first. */
     @JavascriptInterface
     fun stopStream() { main.post { Broadcast.requestStop() } }

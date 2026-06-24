@@ -17,10 +17,13 @@ service cloud.firestore {
       // outright). Team docs always create scorers/followers as [], so the field always exists.
       function isScorer()   { return request.auth != null && (request.auth.token.email in resource.data.scorers); }
       function isFollower() { return request.auth != null && (request.auth.token.email in resource.data.followers); }
+      // Co-owners get full management access (like a second owner) but can't change ownerUid or
+      // the coOwners list themselves. Guard the field existence — older docs have no coOwners.
+      function isCoOwner()  { return request.auth != null && ('coOwners' in resource.data) && (request.auth.token.email in resource.data.coOwners); }
 
       // Public teams (owner set public:true) are readable by anyone — powers the searchable
       // team directory. The `where('public','==',true)` query authorizes against this clause.
-      allow read: if isOwner() || isScorer() || isFollower() || resource.data.public == true;
+      allow read: if isOwner() || isCoOwner() || isScorer() || isFollower() || resource.data.public == true;
 
       // Create: must stamp yourself as the owner.
       allow create: if request.auth != null && request.resource.data.ownerUid == request.auth.uid;
@@ -28,6 +31,12 @@ service cloud.firestore {
       allow update:
         // Owner = anything.
         if isOwner()
+        // Co-owner = anything EXCEPT changing the owner or the co-owners list.
+        || (
+          isCoOwner() &&
+          request.resource.data.ownerUid == resource.data.ownerUid &&
+          request.resource.data.coOwners == resource.data.coOwners
+        )
         // Scorer = anything EXCEPT changing owner / scorers / followers.
         || (
           isScorer() &&
@@ -50,6 +59,11 @@ service cloud.firestore {
           !(request.auth.token.email in resource.data.followers) &&
           (request.auth.token.email in request.resource.data.followers) &&
           request.resource.data.followers.size() == resource.data.followers.size() + 1
+        )
+        // Any member may bump ONLY the chat-activity stamp (powers home unread badges).
+        || (
+          (isOwner() || isCoOwner() || isScorer() || isFollower()) &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastMsgAt', 'updatedAt'])
         );
 
       allow delete: if isOwner();
@@ -60,6 +74,7 @@ service cloud.firestore {
         function isMemberOfTeam() {
           return request.auth != null && (
             team().ownerUid == request.auth.uid ||
+            (team().coOwners is list && (request.auth.token.email in team().coOwners)) ||
             (team().scorers is list && (request.auth.token.email in team().scorers)) ||
             (team().followers is list && (request.auth.token.email in team().followers))
           );
@@ -79,6 +94,8 @@ service cloud.firestore {
           && exists(/databases/$(database)/documents/teams/$(tid))
           && (
             get(/databases/$(database)/documents/teams/$(tid)).data.ownerUid == request.auth.uid ||
+            (get(/databases/$(database)/documents/teams/$(tid)).data.coOwners is list &&
+             (request.auth.token.email in get(/databases/$(database)/documents/teams/$(tid)).data.coOwners)) ||
             (get(/databases/$(database)/documents/teams/$(tid)).data.scorers is list &&
              (request.auth.token.email in get(/databases/$(database)/documents/teams/$(tid)).data.scorers))
           );

@@ -1077,6 +1077,8 @@ function appLive(){ return window.__bcastPhase==="LIVE" || window.__bcastPhase==
 // "● CAMERA LIVE" vs "WAITING FOR CAMERA" status, the operator's connection check.
 window.__camLive=false;
 window.__cam=function(connected){ const v=!!connected; if(v===window.__camLive)return; window.__camLive=v; try{render();}catch(e){} };
+// Native contact picker returned an email/phone → drop it into the invite field.
+window.__contactPicked=function(value){ try{ const v=(value||"").trim(); if(!v)return; const e=document.getElementById("inviteWho"); if(e){ e.value=v; try{e.focus();}catch(x){} } else { flash("Contact: "+v); } }catch(e){} };
 // Report the monitor div's on-screen rect to native so it can place the live camera
 // preview exactly there (CSS px ≈ dp). Debounced by value so we don't spam the bridge.
 let _previewKey="";
@@ -1327,6 +1329,39 @@ window._tpSync=function(idp){
   const hid=document.getElementById(idp); if(hid)hid.value=val;
   const cb=window["_tpcb_"+idp]; if(typeof cb==="function") try{cb(val);}catch(e){}
 };
+/* Recent opponents — remembered locally so the opponent picker can offer quick re-picks. */
+function getRecentOpps(){ try{ return JSON.parse(localStorage.getItem("al-recent-opps")||"[]"); }catch(e){ return []; } }
+/* Per-device "last seen this team's chat" stamps → home unread badge (t.lastMsgAt is cloud-set). */
+function getSeenChat(){ try{ return JSON.parse(localStorage.getItem("al-chat-seen")||"{}"); }catch(e){ return {}; } }
+function markSeenChat(id){ if(!id)return; try{ const s=getSeenChat(); s[id]=Date.now(); localStorage.setItem("al-chat-seen",JSON.stringify(s)); }catch(e){} }
+function teamHasUnread(t){ try{ if(!t||!t.lastMsgAt)return false; return (getSeenChat()[t.id]||0) < (t.lastMsgAt-4000); }catch(e){ return false; } }  // 4s grace: never badge your own just-sent message (same-device clock skew)
+function recordRecentOpp(o){ if(!o||!o.name||o.name==="Opponent")return; try{ let r=getRecentOpps().filter(x=>x.name!==o.name); r.unshift({name:o.name,short:o.short||"",color:o.color||"#E2574C"}); localStorage.setItem("al-recent-opps",JSON.stringify(r.slice(0,8))); }catch(e){} }
+/* Live client-side filter for the opponent picker (no re-render → keeps the input focused). */
+window._oppFilter=function(v){ v=(v||"").trim().toLowerCase(); try{ document.querySelectorAll('[data-tname]').forEach(function(el){ el.style.display=(!v||(el.getAttribute('data-tname')||'').indexOf(v)>=0)?"":"none"; }); }catch(e){} };
+/* Schedule month-calendar view (toggle with the list). calYM = {y,m} of the shown month. */
+let calYM=null, scheduleView=(()=>{try{return localStorage.getItem("al-sched-view")||"list";}catch(e){return "list";}})();
+/* Public-team directory browser + read-only stats viewer (any team that opted public). */
+let dirResults=null, viewTeam=null;
+function calendarHtml(t){
+  if(!calYM){ const d=new Date(); calYM={y:d.getFullYear(),m:d.getMonth()}; }
+  const y=calYM.y, m=calYM.m, first=new Date(y,m,1), startDow=first.getDay(), daysIn=new Date(y,m+1,0).getDate();
+  const monthName=first.toLocaleDateString(undefined,{month:"long",year:"numeric"});
+  const pad=n=>String(n).padStart(2,"0"), byDate={};
+  (t.schedule||[]).forEach(s=>{ if(s.date){(byDate[s.date]=byDate[s.date]||[]).push(s);} });
+  const total=Math.ceil((startDow+daysIn)/7)*7; let cells="";
+  for(let i=0;i<total;i++){ const dn=i-startDow+1, inM=dn>=1&&dn<=daysIn, ds=inM?`${y}-${pad(m+1)}-${pad(dn)}`:""; const evs=ds?(byDate[ds]||[]):[];
+    cells+=`<div style="min-height:52px;border:1px solid ${T.line};border-radius:7px;padding:3px 4px;background:${inM?T.surface2:'transparent'};opacity:${inM?1:.25};display:flex;flex-direction:column;gap:2px">
+        <div style="font-family:${MONO};font-size:12px;font-weight:800;color:${T.sage}">${inM?dn:""}</div>
+        ${evs.length?`<div style="font-size:9px;line-height:1.15;overflow:hidden">${evs.slice(0,2).map(s=>`<div style="color:${s.type==="practice"?T.sage:t.color};font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${s.type==="practice"?"⚾":"🏟️"}${s.opp?" "+(s.opp||"").replace(/</g,"&lt;"):""}</div>`).join("")}${evs.length>2?`<div style="color:${T.sageDim}">+${evs.length-2}</div>`:""}</div>`:""}
+      </div>`; }
+  const dow=["Su","Mo","Tu","We","Th","Fr","Sa"].map(d=>`<div style="text-align:center;font-family:${MONO};font-size:11px;font-weight:800;color:${T.sageDim};padding:2px 0">${d}</div>`).join("");
+  return `<div style="background:${T.surface};border:1px solid ${T.line};border-radius:10px;padding:10px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <button data-act="calprev" style="${ghost};padding:7px 13px">&lsaquo;</button>
+        <div style="font-family:${MONO};font-size:16px;font-weight:800;color:${T.ink}">${monthName}</div>
+        <button data-act="calnext" style="${ghost};padding:7px 13px">&rsaquo;</button></div>
+      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px">${dow}${cells}</div></div>`;
+}
 function actionArea(){
   if(mode==="home"){
     const PLAY='<path d="M8 5l11 7-11 7z" fill="currentColor" stroke="none"/>';
@@ -1335,7 +1370,9 @@ function actionArea(){
     // Favorite-team cards: quick "Start" + manage, with record at a glance.
     const favs=DB.teams.filter(t=>t.fav), list=favs.length?favs:DB.teams;
     const card=t=>{const rec=`${t.record.w}-${t.record.l}${t.record.t?"-"+t.record.t:""}`;const games=t.record.w+t.record.l+t.record.t;
+      const unread=teamHasUnread(t);
       return `<div data-act="opent" data-arg="${t.id}" style="position:relative;background:${T.surface};border:2px solid ${t.color};border-left:7px solid ${t.color};border-radius:14px;padding:14px;box-shadow:0 0 0 1px rgba(0,0,0,.35), 0 8px 20px rgba(0,0,0,.4);cursor:pointer">
+          ${unread?`<span title="New chat messages" style="position:absolute;top:11px;left:11px;display:flex;align-items:center;gap:5px;background:${T.amber};color:${T.field};border-radius:999px;padding:3px 9px;font-family:${MONO};font-weight:800;font-size:11px;letter-spacing:.4px">💬 NEW</span>`:""}
           ${(window.cloudIsScorer&&window.cloudIsScorer(t))?"":`<button data-act="favteam" data-arg="${t.id}" title="Follow this team" style="position:absolute;top:9px;right:11px;background:none;border:none;color:${t.fav?T.amber:T.sageDim};font-size:24px;line-height:1;padding:0;cursor:pointer">${t.fav?"★":"☆"}</button>`}
           <div style="font-family:${MONO};font-size:23px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:30px">${t.name}</div>
           <div style="display:flex;align-items:center;gap:10px;margin-top:7px;font-family:${MONO};font-size:18px;color:${T.sage}">
@@ -1372,8 +1409,9 @@ function actionArea(){
     const showTeams=true;   // always show My Teams on home (local teams cache; cloud merges when signed in)
     const authBar = (C&&C.enabled)
       ? (C.user
-          ? `<div style="flex:none;display:flex;align-items:center;justify-content:center;gap:10px;font-size:13px;color:${T.sage}">
+          ? `<div style="flex:none;display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;font-size:13px;color:${T.sage}">
                <span>Signed in as <b style="color:${T.chalk}">${(C.user.email||"account").replace(/</g,"")}</b></span>
+               <button data-act="opendirectory" style="background:${T.surface};border:1px solid ${T.line};color:${T.lime};border-radius:8px;padding:6px 12px;font-weight:800;font-size:12px">🔎 Browse teams</button>
                <button data-act="signout" style="background:${T.surface};border:1px solid ${T.line};color:${T.chalk};border-radius:8px;padding:6px 12px;font-weight:800;font-size:12px">Sign out</button></div>`
           : `<div style="flex:none;display:flex;flex-direction:column;align-items:center;gap:9px">
                ${`<button data-act="signingoogle" style="display:flex;align-items:center;justify-content:center;gap:10px;background:#fff;color:#1f1f1f;border:1px solid #dadce0;border-radius:8px;padding:11px 18px;font-family:${SANS};font-weight:700;font-size:14px;min-width:240px">
@@ -1472,9 +1510,12 @@ function actionArea(){
           <button data-act="schedrm" data-arg="${s.id}" style="background:none;border:1px solid ${T.line};color:${T.out};border-radius:7px;padding:7px 9px;font-weight:800">&times;</button></div>`;}).join("");
     const fLbl=`font-size:10px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:${T.sageDim};margin:0 2px 3px`;
     const fld=(lbl,inner)=>`<div style="flex:1;min-width:120px;display:flex;flex-direction:column">${lbl?`<div style="${fLbl}">${lbl}</div>`:""}${inner}</div>`;
+    const svBtn=(v,lbl)=>`<button data-act="schview" data-arg="${v}" style="flex:1;background:${scheduleView===v?T.lime:T.surface2};color:${scheduleView===v?T.field:T.sage};border:1px solid ${scheduleView===v?T.lime:T.line};border-radius:8px;padding:8px 0;font-weight:800;font-size:12px;letter-spacing:.4px">${lbl}</button>`;
     const scheduleSection=`<div style="background:${T.surface};border:1px solid ${T.line};border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:8px">
-        <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime}">Schedule — games &amp; practices</div>
-        ${schedRows||`<div style="font-size:12px;color:${T.sageDim}">Nothing scheduled yet.</div>`}
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+          <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime}">Schedule — games &amp; practices</div></div>
+        <div style="display:flex;gap:6px">${svBtn("list","☰ List")}${svBtn("calendar","▦ Calendar")}</div>
+        ${scheduleView==="calendar" ? calendarHtml(t) : (schedRows||`<div style="font-size:12px;color:${T.sageDim}">Nothing scheduled yet.</div>`)}
         <div style="font-size:11px;color:${T.sage};margin-top:4px">Add a game or practice:</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           ${fld("Type",`<select id="schType" style="${cell}"><option value="game">Game</option><option value="practice">Practice</option></select>`)}
@@ -1485,7 +1526,7 @@ function actionArea(){
         ${fld("Notes (optional)",`<input id="schNotes" placeholder="e.g. arrive 45 min early, white jerseys" style="${cell}">`)}
         <button data-act="schedadd" style="${bigBtn(T.lime,'',T.field)};margin-top:4px">+ Add to schedule</button></div>`;
     // Per-team league rules URL. Only the owner can edit it; scorers/followers see it read-only.
-    const canEditRules = !(window.Cloud&&window.Cloud.enabled&&window.Cloud.user) || (window.cloudIsOwner&&window.cloudIsOwner(t));
+    const canEditRules = !(window.Cloud&&window.Cloud.enabled&&window.Cloud.user) || (window.cloudCanManage&&window.cloudCanManage(t));
     const rulesSection=`<div style="background:${T.surface};border:1px solid ${T.line};border-radius:10px;padding:12px 14px">
         <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin-bottom:8px">League rulebook</div>
         <div style="display:flex;gap:8px;align-items:center">
@@ -1497,6 +1538,7 @@ function actionArea(){
     // Team access (cloud) — owner + authorized scorers. Only when signed in.
     const C=window.Cloud, signedIn=!!(C&&C.enabled&&C.user);
     const owner=signedIn && typeof window.cloudIsOwner==="function" && window.cloudIsOwner(t);
+    const canManage=signedIn && typeof window.cloudCanManage==="function" && window.cloudCanManage(t);
     const scorersSection = !(C&&C.enabled) ? ""
       : !signedIn ? `<div style="background:${T.surface};border:1px solid ${T.line};border-radius:10px;padding:12px 14px">
           <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin-bottom:6px">Team access — authorized scorers</div>
@@ -1504,9 +1546,13 @@ function actionArea(){
       : `<div style="background:${T.surface};border:1px solid ${T.line};border-radius:10px;padding:12px 14px">
         <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin-bottom:6px">Team access — authorized scorers</div>
         <div style="font-size:13px;color:${T.sage};margin-bottom:6px">Owner: <b style="color:${T.chalk};word-break:break-all">${(t.ownerEmail||C.user.email||"you").replace(/</g,"")}</b></div>
-        ${(t.scorers&&t.scorers.length)?t.scorers.map(s=>`<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 0;border-top:1px solid ${T.line}"><span style="font-size:13px;color:${T.chalk};word-break:break-all">${s.replace(/</g,"")}</span>${owner?`<button data-act="rmscorer" data-arg="${s}" style="background:none;border:1px solid ${T.line};color:${T.out};border-radius:7px;padding:5px 10px;font-weight:800;font-size:12px">Remove</button>`:""}</div>`).join(""):`<div style="font-size:12px;color:${T.sageDim};padding:4px 0">No authorized scorers yet.</div>`}
-        ${owner?`<div style="display:flex;gap:8px;margin-top:10px"><input id="inviteWho" type="text" autocomplete="off" autocapitalize="off" placeholder="Email or phone number" style="${cell};flex:1;min-width:0"><button data-act="inviteadd" style="background:${T.lime};color:${T.field};border:none;border-radius:8px;padding:9px 16px;font-weight:800;font-size:13px">Invite</button></div>
-          <div style="font-size:11px;color:${T.sageDim};margin-top:6px">Enter an <b style="color:${T.sage}">email</b> to authorize a scorer, or a <b style="color:${T.sage}">phone number</b> to text them a join link. Either way they sign in once and they're in.</div>`:`<div style="font-size:11px;color:${T.sageDim};margin-top:6px">Only the owner can add scorers.</div>`}</div>`;
+        <div style="font-size:11px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:${T.sage};margin:6px 0 2px">Co-owners — full management access</div>
+        ${(t.coOwners&&t.coOwners.length)?t.coOwners.map(co=>`<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 0;border-top:1px solid ${T.line}"><span style="font-size:13px;color:${T.chalk};word-break:break-all">★ ${co.replace(/</g,"")}</span>${owner?`<button data-act="rmcoowner" data-arg="${co}" style="background:none;border:1px solid ${T.line};color:${T.out};border-radius:7px;padding:5px 10px;font-weight:800;font-size:12px">Remove</button>`:""}</div>`).join(""):`<div style="font-size:12px;color:${T.sageDim};padding:2px 0">No co-owners. A co-owner can manage the roster, schedule, scorers &amp; settings — but only you can delete the team or change co-owners.</div>`}
+        ${owner?`<div style="display:flex;gap:8px;margin:8px 0 4px"><input id="coOwnerWho" type="email" autocomplete="off" autocapitalize="off" placeholder="Co-owner email" style="${cell};flex:1;min-width:0"><button data-act="addcoowner" style="background:${T.surface2};color:${T.lime};border:1px solid ${T.line};border-radius:8px;padding:9px 16px;font-weight:800;font-size:13px">Add</button></div>`:""}
+        <div style="font-size:11px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:${T.sage};margin:8px 0 2px">Authorized scorers</div>
+        ${(t.scorers&&t.scorers.length)?t.scorers.map(s=>`<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 0;border-top:1px solid ${T.line}"><span style="font-size:13px;color:${T.chalk};word-break:break-all">${s.replace(/</g,"")}</span>${canManage?`<button data-act="rmscorer" data-arg="${s}" style="background:none;border:1px solid ${T.line};color:${T.out};border-radius:7px;padding:5px 10px;font-weight:800;font-size:12px">Remove</button>`:""}</div>`).join(""):`<div style="font-size:12px;color:${T.sageDim};padding:4px 0">No authorized scorers yet.</div>`}
+        ${canManage?`<div style="display:flex;gap:8px;margin-top:10px"><input id="inviteWho" type="text" autocomplete="off" autocapitalize="off" placeholder="Email or phone number" style="${cell};flex:1;min-width:0">${(window.AllStars&&window.AllStars.pickContact)?`<button data-act="pickcontact" title="Pick from contacts" style="background:${T.surface2};color:${T.lime};border:1px solid ${T.line};border-radius:8px;padding:9px 13px;font-size:16px">📇</button>`:""}<button data-act="inviteadd" style="background:${T.lime};color:${T.field};border:none;border-radius:8px;padding:9px 16px;font-weight:800;font-size:13px">Invite</button></div>
+          <div style="font-size:11px;color:${T.sageDim};margin-top:6px">Enter an <b style="color:${T.sage}">email</b> to authorize a scorer, or a <b style="color:${T.sage}">phone number</b> to text them a join link. Either way they sign in once and they're in.</div>`:`<div style="font-size:11px;color:${T.sageDim};margin-top:6px">Only the owner or a co-owner can add scorers.</div>`}</div>`;
     // Owner-only discovery toggles (public team directory + public stats).
     const toggleRow=(act,on,label,sub)=>`<button data-act="${act}" style="display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;background:${T.surface};border:1px solid ${T.line};border-radius:10px;padding:12px 14px;text-align:left;cursor:pointer">
         <div style="flex:1;min-width:0"><div style="font-weight:800;color:${T.ink};font-size:14px">${label}</div><div style="font-size:11px;color:${T.sageDim};margin-top:2px;line-height:1.35">${sub}</div></div>
@@ -1565,11 +1611,18 @@ function actionArea(){
       </div>`;
   }
   if(mode==="pickteam"){
-    const cards=DB.teams.map(t=>`<button data-act="setteam" data-arg="${t.id}" style="display:flex;align-items:center;gap:12px;background:${T.surface};border:1px solid ${T.line};border-left:5px solid ${t.color};border-radius:10px;padding:12px 14px;text-align:left;width:100%">
+    const sortedTeams=DB.teams.slice().sort((a,b)=>((a.name||"").toLowerCase()<(b.name||"").toLowerCase()?-1:1));
+    const cards=sortedTeams.map(t=>`<button data-act="setteam" data-arg="${t.id}" data-tname="${(t.name||'').toLowerCase().replace(/"/g,'&quot;')}" style="display:flex;align-items:center;gap:12px;background:${T.surface};border:1px solid ${T.line};border-left:5px solid ${t.color};border-radius:10px;padding:12px 14px;text-align:left;width:100%">
         <div style="flex:1;min-width:0"><div style="font-family:${MONO};font-size:17px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.name}</div>
           <div style="font-size:11px;color:${T.sage};margin-top:2px">${t.players.length} players</div></div>
         <span style="color:${t.color};font-weight:800;font-size:12px">PICK &rsaquo;</span></button>`).join("")
       ||`<div style="color:${T.sage};font-size:13px;text-align:center;padding:16px 8px;border:1px dashed ${T.line};border-radius:10px">No saved teams yet — create one below.</div>`;
+    // Type-to-filter the saved-team list (alphabetical, live). Recent opponents = quick re-picks.
+    const filterInput = sortedTeams.length>3 ? `<input oninput="window._oppFilter(this.value)" placeholder="Type to filter teams…" autocomplete="off" style="background:${T.surface2};border:1px solid ${T.line};color:${T.ink};border-radius:8px;padding:10px 12px;font-size:14px;outline:none;width:100%;box-sizing:border-box">` : "";
+    const recent = (pickFor==="opp") ? getRecentOpps() : [];
+    const recentBlock = recent.length ? `<div style="border-bottom:1px solid ${T.line};margin-bottom:4px;padding-bottom:10px">
+        <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin-bottom:6px">Recent opponents</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">${recent.map((o,i)=>`<button data-act="setrecentopp" data-arg="${i}" style="background:${T.surface};border:1px solid ${T.line};border-left:4px solid ${o.color||T.out};color:${T.ink};border-radius:8px;padding:8px 12px;font-family:${MONO};font-weight:800;font-size:13px">${(o.name||'').replace(/</g,'&lt;')}</button>`).join("")}</div></div>` : "";
     // Public team directory search (opponent only; needs sign-in). Find a public team by name and
     // use it as the opponent for this game.
     const C2=window.Cloud, canSearch=!!(C2&&C2.enabled&&C2.user);
@@ -1583,12 +1636,51 @@ function actionArea(){
         <div style="display:flex;gap:8px"><input id="finderQ" placeholder="Search team name" value="${(window._finderQ||'').replace(/"/g,'&quot;')}" style="${inpCss};flex:1;min-width:0"><button data-act="findteams" style="background:${T.lime};color:${T.field};border:none;border-radius:8px;padding:9px 16px;font-weight:800;font-size:13px">Search</button></div>
         ${finderResults!==null?(finderResults.length?finderResults.map(resCard).join(""):`<div style="font-size:12px;color:${T.sageDim};margin-top:8px">No public teams match that name.</div>`):""}
       </div>` : "";
-    return step(`Choose ${pickFor==="our"?"your team":"the opponent"}`,"Pick a saved team, search the directory, or create a new one.",
-      `<div style="display:flex;flex-direction:column;gap:8px">${cards}
+    return step(`Choose ${pickFor==="our"?"your team":"the opponent"}`,"Pick a saved team, a recent opponent, search the directory, or create one.",
+      `<div style="display:flex;flex-direction:column;gap:8px">${recentBlock}${filterInput}${cards}
         <button data-act="newteampick" style="${ghost}">+ New team</button>
         ${pickFor==="opp"?`<button data-act="oppnoroster" style="${ghost}">Unnamed opponent (no roster)</button>`:""}
         ${searchBlock}
         <button data-act="ngback" style="${ghost}">&lsaquo; Back</button></div>`);
+  }
+  if(mode==="directory"){
+    const inpCss=`background:${T.surface2};border:1px solid ${T.line};color:${T.ink};border-radius:8px;padding:10px 12px;font-size:14px;outline:none`;
+    const dcard=(r)=>`<div style="display:flex;align-items:center;gap:10px;background:${T.surface};border:1px solid ${T.line};border-left:5px solid ${r.color};border-radius:10px;padding:10px 12px">
+        <div style="flex:1;min-width:0"><div style="font-family:${MONO};font-size:16px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${(r.name||'').replace(/</g,'&lt;')}</div>
+          <div style="font-size:11px;color:${T.sage};margin-top:2px">${r.players} players${r.statsPublic?` &middot; ${r.record.w}-${r.record.l}${r.record.t?'-'+r.record.t:''}`:''}</div></div>
+        <button data-act="viewteamstats" data-arg="${r.id}" style="background:${T.lime};color:${T.field};border:none;border-radius:8px;padding:8px 13px;font-weight:800;font-size:12px">View &rsaquo;</button></div>`;
+    const results = dirResults!==null
+      ? (dirResults.length?dirResults.map(dcard).join(""):`<div style="font-size:12px;color:${T.sageDim};text-align:center;padding:12px">No public teams match that name.</div>`)
+      : `<div style="font-size:12px;color:${T.sageDim};text-align:center;padding:12px;border:1px dashed ${T.line};border-radius:10px">Search to view any public team's roster &amp; season stats.</div>`;
+    return step("Find a team","Browse teams that have opted to be public.",
+      `<div style="display:flex;flex-direction:column;gap:8px">
+          <div style="display:flex;gap:8px"><input id="dirQ" placeholder="Search team name" value="${(window._dirQ||'').replace(/"/g,'&quot;')}" autocomplete="off" style="${inpCss};flex:1;min-width:0"><button data-act="dirsearch" style="background:${T.lime};color:${T.field};border:none;border-radius:8px;padding:9px 16px;font-weight:800;font-size:13px">Search</button></div>
+          ${results}
+          <button data-act="gohome" style="${ghost}">&lsaquo; Back</button></div>`);
+  }
+  if(mode==="teamstats"){
+    const vt=viewTeam;
+    if(!vt) return step("Team stats","",`<div style="font-size:13px;color:${T.sage};padding:8px">Couldn't load that team — it may no longer be public.</div><button data-act="opendirectory" style="${ghost}">&lsaquo; Back to search</button>`);
+    const rec=vt.record||{w:0,l:0,t:0}, players=vt.players||[], season=vt.season||{}, sp=!!vt.statsPublic;
+    const recLine=`${rec.w}-${rec.l}${rec.t?"-"+rec.t:""}`;
+    const head=`<div class="frost-card" style="background:${T.surface};border:1px solid ${T.line};border-left:6px solid ${vt.color||T.lime};border-radius:14px;padding:14px 16px">
+        <div style="font-family:${MONO};font-size:24px;font-weight:800;color:${T.ink}">${(vt.name||'Team').replace(/</g,'&lt;')}</div>
+        <div style="display:flex;align-items:center;gap:10px;margin-top:6px;font-family:${MONO};font-size:17px;color:${T.sage}">
+          <span style="font-weight:800;color:${vt.color||T.lime}">${recLine}</span><span style="opacity:.45">&middot;</span><span>${players.length} players</span></div></div>`;
+    const roster=`<div style="background:${T.surface};border:1px solid ${T.line};border-radius:12px;padding:12px 14px">
+        <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin-bottom:8px">Roster</div>
+        ${players.length?`<div style="display:flex;flex-wrap:wrap;gap:6px">${players.map(p=>`<span style="background:${T.surface2};border:1px solid ${T.line};border-radius:8px;padding:6px 10px;font-family:${MONO};font-size:13px;font-weight:700;color:${T.chalk}">#${p.num||"–"} ${(p.name||'').replace(/</g,'&lt;')}</span>`).join("")}</div>`:`<div style="font-size:12px;color:${T.sageDim}">No roster shared.</div>`}</div>`;
+    let statBlock;
+    if(sp){
+      const rows=players.map(p=>{const s=(season[p.id]||{}).bat||{};const ab=s.ab||0,h=s.h||0;const avg=ab?(h/ab).toFixed(3).replace(/^0/,""):"—";
+        return `<tr style="border-top:1px solid ${T.line}"><td style="text-align:left;padding:9px 8px;font-weight:700;white-space:nowrap">#${p.num} ${(p.name||'').replace(/</g,'&lt;')}</td><td style="padding:9px 6px">${ab}</td><td style="padding:9px 6px">${s.r||0}</td><td style="padding:9px 6px">${h}</td><td style="padding:9px 6px">${s.rbi||0}</td><td style="padding:9px 6px">${s.bb||0}</td><td style="padding:9px 6px">${s.k||0}</td><td style="padding:9px 6px;font-weight:800">${avg}</td></tr>`;}).join("");
+      statBlock=`<div style="background:${T.surface};border:1px solid ${T.line};border-radius:12px;padding:12px 14px"><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-family:${MONO};font-size:15px;color:${T.chalk};text-align:center">
+          <thead><tr style="color:${T.sageDim};font-size:12px;letter-spacing:.5px"><th style="text-align:left;padding:0 8px 6px">SEASON &middot; BATTING</th><th>AB</th><th>R</th><th>H</th><th>RBI</th><th>BB</th><th>K</th><th>AVG</th></tr></thead>
+          <tbody>${rows||`<tr><td colspan="8" style="padding:8px;color:${T.sageDim}">No stats yet.</td></tr>`}</tbody></table></div></div>`;
+    } else {
+      statBlock=`<div style="font-size:12px;color:${T.sageDim};text-align:center;padding:14px;border:1px dashed ${T.line};border-radius:12px">This team keeps its season stats private.</div>`;
+    }
+    return step("Team stats","",`<div style="display:flex;flex-direction:column;gap:12px">${head}${roster}${statBlock}<button data-act="opendirectory" style="${ghost}">&lsaquo; Back to search</button></div>`);
   }
   if(mode==="settings"){
     const C=window.Cloud, signedIn=!!(C&&C.enabled&&C.user);
@@ -1987,7 +2079,7 @@ function render(){
     return;
   }
   renderToolbar();
-  const menu=(mode==="home"||mode==="teams"||mode==="team"||mode==="pickteam"||mode==="newgame"||mode==="lineup"||mode==="pickplayer"||mode==="pickpos"||mode==="editplayer"||mode==="summary"||mode==="settings");
+  const menu=(mode==="home"||mode==="teams"||mode==="team"||mode==="pickteam"||mode==="newgame"||mode==="lineup"||mode==="pickplayer"||mode==="pickpos"||mode==="editplayer"||mode==="summary"||mode==="settings"||mode==="directory"||mode==="teamstats");
   if(IS_APP&&window.AllStars.setInGame){ try{ AllStars.setInGame(!menu); }catch(e){} }   // hide native tabs during a game
   // Push the live score to the native compositor so it's burned into the broadcast.
   if(IS_APP&&!menu&&window.AllStars.setScore){ try{
@@ -2212,6 +2304,8 @@ document.getElementById("app").addEventListener("click",e=>{
   if(act==="alertsilence"){ if(activeAlert)dismissedAlerts.add(activeAlert.key); activeAlert=null; render(); return; }
   if(act==="schedadd"){ const t=teamById(openTeamId); if(!t)return; const g=id=>{const e=document.getElementById(id);return e?(e.value||""):"";}; const date=g("schDate"); if(!date){flash("Pick a date");return;} const _sel=g("schOppSel"); const opp=(_sel==="__new__"?g("schOppNew"):_sel).trim(); if(!Array.isArray(t.schedule))t.schedule=[]; t.schedule.push({id:"s"+Date.now().toString(36),type:g("schType")||"game",date:date,time:g("schTime"),opp:opp,loc:g("schLoc").trim(),notes:g("schNotes").trim()}); saveDB(); render(); return; }
   if(act==="schedrm"){ const t=teamById(openTeamId); if(t&&Array.isArray(t.schedule)){ t.schedule=t.schedule.filter(s=>s.id!==arg); saveDB(); render(); } return; }
+  if(act==="schview"){ scheduleView=(arg==="calendar"?"calendar":"list"); try{localStorage.setItem("al-sched-view",scheduleView);}catch(e){} render(); return; }
+  if(act==="calprev"||act==="calnext"){ if(!calYM){const d=new Date();calYM={y:d.getFullYear(),m:d.getMonth()};} let mm=calYM.m+(act==="calnext"?1:-1),yy=calYM.y; if(mm<0){mm=11;yy--;} else if(mm>11){mm=0;yy++;} calYM={y:yy,m:mm}; render(); return; }
   if(act==="invitewatch"){ openShare(); return; }
   if(act==="teamchat"){ openChat(openTeamId); return; }
   if(act==="closechat"){ closeChat(); return; }
@@ -2237,6 +2331,9 @@ document.getElementById("app").addEventListener("click",e=>{
     confirmAct={title:"Invite to "+team, msg:msg, yes:"Copy link", run:function(){ try{ if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(url); }catch(e){} flash("Link copied — paste it into a text or email"); }};
     render(); return; }
   if(act==="rmscorer"){ if(window.cloudRemoveScorer)window.cloudRemoveScorer(openTeamId,arg); return; }
+  if(act==="pickcontact"){ try{ if(window.AllStars&&window.AllStars.pickContact)window.AllStars.pickContact(); }catch(e){} return; }
+  if(act==="addcoowner"){ const e=document.getElementById("coOwnerWho"); if(!e)return; const v=(e.value||"").trim().toLowerCase(); if(v.indexOf("@")<0){flash("Enter a valid email");return;} const t=teamById(openTeamId); if(t){ if(!Array.isArray(t.coOwners))t.coOwners=[]; if(t.coOwners.indexOf(v)<0)t.coOwners.push(v); } if(window.cloudAddCoOwner)window.cloudAddCoOwner(openTeamId,v); e.value=""; flash(v+" is now a co-owner"); render(); return; }
+  if(act==="rmcoowner"){ const t=teamById(openTeamId); if(t&&Array.isArray(t.coOwners)){ t.coOwners=t.coOwners.filter(x=>x!==arg); } if(window.cloudRemoveCoOwner)window.cloudRemoveCoOwner(openTeamId,arg); render(); return; }
   if(act==="lineupback"){ mode=gameActive?"idle":"home"; render(); return; }
   if(act==="openrules"){ const _t=teamById(openTeamId); const _u=_t&&_t.rulesUrl; if(_u){ if(IS_APP&&window.AllStars&&window.AllStars.openExternal)AllStars.openExternal(_u); else window.open(_u,"_blank","noopener"); } return; }
   if(act==="exportteam"){ if(window.exportTeam)window.exportTeam(openTeamId); return; }
@@ -2333,8 +2430,12 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="pickour"){pickFor="our";mode="pickteam";render();}
   else if(act==="pickopp"){pickFor="opp";finderResults=null;window._finderQ="";mode="pickteam";render();}
   else if(act==="findteams"){ const e=document.getElementById("finderQ"); const q=e?(e.value||"").trim():""; window._finderQ=q; if(!window.cloudSearchTeams){flash("Search needs sign-in");return;} flash("Searching…"); window.cloudSearchTeams(q).then(function(res){ finderResults=res||[]; render(); }); }
-  else if(act==="setpubopp"){ const r=finderResults&&finderResults[+arg]; if(r){ oppTeamId=r.id; OPP.name=r.name; OPP.short=r.short||(r.name||"OPP").slice(0,3).toUpperCase(); OPP.color=r.color; } finderResults=null; mode="newgame"; render(); broadcast(); }
-  else if(act==="setteam"){const id=arg;if(pickFor==="our"){selectTeam(id);}else{const t=teamById(id);oppTeamId=id;if(t){OPP.name=t.name;OPP.short=t.short;OPP.color=t.color;}}mode="newgame";render();broadcast();}
+  else if(act==="opendirectory"){ if(!(window.Cloud&&window.Cloud.enabled&&window.Cloud.user)){flash("Sign in to browse teams");return;} mode="directory"; render(); }
+  else if(act==="dirsearch"){ const e=document.getElementById("dirQ"); const q=e?(e.value||"").trim():""; window._dirQ=q; if(!window.cloudSearchTeams){flash("Search needs sign-in");return;} flash("Searching…"); window.cloudSearchTeams(q).then(function(res){ dirResults=res||[]; render(); }); }
+  else if(act==="viewteamstats"){ if(!window.cloudGetTeam){flash("Sign in to view");return;} flash("Loading…"); window.cloudGetTeam(arg).then(function(t){ viewTeam=t; mode="teamstats"; render(); }); }
+  else if(act==="setpubopp"){ const r=finderResults&&finderResults[+arg]; if(r){ oppTeamId=r.id; OPP.name=r.name; OPP.short=r.short||(r.name||"OPP").slice(0,3).toUpperCase(); OPP.color=r.color; recordRecentOpp(OPP); } finderResults=null; mode="newgame"; render(); broadcast(); }
+  else if(act==="setrecentopp"){ const o=getRecentOpps()[+arg]; if(o){ oppTeamId=null; OPP.name=o.name; OPP.short=o.short||(o.name||"OPP").slice(0,3).toUpperCase(); OPP.color=o.color||"#E2574C"; recordRecentOpp(OPP); } mode="newgame"; render(); broadcast(); }
+  else if(act==="setteam"){const id=arg;if(pickFor==="our"){selectTeam(id);}else{const t=teamById(id);oppTeamId=id;if(t){OPP.name=t.name;OPP.short=t.short;OPP.color=t.color;recordRecentOpp(OPP);}}mode="newgame";render();broadcast();}
   else if(act==="newteampick"){const t=newTeam("");if(pickFor==="our"){selectTeam(t.id);}else{oppTeamId=t.id;OPP.name=t.name;OPP.short=t.short;OPP.color=t.color;}mode="newgame";render();broadcast();}
   else if(act==="oppnoroster"){oppTeamId=null;OPP.name="Opponent";OPP.short="OPP";OPP.color="#E2574C";mode="newgame";render();broadcast();}
   else if(act==="ngback"){mode="newgame";render();}
@@ -2432,6 +2533,7 @@ function openChat(teamId){
   if(!C.user){ flash("Sign in to use team chat"); return; }
   if(!teamId) return;
   chatTeamId=teamId; chatMsgs=[];
+  markSeenChat(teamId);   // opening chat clears the home "NEW" badge for this team
   const t=teamById(teamId); const title=document.getElementById("chatTitle"); if(title)title.textContent=((t&&t.name)?t.name:"Team")+" chat";
   document.getElementById("chatmodal").style.display="flex";
   renderChatList();
@@ -2439,11 +2541,12 @@ function openChat(teamId){
   chatUnsub=window.cloudSubscribeMessages(teamId,function(msgs,err){
     if(err){ const b=document.getElementById("chatList"); if(b)b.innerHTML=`<div style="color:#E2574C;font-size:13px;text-align:center;margin:auto;line-height:1.5">Couldn't load chat.<br>The team owner may still need to publish the chat rules.</div>`; return; }
     chatMsgs=msgs||[]; renderChatList();
+    if(chatTeamId===teamId) markSeenChat(teamId);   // chat is open → keep "seen" current (incl. own sends)
   });
   const inp=document.getElementById("chatInput"); const can=chatCanPost();
   if(inp){ inp.disabled=!can; inp.placeholder=can?"Message…":"Read-only — follow this team to post"; if(can)setTimeout(()=>{try{inp.focus();}catch(e){}},60); }
 }
-function closeChat(){ if(chatUnsub){try{chatUnsub();}catch(e){}chatUnsub=null;} const m=document.getElementById("chatmodal"); if(m)m.style.display="none"; chatTeamId=null; }
+function closeChat(){ if(chatUnsub){try{chatUnsub();}catch(e){}chatUnsub=null;} const m=document.getElementById("chatmodal"); if(m)m.style.display="none"; chatTeamId=null; if(mode==="home"){try{render();}catch(e){}} }
 function sendChat(){ const inp=document.getElementById("chatInput"); if(!inp)return; const v=(inp.value||"").trim(); if(!v)return; if(!chatCanPost()){flash("You can't post here");return;} window.cloudSendMessage(chatTeamId,v); inp.value=""; }
 (function(){ const cm=document.getElementById("chatmodal"); if(cm)cm.addEventListener("click",e=>{ if(e.target.id==="chatmodal")closeChat(); });
   const ci=document.getElementById("chatInput"); if(ci)ci.addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); sendChat(); } }); })();   // sign-in → sync teams, claim texted invite, repaint
@@ -2624,7 +2727,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v72";
+var APP_VERSION="v73";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
