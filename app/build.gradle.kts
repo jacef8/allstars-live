@@ -8,7 +8,7 @@ android {
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.libertyclerk.allstarslive"
+        applicationId = "com.libertyclerk.allstarslive.app"   // unique install id (avoids an OAuth package+SHA-1 conflict in another project); code namespace stays the same
         minSdk = 26
         targetSdk = 34
         versionCode = 1
