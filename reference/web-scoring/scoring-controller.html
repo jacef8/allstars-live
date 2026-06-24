@@ -1517,7 +1517,7 @@ function actionArea(){
         ${toggleRow("togglestatspublic",!!t.statsPublic,"Public season stats","Let people who find your team also see its season stats.")}
       </div>` : "";
     // ----- section sub-pages (reached from the hub grid); each has a back-to-hub header -----
-    const secHdr=(title)=>`<div style="display:flex;align-items:center;gap:10px">
+    const secHdr=(title)=>`<div class="frost-card" style="display:flex;align-items:center;gap:10px;background:${T.surface};border:1px solid ${T.line};border-radius:14px;padding:12px 14px">
         <button data-act="teamhub" style="${ghost};padding:9px 11px">&lsaquo; ${(t.name||"Team").replace(/</g,"")}</button>
         <div style="font-family:${MONO};font-size:20px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:${T.lime}">${title}</div></div>`;
     if(teamTab==="roster"){
@@ -1543,7 +1543,7 @@ function actionArea(){
     const rec=`${t.record.w}-${t.record.l}${t.record.t?"-"+t.record.t:""}`;
     const hb=(arg,icon,label)=>`<button data-act="teamtab" data-arg="${arg}" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;background:${T.surface};border:1px solid ${T.line};border-radius:14px;padding:18px 10px;min-height:96px;cursor:pointer"><span style="font-size:26px">${icon}</span><span style="font-weight:800;color:${T.ink};font-size:15px;text-align:center;line-height:1.2">${label}</span></button>`;
     return `<div style="display:flex;flex-direction:column;gap:12px">
-        <div style="display:flex;align-items:center;gap:10px">
+        <div class="frost-card" style="display:flex;align-items:center;gap:10px;background:${T.surface};border:1px solid ${T.line};border-radius:14px;padding:12px 14px">
           <button data-act="teamsback" style="${ghost};padding:9px 11px">&lsaquo; Teams</button>
           <div style="flex:1;min-width:0;border-left:5px solid ${t.color};padding-left:10px">
             <div style="font-family:${MONO};font-size:22px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${(t.name||"Team").replace(/</g,"")}</div>
@@ -2624,7 +2624,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v70";
+var APP_VERSION="v71";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
