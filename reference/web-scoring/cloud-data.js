@@ -50,6 +50,12 @@
       .update({ scorers: firebase.firestore.FieldValue.arrayUnion(email) })
       .catch(function (e) { try { alert("Couldn't add scorer: " + e.message); } catch (x) {} });
   };
+  // Delete the team in the cloud too (owner only, by rules) — otherwise onSnapshot re-adds it.
+  window.cloudDeleteTeam = function (teamId) {
+    var d = fdb(); if (!d || !teamId) return Promise.resolve();
+    return d.collection("teams").doc(teamId).delete()
+      .catch(function (e) { console.warn("cloudDeleteTeam:", e.message); });
+  };
   window.cloudRemoveScorer = function (teamId, email) {
     var d = fdb(); if (!d || !teamId) return Promise.resolve();
     return d.collection("teams").doc(teamId)
