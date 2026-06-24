@@ -181,7 +181,6 @@
   <div style="max-width:460px;width:100%;height:min(calc(var(--avh) * 82),660px);display:flex;flex-direction:column;background:#0E1420;border:1px solid #2A3650;border-radius:18px;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,.6)">
     <div style="display:flex;align-items:center;gap:8px;padding:13px 15px;border-bottom:1px solid #2A3650;flex:none">
       <div id="chatTitle" style="font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:19px;letter-spacing:.5px;color:#EAEDF2;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Team chat</div>
-      <button data-act="chatinvite" title="Invite parents to the chat" style="background:#1A2233;border:1px solid #2A3650;color:#A3E635;border-radius:8px;padding:7px 11px;font-weight:800;font-size:12px;cursor:pointer">&#43; Invite</button>
       <button data-act="closechat" style="background:#1A2233;border:1px solid #2A3650;color:#B7C2D6;border-radius:8px;padding:7px 11px;font-weight:700;font-size:13px;cursor:pointer">&times;</button>
     </div>
     <div id="chatList" style="flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px 14px;display:flex;flex-direction:column;gap:8px"></div>
@@ -269,6 +268,46 @@ function loadTeamLineup(t){ if(t&&t.lineup&&t.lineup.order&&t.lineup.order.lengt
 function downloadJSON(filename,obj){ try{ const blob=new Blob([JSON.stringify(obj,null,2)],{type:"application/json"}); const url=URL.createObjectURL(blob); const a=document.createElement("a"); a.href=url; a.download=filename; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>{try{URL.revokeObjectURL(url);}catch(e){}},1500); }catch(e){ try{alert("Export failed: "+e.message);}catch(x){} } }
 function pickJSON(onObj){ const inp=document.createElement("input"); inp.type="file"; inp.accept=".json,application/json"; inp.onchange=function(){ const f=inp.files&&inp.files[0]; if(!f)return; const r=new FileReader(); r.onload=function(){ try{ onObj(JSON.parse(r.result)); }catch(e){ try{alert("Couldn't read that file: "+e.message);}catch(x){} } }; r.readAsText(f); }; inp.click(); }
 window.exportTeam=function(id){ const t=teamById(id); if(!t)return; downloadJSON(((t.name||"team").replace(/[^a-z0-9]+/gi,"_"))+".allstars-team.json",{kind:"allstars-team",v:1,team:t}); };
+/* Printable "lineup card" — opens a clean print view (Save as PDF) with the team logo, color,
+ * record and a batting-order grid pre-filled with the roster + blank POS / innings to fill in. */
+function printLineupCard(t){
+  if(!t)return;
+  const esc=s=>(s==null?"":String(s)).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+  const R=teamRec(t), rec=`${R.w}-${R.l}${R.t?"-"+R.t:""}`;
+  const today=new Date().toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric",year:"numeric"});
+  const color=esc(t.color||"#2E6BE6");
+  const players=(t.players||[]).slice();
+  const total=Math.max(12,players.length);
+  let rows="";
+  for(let i=0;i<total;i++){ const p=players[i];
+    const pname=p?(p.name||((p.first||"")+" "+(p.last||"")).trim()):"";
+    rows+=`<tr><td class="ord">${i+1}</td><td class="num">${p?esc(p.num):""}</td><td class="nm">${esc(pname)}</td><td class="pos"></td><td class="bl"></td><td class="bl"></td><td class="bl"></td><td class="bl"></td><td class="bl"></td><td class="bl"></td></tr>`; }
+  const logo=t.logo?`<img src="${t.logo}" alt="">`:"";
+  const html='<!doctype html><html><head><meta charset="utf-8"><title>'+esc(t.name||"Team")+' — Lineup Card</title><style>'
+    +'*{box-sizing:border-box}body{margin:0;font-family:Arial,Helvetica,sans-serif;color:#0B0E13;padding:24px}'
+    +'.hd{display:flex;align-items:center;gap:16px;border-bottom:4px solid '+color+';padding-bottom:12px}'
+    +'.hd img{width:64px;height:64px;object-fit:contain}'
+    +'.hd .nm{font-size:30px;font-weight:800;letter-spacing:.5px}'
+    +'.hd .meta{margin-left:auto;text-align:right;font-size:13px;color:#444}'
+    +'.hd .rec{font-size:22px;font-weight:800;color:'+color+'}'
+    +'h2{font-size:14px;letter-spacing:1px;text-transform:uppercase;color:'+color+';margin:18px 0 6px}'
+    +'table{width:100%;border-collapse:collapse;font-size:14px}'
+    +'th,td{border:1px solid #c8ccd4;padding:8px 6px;text-align:center;height:30px}'
+    +'th{background:'+color+';color:#fff;font-size:11px;letter-spacing:.5px;text-transform:uppercase}'
+    +'td.nm{text-align:left;font-weight:700;width:34%}td.ord{width:36px;font-weight:800;color:'+color+'}td.num{width:42px}td.pos{width:54px}'
+    +'.ft{margin-top:14px;font-size:11px;color:#888;text-align:right}'
+    +'@media print{body{padding:0}@page{margin:14mm}}'
+    +'</style></head><body>'
+    +'<div class="hd">'+logo+'<div class="nm">'+esc(t.name||"Team")+'</div><div class="meta"><div class="rec">'+rec+'</div><div>'+esc(today)+'</div></div></div>'
+    +'<h2>Batting order</h2>'
+    +'<table><thead><tr><th>#</th><th>No.</th><th>Player</th><th>Pos</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th></tr></thead><tbody>'+rows+'</tbody></table>'
+    +'<div class="ft">All-Stars Live</div>'
+    +'<scr'+'ipt>window.onload=function(){setTimeout(function(){try{window.print();}catch(e){}},300);};</scr'+'ipt>'
+    +'</body></html>';
+  const w=window.open("","_blank");
+  if(!w){ flash("Allow pop-ups to open the lineup card"); return; }
+  w.document.open(); w.document.write(html); w.document.close();
+}
 window.importTeam=function(){ pickJSON(function(o){ const t=(o&&o.team&&o.team.players)?o.team:(o&&o.players?o:null); if(!t||!t.players){try{alert("That's not a team file.");}catch(e){} return;} t.id=nextId("t"); delete t.ownerUid; delete t.ownerEmail; delete t.scorers; (t.players||[]).forEach(ensureName); if(!t.record)t.record={w:0,l:0,t:0}; if(!t.season)t.season={}; DB.teams.push(t); saveDB(); openTeamId=t.id; mode="team"; render(); }); };
 window.exportGame=function(){ downloadJSON("game-"+((OUR.short||"home"))+"-vs-"+((OPP.short||"opp"))+".allstars-game.json",{kind:"allstars-game",v:1,G,OUR,OPP,curTeamId,oppTeamId}); };
 window.importGame=function(){ pickJSON(function(o){ if(!o||!o.G){try{alert("That's not a game file.");}catch(e){} return;} G=o.G; if(o.OUR)Object.assign(OUR,o.OUR); if(o.OPP)Object.assign(OPP,o.OPP); curTeamId=o.curTeamId||null; oppTeamId=o.oppTeamId||null; const t=curTeamId&&teamById(curTeamId); if(t)ROSTER=t.players; gameActive=true; resetUI(); render(); try{broadcast();}catch(e){} }); };
@@ -287,6 +326,10 @@ window.teamPLast=function(id,v){const t=teamById(openTeamId);if(!t)return;const 
 window.edTeamName=function(v){const t=teamById(openTeamId);if(!t)return;t.name=(v||"").trim()||"New Team";saveDB();};
 window.edTeamAbbr=function(v){const t=teamById(openTeamId);if(!t)return;t.short=(v||"").toUpperCase().slice(0,6)||"TM";saveDB();};
 window.edTeamRulesUrl=function(v){const t=teamById(openTeamId);if(!t)return;t.rulesUrl=(v||"").trim()||undefined;saveDB();};
+window.edTeamColor=function(v){const t=teamById(openTeamId);if(!t||!v)return;t.color=v;saveDB();render();};
+// Upload a team logo: downscale to <=240px on a canvas (keeps the synced team doc small),
+// store as a data URL on t.logo. Shows on team cards, the lineup card, etc.
+window.uploadTeamLogo=function(input){ try{ const f=input&&input.files&&input.files[0]; if(!f)return; const t=teamById(openTeamId); if(!t)return; if(f.size>8*1024*1024){flash("Image too large (max 8MB)");return;} const r=new FileReader(); r.onload=function(){ const img=new Image(); img.onload=function(){ try{ const max=240; let w=img.width,h=img.height; const sc=Math.min(1,max/Math.max(w,h)); w=Math.max(1,Math.round(w*sc)); h=Math.max(1,Math.round(h*sc)); const cv=document.createElement("canvas"); cv.width=w; cv.height=h; cv.getContext("2d").drawImage(img,0,0,w,h); t.logo=cv.toDataURL("image/png"); saveDB(); render(); flash("Logo updated"); }catch(e){ flash("Couldn't process that image"); } }; img.onerror=function(){ flash("Couldn't read that image"); }; img.src=r.result; }; r.readAsDataURL(f); }catch(e){} };
 const POSLIST=["P","C","1B","2B","3B","SS","LF","CF","RF"];
 const POSFULL={P:"Pitcher",C:"Catcher","1B":"First base","2B":"Second base","3B":"Third base",SS:"Shortstop",LF:"Left field",CF:"Center field",RF:"Right field"};
 const DESTNAME={1:"1st",2:"2nd",3:"3rd",4:"SCORED"};
@@ -511,13 +554,17 @@ const capReached=()=>G.runCap>0&&G.halfRuns>=G.runCap;
 function endInning(){snapshot();doFlip();resetUI();flash("Inning ended");render();broadcast();}
 /* Mark the game final (toggle) so the viewer shows its Final summary. Undoable. */
 function endGame(){snapshot();G.final=true;
-  if(curTeam()&&!G.rolledUp){rollupSeason();const t=curTeam(),o=ourRuns(),p=oppRuns();if(o>p)t.record.w++;else if(o<p)t.record.l++;else t.record.t++;
-    // Archive this game so it shows under the team's "Recent games" (final score, opponent, date).
+  if(curTeam()&&!G.rolledUp){rollupSeason();const t=curTeam(),o=ourRuns(),p=oppRuns();
+    // Archive this game (final score, opponent, date) — the W-L-T record is DERIVED from this
+    // log via teamRec(), so the record can never disagree with the games shown below it.
     if(!Array.isArray(t.games))t.games=[];
     t.games.unshift({id:"g"+Date.now().toString(36),date:new Date().toISOString().slice(0,10),opp:(OPP.name||"Opponent"),oppShort:OPP.short||"OPP",us:o,them:p,result:(o>p?"W":o<p?"L":"T")});
     if(t.games.length>100)t.games=t.games.slice(0,100);
+    t.record=teamRec(t);          // keep the stored/synced record in lockstep with the log
     saveDB();G.rolledUp=true;}
   resetUI();mode="summary";render();broadcast();}
+/* The team's W-L-T record, computed from its finished-game log so the two are always consistent. */
+function teamRec(t){const g=(t&&t.games)||[];let w=0,l=0,ti=0;for(const x of g){if(x.result==="W")w++;else if(x.result==="L")l++;else if(x.result==="T")ti++;}return {w:w,l:l,t:ti};}
 /* New Game: reset scores/innings/in-play state but keep the chosen rules, side, and lineup. */
 function startNewGame(){
   const keep={runCap:G.runCap,oppBatters:G.oppBatters,ourSide:G.ourSide,innings:G.innings,lineup:JSON.parse(JSON.stringify(G.lineup)),
@@ -1392,12 +1439,14 @@ function actionArea(){
 
     // Favorite-team cards: quick "Start" + manage, with record at a glance.
     const favs=DB.teams.filter(t=>t.fav), list=favs.length?favs:DB.teams;
-    const card=t=>{const rec=`${t.record.w}-${t.record.l}${t.record.t?"-"+t.record.t:""}`;const games=t.record.w+t.record.l+t.record.t;
+    const card=t=>{const R=teamRec(t);const rec=`${R.w}-${R.l}${R.t?"-"+R.t:""}`;const games=R.w+R.l+R.t;
       const unread=teamHasUnread(t);
       return `<div data-act="opent" data-arg="${t.id}" style="position:relative;background:${T.surface};border:2px solid ${t.color};border-left:7px solid ${t.color};border-radius:14px;padding:14px;box-shadow:0 0 0 1px rgba(0,0,0,.35), 0 8px 20px rgba(0,0,0,.4);cursor:pointer">
           ${unread?`<span title="New chat messages" style="position:absolute;top:11px;left:11px;display:flex;align-items:center;gap:5px;background:${T.amber};color:${T.field};border-radius:999px;padding:3px 9px;font-family:${MONO};font-weight:800;font-size:11px;letter-spacing:.4px">💬 NEW</span>`:""}
           ${(window.cloudIsScorer&&window.cloudIsScorer(t))?"":`<button data-act="favteam" data-arg="${t.id}" title="Follow this team" style="position:absolute;top:9px;right:11px;background:none;border:none;color:${t.fav?T.amber:T.sageDim};font-size:24px;line-height:1;padding:0;cursor:pointer">${t.fav?"★":"☆"}</button>`}
-          <div style="font-family:${MONO};font-size:23px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:30px">${t.name}</div>
+          <div style="display:flex;align-items:center;gap:10px;padding-right:30px">
+            ${t.logo?`<img src="${t.logo}" alt="" style="width:36px;height:36px;flex:none;border-radius:8px;object-fit:contain;background:#fff;box-shadow:0 0 0 1px ${T.line}">`:""}
+            <div style="font-family:${MONO};font-size:23px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0">${t.name}</div></div>
           <div style="display:flex;align-items:center;gap:10px;margin-top:7px;font-family:${MONO};font-size:18px;color:${T.sage}">
             <span style="font-weight:800;color:${t.color}">${rec}</span><span style="opacity:.45">·</span><span>${t.players.length} players</span></div>
           <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:14px;background:${t.color};color:#fff;border-radius:9px;padding:13px;font-family:${MONO};font-weight:800;font-size:16px;letter-spacing:.8px;pointer-events:none">${IC(GEAR)} MANAGE TEAM</div></div>`;};
@@ -1490,7 +1539,7 @@ function actionArea(){
   }
   if(mode==="teams"){
     const sorted=DB.teams.slice().sort((a,b)=>(b.fav?1:0)-(a.fav?1:0));
-    const cards=sorted.map(t=>{const rec=`${t.record.w}-${t.record.l}${t.record.t?"-"+t.record.t:""}`;
+    const cards=sorted.map(t=>{const R=teamRec(t);const rec=`${R.w}-${R.l}${R.t?"-"+R.t:""}`;
       return `<div style="display:flex;align-items:center;gap:8px;background:${T.surface};border:2px solid ${t.color};border-left:7px solid ${t.color};border-radius:12px;padding:11px 13px;box-shadow:0 6px 16px rgba(0,0,0,.35)">
         ${(window.cloudIsScorer&&window.cloudIsScorer(t))?"":`<button data-act="favteam" data-arg="${t.id}" title="Follow this team" style="background:none;border:none;color:${t.fav?T.amber:T.sageDim};font-size:25px;line-height:1;padding:2px 4px;cursor:pointer">${t.fav?"★":"☆"}</button>`}
         <button data-act="opent" data-arg="${t.id}" style="flex:1;min-width:0;display:flex;align-items:center;gap:10px;text-align:left;background:none;border:none;padding:6px 2px;cursor:pointer">
@@ -1533,16 +1582,15 @@ function actionArea(){
     const gamesBlock=`<div class="frost-card" style="background:${T.surface};border:1px solid ${T.line};border-radius:14px;padding:12px 16px">
         <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin-bottom:2px">Recent games</div>
         ${gamesList||`<div style="font-size:12px;color:${T.sageDim};padding:8px 0">No finished games yet — each game appears here once you end it.</div>`}</div>`;
-    // Editable W-L-T record — auto-updates when a game ends, but tappable here to correct it
-    // (e.g. clear test games, or fix a game that wasn't scored to the end).
-    const canEditRec = !(window.Cloud&&window.Cloud.enabled&&window.Cloud.user) || (window.cloudCanManage&&window.cloudCanManage(t));
-    const stp=(f,d,lbl)=>`<button data-act="recadj" data-arg="${f}:${d}" style="width:34px;height:34px;border-radius:9px;background:${T.surface2};border:1px solid ${T.line};color:${T.ink};font-weight:800;font-size:18px;line-height:1">${lbl}</button>`;
-    const recCell=(f,label)=>`<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:7px">
+    // Read-only W-L-T record, DERIVED from the finished-game log above — so it can never disagree
+    // with the games shown. (No manual editing: the record simply reflects the games played.)
+    const REC=teamRec(t);
+    const recCell=(v,label)=>`<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:5px">
         <div style="font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:${T.sageDim}">${label}</div>
-        <div style="display:flex;align-items:center;gap:10px">${canEditRec?stp(f,-1,"&minus;"):""}<span style="font-family:${MONO};font-size:26px;font-weight:800;color:${T.ink};min-width:30px;text-align:center">${t.record[f]||0}</span>${canEditRec?stp(f,1,"+"):""}</div></div>`;
+        <span style="font-family:${MONO};font-size:30px;font-weight:800;color:${T.ink}">${v}</span></div>`;
     const recEditor=`<div class="frost-card" style="background:${T.surface};border:1px solid ${T.line};border-radius:14px;padding:14px 16px">
-        <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin-bottom:10px">Record${canEditRec?" &mdash; tap to adjust":""}</div>
-        <div style="display:flex;gap:8px">${recCell("w","Wins")}${recCell("l","Losses")}${recCell("t","Ties")}</div></div>`;
+        <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin-bottom:10px">Record</div>
+        <div style="display:flex;gap:8px">${recCell(REC.w,"Wins")}${recCell(REC.l,"Losses")}${recCell(REC.t,"Ties")}</div></div>`;
     // Schedule — games & practices stored on the team (syncs to the cloud with the team).
     const fmtSched=(s)=>{ try{ const dt=new Date((s.date||"")+"T"+(s.time||"00:00")); if(isNaN(dt))return s.date||""; let o=dt.toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"}); if(s.time)o+=" · "+dt.toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"}); return o; }catch(e){ return s.date||""; } };
     const sched=(t.schedule||[]).slice().sort((a,b)=>(((a.date||"")+(a.time||""))<((b.date||"")+(b.time||""))?-1:1));
@@ -1584,7 +1632,7 @@ function actionArea(){
     const C=window.Cloud, signedIn=!!(C&&C.enabled&&C.user);
     const owner=signedIn && typeof window.cloudIsOwner==="function" && window.cloudIsOwner(t);
     const canManage=signedIn && typeof window.cloudCanManage==="function" && window.cloudCanManage(t);
-    const ownerEmail=(t.ownerEmail||C.user.email||"you").replace(/</g,"");
+    const ownerEmail=(t.ownerEmail||(C&&C.user&&C.user.email)||"you").replace(/</g,"");
     const cardCss=`background:${T.surface};border:1px solid ${T.line};border-radius:14px;padding:14px 16px`;
     const subLbl=`font-size:11px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:${T.sage};margin:8px 0 2px`;
     // OWNERS box: the primary owner + co-owners (full management). SCORERS box: authorized scorers.
@@ -1633,7 +1681,16 @@ function actionArea(){
             <span style="font-size:11px;color:${T.sageDim}">up to 6 chars</span></div>
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
             <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};width:100%;margin-bottom:2px">Team color</div>
-            ${["#2E6BE6","#0EA5E9","#12A150","#E08A12","#E2574C","#EC4899","#8B5CF6","#0F172A"].map(c=>`<button data-act="teamcolor" data-arg="${c}" style="width:32px;height:32px;border-radius:8px;background:${c};border:3px solid ${t.color.toLowerCase()===c.toLowerCase()?T.ink:"transparent"};box-shadow:0 0 0 1px ${T.line}"></button>`).join("")}</div>`;
+            ${["#2E6BE6","#0EA5E9","#12A150","#E08A12","#E2574C","#EC4899"].map(c=>`<button data-act="teamcolor" data-arg="${c}" style="width:32px;height:32px;border-radius:8px;background:${c};border:3px solid ${t.color.toLowerCase()===c.toLowerCase()?T.ink:"transparent"};box-shadow:0 0 0 1px ${T.line}"></button>`).join("")}
+            <label style="display:inline-flex;align-items:center;gap:8px;background:${T.surface2};border:1px solid ${T.line};border-radius:8px;padding:6px 12px;cursor:pointer;font-size:13px;font-weight:700;color:${T.ink};position:relative">
+              <span style="width:22px;height:22px;border-radius:6px;background:${t.color};box-shadow:0 0 0 1px ${T.line}"></span>🎨 More colors
+              <input type="color" value="${t.color}" onchange="window.edTeamColor(this.value)" style="position:absolute;left:0;top:0;width:100%;height:100%;opacity:0;cursor:pointer"></label></div>
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+            <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};width:100%;margin-bottom:2px">Team logo</div>
+            <div style="width:58px;height:58px;flex:none;border-radius:12px;border:1px solid ${T.line};background:${t.logo?"#fff":T.surface2} ${t.logo?`center/contain no-repeat`:""};${t.logo?`background-image:url('${t.logo}')`:""};display:flex;align-items:center;justify-content:center;font-size:24px;color:${T.sageDim}">${t.logo?"":"🏳️"}</div>
+            <label style="display:inline-flex;align-items:center;gap:8px;background:${T.surface2};border:1px solid ${T.line};border-radius:8px;padding:8px 14px;cursor:pointer;font-size:13px;font-weight:700;color:${T.ink}">&#8593; ${t.logo?"Change logo":"Upload logo"}<input type="file" accept="image/*" onchange="window.uploadTeamLogo(this)" style="display:none"></label>
+            ${t.logo?`<button data-act="rmlogo" style="background:none;border:1px solid ${T.line};color:${T.out};border-radius:8px;padding:8px 12px;font-weight:700;font-size:12px">Remove</button>`:""}
+            <div style="font-size:11px;color:${T.sageDim};width:100%;line-height:1.4">Shows on team cards, the lineup card &amp; (soon) the scoreboard. A square PNG with a transparent background looks best.</div></div>`;
       return secWrap(`${secHdr("Roster &amp; details")}${detailsBlock}
           <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin:2px 2px -2px">Roster — tap to edit #/name</div>
           <div class="frost-card" style="background:${T.surface};border:1px solid ${T.line};border-radius:12px;padding:4px 12px">${roster}</div>
@@ -1644,13 +1701,14 @@ function actionArea(){
     if(teamTab==="access") return secWrap(`${secHdr("Team access")}${scorersSection}${discoverySection}`);
     if(teamTab==="rules") return secWrap(`${secHdr("League rules")}${rulesSection}`);
     // ----- HUB: team header + grid of sections + primary actions -----
-    const rec=`${t.record.w}-${t.record.l}${t.record.t?"-"+t.record.t:""}`;
-    const hb=(arg,icon,label)=>`<button data-act="teamtab" data-arg="${arg}" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;background:${T.surface};border:1px solid ${T.line};border-radius:14px;padding:18px 10px;min-height:96px;cursor:pointer"><span style="font-size:26px">${icon}</span><span style="font-weight:800;color:${T.ink};font-size:15px;text-align:center;line-height:1.2">${label}</span></button>`;
+    const rec=(()=>{const R=teamRec(t);return `${R.w}-${R.l}${R.t?"-"+R.t:""}`;})();
+    const hb=(arg,icon,label)=>`<button data-act="teamtab" data-arg="${arg}" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;background:${T.surface};border:1px solid ${T.line};border-radius:14px;padding:14px 10px;min-height:84px;cursor:pointer"><span style="font-size:25px">${icon}</span><span style="font-weight:800;color:${T.ink};font-size:15px;text-align:center;line-height:1.2">${label}</span></button>`;
     // Hub tile that fires a non-tab action (Share) — same look as hb() but its own data-act.
-    const hbAct=(act,icon,label)=>`<button data-act="${act}" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;background:${T.surface};border:1px solid ${T.line};border-radius:14px;padding:18px 10px;min-height:96px;cursor:pointer"><span style="font-size:26px">${icon}</span><span style="font-weight:800;color:${T.ink};font-size:15px;text-align:center;line-height:1.2">${label}</span></button>`;
+    const hbAct=(act,icon,label)=>`<button data-act="${act}" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;background:${T.surface};border:1px solid ${T.line};border-radius:14px;padding:14px 10px;min-height:84px;cursor:pointer"><span style="font-size:25px">${icon}</span><span style="font-weight:800;color:${T.ink};font-size:15px;text-align:center;line-height:1.2">${label}</span></button>`;
     return secWrap(`
         <div class="frost-card" style="display:flex;align-items:center;gap:10px;background:${T.surface};border:1px solid ${T.line};border-radius:14px;padding:12px 14px">
           <button data-act="teamsback" style="${ghost};padding:9px 11px">&lsaquo; Teams</button>
+          ${t.logo?`<img src="${t.logo}" alt="" style="width:44px;height:44px;flex:none;border-radius:9px;object-fit:contain;background:#fff;box-shadow:0 0 0 1px ${T.line}">`:""}
           <div style="flex:1;min-width:0;border-left:5px solid ${t.color};padding-left:10px">
             <div style="font-family:${MONO};font-size:22px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${(t.name||"Team").replace(/</g,"")}</div>
             <div style="font-family:${MONO};font-size:18px;color:${T.sage};margin-top:4px"><span style="color:${t.color};font-weight:800">${rec}</span> &middot; ${t.players.length} players</div></div></div>
@@ -1664,8 +1722,9 @@ function actionArea(){
           ${hbAct("shareteam","&#128279;","Share &amp; invite")}
         </div>
         <button data-act="startteam" style="${bigBtn(t.color)}">${IC('<path d="M8 5l11 7-11 7z" fill="currentColor" stroke="none"/>')} Start game with ${t.short}</button>
+        <button data-act="lineupcard" style="${ghost};display:flex;align-items:center;justify-content:center;gap:9px">&#128196; Lineup card (PDF)</button>
         <div style="display:flex;gap:8px">
-          <button data-act="exportteam" style="${ghost};flex:1">&#8681; Export team</button>
+          <button data-act="exportteam" style="${ghost};flex:1">&#8681; Backup (.json)</button>
           <button data-act="deleteteam" style="background:none;border:1px solid ${T.out};color:${T.out};border-radius:8px;padding:11px 16px;font-family:${MONO};font-size:13px;font-weight:700;letter-spacing:.5px;text-transform:uppercase">&#x1F5D1; Delete</button></div>
       `);
   }
@@ -2375,7 +2434,6 @@ document.getElementById("app").addEventListener("click",e=>{
     render(); return; }
   if(act==="schedrm"){ const t=teamById(openTeamId); if(t&&Array.isArray(t.schedule)){ t.schedule=t.schedule.filter(s=>s.id!==arg); saveDB(); render(); } return; }
   if(act==="schview"){ scheduleView=(arg==="calendar"?"calendar":"list"); try{localStorage.setItem("al-sched-view",scheduleView);}catch(e){} render(); return; }
-  if(act==="recadj"){ const t=teamById(openTeamId); if(!t)return; if(window.Cloud&&window.Cloud.enabled&&window.Cloud.user&&window.cloudCanManage&&!window.cloudCanManage(t)){flash("Only the owner can edit the record");return;} const parts=(arg||"").split(":"),f=parts[0],d=+parts[1]; if(!t.record)t.record={w:0,l:0,t:0}; if(f==="w"||f==="l"||f==="t"){ t.record[f]=Math.max(0,(t.record[f]||0)+d); saveDB(); render(); } return; }
   if(act==="calprev"||act==="calnext"){ if(!calYM){const d=new Date();calYM={y:d.getFullYear(),m:d.getMonth()};} let mm=calYM.m+(act==="calnext"?1:-1),yy=calYM.y; if(mm<0){mm=11;yy--;} else if(mm>11){mm=0;yy++;} calYM={y:yy,m:mm}; calSelDay=null; render(); return; }
   if(act==="calday"){ calSelDay=(calSelDay===arg?null:arg); render(); return; }
   if(act==="invitewatch"){ openShare(); return; }
@@ -2383,7 +2441,6 @@ document.getElementById("app").addEventListener("click",e=>{
   if(act==="closechat"){ closeChat(); return; }
   if(act==="sendmsg"){ sendChat(); return; }
   if(act==="delmsg"){ if(window.cloudDeleteMessage&&chatTeamId)window.cloudDeleteMessage(chatTeamId,arg); return; }
-  if(act==="chatinvite"){ const t=teamById(chatTeamId); const url=appBaseUrl()+"?follow="+encodeURIComponent(chatTeamId); const body="Join "+((t&&t.name)?t.name:"our team")+" on All-Stars Live to follow games & chat with the team: "+url; if(navigator.share){navigator.share({text:body}).catch(()=>{});} else { location.href="sms:?&body="+encodeURIComponent(body); } return; }
   if(act==="ingamesettings"){ settingsMode=true; mode="newgame"; render(); return; }
   if(act==="settingsdone"){ settingsMode=false; mode="idle"; render(); broadcast(); return; }
   if(act==="ptype"){ pitchType=(pitchType===arg?null:arg); render(); return; }
@@ -2489,6 +2546,8 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="teamhub"){teamTab="hub";render();}
   else if(act==="favteam"){const t=teamById(arg);if(t){t.fav=!t.fav;saveDB();}render();}
   else if(act==="teamcolor"){const t=teamById(openTeamId);if(t){t.color=arg;saveDB();}render();}
+  else if(act==="rmlogo"){const t=teamById(openTeamId);if(t){delete t.logo;saveDB();render();}}
+  else if(act==="lineupcard"){const t=teamById(openTeamId);if(t)printLineupCard(t);}
   else if(act==="newteam"){const t=newTeam("");openTeamId=t.id;teamTab="hub";mode="team";render();}
   else if(act==="teamsback"){mode="teams";render();}
   else if(act==="deleteteam"){ const delId=openTeamId; const td=teamById(delId); if(!td)return; confirmAct={title:"Delete "+(td.name||"team")+"?",msg:"This removes the roster and all season stats and can't be undone.",yes:"Delete",danger:true,run:function(){ try{ if(window.cloudDeleteTeam)cloudDeleteTeam(delId); }catch(e){} DB.teams=DB.teams.filter(t=>t.id!==delId); if(curTeamId===delId)curTeamId=null; openTeamId=null; teamTab="hub"; saveDB(); mode="teams"; render(); }}; render(); }
@@ -2629,6 +2688,11 @@ function sendChat(){ const inp=document.getElementById("chatInput"); if(!inp)ret
 // the back (navigated); false only at the root (home) so the app can background, not close.
 window.appBack=function(){
   try{
+    // An open overlay/modal swallows Back first — dismiss it instead of leaving the app.
+    const cm=document.getElementById("chatmodal"); if(cm&&cm.style.display==="flex"){ closeChat(); return true; }
+    const qm=document.getElementById("qrmodal"); if(qm&&qm.style.display==="flex"){ closeShare(); return true; }
+    const ym=document.getElementById("ytmodal"); if(ym&&ym.style.display==="flex"){ ym.style.display="none"; return true; }
+    if(typeof confirmAct!=="undefined"&&confirmAct){ confirmAct=null; render(); return true; }
     if(reviewBatter){reviewBatter=null;render();return true;}
     if(reviewInn){reviewInn=false;render();return true;}
     if(["locate","contact","result","runners","errpos","outpos","dppick"].includes(mode)){ resetUI(); render(); return true; }
@@ -2637,7 +2701,7 @@ window.appBack=function(){
     if(mode==="newgame"&&settingsMode){ settingsMode=false; mode="idle"; render(); return true; }
     if(mode==="newgame"){ if(newgameFrom==="team"&&openTeamId){mode="team";}else{mode=gameActive?"idle":"home";} render(); return true; }
     if(mode==="lineup"){ mode=gameActive?"idle":"home"; render(); return true; }
-    if(mode==="team"&&teamTab!=="hub"){ teamTab="hub"; render(); return true; }
+    if(mode==="team"&&teamTab&&teamTab!=="hub"){ teamTab="hub"; render(); return true; }
     if(mode==="team"){ mode="teams"; render(); return true; }
     if(mode==="settings"){ mode="home"; render(); return true; }
     if(mode==="teams"){ mode="home"; render(); return true; }
@@ -2814,7 +2878,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v78";
+var APP_VERSION="v79";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
