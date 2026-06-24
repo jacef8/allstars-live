@@ -3,8 +3,11 @@ package com.libertyclerk.allstarslive.scorer
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.graphics.SurfaceTexture
+import android.util.Base64
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
@@ -96,6 +99,25 @@ fun createScorerWebView(context: Context): WebView {
 private class ScorerBridge(private val appContext: Context) {
     private val main = Handler(Looper.getMainLooper())
 
+    // Team logos for the burned-in scorebug, decoded from the data URLs the web sends.
+    @Volatile private var awayLogo: Bitmap? = null
+    @Volatile private var homeLogo: Bitmap? = null
+    private fun decodeDataUrl(s: String?): Bitmap? {
+        if (s.isNullOrBlank()) return null
+        return try {
+            val b64 = if (s.contains("base64,")) s.substringAfter("base64,") else s
+            val bytes = Base64.decode(b64, Base64.DEFAULT)
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+        } catch (e: Exception) { null }
+    }
+
+    /** Web pushes the two teams' logos (data URLs) when they change; drawn in the scorebug. */
+    @JavascriptInterface
+    fun setTeamLogos(away: String?, home: String?) {
+        awayLogo = decodeDataUrl(away)
+        homeLogo = decodeDataUrl(home)
+    }
+
     /** Lets the web detect it's running inside the tablet app. */
     @JavascriptInterface
     fun isApp(): Boolean = true
@@ -150,7 +172,7 @@ private class ScorerBridge(private val appContext: Context) {
     ) {
         val comp = RtmpHub.videoCompositor ?: return
         val bmp = runCatching {
-            buildScorebugOverlay(1280, 720, away, home, awayScore, homeScore, inning, topHalf, balls, strikes, outs)
+            buildScorebugOverlay(1280, 720, away, home, awayScore, homeScore, inning, topHalf, balls, strikes, outs, awayLogo, homeLogo)
         }.getOrNull() ?: return
         comp.setOverlay(bmp)
     }

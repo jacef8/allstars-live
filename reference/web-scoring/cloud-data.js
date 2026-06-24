@@ -63,6 +63,32 @@
       .catch(function (e) { console.warn("cloudGetTeam:", e.message); return null; });
   };
 
+  // Auto-refresh "followed" public teams (cached locally with external:true). Re-pulls each one's
+  // current public doc and updates the local snapshot, so a watched team's record/roster/games
+  // stay fresh on Home. Runs on sign-in, on app focus, and every few minutes.
+  window.cloudRefreshFollowed = function () {
+    var d = fdb(); if (!d) return;
+    var ext = (DB.teams || []).filter(function (t) { return t && t.external && t.id; });
+    if (!ext.length) return;
+    var changed = false, pending = ext.length;
+    ext.forEach(function (t) {
+      d.collection("teams").doc(t.id).get().then(function (doc) {
+        if (doc.exists) {
+          var c = doc.data();
+          if (c && c.public) {
+            var i = (DB.teams || []).findIndex(function (x) { return x.id === t.id; });
+            if (i >= 0) {
+              var merged = Object.assign({}, c, { external: true, fav: DB.teams[i].fav !== false });
+              if (JSON.stringify(merged) !== JSON.stringify(DB.teams[i])) { DB.teams[i] = merged; changed = true; }
+            }
+          }
+        }
+      }).catch(function () {}).finally(function () {
+        if (--pending === 0 && changed) { try { saveDB(); } catch (e) {} try { if (typeof render === "function") render(); } catch (e) {} }
+      });
+    });
+  };
+
   // Push one team up (claims ownership if it has none / is mine).
   window.cloudSaveTeam = function (t) {
     var d = fdb(), u = myUid();
@@ -185,6 +211,14 @@
       .onSnapshot(function (s) { merge(s.docs); }, function (e) { console.warn("teams(follower):", e.message); }));
     if (em) _unsub.push(d.collection("teams").where("coOwners", "array-contains", em)
       .onSnapshot(function (s) { merge(s.docs); }, function (e) { console.warn("teams(coOwner):", e.message); }));
+    // Followed public teams aren't covered by the member queries above — refresh them on sign-in,
+    // when the app regains focus, and on a slow timer.
+    try { window.cloudRefreshFollowed(); } catch (e) {}
+    if (!window._followRefreshHooked) {
+      window._followRefreshHooked = true;
+      try { document.addEventListener("visibilitychange", function () { if (!document.hidden) { try { window.cloudRefreshFollowed(); } catch (e) {} } }); } catch (e) {}
+      try { setInterval(function () { try { window.cloudRefreshFollowed(); } catch (e) {} }, 5 * 60 * 1000); } catch (e) {}
+    }
   };
 
   // Membership helpers (used to gate the chat composer + game scoring on the web).

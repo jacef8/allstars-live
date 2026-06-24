@@ -257,6 +257,7 @@ fun buildScorebugOverlay(
     awayScore: Int, homeScore: Int,
     inning: Int, topHalf: Boolean,
     balls: Int, strikes: Int, outs: Int,
+    awayLogo: Bitmap? = null, homeLogo: Bitmap? = null,
 ): Bitmap {
     val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)   // transparent
     val c = Canvas(bmp)
@@ -279,19 +280,29 @@ fun buildScorebugOverlay(
     c.drawRoundRect(RectF(x, y, x + boxW, y + boxH), rad, rad, p)
     p.style = Paint.Style.FILL
 
-    fun row(ry: Float, abbr: String, score: Int, active: Boolean, chip: Int) {
+    val logoPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+    fun row(ry: Float, abbr: String, score: Int, active: Boolean, chip: Int, logo: Bitmap?) {
         p.color = chip
         c.drawRect(x + boxW * 0.04f, ry + rowH * 0.24f, x + boxW * 0.06f, ry + rowH * 0.76f, p)
+        var textX = x + boxW * 0.10f
+        // Team logo (if provided) just right of the color chip; the abbreviation shifts over.
+        if (logo != null) {
+            val sz = rowH * 0.62f
+            val lx = x + boxW * 0.09f
+            val ly = ry + (rowH - sz) / 2f
+            c.drawBitmap(logo, null, RectF(lx, ly, lx + sz, ly + sz), logoPaint)
+            textX = lx + sz + boxW * 0.035f
+        }
         p.color = if (active) 0xFFFFFFFF.toInt() else 0xFF8C97A8.toInt()
         p.textAlign = Paint.Align.LEFT
         p.textSize = rowH * 0.46f
-        c.drawText(abbr, x + boxW * 0.10f, ry + rowH * 0.66f, p)
+        c.drawText(abbr, textX, ry + rowH * 0.66f, p)
         p.textAlign = Paint.Align.RIGHT
         p.textSize = rowH * 0.62f
         c.drawText(score.toString(), divX - boxW * 0.03f, ry + rowH * 0.70f, p)
     }
-    row(y, away, awayScore, topHalf, 0xFF2E6BE6.toInt())
-    row(y + rowH, home, homeScore, !topHalf, 0xFFE2574C.toInt())
+    row(y, away, awayScore, topHalf, 0xFF2E6BE6.toInt(), awayLogo)
+    row(y + rowH, home, homeScore, !topHalf, 0xFFE2574C.toInt(), homeLogo)
 
     // divider + inning/count on the right
     p.color = 0xFF1E2A44.toInt()
