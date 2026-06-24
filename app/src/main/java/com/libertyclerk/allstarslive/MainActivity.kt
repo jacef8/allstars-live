@@ -4,8 +4,13 @@ import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import com.google.android.gms.common.api.ApiException
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -85,6 +90,10 @@ private val NavBarColor = Color(0xFF0E1626)   // slightly lifted navy for the ta
 private val NavHairline = Color(0xFF1E2A44)
 private val Sage = Color(0xFF8C97A8)
 
+// OAuth "Web client ID" (Firebase auto-created) — audience for the Google ID token we hand to
+// the web's Firebase. The app's signing SHA-1 must be registered in the Firebase project too.
+private const val WEB_CLIENT_ID = "55677156135-jj5069itokdpgnti217jq91mmqfpn2bo.apps.googleusercontent.com"
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -118,6 +127,32 @@ class MainActivity : ComponentActivity() {
                 val scorerWeb = androidx.compose.runtime.remember { createScorerWebView(ctx) }
                 // Camera & streaming setup overlay — opened from the web's Settings gear (native only).
                 val showVideo by AppUi.showVideo.collectAsStateWithLifecycle()
+
+                // Native Google sign-in (the WebView blocks Google's OAuth). We get a Google ID
+                // token via GoogleSignIn, then hand it to the web's Firebase (signInWithCredential).
+                val googleLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+                    try {
+                        val acct = GoogleSignIn.getSignedInAccountFromIntent(result.data).getResult(ApiException::class.java)
+                        val tok = acct?.idToken
+                        if (tok != null) scorerWeb.evaluateJavascript("window.__googleCredential && window.__googleCredential(" + org.json.JSONObject.quote(tok) + ")", null)
+                        else scorerWeb.evaluateJavascript("window.__googleFail && window.__googleFail('No token — is the app SHA-1 added in Firebase?')", null)
+                    } catch (e: Exception) {
+                        scorerWeb.evaluateJavascript("window.__googleFail && window.__googleFail(" + org.json.JSONObject.quote("Google sign-in failed (" + (e.message ?: "error") + ")") + ")", null)
+                    }
+                }
+                LaunchedEffect(Unit) {
+                    AppUi.googleSignIn.collect {
+                        try {
+                            val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+                                .requestIdToken(WEB_CLIENT_ID).requestEmail().build()
+                            val client = GoogleSignIn.getClient(this@MainActivity, gso)
+                            client.signOut()   // always show the account chooser
+                            googleLauncher.launch(client.signInIntent)
+                        } catch (e: Exception) {
+                            scorerWeb.evaluateJavascript("window.__googleFail && window.__googleFail('Could not start Google sign-in')", null)
+                        }
+                    }
+                }
 
                 // OS back: close the camera overlay first; otherwise ask the web page
                 // (window.appBack) to pop a screen; only at the home screen do we send the app to

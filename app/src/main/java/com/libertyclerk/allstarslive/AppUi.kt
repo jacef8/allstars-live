@@ -1,6 +1,8 @@
 package com.libertyclerk.allstarslive
 
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 
 /**
@@ -24,6 +26,11 @@ object AppUi {
     private val _showVideo = MutableStateFlow(false)
     val showVideo: StateFlow<Boolean> = _showVideo
     fun setShowVideo(v: Boolean) { _showVideo.value = v }
+
+    /** Web "Continue with Google" → ask the native side to run the Credential/GoogleSignIn flow. */
+    private val _googleSignIn = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val googleSignIn: SharedFlow<Unit> = _googleSignIn
+    fun requestGoogleSignIn() { _googleSignIn.tryEmit(Unit) }
 
     /** Monitor rectangle in dp (CSS px ≈ dp at default WebView scale), or null = hide preview. */
     data class PreviewRect(val x: Float, val y: Float, val w: Float, val h: Float)

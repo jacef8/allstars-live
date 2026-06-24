@@ -83,9 +83,21 @@
       .catch(function (e) { cloudToast("Couldn't send link: " + e.message); });
   };
 
-  // Google one-tap (browser / PWA). NOTE: Google blocks OAuth inside embedded WebViews, so the
-  // app hides this button in the native tablet app — magic-link is used there instead.
+  // Native app hands a Google ID token back here → sign in to Firebase with it (bypasses the
+  // WebView OAuth block). Called from MainActivity after the native GoogleSignIn flow.
+  window.__googleCredential = function (idToken) {
+    try {
+      if (!window.Cloud || !window.Cloud.auth || typeof firebase === "undefined" || !idToken) return;
+      var cred = firebase.auth.GoogleAuthProvider.credential(idToken);
+      window.Cloud.auth.signInWithCredential(cred).catch(function (e) { cloudToast("Google sign-in failed: " + (e.message || e)); });
+    } catch (e) { cloudToast("Google sign-in failed."); }
+  };
+  window.__googleFail = function (msg) { cloudToast(msg || "Google sign-in didn't complete."); };
+
+  // Google sign-in. In the native app, route to the native flow (the WebView blocks Google's
+  // OAuth). On the web/PWA, use the popup (with redirect fallback).
   window.cloudSignInGoogle = function () {
+    if (window.AllStars && typeof window.AllStars.googleSignIn === "function") { try { window.AllStars.googleSignIn(); return; } catch (e) {} }
     if (!window.Cloud.auth || typeof firebase === "undefined") return;
     var p = new firebase.auth.GoogleAuthProvider();
     // Popup keeps the app open (no navigation/restart — important for installed PWAs).

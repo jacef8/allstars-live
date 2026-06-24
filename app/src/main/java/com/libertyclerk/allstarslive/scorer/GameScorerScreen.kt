@@ -108,6 +108,10 @@ private class ScorerBridge(private val appContext: Context) {
     @JavascriptInterface
     fun openVideo() { main.post { AppUi.setShowVideo(true) } }
 
+    /** Web "Continue with Google" → run the native Google sign-in (WebView OAuth is blocked). */
+    @JavascriptInterface
+    fun googleSignIn() { AppUi.requestGoogleSignIn() }
+
     /** "End broadcast" from the Game page — asks for confirmation first. */
     @JavascriptInterface
     fun stopStream() { main.post { Broadcast.requestStop() } }
