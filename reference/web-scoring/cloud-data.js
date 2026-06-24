@@ -50,9 +50,16 @@
       .update({ scorers: firebase.firestore.FieldValue.arrayUnion(email) })
       .catch(function (e) { try { alert("Couldn't add scorer: " + e.message); } catch (x) {} });
   };
-  // Delete the team in the cloud too (owner only, by rules) — otherwise onSnapshot re-adds it.
+  // Tombstones: ids the user deleted. merge() never re-adds these, so a deleted team can't come
+  // back even if the cloud delete is slow/denied or another device still has it.
+  function deletedSet() { try { return JSON.parse(localStorage.getItem("al-deleted-teams") || "[]"); } catch (e) { return []; } }
+  function tombstone(id) { try { var s = deletedSet(); if (s.indexOf(id) < 0) { s.push(id); localStorage.setItem("al-deleted-teams", JSON.stringify(s)); } } catch (e) {} }
+
+  // Delete the team: tombstone it locally (so sync won't resurrect it) + delete the cloud doc.
   window.cloudDeleteTeam = function (teamId) {
-    var d = fdb(); if (!d || !teamId) return Promise.resolve();
+    if (!teamId) return Promise.resolve();
+    tombstone(teamId);
+    var d = fdb(); if (!d) return Promise.resolve();
     return d.collection("teams").doc(teamId).delete()
       .catch(function (e) { console.warn("cloudDeleteTeam:", e.message); });
   };
@@ -86,8 +93,10 @@
     function sansTimestamp(o) { var x = Object.assign({}, o); delete x.updatedAt; return JSON.stringify(x); }
     function merge(docs) {
       var changed = false;
+      var dead = deletedSet();
       docs.forEach(function (doc) {
         var c = doc.data(); if (!c || !c.id) return;
+        if (dead.indexOf(c.id) >= 0) return;   // user deleted this team — never re-add it
         var i = (DB.teams || []).findIndex(function (x) { return x.id === c.id; });
         if (i < 0) { DB.teams.push(c); changed = true; }
         else {
