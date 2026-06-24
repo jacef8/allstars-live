@@ -18,9 +18,9 @@
     return {
       id: t.id, name: t.name || "", short: t.short || "", color: t.color || "#2E6BE6",
       players: t.players || [], record: t.record || { w: 0, l: 0, t: 0 }, season: t.season || {}, fav: !!t.fav,
-      schedule: t.schedule || [], lineup: t.lineup || null,
+      schedule: t.schedule || [], lineup: t.lineup || null, rulesUrl: t.rulesUrl || "",
       ownerUid: t.ownerUid || myUid(), ownerEmail: t.ownerEmail || myEmail(),
-      scorers: t.scorers || [], updatedAt: Date.now(),
+      scorers: t.scorers || [], followers: t.followers || [], updatedAt: Date.now(),
     };
   }
 
@@ -111,6 +111,78 @@
       .onSnapshot(function (s) { merge(s.docs); }, function (e) { console.warn("teams(owned):", e.message); }));
     if (em) _unsub.push(d.collection("teams").where("scorers", "array-contains", em)
       .onSnapshot(function (s) { merge(s.docs); }, function (e) { console.warn("teams(scorer):", e.message); }));
+    if (em) _unsub.push(d.collection("teams").where("followers", "array-contains", em)
+      .onSnapshot(function (s) { merge(s.docs); }, function (e) { console.warn("teams(follower):", e.message); }));
+  };
+
+  // Membership helpers (used to gate the chat composer + game scoring on the web).
+  window.cloudIsScorer = function (t) {
+    var em = myEmail(); return !!(t && (window.cloudIsOwner(t) || (Array.isArray(t.scorers) && t.scorers.indexOf(em) >= 0)));
+  };
+  window.cloudIsMember = function (t) {
+    var em = myEmail(); return !!(t && (window.cloudIsScorer(t) || (Array.isArray(t.followers) && t.followers.indexOf(em) >= 0)));
+  };
+
+  // Follow a team to read/post its chat (parents/fans) — NOT a scorer. From a ?follow=<teamId> link.
+  window.cloudFollowTeam = function (teamId) {
+    var d = fdb(), em = myEmail(); if (!d || !em || !teamId) return Promise.resolve();
+    return d.collection("teams").doc(teamId)
+      .update({ followers: firebase.firestore.FieldValue.arrayUnion(em), updatedAt: Date.now() })
+      .then(function () { window._joinTeamId = teamId; ctoast("You're now following this team."); })
+      .catch(function (e) { ctoast("Couldn't follow team: " + e.message); });
+  };
+  window.cloudClaimFollow = function () {
+    var d = fdb(), em = myEmail(); if (!d || !em) return;
+    var tid; try { tid = new URLSearchParams(location.search).get("follow"); } catch (e) {}
+    if (!tid) return;
+    window.cloudFollowTeam(tid).finally(function () {
+      try { var u = new URL(location.href); u.searchParams.delete("follow"); history.replaceState(null, "", u.pathname + u.search); } catch (e) {}
+    });
+  };
+
+  /* ===== Team chat (messages subcollection) — owner/scorers/followers can read+post; owner deletes ===== */
+  window.cloudSubscribeMessages = function (teamId, cb) {
+    var d = fdb(); if (!d || !teamId) return function () {};
+    try {
+      return d.collection("teams").doc(teamId).collection("messages").orderBy("ts", "asc").limitToLast(200)
+        .onSnapshot(function (s) { var out = []; s.forEach(function (m) { out.push(Object.assign({ id: m.id }, m.data())); }); try { cb(out); } catch (e) {} },
+                    function (e) { console.warn("messages:", e.message); try { cb(null, e); } catch (x) {} });
+    } catch (e) { return function () {}; }
+  };
+  window.cloudSendMessage = function (teamId, text) {
+    var d = fdb(), u = myUid(); text = (text || "").trim();
+    if (!d || !u || !teamId || !text) return Promise.resolve();
+    return d.collection("teams").doc(teamId).collection("messages").add({
+      text: text.slice(0, 2000), authorUid: u, authorName: (window.cloudMyName ? window.cloudMyName() : myEmail()) || "Someone",
+      authorEmail: myEmail(), ts: Date.now(),
+    }).catch(function (e) { ctoast("Couldn't send: " + e.message); });
+  };
+  window.cloudDeleteMessage = function (teamId, msgId) {
+    var d = fdb(); if (!d || !teamId || !msgId) return Promise.resolve();
+    return d.collection("teams").doc(teamId).collection("messages").doc(msgId).delete()
+      .catch(function (e) { ctoast("Couldn't delete: " + e.message); });
+  };
+
+  /* ===== Persistent cloud game — owner/scorer writes games/{id}; anyone with the link reads (watch) ===== */
+  var _gp;
+  window.cloudPublishGame = function (id, payload) {
+    var d = fdb(), u = myUid(); if (!d || !u || !id) return;
+    if (window._cloudApplying) return;
+    clearTimeout(_gp);
+    _gp = setTimeout(function () {
+      d.collection("games").doc(id).set({
+        id: id, teamId: payload.teamId || "", ownerUid: u,
+        state: payload, updatedAt: Date.now(),
+      }, { merge: true }).catch(function (e) { console.warn("cloudPublishGame:", e.message); });
+    }, 1000);
+  };
+  window.cloudSubscribeGame = function (id, cb) {
+    var d = fdb(); if (!d || !id) return function () {};
+    try {
+      return d.collection("games").doc(id).onSnapshot(function (s) {
+        var v = s.exists ? s.data() : null; try { cb(v && v.state ? v.state : null); } catch (e) {}
+      }, function (e) { console.warn("game:", e.message); });
+    } catch (e) { return function () {}; }
   };
 
   // Claim a texted invite: ?invite=<teamId> in the URL → add me as a scorer on that team.

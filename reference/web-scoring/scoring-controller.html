@@ -171,6 +171,22 @@
   </div>
 </div>
 
+<!-- Team chat: real-time messages for owner/scorers/followers (parents). DORMANT until cloud is on. -->
+<div id="chatmodal" style="display:none;position:fixed;inset:0;z-index:200;background:rgba(8,11,16,.84);align-items:center;justify-content:center;padding:14px">
+  <div style="max-width:460px;width:100%;height:min(82vh,660px);display:flex;flex-direction:column;background:#0E1420;border:1px solid #2A3650;border-radius:18px;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,.6)">
+    <div style="display:flex;align-items:center;gap:8px;padding:13px 15px;border-bottom:1px solid #2A3650;flex:none">
+      <div id="chatTitle" style="font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:19px;letter-spacing:.5px;color:#EAEDF2;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Team chat</div>
+      <button data-act="chatinvite" title="Invite parents to the chat" style="background:#1A2233;border:1px solid #2A3650;color:#A3E635;border-radius:8px;padding:7px 11px;font-weight:800;font-size:12px;cursor:pointer">&#43; Invite</button>
+      <button data-act="closechat" style="background:#1A2233;border:1px solid #2A3650;color:#B7C2D6;border-radius:8px;padding:7px 11px;font-weight:700;font-size:13px;cursor:pointer">&times;</button>
+    </div>
+    <div id="chatList" style="flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px 14px;display:flex;flex-direction:column;gap:8px"></div>
+    <div style="display:flex;gap:8px;padding:11px 14px;border-top:1px solid #2A3650;flex:none">
+      <input id="chatInput" placeholder="Message…" autocomplete="off" style="flex:1;min-width:0;background:#10141A;border:1px solid #2A3650;color:#EAEDF2;border-radius:10px;padding:12px;font-size:14px;font-family:system-ui;outline:none">
+      <button data-act="sendmsg" style="background:#A3E635;border:none;color:#0B0E13;border-radius:10px;padding:12px 16px;font-weight:800;font-size:14px;cursor:pointer">Send</button>
+    </div>
+  </div>
+</div>
+
 <!-- Bundled locally so the QR renders even on spotty field internet. -->
 <script src="lib/qrcode.min.js"></script>
 <!-- Cloud accounts/sync config + loader. DORMANT until firebase-config.js has an apiKey. -->
@@ -756,7 +772,10 @@ function broadcast(){
   if(viewMode==="viewer") return;   // viewers are read-only — they receive state, never send it
   try{ saveGame(); }catch(e){}   // persist the in-progress game on every change (resume after reload/update)
   // Full snapshot for remote viewers (watch link): lets any device render the game identically.
-  try{ LINK.send({type:"full",G:G,ROSTER:ROSTER,OUR:OUR,OPP:OPP,curTeamId:curTeamId,oppTeamId:oppTeamId,gameFeed:gameFeed}); }catch(e){}
+  const _full={type:"full",G:G,ROSTER:ROSTER,OUR:OUR,OPP:OPP,curTeamId:curTeamId,oppTeamId:oppTeamId,gameFeed:gameFeed};
+  try{ LINK.send(_full); }catch(e){}
+  // Persist the game to the cloud so it survives a dead phone + co-scorers share it (owner/scorer only).
+  try{ if(window.Cloud&&window.Cloud.user&&curTeamId&&window.cloudPublishGame){ const _t=teamById(curTeamId); if(_t&&window.cloudIsScorer&&window.cloudIsScorer(_t)){ if(!G.cloudId)G.cloudId=curTeamId+"-"+Date.now().toString(36); window.cloudPublishGame(G.cloudId, Object.assign({teamId:curTeamId},_full)); } } }catch(e){}
   _seq++; const k=battingKey(),b=batter();
   LINK.send({type:"state",seq:_seq,
     away:G.away,home:G.home,inning:G.inning,half:G.half,balls:G.balls,strikes:G.strikes,outs:G.outs,
@@ -1437,6 +1456,7 @@ function actionArea(){
         ${rulesSection}
         ${scorersSection}
         <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button data-act="teamchat" style="${ghost};flex:1;min-width:140px">&#128172; Team chat</button>
           <button data-act="invitewatch" style="${ghost};flex:1;min-width:140px">&#128227; Invite to watch</button>
           <button data-act="exportteam" style="${ghost};flex:1;min-width:140px">&#8681; Export team</button>
           <button data-act="deleteteam" style="background:none;border:1px solid ${T.out};color:${T.out};border-radius:8px;padding:11px 14px;font-family:${MONO};font-size:13px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;flex:none">&#x1F5D1; Delete</button></div>
@@ -2050,6 +2070,11 @@ document.getElementById("app").addEventListener("click",e=>{
   if(act==="schedadd"){ const t=teamById(openTeamId); if(!t)return; const g=id=>{const e=document.getElementById(id);return e?(e.value||""):"";}; const date=g("schDate"); if(!date){flash("Pick a date");return;} const _sel=g("schOppSel"); const opp=(_sel==="__new__"?g("schOppNew"):_sel).trim(); if(!Array.isArray(t.schedule))t.schedule=[]; t.schedule.push({id:"s"+Date.now().toString(36),type:g("schType")||"game",date:date,time:g("schTime"),opp:opp,loc:g("schLoc").trim(),notes:g("schNotes").trim()}); saveDB(); render(); return; }
   if(act==="schedrm"){ const t=teamById(openTeamId); if(t&&Array.isArray(t.schedule)){ t.schedule=t.schedule.filter(s=>s.id!==arg); saveDB(); render(); } return; }
   if(act==="invitewatch"){ openShare(); return; }
+  if(act==="teamchat"){ openChat(openTeamId); return; }
+  if(act==="closechat"){ closeChat(); return; }
+  if(act==="sendmsg"){ sendChat(); return; }
+  if(act==="delmsg"){ if(window.cloudDeleteMessage&&chatTeamId)window.cloudDeleteMessage(chatTeamId,arg); return; }
+  if(act==="chatinvite"){ const t=teamById(chatTeamId); const url=appBaseUrl()+"?follow="+encodeURIComponent(chatTeamId); const body="Join "+((t&&t.name)?t.name:"our team")+" on All-Stars Live to follow games & chat with the team: "+url; if(navigator.share){navigator.share({text:body}).catch(()=>{});} else { location.href="sms:?&body="+encodeURIComponent(body); } return; }
   if(act==="ingamesettings"){ settingsMode=true; mode="newgame"; render(); return; }
   if(act==="settingsdone"){ settingsMode=false; mode="idle"; render(); broadcast(); return; }
   if(act==="ptype"){ pitchType=(pitchType===arg?null:arg); render(); return; }
@@ -2210,7 +2235,46 @@ function renderToolbar(){
   </div>`;
 }
 window.onLinkChange=renderToolbar;   // relay open/close → repaint the dot
-window.onCloudAuth=function(u){ try{ if(u&&window.cloudSyncTeams)window.cloudSyncTeams(); }catch(e){} try{ if(u&&window.cloudClaimInvite)window.cloudClaimInvite(); }catch(e){} try{ render(); }catch(e){} };   // sign-in → sync teams, claim texted invite, repaint
+window.cloudMyName=function(){ const u=window.Cloud&&window.Cloud.user; if(!u)return ""; return u.displayName||(u.email||"").split("@")[0]||"Someone"; };
+window.onCloudAuth=function(u){ try{ if(u&&window.cloudSyncTeams)window.cloudSyncTeams(); }catch(e){} try{ if(u&&window.cloudClaimInvite)window.cloudClaimInvite(); }catch(e){} try{ if(u&&window.cloudClaimFollow)window.cloudClaimFollow(); }catch(e){} try{ render(); }catch(e){} };
+
+/* ===== Team chat (modal) — real-time messages; owner/scorers/followers can post, owner can delete ===== */
+let chatTeamId=null, chatUnsub=null, chatMsgs=[];
+function chatCanPost(){ const C=window.Cloud; if(!(C&&C.enabled&&C.user))return false; const t=teamById(chatTeamId); return !!(t&&window.cloudIsMember&&window.cloudIsMember(t)); }
+function renderChatList(){
+  const box=document.getElementById("chatList"); if(!box)return;
+  const t=teamById(chatTeamId); const owner=!!(t&&window.cloudIsOwner&&window.cloudIsOwner(t));
+  const myUid=(window.Cloud&&window.Cloud.user&&window.Cloud.user.uid)||"";
+  if(!chatMsgs.length){ box.innerHTML=`<div style="color:#6B7890;font-size:13px;text-align:center;margin:auto">No messages yet. Say hi! 👋</div>`; return; }
+  box.innerHTML=chatMsgs.map(m=>{ const mine=m.authorUid===myUid; const canDel=mine||owner;
+    const when=(()=>{try{return new Date(m.ts).toLocaleString(undefined,{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"});}catch(e){return "";}})();
+    return `<div style="align-self:${mine?"flex-end":"flex-start"};max-width:84%;background:${mine?"#1E2C16":"#1A2233"};border:1px solid ${mine?"#3A5A1E":"#2A3650"};border-radius:12px;padding:8px 11px">
+        <div style="font-size:11px;color:${mine?"#A3E635":"#8FA0BD"};font-weight:800;margin-bottom:2px">${(m.authorName||"Someone").replace(/</g,"&lt;")}${canDel?` <button data-act="delmsg" data-arg="${m.id}" style="background:none;border:none;color:#E2574C;font-size:11px;font-weight:700;cursor:pointer;padding:0 0 0 6px">delete</button>`:""}</div>
+        <div style="font-size:14px;color:#EAEDF2;line-height:1.4;white-space:pre-wrap;word-break:break-word">${(m.text||"").replace(/</g,"&lt;")}</div>
+        <div style="font-size:10px;color:#5B6880;margin-top:3px">${when}</div></div>`;}).join("");
+  box.scrollTop=box.scrollHeight;
+}
+function openChat(teamId){
+  const C=window.Cloud;
+  if(!(C&&C.enabled)){ flash("Team chat needs the web app (sign-in)"); return; }
+  if(!C.user){ flash("Sign in to use team chat"); return; }
+  if(!teamId) return;
+  chatTeamId=teamId; chatMsgs=[];
+  const t=teamById(teamId); const title=document.getElementById("chatTitle"); if(title)title.textContent=((t&&t.name)?t.name:"Team")+" chat";
+  document.getElementById("chatmodal").style.display="flex";
+  renderChatList();
+  if(chatUnsub){try{chatUnsub();}catch(e){}}
+  chatUnsub=window.cloudSubscribeMessages(teamId,function(msgs,err){
+    if(err){ const b=document.getElementById("chatList"); if(b)b.innerHTML=`<div style="color:#E2574C;font-size:13px;text-align:center;margin:auto;line-height:1.5">Couldn't load chat.<br>The team owner may still need to publish the chat rules.</div>`; return; }
+    chatMsgs=msgs||[]; renderChatList();
+  });
+  const inp=document.getElementById("chatInput"); const can=chatCanPost();
+  if(inp){ inp.disabled=!can; inp.placeholder=can?"Message…":"Read-only — follow this team to post"; if(can)setTimeout(()=>{try{inp.focus();}catch(e){}},60); }
+}
+function closeChat(){ if(chatUnsub){try{chatUnsub();}catch(e){}chatUnsub=null;} const m=document.getElementById("chatmodal"); if(m)m.style.display="none"; chatTeamId=null; }
+function sendChat(){ const inp=document.getElementById("chatInput"); if(!inp)return; const v=(inp.value||"").trim(); if(!v)return; if(!chatCanPost()){flash("You can't post here");return;} window.cloudSendMessage(chatTeamId,v); inp.value=""; }
+(function(){ const cm=document.getElementById("chatmodal"); if(cm)cm.addEventListener("click",e=>{ if(e.target.id==="chatmodal")closeChat(); });
+  const ci=document.getElementById("chatInput"); if(ci)ci.addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); sendChat(); } }); })();   // sign-in → sync teams, claim texted invite, repaint
 // OS back button (native): go BACK one screen instead of exiting. Returns true if it handled
 // the back (navigated); false only at the root (home) so the app can background, not close.
 window.appBack=function(){
@@ -2343,6 +2407,15 @@ function applySetupParams(){
 
 applySetupParams();
 render();broadcast();
+// Persistent watch link (?watch=<gameId>): subscribe to the cloud game doc and follow it live —
+// works even after the scorer's device goes offline. Public-read by rules; no sign-in needed.
+(function(){ var id; try{id=new URLSearchParams(location.search).get("watch");}catch(e){} if(!id)return;
+  viewerLocked=true; viewMode="viewer"; var tries=0;
+  (function wait(){ if(window.cloudSubscribeGame && window.Cloud && window.Cloud.db){
+      window._watchUnsub=window.cloudSubscribeGame(id,function(state){ if(state){ try{ applyRemote(Object.assign({type:"full"},state)); }catch(e){} } });
+      return; }
+    if(tries++<40) setTimeout(wait,300); })();
+})();
 setTimeout(function(){var s=document.getElementById("splash");if(s)s.remove();},2000);
 // Re-render on rotate/resize so the event picker swaps between bottom-sheet and side panel.
 // Re-render on resize ONLY when the wide/narrow breakpoint actually flips (e.g. rotation) — and
@@ -2377,7 +2450,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v44";
+var APP_VERSION="v45";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
