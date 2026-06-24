@@ -1344,9 +1344,14 @@ function actionArea(){
           ${sub?`<span style="font-size:13px;font-weight:600;opacity:.85">${sub}</span>`:""}</button>`;
       const newTile=tile('newgamestart','New Game',T.lime,T.field,'<path d="M8 5l11 7-11 7z" fill="currentColor" stroke="none"/>','Score + stream a game');
       const manageTile=tile('gototeams','Manage Teams',T.surface2,T.ink,'<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>','Rosters · records · stats');
+      // Scroll a long team list in its own column. NOTE: use a JS-computed px max-height, NOT
+      // `46vh` — in the Android WebView `vh` was resolving to 0px, collapsing this wrapper to
+      // height:0 and clipping ALL team cards out of view (cards were in the DOM at top:428 but
+      // never painted). innerHeight is reliable; vh is not here.
+      const teamsMaxH = Math.max(220, Math.round((window.innerHeight || 700) * 0.5));
       const rightCell = showTeams && DB.teams.length
         ? `<div style="display:flex;flex-direction:column;gap:10px">
-             <div style="max-height:46vh;overflow-y:auto;-webkit-overflow-scrolling:touch;display:flex;flex-direction:column;gap:10px">${teamsBlock}</div>
+             <div style="max-height:${teamsMaxH}px;overflow-y:auto;-webkit-overflow-scrolling:touch;display:flex;flex-direction:column;gap:10px">${teamsBlock}</div>
              ${manageBtn}</div>`
         : manageTile;
       // Top-aligned, width-capped. Scrolls if content is tall (never overlaps the logo).
@@ -2129,15 +2134,16 @@ document.getElementById("app").addEventListener("click",e=>{
   if(act==="swapviewer"){ viewerRight=viewerRight==="field"?"feed":"field"; try{localStorage.setItem("al-viewer-right",viewerRight);}catch(e){} render(); return; }
   if(act==="inviteadd"){ const e=document.getElementById("inviteWho"); if(!e)return; const v=(e.value||"").trim(); if(!v){flash("Enter an email or phone number");return;}
     const url=appBaseUrl()+"?invite="+encodeURIComponent(openTeamId); const t=teamById(openTeamId);
-    const team=(t&&t.name)?t.name:"our team";
-    if(v.indexOf("@")>=0){ if(window.cloudAddScorer)window.cloudAddScorer(openTeamId,v);   // authorize this email as a scorer
-      const subj="You're invited to score "+team+" on All-Stars Live";
-      const body="You're invited to score "+team+" on All-Stars Live.\n\nTap this link to join (you'll sign in once): "+url+"\n\nUse this same email address when you sign in.";
-      const mail="mailto:"+encodeURIComponent(v)+"?subject="+encodeURIComponent(subj)+"&body="+encodeURIComponent(body);
-      if(IS_APP&&window.AllStars&&window.AllStars.openExternal)AllStars.openExternal(mail); else location.href=mail;
-      e.value=""; flash("Scorer authorized — invite email drafted"); }
-    else { const num=v.replace(/[^0-9+]/g,""); const body="You're invited to score "+team+" on All-Stars Live. Tap to join (sign in once): "+url; const sms="sms:"+num+"?body="+encodeURIComponent(body); if(IS_APP&&window.AllStars&&window.AllStars.openExternal)AllStars.openExternal(sms); else location.href=sms; e.value=""; }
-    return; }
+    const team=(t&&t.name)?t.name:"our team"; const isEmail=v.indexOf("@")>=0;
+    if(isEmail && window.cloudAddScorer) window.cloudAddScorer(openTeamId,v);   // authorize this email as a scorer now
+    e.value="";
+    // Show a COPYABLE link in-app. We don't rely on mailto:/sms: carrying the body — in the native
+    // WebView the mail/SMS app opens blank (it ignores subject/body from a generic VIEW intent), so
+    // the operator was left with no link to send. A copy-to-clipboard link works everywhere.
+    const msg=`<div style="font-size:13px;color:${T.sage};line-height:1.5">${isEmail?`<b style="color:${T.ink}">${v.replace(/</g,"")}</b> is now an authorized scorer. `:""}Send them this link — they sign in once${isEmail?" with that email":""} and they're in:</div>
+      <div style="user-select:all;-webkit-user-select:all;word-break:break-all;margin-top:10px;background:${T.surface2};border:1px solid ${T.line};border-radius:8px;padding:11px;font-family:${MONO};font-size:12px;color:${T.ink}">${url}</div>`;
+    confirmAct={title:"Invite to "+team, msg:msg, yes:"Copy link", run:function(){ try{ if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(url); }catch(e){} flash("Link copied — paste it into a text or email"); }};
+    render(); return; }
   if(act==="rmscorer"){ if(window.cloudRemoveScorer)window.cloudRemoveScorer(openTeamId,arg); return; }
   if(act==="lineupback"){ mode=gameActive?"idle":"home"; render(); return; }
   if(act==="openrules"){ const _t=teamById(openTeamId); const _u=_t&&_t.rulesUrl; if(_u){ if(IS_APP&&window.AllStars&&window.AllStars.openExternal)AllStars.openExternal(_u); else window.open(_u,"_blank","noopener"); } return; }
@@ -2513,7 +2519,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v59";
+var APP_VERSION="v60";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
