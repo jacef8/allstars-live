@@ -1287,10 +1287,7 @@ function actionArea(){
             <button data-act="opent" data-arg="${t.id}" style="flex:1;background:${t.color};color:#fff;border:none;border-radius:9px;padding:13px;font-family:${MONO};font-weight:800;font-size:16px;letter-spacing:.8px;display:flex;align-items:center;justify-content:center;gap:8px">${IC(GEAR)} MANAGE TEAM</button>
           </div></div>`;};
     const teamsBlock = DB.teams.length
-      ? `<div style="display:flex;align-items:center;justify-content:space-between;margin:4px 2px -2px">
-            <span style="font-size:17px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime}">${favs.length?"★ Your teams":"Your teams"}</span>
-            <button data-act="gototeams" style="background:${T.surface};border:1px solid ${T.line};color:${T.lime};font-weight:800;font-size:14px;letter-spacing:.3px;cursor:pointer;border-radius:9px;padding:8px 13px">All teams &rsaquo;</button></div>
-          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px">${list.map(card).join("")}</div>`
+      ? `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;align-content:start">${list.map(card).join("")}</div>`
       : "";
 
     // Home header = the transparent "A" logo floating over the turf (no banner box).
@@ -1330,7 +1327,8 @@ function actionArea(){
                  <button data-act="signin" style="background:${T.lime};color:${T.field};border:none;border-radius:8px;padding:10px 16px;font-weight:800;font-size:13px">Email link</button></div></div>`)
       : "";
     // Single Settings gear (top-right) — app/camera/account settings. Same on native + web.
-    const settingsGear=`<button data-act="settings" title="Settings" style="position:absolute;top:8px;right:10px;z-index:6;background:rgba(13,19,32,.72);border:1px solid ${T.line};color:${T.chalk};border-radius:11px;width:44px;height:44px;display:flex;align-items:center;justify-content:center;font-size:21px;cursor:pointer">&#9881;</button>`;
+    const gBtn=(act,glyph,title)=>`<button data-act="${act}" title="${title}" style="background:rgba(13,19,32,.72);border:1px solid ${T.line};color:${T.chalk};border-radius:11px;width:44px;height:44px;display:flex;align-items:center;justify-content:center;font-size:20px;cursor:pointer">${glyph}</button>`;
+    const settingsGear=`<div style="position:absolute;top:8px;right:10px;z-index:6;display:flex;gap:8px">${gBtn("refresh","&#8635;","Refresh")}${gBtn("settings","&#9881;","Settings")}</div>`;
     // Wide (tablet): two columns so the key actions fit without scrolling — only a long
     // team list scrolls, inside its own column. Narrow (phone): the classic vertical stack.
     if(isWide()){
@@ -2175,6 +2173,7 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="confirm-yes"){const r=confirmAct&&confirmAct.run;confirmAct=null;if(r)r();else render();}
   else if(act==="newgame"){mode="newgame";render();}
   else if(act==="gohome"){mode="home";render();}
+  else if(act==="refresh"){ try{ if(window.cloudSyncTeams)cloudSyncTeams(); }catch(e){} flash("Refreshed"); render(); }
   else if(act==="settings"){mode="settings";render();}
   else if(act==="opencamera"){ try{ if(window.AllStars&&window.AllStars.openVideo)AllStars.openVideo(); }catch(e){} }
   else if(act==="newgamestart"){newgameFrom="home";mode="newgame";render();}
@@ -2476,7 +2475,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v49";
+var APP_VERSION="v50";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
