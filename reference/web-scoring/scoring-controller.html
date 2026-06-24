@@ -292,30 +292,41 @@ function printLineupCard(t){
   const today=new Date().toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric",year:"numeric"});
   const color=esc(t.color||"#2E6BE6");
   const players=(t.players||[]).slice();
-  const total=Math.max(12,players.length);
+  const total=Math.max(players.length, players.length>9?players.length:9);   // 9 slots min, or full roster (continuous)
+  // Standard lineup-card grid: Order | No. | Player | Position | Sub.
   let rows="";
   for(let i=0;i<total;i++){ const p=players[i];
     const pname=p?(p.name||((p.first||"")+" "+(p.last||"")).trim()):"";
-    rows+=`<tr><td class="ord">${i+1}</td><td class="num">${p?esc(p.num):""}</td><td class="nm">${esc(pname)}</td><td class="pos"></td><td class="bl"></td><td class="bl"></td><td class="bl"></td><td class="bl"></td><td class="bl"></td><td class="bl"></td></tr>`; }
+    rows+=`<tr><td class="ord">${i+1}</td><td class="num">${p?esc(p.num):""}</td><td class="nm">${esc(pname)}</td><td class="pos"></td><td class="sub"></td></tr>`; }
+  // Bench / extra players (named, beyond slot count) for the substitutes box.
+  let subs=""; for(let i=0;i<6;i++)subs+=`<tr><td class="num"></td><td class="nm"></td><td class="pos"></td></tr>`;
+  // Pitcher log (blank to fill in).
+  let plog=""; for(let i=0;i<5;i++)plog+=`<tr><td class="nm"></td><td></td><td></td><td></td></tr>`;
   const logo=t.logo?`<img src="${t.logo}" alt="">`:"";
   const html='<!doctype html><html><head><meta charset="utf-8"><title>'+esc(t.name||"Team")+' — Lineup Card</title><style>'
     +'*{box-sizing:border-box}body{margin:0;font-family:Arial,Helvetica,sans-serif;color:#0B0E13;padding:24px}'
     +'.hd{display:flex;align-items:center;gap:16px;border-bottom:4px solid '+color+';padding-bottom:12px}'
-    +'.hd img{width:64px;height:64px;object-fit:contain}'
-    +'.hd .nm{font-size:30px;font-weight:800;letter-spacing:.5px}'
-    +'.hd .meta{margin-left:auto;text-align:right;font-size:13px;color:#444}'
-    +'.hd .rec{font-size:22px;font-weight:800;color:'+color+'}'
-    +'h2{font-size:14px;letter-spacing:1px;text-transform:uppercase;color:'+color+';margin:18px 0 6px}'
+    +'.hd img{width:62px;height:62px;object-fit:contain}'
+    +'.hd .nm{font-size:28px;font-weight:800;letter-spacing:.5px;line-height:1.1}'
+    +'.hd .nm small{display:block;font-size:13px;font-weight:700;color:'+color+';letter-spacing:0;margin-top:2px}'
+    +'.hd .meta{margin-left:auto;font-size:13px;color:#222;line-height:1.9;min-width:240px}'
+    +'.hd .meta .f{display:flex;gap:6px}.hd .meta .f span{color:#888;font-weight:700;width:64px;text-transform:uppercase;font-size:11px;letter-spacing:.5px;align-self:center}'
+    +'.hd .meta .f b{flex:1;border-bottom:1px solid #bbb;font-weight:600}'
+    +'h2{font-size:13px;letter-spacing:1px;text-transform:uppercase;color:'+color+';margin:18px 0 6px}'
     +'table{width:100%;border-collapse:collapse;font-size:14px}'
-    +'th,td{border:1px solid #c8ccd4;padding:8px 6px;text-align:center;height:30px}'
+    +'th,td{border:1px solid #c8ccd4;padding:8px 6px;text-align:center;height:32px}'
     +'th{background:'+color+';color:#fff;font-size:11px;letter-spacing:.5px;text-transform:uppercase}'
-    +'td.nm{text-align:left;font-weight:700;width:34%}td.ord{width:36px;font-weight:800;color:'+color+'}td.num{width:42px}td.pos{width:54px}'
-    +'.ft{margin-top:14px;font-size:11px;color:#888;text-align:right}'
-    +'@media print{body{padding:0}@page{margin:14mm}}'
+    +'td.nm,th.nm{text-align:left;font-weight:700}td.ord{width:42px;font-weight:800;color:'+color+'}td.num,th.num{width:48px}td.pos,th.pos{width:70px}td.sub,th.sub{width:30%}'
+    +'.two{display:flex;gap:20px}.two>div{flex:1}'
+    +'.ft{margin-top:16px;font-size:11px;color:#888;text-align:right}'
+    +'@media print{body{padding:0}@page{margin:12mm}}'
     +'</style></head><body>'
-    +'<div class="hd">'+logo+'<div class="nm">'+esc(t.name||"Team")+'</div><div class="meta"><div class="rec">'+rec+'</div><div>'+esc(today)+'</div></div></div>'
+    +'<div class="hd">'+logo+'<div class="nm">'+esc(t.name||"Team")+'<small>Record '+esc(rec)+'</small></div>'
+    +'<div class="meta"><div class="f"><span>Date</span><b>'+esc(today)+'</b></div><div class="f"><span>Opponent</span><b>&nbsp;</b></div><div class="f"><span>Location</span><b>&nbsp;</b></div><div class="f"><span>Coach</span><b>&nbsp;</b></div></div></div>'
     +'<h2>Batting order</h2>'
-    +'<table><thead><tr><th>#</th><th>No.</th><th>Player</th><th>Pos</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th></tr></thead><tbody>'+rows+'</tbody></table>'
+    +'<table><thead><tr><th>Order</th><th class="num">No.</th><th class="nm">Player</th><th class="pos">Pos</th><th class="sub">Sub</th></tr></thead><tbody>'+rows+'</tbody></table>'
+    +'<div class="two"><div><h2>Substitutes</h2><table><thead><tr><th class="num">No.</th><th class="nm">Player</th><th class="pos">Pos</th></tr></thead><tbody>'+subs+'</tbody></table></div>'
+    +'<div><h2>Pitchers</h2><table><thead><tr><th class="nm">Pitcher</th><th>IP</th><th>Pitches</th><th>Notes</th></tr></thead><tbody>'+plog+'</tbody></table></div></div>'
     +'<div class="ft">All-Stars Live</div>'
     +'<scr'+'ipt>window.onload=function(){setTimeout(function(){try{window.print();}catch(e){}},300);};</scr'+'ipt>'
     +'</body></html>';
@@ -622,8 +633,8 @@ function endGame(){snapshot();G.final=true;
     // Archive this game (final score, opponent, date) — the W-L-T record is DERIVED from this
     // log via teamRec(), so the record can never disagree with the games shown below it.
     if(!Array.isArray(t.games))t.games=[];
-    t.games.unshift({id:"g"+Date.now().toString(36),date:new Date().toISOString().slice(0,10),opp:(OPP.name||"Opponent"),oppShort:OPP.short||"OPP",us:o,them:p,result:(o>p?"W":o<p?"L":"T")});
-    if(t.games.length>100)t.games=t.games.slice(0,100);
+    t.games.unshift(Object.assign({id:"g"+Date.now().toString(36),date:new Date().toISOString().slice(0,10),opp:(OPP.name||"Opponent"),oppShort:OPP.short||"OPP",us:o,them:p,result:(o>p?"W":o<p?"L":"T")}, liveGameBox()));
+    if(t.games.length>60)t.games=t.games.slice(0,60);   // cap (each carries a compact box score)
     t.record=teamRec(t);          // keep the stored/synced record in lockstep with the log
     saveDB();G.rolledUp=true;}
   resetUI();mode="summary";render();broadcast();}
@@ -665,6 +676,7 @@ const leagueById=id=>LEAGUES.find(l=>l.id===id)||LEAGUES[0];
 window.ngLeague=function(v){ const L=leagueById(v); G.league=L.id; G.innings=L.innings; G.runCap=L.runCap; G.mercy=L.mercy?{r15:L.mercy.r15,r10:L.mercy.r10}:null; G.pitchMax=L.pitch||0; render(); };
 let settingsMode=false;   // true = Game Setup opened mid-game (Done returns to play, never resets)
 let teamTab="hub";        // team page: "hub" (grid of sections) or a section: roster/schedule/stats/access/rules
+let viewGameId=null;      // when teamTab==="gameview": which finished game (t.games[].id) to show
 
 /* ===== rule-reminder popups (run cap / run rule / pitch limit / final inning) ===== */
 let activeAlert=null, firedAlerts=new Set(), dismissedAlerts=new Set();
@@ -908,6 +920,18 @@ function buildBox(){
   return {away,home,totals:{
     away:{r:G.away,h:sum(away,"h"),e:G.errors.away},
     home:{r:G.home,h:sum(home,"h"),e:G.errors.home}}};
+}
+/* Compact, self-contained box score from the CURRENT live game — stored on the team's game
+ * log (t.games) at endGame so a finished game can be re-opened later with full score + stats. */
+function liveGameBox(){
+  const box=buildBox(), maxI=Math.max(1,G.inning);
+  const lineArr=side=>{const a=[];for(let i=1;i<=maxI;i++)a.push(((G.line[side])&&G.line[side][i])||0);return a;};
+  const pitchersForSide=side=>{ let list; if(side===G.ourSide){ list=Object.keys(G.pstats||{}).filter(k=>/^o\d/.test(k)).map(k=>{const idx=+k.slice(1),pl=ROSTER[idx],ps=G.pstats[k]||{},pc=(G.pitches&&G.pitches[k])||0,outs=ps.outs||0;return {name:pl?("#"+pl.num+" "+pl.name):"Pitcher",ip:Math.floor(outs/3)+"."+(outs%3),pc:pc,h:ps.h||0,r:ps.r||0,bb:ps.bb||0,k:ps.k||0,outs:outs};}); } else { const ps=(G.pstats&&G.pstats.oppP)||{},pc=(G.pitches&&G.pitches.oppP)||0,outs=ps.outs||0; list=[{name:(TEAMS[side].short||"OPP")+" pitcher",ip:Math.floor(outs/3)+"."+(outs%3),pc:pc,h:ps.h||0,r:ps.r||0,bb:ps.bb||0,k:ps.k||0,outs:outs}]; } return list.filter(x=>x.outs>0||x.pc>0).sort((a,b)=>b.outs-a.outs); };
+  return { ourSide:G.ourSide, maxI:maxI,
+    awayShort:TEAMS.away.short, homeShort:TEAMS.home.short, awayName:TEAMS.away.name, homeName:TEAMS.home.name,
+    awayColor:TEAMS.away.color, homeColor:TEAMS.home.color,
+    line:{away:lineArr("away"),home:lineArr("home")}, totals:box.totals,
+    bat:{away:box.away,home:box.home}, pitch:{away:pitchersForSide("away"),home:pitchersForSide("home")} };
 }
 function broadcast(){
   if(viewMode==="viewer") return;   // viewers are read-only — they receive state, never send it
@@ -1641,10 +1665,11 @@ function actionArea(){
     // Recent games — the finished-game log, newest first (archived when a game ends).
     const gamesList=(t.games||[]).slice(0,25).map(g=>{const rc=g.result==="W"?T.lime:(g.result==="L"?T.out:T.sage);
       const dt=(()=>{try{return new Date((g.date||"")+"T00:00").toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"});}catch(e){return g.date||"";}})();
-      return `<div style="display:flex;align-items:center;gap:12px;padding:10px 2px;border-top:1px solid ${T.line}">
+      return `<button data-act="opengame" data-arg="${g.id}" style="display:flex;align-items:center;gap:12px;width:100%;text-align:left;padding:10px 2px;border:none;border-top:1px solid ${T.line};background:none;cursor:pointer">
           <span style="width:28px;height:28px;flex:none;display:flex;align-items:center;justify-content:center;border-radius:7px;background:${rc};color:${T.field};font-family:${MONO};font-weight:800;font-size:14px">${g.result||""}</span>
           <div style="flex:1;min-width:0"><div style="font-weight:800;color:${T.ink};font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">vs ${(g.opp||"Opponent").replace(/</g,"&lt;")}</div><div style="font-size:12px;color:${T.sage};margin-top:1px">${dt}</div></div>
-          <div style="font-family:${MONO};font-weight:800;font-size:19px;color:${T.chalk}">${g.us}&ndash;${g.them}</div></div>`;}).join("");
+          <div style="font-family:${MONO};font-weight:800;font-size:19px;color:${T.chalk}">${g.us}&ndash;${g.them}</div>
+          <span style="color:${T.lime};font-weight:800;font-size:16px">&rsaquo;</span></button>`;}).join("");
     const gamesBlock=`<div class="frost-card" style="background:${T.surface};border:1px solid ${T.line};border-radius:14px;padding:12px 16px">
         <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin-bottom:2px">Recent games</div>
         ${gamesList||`<div style="font-size:12px;color:${T.sageDim};padding:8px 0">No finished games yet — each game appears here once you end it.</div>`}</div>`;
@@ -1683,7 +1708,18 @@ function actionArea(){
         ${fld("Location",`<input id="schLoc" placeholder="e.g. City Park — Field 2" style="${cell}">`)}
         ${fld("Notes (optional)",`<input id="schNotes" placeholder="e.g. arrive 45 min early, white jerseys" style="${cell}">`)}
         <button data-act="schedadd" style="${bigBtn(T.lime,'',T.field)};margin-top:4px">+ Add to schedule</button></div>`;
-    const scheduleSection=scheduleViewCard+scheduleEditCard;
+    // Past games — the finished-game log, newest first, TAPPABLE to open the score + box score.
+    const pastRows=(t.games||[]).slice(0,25).map(g=>{const rc=g.result==="W"?T.lime:(g.result==="L"?T.out:T.sage);
+      const gdt=(()=>{try{return new Date((g.date||"")+"T00:00").toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"});}catch(e){return g.date||"";}})();
+      return `<button data-act="opengame" data-arg="${g.id}" style="display:flex;align-items:center;gap:11px;width:100%;text-align:left;background:${T.surface2};border:1px solid ${T.line};border-left:5px solid ${rc};border-radius:9px;padding:9px 11px;cursor:pointer">
+          <span style="width:26px;height:26px;flex:none;display:flex;align-items:center;justify-content:center;border-radius:7px;background:${rc};color:${T.field};font-family:${MONO};font-weight:800;font-size:13px">${g.result||""}</span>
+          <div style="flex:1;min-width:0"><div style="font-weight:800;color:${T.ink};font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">vs ${(g.opp||"Opponent").replace(/</g,"&lt;")}</div><div style="font-size:12px;color:${T.sage};margin-top:1px">${gdt}</div></div>
+          <span style="font-family:${MONO};font-weight:800;font-size:18px;color:${T.chalk}">${g.us}&ndash;${g.them}</span>
+          <span style="color:${T.lime};font-weight:800;font-size:16px">&rsaquo;</span></button>`;}).join("");
+    const pastGamesCard=`<div class="frost-card" style="background:${T.surface};border:1px solid ${T.line};border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:7px">
+        <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime}">Past games &mdash; tap to see the score &amp; stats</div>
+        ${pastRows||`<div style="font-size:12px;color:${T.sageDim}">No finished games yet — each game lands here once you end it.</div>`}</div>`;
+    const scheduleSection=scheduleViewCard+pastGamesCard+scheduleEditCard;
     // Per-team league rules URL. Only the owner can edit it; scorers/followers see it read-only.
     const canEditRules = !(window.Cloud&&window.Cloud.enabled&&window.Cloud.user) || (window.cloudCanManage&&window.cloudCanManage(t));
     const rulesSection=`<div class="frost-card" style="background:${T.surface};border:1px solid ${T.line};border-radius:14px;padding:14px 16px">
@@ -1766,6 +1802,29 @@ function actionArea(){
           <button data-act="addteamp" style="${ghost}">+ Add player</button>`);
     }
     if(teamTab==="schedule") return secWrap(`${secHdr("Schedule")}${scheduleSection}`);
+    if(teamTab==="gameview"){
+      const g=(t.games||[]).find(x=>x.id===viewGameId);
+      const esc=s=>(s==null?"":String(s)).replace(/</g,"&lt;");
+      if(!g) return secWrap(`${secHdr("Game")}<div style="font-size:13px;color:${T.sage};padding:8px">Game not found.</div>`);
+      const dt=(()=>{try{return new Date((g.date||"")+"T00:00").toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric"});}catch(e){return g.date||"";}})();
+      const resCol=g.result==="W"?T.lime:(g.result==="L"?T.out:T.sage), resWord=g.result==="W"?"WIN":(g.result==="L"?"LOSS":"TIE");
+      const head=`<div class="frost-card" style="text-align:center;background:${T.surface};border:1px solid ${T.line};border-left:6px solid ${resCol};border-radius:14px;padding:14px 16px">
+          <div style="font-family:${MONO};font-size:17px;font-weight:800;letter-spacing:1.2px;color:${resCol}">FINAL &middot; ${resWord}</div>
+          <div style="font-family:${MONO};font-size:30px;font-weight:800;color:${T.ink};margin-top:6px">${esc(t.name||"Us")} ${g.us} &ndash; ${g.them} ${esc(g.opp||"Opp")}</div>
+          <div style="font-size:12px;color:${T.sage};margin-top:4px">${dt}</div></div>`;
+      if(!g.bat){ return secWrap(`${secHdr("Game")}${head}<div style="font-size:12px;color:${T.sageDim};text-align:center;padding:14px;border:1px dashed ${T.line};border-radius:12px">Per-game stats weren't recorded for this game (it finished before by-game stat tracking). The final score is above.</div>`); }
+      const maxI=g.maxI||((g.line&&g.line.away&&g.line.away.length)||1);
+      const card=(inner)=>`<div class="frost-card" style="overflow-x:auto;background:${T.surface};border:1px solid ${T.line};border-radius:12px;padding:8px 10px">${inner}</div>`;
+      let lh='<th style="text-align:left;padding:4px 6px">Team</th>'; for(let i=1;i<=maxI;i++)lh+=`<th style="padding:7px 6px">${i}</th>`; lh+='<th style="padding:7px 6px">R</th><th>H</th><th>E</th>';
+      const lr=(side)=>{const sh=side==="away"?g.awayShort:g.homeShort;const arr=(g.line&&g.line[side])||[];const tot=(g.totals&&g.totals[side])||{r:0,h:0,e:0};let c=`<td style="text-align:left;padding:6px;font-weight:800">${esc(sh)}</td>`;for(let i=0;i<maxI;i++)c+=`<td style="padding:9px 6px">${arr[i]||0}</td>`;c+=`<td style="padding:9px 6px;font-weight:800;color:${T.ink}">${tot.r}</td><td style="padding:9px 6px">${tot.h}</td><td style="padding:9px 6px">${tot.e}</td>`;return `<tr style="border-top:1px solid ${T.line}">${c}</tr>`;};
+      const lineTbl=card(`<table style="width:100%;border-collapse:collapse;font-family:${MONO};font-size:16px;text-align:center;color:${T.chalk}"><thead><tr style="color:${T.sageDim};font-size:12px">${lh}</tr></thead><tbody>${lr("away")}${lr("home")}</tbody></table>`);
+      const sideName=(side)=> side==="away"?(g.ourSide==="away"?t.name:g.opp):(g.ourSide==="home"?t.name:g.opp);
+      const batTbl=(side)=>{const rows=((g.bat&&g.bat[side])||[]).map(b=>`<tr style="border-top:1px solid ${T.line}"><td style="text-align:left;padding:6px;font-weight:700;white-space:nowrap">#${esc(b.num)} ${esc(b.name)}</td><td style="padding:9px 6px">${b.ab}</td><td>${b.r}</td><td>${b.h}</td><td>${b.rbi}</td><td>${b.bb}</td><td>${b.k}</td></tr>`).join("");
+        return `<div><div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin:0 2px 4px">${esc(sideName(side))} &mdash; batting</div>${card(`<table style="width:100%;border-collapse:collapse;font-family:${MONO};font-size:16px;text-align:center;color:${T.chalk}"><thead><tr style="color:${T.sageDim};font-size:12px"><th style="text-align:left;padding:4px 6px">Batter</th><th>AB</th><th>R</th><th>H</th><th>RBI</th><th>BB</th><th>K</th></tr></thead><tbody>${rows||`<tr><td colspan="7" style="padding:8px;color:${T.sageDim}">No at-bats</td></tr>`}</tbody></table>`)}</div>`;};
+      const pitchTbl=(side)=>{const list=(g.pitch&&g.pitch[side])||[];if(!list.length)return "";const rows=list.map(x=>`<tr style="border-top:1px solid ${T.line}"><td style="text-align:left;padding:6px;font-weight:700;white-space:nowrap">${esc(x.name)}</td><td style="padding:9px 6px">${x.ip}</td><td>${x.pc}</td><td>${x.h}</td><td>${x.r}</td><td>${x.bb}</td><td>${x.k}</td></tr>`).join("");
+        return `<div><div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin:0 2px 4px">${esc(sideName(side))} &mdash; pitching</div>${card(`<table style="width:100%;border-collapse:collapse;font-family:${MONO};font-size:16px;text-align:center;color:${T.chalk}"><thead><tr style="color:${T.sageDim};font-size:12px"><th style="text-align:left;padding:4px 6px">Pitcher</th><th>IP</th><th>P</th><th>H</th><th>R</th><th>BB</th><th>K</th></tr></thead><tbody>${rows}</tbody></table>`)}</div>`;};
+      return secWrap(`${secHdr("Game")}${head}${lineTbl}${batTbl("away")}${batTbl("home")}${pitchTbl("away")}${pitchTbl("home")}`);
+    }
     if(teamTab==="stats") return secWrap(`${secHdr("Stats &amp; games")}${recEditor}${gamesBlock}${statTable}`);
     if(teamTab==="access") return secWrap(`${secHdr("Team access")}${scorersSection}${discoverySection}`);
     if(teamTab==="rules") return secWrap(`${secHdr("League rules")}${rulesSection}`);
@@ -1792,9 +1851,8 @@ function actionArea(){
         </div>
         <button data-act="startteam" style="${bigBtn(t.color)}">${IC('<path d="M8 5l11 7-11 7z" fill="currentColor" stroke="none"/>')} Start game with ${t.short}</button>
         <button data-act="lineupcard" style="${ghost};display:flex;align-items:center;justify-content:center;gap:9px">&#128196; Lineup card (PDF)</button>
-        <div style="display:flex;gap:8px">
-          <button data-act="exportteam" style="${ghost};flex:1">&#8681; Backup (.json)</button>
-          <button data-act="deleteteam" style="background:none;border:1px solid ${T.out};color:${T.out};border-radius:8px;padding:11px 16px;font-family:${MONO};font-size:13px;font-weight:700;letter-spacing:.5px;text-transform:uppercase">&#x1F5D1; Delete</button></div>
+        <div style="display:flex;justify-content:flex-end;margin-top:2px">
+          <button data-act="deleteteam" style="background:none;border:1px solid ${T.out};color:${T.out};border-radius:8px;padding:9px 14px;font-family:${MONO};font-size:12px;font-weight:700;letter-spacing:.5px;text-transform:uppercase">&#x1F5D1; Delete team</button></div>
       `);
   }
   if(mode==="pickteam"){
@@ -2430,12 +2488,14 @@ function render(){
     // pitch-count line and push the buttons to the thumb zone. The field returns full-screen
     // for locate/runners (focusPlay).
     const pitchTeam=fielding()?(OUR.short||"US"):(OPP.short||"OPP");
-    const pcLine=`<div style="flex:none;display:flex;align-items:center;gap:10px;background:${T.surface};border:1px solid ${T.line};border-radius:10px;padding:9px 14px">
-        <span style="font-family:${MONO};font-size:24px;font-weight:800;color:${T.amber}">${currentPitchCount()}</span>
-        <span style="font-size:11px;font-weight:800;letter-spacing:1.2px;color:${T.sageDim}">PITCHES</span>
-        <span style="display:flex;align-items:center;gap:7px;margin-left:auto;min-width:0">
-          <span style="background:${fielding()?OUR.color:OPP.color};color:#fff;border-radius:999px;padding:2px 8px;font-family:${MONO};font-size:9px;font-weight:800;letter-spacing:1px;flex:none">&#9899; PITCHING</span>
-          <span style="font-size:12px;color:${T.chalk};font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${currentPitcherName()} &middot; ${pitchTeam}</span></span></div>`;
+    const pitchClr=fielding()?OUR.color:OPP.color;
+    const pcLine=`<div style="flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px;background:${T.surface};border:1px solid ${T.line};border-radius:10px;padding:11px 16px">
+        <div style="display:flex;align-items:baseline;gap:9px;flex:none">
+          <span style="font-family:${MONO};font-size:32px;font-weight:800;color:${T.amber};line-height:1">${currentPitchCount()}</span>
+          <span style="font-size:14px;font-weight:800;letter-spacing:1.2px;color:${T.sageDim}">PITCHES</span></div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;min-width:0">
+          <span style="font-family:${MONO};font-size:10px;font-weight:800;letter-spacing:1.5px;color:${pitchClr}">&#9899; PITCHING</span>
+          <span style="font-size:18px;color:${T.chalk};font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%">${currentPitcherName()} &middot; ${pitchTeam}</span></div></div>`;
     const tab=(id,label)=>`<button data-act="pane" data-arg="${id}" style="flex:1;background:${phonePane===id?T.lime:T.surface};border:2px solid ${phonePane===id?T.lime:T.line};color:${phonePane===id?T.field:T.sage};border-radius:10px;padding:9px;font-family:${MONO};font-weight:800;font-size:14px;letter-spacing:.6px;text-transform:uppercase">${label}</button>`;
     const pane=phonePane==="video"
       ? `<div style="flex:1;min-height:0;display:flex;flex-direction:column;justify-content:center;gap:11px">${monitorPane()}${isView?"":shareBtn}</div>`
@@ -2534,6 +2594,7 @@ document.getElementById("app").addEventListener("click",e=>{
   if(act==="pane"){ phonePane=arg; render(); return; }
   if(act==="feedview"){ feedView=(arg==="pitch"?"pitch":"play"); try{localStorage.setItem("al-feed-view",feedView);}catch(e){} render(); return; }
   if(act==="sumteam"){ summaryTeam=(arg==="opp"?"opp":"us"); render(); return; }
+  if(act==="opengame"){ viewGameId=arg; teamTab="gameview"; render(); return; }
   if(act==="swapviewer"){ viewerRight=viewerRight==="field"?"feed":"field"; try{localStorage.setItem("al-viewer-right",viewerRight);}catch(e){} render(); return; }
   if(act==="inviteadd"){ const e=document.getElementById("inviteWho"); if(!e)return; const v=(e.value||"").trim(); if(!v){flash("Enter an email or phone number");return;}
     const url=appBaseUrl()+"?invite="+encodeURIComponent(openTeamId); const t=teamById(openTeamId);
@@ -2998,7 +3059,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v81";
+var APP_VERSION="v82";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
