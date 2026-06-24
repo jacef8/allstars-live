@@ -13,7 +13,9 @@ update the version, status, and pending lists with each meaningful change._
 > MainActivity) → `window.__googleCredential(idToken)` → firebase `signInWithCredential`.
 > **Needs the app's signing SHA-1 registered in Firebase** (debug SHA-1:
 > D2:D3:46:06:8E:DD:EC:BD:B0:23:AC:51:D1:1C:32:F0:BD:8B:A1:8F) or Google returns error 10. A release/
-> Play build needs its own SHA-1 added too.
+> Play build needs its own SHA-1 added too. **applicationId is now `com.libertyclerk.allstarslive.app`**
+> (code namespace unchanged) to avoid an OAuth package+SHA-1 conflict that existed in another project;
+> register THAT package + the SHA-1 in Firebase. Launch: `am start -n com.libertyclerk.allstarslive.app/com.libertyclerk.allstarslive.MainActivity`.
 
 > **v51 ARCHITECTURE CHANGE:** the native app now loads the **live https web app** (offline‑cached),
 > not bundled `file://` assets. → **web pushes reach the native app with no APK rebuild**; rebuild the
