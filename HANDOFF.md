@@ -3,7 +3,8 @@
 > **Read this first.** This is the single source of truth for picking up the project — e.g. from a
 > fresh Claude Code session or a different account. The code is the truth; this explains the rest.
 
-_Last updated: 2026‑06‑23 (app version **v48**)._
+_Last updated: 2026‑06‑23 (app version **v49**). **Keep this file current as work continues** —
+update the version, status, and pending lists with each meaningful change._
 
 ---
 
@@ -109,7 +110,13 @@ Only commit when asked / push when asked. The native files have at times been in
 - **Gallery + push notifications:** need Firebase **Blaze** plan (jford chose to skip for now).
 - **AI coach + lineup‑from‑photo:** need a server‑side Anthropic key proxy (deferred to the end).
 - **Viewer field animations** (ball + runners): not built; needs feel‑tuning.
-- **Home polish:** bigger hero A, always‑visible Share button (in progress).
+- **Home polish:** bigger hero A + always‑visible Share button — DONE (v49). Launcher icon set to
+  the A on #0B0E13 (adaptive: `drawable-nodpi/ic_launcher_foreground.png` + dark `ic_launcher_background`).
+- **Single‑source convergence (jford's goal):** make ONE edit update BOTH surfaces automatically.
+  Path = the https‑load switch above — then the web app (one HTML) is the source of truth, deployed
+  to Railway, and the native app loads it live (offline‑cached). Native‑only Kotlin (camera/stream,
+  splash, icon) changes rarely. Result: edit the shared web once → web + native both update, no APK
+  rebuild. (Until then, native is updated by rebuilding the APK, which bundles the web.)
 - Minor: native camera screen first‑run overlap (YouTube prompt over "waiting for camera").
 
 ## 7. Firebase project
