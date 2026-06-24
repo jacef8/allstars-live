@@ -1438,7 +1438,7 @@ function actionArea(){
           <span style="color:${t.color};font-weight:800;font-size:15px;letter-spacing:.5px;white-space:nowrap">MANAGE &rsaquo;</span></button></div>`;}).join("")
       ||`<div style="color:${T.sage};font-size:15px;text-align:center;padding:24px 8px;border:1px dashed ${T.line};border-radius:12px">No teams yet — create one to start tracking rosters &amp; season stats.</div>`;
     return `<div style="display:flex;flex-direction:column;gap:14px">
-        <div style="display:flex;align-items:center;gap:10px">
+        <div class="frost-card" style="display:flex;align-items:center;gap:10px;background:${T.surface};border:1px solid ${T.line};border-radius:14px;padding:12px 14px">
           <button data-act="gohome" style="${ghost};padding:9px 11px">&lsaquo; Home</button>
           <div style="font-family:${MONO};font-size:23px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:${T.lime}">Teams</div></div>
         <div style="font-size:12px;color:${T.sage};margin-top:-6px">Manage rosters &amp; season stats.</div>
@@ -1597,7 +1597,7 @@ function actionArea(){
         <div style="flex:1;min-width:0"><div style="font-weight:800;color:${T.ink};font-size:18px">${label}</div>${sub?`<div style="font-size:13px;color:${T.sage};margin-top:2px">${sub}</div>`:""}</div>
         <span style="color:${T.lime};font-weight:800;font-size:18px">&rsaquo;</span></button>`;
     return `<div style="display:flex;flex-direction:column;gap:14px">
-        <div style="display:flex;align-items:center;gap:10px">
+        <div class="frost-card" style="display:flex;align-items:center;gap:10px;background:${T.surface};border:1px solid ${T.line};border-radius:14px;padding:12px 14px">
           <button data-act="gohome" style="${ghost};padding:9px 11px">&lsaquo; Home</button>
           <div style="font-family:${MONO};font-size:23px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:${T.lime}">Settings</div></div>
         ${IS_APP?item("opencamera","📹","Camera &amp; stream setup","Connect your camera and go live"):`<div style="font-size:13px;color:${T.sageDim};background:${T.surface};border:1px dashed ${T.line};border-radius:12px;padding:16px 18px;line-height:1.5">📹 Camera &amp; streaming is available in the All-Stars Live app (Android/iOS). This web view is for watching shared games.</div>`}
@@ -1618,7 +1618,7 @@ function actionArea(){
     const teamRow=(who,name,color,act)=>`<button data-act="${act}" class="frost-card" style="display:flex;align-items:center;justify-content:space-between;background:rgba(13,19,32,.82);border:1px solid ${color}66;border-left:7px solid ${color};border-radius:12px;padding:18px 20px;width:100%;text-align:left">
         <div><div style="${lbl};margin:0 0 4px">${who}</div><div style="font-family:${MONO};font-size:25px;font-weight:800;color:${T.ink}">${name}</div></div>
         <span style="color:${color};font-weight:800;font-size:15px;letter-spacing:.5px">CHANGE &rsaquo;</span></button>`;
-    const header=`<div style="display:flex;align-items:center;gap:10px;flex:none">
+    const header=`<div class="frost-card" style="display:flex;align-items:center;gap:10px;flex:none;background:${T.surface};border:1px solid ${T.line};border-radius:14px;padding:12px 14px">
           <button data-act="${setMode?"settingsdone":"gohome"}" style="${ghost};padding:9px 11px">&lsaquo; ${setMode?"Done":"Home"}</button>
           <div style="font-family:${MONO};font-size:23px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:${T.lime}">${setMode?"Game Settings":"New Game"}</div></div>`;
     const sideSel=`<div><div style="${lbl}">Is ${OUR.name} home or away?</div>
@@ -1710,7 +1710,7 @@ function actionArea(){
     const bench=benchIdx().map(ri=>`<span style="font-family:${MONO};font-size:14px;color:${T.sage};background:${T.surface};border:1px solid ${T.line};border-radius:6px;padding:5px 10px;white-space:nowrap">#${ROSTER[ri].num} ${ROSTER[ri].name}</span>`).join(" ");
     const pit=playerAtPos("P");
     const n=G.lineup.order.length;
-    return `<div style="flex-shrink:0;display:flex;align-items:center;gap:10px">
+    return `<div class="frost-card" style="flex-shrink:0;display:flex;align-items:center;gap:10px;background:${T.surface};border:1px solid ${T.line};border-radius:14px;padding:10px 12px">
         <button data-act="lineupback" style="${ghost};padding:9px 13px;flex:none">&lsaquo; Back</button>
         <div style="flex:1;min-width:0"><div style="font-family:${MONO};font-size:20px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:${T.lime}">Lineups</div>
           <div style="font-size:11px;color:${T.sage};margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${OUR.name} &middot; batting ${n}${n>9?" (continuous)":""} &middot; drag to reorder</div></div>
@@ -1923,7 +1923,7 @@ function actionArea(){
 }
 function step(title,hint,inner){
   return `<div style="display:flex;flex-direction:column;gap:8px">
-    <div><div style="font-family:${MONO};font-size:19px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;line-height:1.05">${title}</div>
+    <div class="frost-card" style="background:${T.surface};border:1px solid ${T.line};border-radius:14px;padding:12px 14px"><div style="font-family:${MONO};font-size:19px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;line-height:1.05">${title}</div>
       <div style="font-size:11px;color:${T.sage};margin-top:3px">${hint}</div></div>${inner}</div>`;
 }
 
@@ -2624,7 +2624,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v71";
+var APP_VERSION="v72";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
