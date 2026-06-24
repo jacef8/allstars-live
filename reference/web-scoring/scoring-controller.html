@@ -283,8 +283,29 @@ function loadTeamLineup(t){ if(t&&t.lineup&&t.lineup.order&&t.lineup.order.lengt
 function downloadJSON(filename,obj){ try{ const blob=new Blob([JSON.stringify(obj,null,2)],{type:"application/json"}); const url=URL.createObjectURL(blob); const a=document.createElement("a"); a.href=url; a.download=filename; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>{try{URL.revokeObjectURL(url);}catch(e){}},1500); }catch(e){ try{alert("Export failed: "+e.message);}catch(x){} } }
 function pickJSON(onObj){ const inp=document.createElement("input"); inp.type="file"; inp.accept=".json,application/json"; inp.onchange=function(){ const f=inp.files&&inp.files[0]; if(!f)return; const r=new FileReader(); r.onload=function(){ try{ onObj(JSON.parse(r.result)); }catch(e){ try{alert("Couldn't read that file: "+e.message);}catch(x){} } }; r.readAsText(f); }; inp.click(); }
 window.exportTeam=function(id){ const t=teamById(id); if(!t)return; downloadJSON(((t.name||"team").replace(/[^a-z0-9]+/gi,"_"))+".allstars-team.json",{kind:"allstars-team",v:1,team:t}); };
+/* ===== Shared All-Stars Live branding for the printable PDF cards (lineup + scorecard) ===== */
+function brandCss(accent){ return '*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}'
+  +'body{margin:0;font-family:Arial,Helvetica,sans-serif;color:#0B0E13;padding:18px;background:#e9edf3}'
+  +'.card{max-width:920px;margin:0 auto;background:#fff;border:1px solid #d4d8e0;border-radius:16px;overflow:hidden;box-shadow:0 6px 24px rgba(11,14,19,.12)}'
+  +'.brand{background:#0B0E13;color:#fff;padding:13px 22px;display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid '+accent+'}'
+  +'.brand .wm{font-family:"Arial Black",Arial,sans-serif;font-weight:900;font-size:23px;letter-spacing:1.5px}'
+  +'.brand .wm i{color:#A3E635;font-style:normal}'
+  +'.brand .tag{font-size:12px;letter-spacing:3px;color:#A3E635;text-transform:uppercase;font-weight:800}'
+  +'.inner{padding:18px 22px}'
+  +'.hd{display:flex;align-items:center;gap:16px;border-bottom:3px solid '+accent+';padding-bottom:12px}'
+  +'.hd img{width:62px;height:62px;object-fit:contain}'
+  +'.hd .nm{font-size:27px;font-weight:800;letter-spacing:.5px;line-height:1.1}'
+  +'.hd .nm small{display:block;font-size:13px;font-weight:700;color:'+accent+';letter-spacing:0;margin-top:2px}'
+  +'.hd .meta{margin-left:auto;font-size:13px;color:#222;line-height:1.9;min-width:240px}'
+  +'.hd .meta .f{display:flex;gap:6px}.hd .meta .f span{color:#888;font-weight:700;width:64px;text-transform:uppercase;font-size:11px;letter-spacing:.5px;align-self:center}'
+  +'.hd .meta .f b{flex:1;border-bottom:1px solid #bbb;font-weight:600}'
+  +'.brandft{background:#0B0E13;color:#8290AC;font-size:11px;padding:9px 22px;display:flex;justify-content:space-between;align-items:center;letter-spacing:.3px}'
+  +'.brandft b{color:#A3E635;font-weight:800;letter-spacing:1px}'
+  +'@media print{body{padding:0;background:#fff}.card{border:none;box-shadow:none;border-radius:0;max-width:none}@page{margin:11mm}}'; }
+function brandBar(tag){ return '<div class="brand"><div class="wm">ALL-STARS <i>LIVE</i></div><div class="tag">'+tag+'</div></div>'; }
+function brandFt(){ return '<div class="brandft"><span>Generated with <b>ALL-STARS LIVE</b></span><span>allstarslive</span></div>'; }
 /* Printable "lineup card" — opens a clean print view (Save as PDF) with the team logo, color,
- * record and a batting-order grid pre-filled with the roster + blank POS / innings to fill in. */
+ * record and a standard batting-order grid + substitutes + pitcher log. */
 function printLineupCard(t){
   if(!t)return;
   const esc=s=>(s==null?"":String(s)).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
@@ -304,30 +325,23 @@ function printLineupCard(t){
   let plog=""; for(let i=0;i<5;i++)plog+=`<tr><td class="nm"></td><td></td><td></td><td></td></tr>`;
   const logo=t.logo?`<img src="${t.logo}" alt="">`:"";
   const html='<!doctype html><html><head><meta charset="utf-8"><title>'+esc(t.name||"Team")+' — Lineup Card</title><style>'
-    +'*{box-sizing:border-box}body{margin:0;font-family:Arial,Helvetica,sans-serif;color:#0B0E13;padding:24px}'
-    +'.hd{display:flex;align-items:center;gap:16px;border-bottom:4px solid '+color+';padding-bottom:12px}'
-    +'.hd img{width:62px;height:62px;object-fit:contain}'
-    +'.hd .nm{font-size:28px;font-weight:800;letter-spacing:.5px;line-height:1.1}'
-    +'.hd .nm small{display:block;font-size:13px;font-weight:700;color:'+color+';letter-spacing:0;margin-top:2px}'
-    +'.hd .meta{margin-left:auto;font-size:13px;color:#222;line-height:1.9;min-width:240px}'
-    +'.hd .meta .f{display:flex;gap:6px}.hd .meta .f span{color:#888;font-weight:700;width:64px;text-transform:uppercase;font-size:11px;letter-spacing:.5px;align-self:center}'
-    +'.hd .meta .f b{flex:1;border-bottom:1px solid #bbb;font-weight:600}'
+    +brandCss(color)
     +'h2{font-size:13px;letter-spacing:1px;text-transform:uppercase;color:'+color+';margin:18px 0 6px}'
     +'table{width:100%;border-collapse:collapse;font-size:14px}'
     +'th,td{border:1px solid #c8ccd4;padding:8px 6px;text-align:center;height:32px}'
     +'th{background:'+color+';color:#fff;font-size:11px;letter-spacing:.5px;text-transform:uppercase}'
     +'td.nm,th.nm{text-align:left;font-weight:700}td.ord{width:42px;font-weight:800;color:'+color+'}td.num,th.num{width:48px}td.pos,th.pos{width:70px}td.sub,th.sub{width:30%}'
     +'.two{display:flex;gap:20px}.two>div{flex:1}'
-    +'.ft{margin-top:16px;font-size:11px;color:#888;text-align:right}'
-    +'@media print{body{padding:0}@page{margin:12mm}}'
-    +'</style></head><body>'
+    +'</style></head><body><div class="card">'
+    +brandBar("Lineup Card")
+    +'<div class="inner">'
     +'<div class="hd">'+logo+'<div class="nm">'+esc(t.name||"Team")+'<small>Record '+esc(rec)+'</small></div>'
     +'<div class="meta"><div class="f"><span>Date</span><b>'+esc(today)+'</b></div><div class="f"><span>Opponent</span><b>&nbsp;</b></div><div class="f"><span>Location</span><b>&nbsp;</b></div><div class="f"><span>Coach</span><b>&nbsp;</b></div></div></div>'
     +'<h2>Batting order</h2>'
     +'<table><thead><tr><th>Order</th><th class="num">No.</th><th class="nm">Player</th><th class="pos">Pos</th><th class="sub">Sub</th></tr></thead><tbody>'+rows+'</tbody></table>'
     +'<div class="two"><div><h2>Substitutes</h2><table><thead><tr><th class="num">No.</th><th class="nm">Player</th><th class="pos">Pos</th></tr></thead><tbody>'+subs+'</tbody></table></div>'
     +'<div><h2>Pitchers</h2><table><thead><tr><th class="nm">Pitcher</th><th>IP</th><th>Pitches</th><th>Notes</th></tr></thead><tbody>'+plog+'</tbody></table></div></div>'
-    +'<div class="ft">All-Stars Live</div>'
+    +'</div>'+brandFt()+'</div>'
     +'<scr'+'ipt>window.onload=function(){setTimeout(function(){try{window.print();}catch(e){}},300);};</scr'+'ipt>'
     +'</body></html>';
   const w=window.open("","_blank");
@@ -356,29 +370,29 @@ function printGameCard(){
   const teamHead=(m,win)=>'<div class="team">'+(m.logo?'<img src="'+m.logo+'">':'<div class="ph"></div>')+'<div class="ti"><div class="tn">'+esc(m.name)+'</div>'+(m.rec?'<div class="tc">'+esc(m.rec)+'</div>':'')+'</div><div class="ts" style="color:'+m.color+'">'+m.runs+'</div>'+(win?'<div class="wb">WIN</div>':'')+'</div>';
   const today=new Date().toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric",year:"numeric"});
   const html='<!doctype html><html><head><meta charset="utf-8"><title>'+esc(A.short)+' vs '+esc(H.short)+' — Scorecard</title><style>'
-    +'*{box-sizing:border-box}body{margin:0;font-family:Arial,Helvetica,sans-serif;color:#0B0E13;padding:22px}'
-    +'.top{display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid #0B0E13;padding-bottom:6px;margin-bottom:14px}'
+    +brandCss('#A3E635')
+    +'.top{display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid #e0e3ea;padding-bottom:6px;margin-bottom:14px}'
     +'.top .ttl{font-size:13px;letter-spacing:2px;font-weight:800;color:#444}.top .dt{font-size:12px;color:#666}'
     +'.score{display:flex;align-items:stretch;gap:14px;margin-bottom:16px}'
     +'.team{flex:1;display:flex;align-items:center;gap:12px;border:1px solid #ccd2db;border-radius:10px;padding:12px 14px;position:relative}'
     +'.team img{width:54px;height:54px;object-fit:contain}.team .ph{width:54px;height:54px;border-radius:8px;background:#eef0f4}'
     +'.team .ti{flex:1}.team .tn{font-size:18px;font-weight:800;line-height:1.1}.team .tc{font-size:12px;color:#666;margin-top:2px}'
     +'.team .ts{font-size:46px;font-weight:800;line-height:1}'
-    +'.team .wb{position:absolute;top:-9px;left:12px;background:#15a34a;color:#fff;font-size:10px;font-weight:800;letter-spacing:1px;padding:2px 8px;border-radius:999px}'
+    +'.team .wb{position:absolute;top:-9px;left:12px;background:#A3E635;color:#0B0E13;font-size:10px;font-weight:800;letter-spacing:1px;padding:2px 8px;border-radius:999px}'
     +'.vs{display:flex;align-items:center;font-weight:800;color:#999;font-size:14px}'
     +'h3{font-size:13px;letter-spacing:.5px;text-transform:uppercase;margin:16px 0 6px;border-left:5px solid #0B0E13;padding-left:8px}'
     +'table{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:4px}'
     +'.ls th,.ls td{border:1px solid #c8ccd4;padding:6px 8px;text-align:center;width:34px}.ls td.tm,.ls th.tm{text-align:left;font-weight:800;width:auto}.ls .rhe{background:#f2f4f7;font-weight:800}.ls td.b{font-weight:800}'
     +'.grid th,.grid td{border:1px solid #c8ccd4;padding:6px;text-align:center;height:26px}.grid th{background:#0B0E13;color:#fff;font-size:10px;letter-spacing:.5px}.grid td.nm,.grid th.nm{text-align:left;font-weight:700;width:40%}'
     +'.cols{display:flex;gap:18px}.cols>div{flex:1}'
-    +'.ft{margin-top:14px;font-size:11px;color:#888;text-align:right}'
-    +'@media print{body{padding:0}@page{margin:12mm}}'
-    +'</style></head><body>'
+    +'</style></head><body><div class="card">'
+    +brandBar("Game Scorecard")
+    +'<div class="inner">'
     +'<div class="top"><div class="ttl">FINAL SCORE</div><div class="dt">'+esc(today)+'</div></div>'
     +'<div class="score">'+teamHead(A,winA)+'<div class="vs">vs</div>'+teamHead(H,winH)+'</div>'
     +'<h3>Line score</h3><table class="ls"><thead><tr>'+lhead+'</tr></thead><tbody>'+lrow("away",A)+lrow("home",H)+'</tbody></table>'
     +'<div class="cols"><div>'+batTable("away",A)+pitchTable("away",A)+'</div><div>'+batTable("home",H)+pitchTable("home",H)+'</div></div>'
-    +'<div class="ft">All-Stars Live</div>'
+    +'</div>'+brandFt()+'</div>'
     +'<scr'+'ipt>window.onload=function(){setTimeout(function(){try{window.print();}catch(e){}},350);};</scr'+'ipt>'
     +'</body></html>';
   const w=window.open("","_blank");
@@ -1539,7 +1553,7 @@ function actionArea(){
             <div style="font-family:${MONO};font-size:23px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0">${t.name}</div></div>
           <div style="display:flex;align-items:center;gap:10px;margin-top:7px;font-family:${MONO};font-size:18px;color:${T.sage}">
             <span style="font-weight:800;color:${t.color}">${rec}</span><span style="opacity:.45">·</span><span>${t.players.length} players</span></div>
-          <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:14px;background:${t.color};color:#fff;border-radius:9px;padding:13px;font-family:${MONO};font-weight:800;font-size:16px;letter-spacing:.8px;pointer-events:none">${IC(GEAR)} MANAGE TEAM</div></div>`;};
+          <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:14px;background:${t.color};color:#fff;border-radius:9px;padding:13px;font-family:${MONO};font-weight:800;font-size:16px;letter-spacing:.8px;pointer-events:none">${IC(GEAR)} ${t.external?"VIEW TEAM":"MANAGE TEAM"}</div></div>`;};
     const teamsBlock = DB.teams.length
       ? `<div style="font-size:13px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:${T.lime};margin:2px 2px 0">My teams</div>
          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;align-content:start">${list.map(card).join("")}</div>`
@@ -1925,7 +1939,11 @@ function actionArea(){
     } else {
       statBlock=`<div style="font-size:12px;color:${T.sageDim};text-align:center;padding:14px;border:1px dashed ${T.line};border-radius:12px">This team keeps its season stats private.</div>`;
     }
-    return step("Team stats","",`<div style="display:flex;flex-direction:column;gap:12px">${head}${roster}${statBlock}<button data-act="opendirectory" style="${ghost}">&lsaquo; Back to search</button></div>`);
+    const alreadyFav=DB.teams.some(x=>x.id===vt.id);
+    const favBtn=alreadyFav
+      ? `<button data-act="favpublicteam" style="${ghost};display:flex;align-items:center;justify-content:center;gap:9px;color:${T.amber}">★ Following — tap to remove from my home</button>`
+      : `<button data-act="favpublicteam" style="${bigBtn(T.lime,'',T.field)};display:flex;align-items:center;justify-content:center;gap:9px">☆ Follow this team — add to my home</button>`;
+    return step("Team stats","",`<div style="display:flex;flex-direction:column;gap:12px">${head}${favBtn}<div style="font-size:11px;color:${T.sageDim};text-align:center;margin-top:-4px">Following just keeps this team on your home to watch — it does NOT make you a member.</div>${roster}${statBlock}<button data-act="opendirectory" style="${ghost}">&lsaquo; Back to search</button></div>`);
   }
   if(mode==="settings"){
     const C=window.Cloud, signedIn=!!(C&&C.enabled&&C.user);
@@ -2137,7 +2155,6 @@ function actionArea(){
         <button data-act="gamecard" style="${ghost};display:flex;align-items:center;justify-content:center;gap:9px">&#128196; Scorecard (PDF)</button>
         <div style="display:flex;gap:10px">
           <button data-act="resumegame" style="${ghost};flex:1;padding:14px">&lsaquo; Resume game</button>
-          <button data-act="exportgame" style="${ghost};flex:1;padding:14px">&#8681; Data</button>
           <button data-act="summary-done" style="${bigBtn(OUR.color)};flex:2">Done</button></div>
       </div>`;
   }
@@ -2719,6 +2736,7 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="opendirectory"){ if(!(window.Cloud&&window.Cloud.enabled&&window.Cloud.user)){flash("Sign in to browse teams");return;} mode="directory"; render(); }
   else if(act==="dirsearch"){ const e=document.getElementById("dirQ"); const q=e?(e.value||"").trim():""; window._dirQ=q; if(!window.cloudSearchTeams){flash("Search needs sign-in");return;} flash("Searching…"); window.cloudSearchTeams(q).then(function(res){ dirResults=res||[]; render(); }); }
   else if(act==="viewteamstats"){ if(!window.cloudGetTeam){flash("Sign in to view");return;} flash("Loading…"); window.cloudGetTeam(arg).then(function(t){ viewTeam=t; mode="teamstats"; render(); }); }
+  else if(act==="favpublicteam"){ if(!viewTeam)return; const ex=DB.teams.find(x=>x.id===viewTeam.id); if(ex){ DB.teams=DB.teams.filter(x=>x.id!==viewTeam.id); saveDB(); flash("Removed from your home"); } else { const copy=JSON.parse(JSON.stringify(viewTeam)); copy.fav=true; copy.external=true; if(!Array.isArray(copy.players))copy.players=[]; DB.teams.push(copy); saveDB(); flash("Added to your home — watch them from the Home screen"); } render(); }
   else if(act==="setpubopp"){ const r=finderResults&&finderResults[+arg]; if(r){ oppTeamId=r.id; OPP.name=r.name; OPP.short=r.short||(r.name||"OPP").slice(0,3).toUpperCase(); OPP.color=r.color; recordRecentOpp(OPP); } finderResults=null; mode="newgame"; render(); broadcast(); }
   else if(act==="setrecentopp"){ const o=getRecentOpps()[+arg]; if(o){ oppTeamId=null; OPP.name=o.name; OPP.short=o.short||(o.name||"OPP").slice(0,3).toUpperCase(); OPP.color=o.color||"#E2574C"; recordRecentOpp(OPP); } mode="newgame"; render(); broadcast(); }
   else if(act==="setteam"){const id=arg;if(pickFor==="our"){selectTeam(id);}else{const t=teamById(id);oppTeamId=id;if(t){OPP.name=t.name;OPP.short=t.short;OPP.color=t.color;recordRecentOpp(OPP);}}mode="newgame";render();broadcast();}
@@ -3059,7 +3077,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v82";
+var APP_VERSION="v83";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
