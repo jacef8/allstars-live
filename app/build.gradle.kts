@@ -94,6 +94,9 @@ dependencies {
     // M3 (full): Google Sign-In -> OAuth token for the YouTube Live API (auto broadcast + key).
     implementation("com.google.android.gms:play-services-auth:20.7.0")
 
+    // QR generation for "use a phone as the camera" (Larix Grove deep-link → QR in camera setup).
+    implementation("com.google.zxing:core:3.5.3")
+
     debugImplementation("androidx.compose.ui:ui-tooling")
 }
 
