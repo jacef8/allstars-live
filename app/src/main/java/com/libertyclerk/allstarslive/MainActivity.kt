@@ -7,6 +7,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
@@ -24,6 +25,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
@@ -51,6 +53,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -110,53 +113,36 @@ class MainActivity : ComponentActivity() {
                 // launch splash already shows the same logo on the dark bg, so it's seamless).
                 var showSplash by rememberSaveable { mutableStateOf(true) }
                 LaunchedEffect(Unit) { delay(1200); showSplash = false }
-                var tabIndex by rememberSaveable { mutableStateOf(0) }
-                val tabs = Tab.entries
                 val ctx = androidx.compose.ui.platform.LocalContext.current
-                // Created once + kept alive so switching tabs doesn't reload a live game.
+                // Created once + kept alive so a config change doesn't reload a live game.
                 val scorerWeb = androidx.compose.runtime.remember { createScorerWebView(ctx) }
-                // During a game the tabs are seldom used — hide the bar and tuck it behind a
-                // small floating "Menu" toggle so the scorer/video get the full screen.
-                val inGame by AppUi.inGame.collectAsStateWithLifecycle()
-                var tabsOpen by rememberSaveable { mutableStateOf(false) }
-                val hideTabs = tabs[tabIndex] == Tab.GAME && inGame && !tabsOpen
+                // Camera & streaming setup overlay — opened from the web's Settings gear (native only).
+                val showVideo by AppUi.showVideo.collectAsStateWithLifecycle()
 
-                // OS back: go back a page inside the app instead of exiting. Video tab → Game tab;
-                // otherwise ask the web page (window.appBack) to pop a screen; only when it's at
-                // the home screen do we send the app to the background (never destroy it).
+                // OS back: close the camera overlay first; otherwise ask the web page
+                // (window.appBack) to pop a screen; only at the home screen do we send the app to
+                // the background (never destroy it).
                 BackHandler {
-                    if (tabIndex != 0) { tabIndex = 0 }
+                    if (showVideo) { AppUi.setShowVideo(false) }
                     else scorerWeb.evaluateJavascript("(window.appBack && window.appBack()) ? true : false") { r ->
                         if (r != "true") this@MainActivity.moveTaskToBack(true)
                     }
                 }
 
                 Box(Modifier.fillMaxSize()) {
-                    Scaffold(
-                        containerColor = MaterialTheme.colorScheme.background,
-                        bottomBar = {
-                            if (!hideTabs) AllStarsBottomBar(
-                                tabs, tabIndex,
-                                onSelect = { tabsOpen = false; tabIndex = it },
-                                // In a game, let the operator collapse the bar back to the Menu pill.
-                                onCollapse = if (inGame && tabs[tabIndex] == Tab.GAME) ({ tabsOpen = false }) else null,
-                            )
-                        },
-                    ) { inner ->
-                        Box(Modifier.fillMaxSize().padding(inner)) {
-                            when (tabs[tabIndex]) {
-                                Tab.GAME -> GameScorerScreen(scorerWeb)
-                                Tab.VIDEO -> VideoTab()
-                            }
-                        }
-                    }
+                    // The app IS the web scorer, full-screen — no native tabs (matches the web/PWA).
+                    GameScorerScreen(scorerWeb)
 
-                    // Floating toggle to bring the tab bar back during a game.
-                    if (hideTabs) {
-                        TabsPeekButton(
-                            onClick = { tabsOpen = true },
-                            modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 6.dp),
-                        )
+                    // Camera & streaming setup — native-only, opened from the web Settings gear.
+                    AnimatedVisibility(visible = showVideo, enter = fadeIn(animationSpec = tween(200)), exit = fadeOut(animationSpec = tween(200))) {
+                        Box(Modifier.fillMaxSize().background(Color(0xFF0B0E13))) {
+                            VideoTab()
+                            Button(
+                                onClick = { AppUi.setShowVideo(false) },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xCC1A2233), contentColor = Color.White),
+                                modifier = Modifier.align(Alignment.TopStart).statusBarsPadding().padding(10.dp),
+                            ) { Text("‹ Done", fontWeight = FontWeight.Bold) }
+                        }
                     }
 
                     // App-level "Start game stream" dialog — raised from the Video tab
@@ -183,19 +169,29 @@ class MainActivity : ComponentActivity() {
                         )
                     }
 
-                    // Branded splash overlay — big A centered, wordmark near the bottom; fades out.
+                    // Branded splash overlay — turf background, a near-full-screen A, wordmark at
+                    // the bottom; fades out into the app.
                     AnimatedVisibility(visible = showSplash, exit = fadeOut(animationSpec = tween(450))) {
                         Box(Modifier.fillMaxSize().background(Color(0xFF0B0E13))) {
                             Image(
+                                painter = painterResource(R.drawable.splash_turf),
+                                contentDescription = null,
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop,
+                            )
+                            // Subtle scrim so the logo + wordmark stay crisp over the turf.
+                            Box(Modifier.fillMaxSize().background(Color(0x4D070B13)))
+                            Image(
                                 painter = painterResource(R.drawable.splash_logo),
                                 contentDescription = "All-Stars Live",
-                                modifier = Modifier.size(240.dp).align(Alignment.Center),
+                                modifier = Modifier.fillMaxWidth(0.82f).align(Alignment.Center),
+                                contentScale = ContentScale.Fit,
                             )
                             Row(
-                                Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 64.dp),
+                                Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 54.dp),
                             ) {
-                                Text("ALL-STARS ", color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 30.sp, letterSpacing = 2.sp)
-                                Text("LIVE", color = Color(0xFFA3E635), fontWeight = FontWeight.ExtraBold, fontSize = 30.sp, letterSpacing = 2.sp)
+                                Text("ALL-STARS ", color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 32.sp, letterSpacing = 2.sp)
+                                Text("LIVE", color = Color(0xFFA3E635), fontWeight = FontWeight.ExtraBold, fontSize = 32.sp, letterSpacing = 2.sp)
                             }
                         }
                     }

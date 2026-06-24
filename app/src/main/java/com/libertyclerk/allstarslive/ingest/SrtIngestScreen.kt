@@ -46,6 +46,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -76,6 +77,8 @@ fun SrtIngestScreen(onUseTestPattern: () -> Unit = {}) {
     // Which camera the operator uses — picks the right setup instructions. Persisted.
     val prefs = remember { ctx.getSharedPreferences("allstars", android.content.Context.MODE_PRIVATE) }
     var cameraProfile by remember { mutableStateOf(prefs.getString("cam_profile", "mevo") ?: "mevo") }
+    // Track YouTube connection so we can show a first-run prompt when it's not set up.
+    var ytChannel by remember { mutableStateOf(prefs.getString("yt_channel", null)) }
 
     fun connect() {
         val s = surface ?: return
@@ -125,7 +128,10 @@ fun SrtIngestScreen(onUseTestPattern: () -> Unit = {}) {
 
         if (playing) {
             LiveChip(Modifier.align(Alignment.TopStart).padding(14.dp))
-        } else {
+        } else if (ytChannel != null) {
+            // Camera not live yet, but YouTube is set up → show the "waiting for camera" status.
+            // (When YouTube isn't connected we show the first-run prompt below INSTEAD, so the two
+            // never overlap.)
             CameraStatus(stats.state, stats.message, onSetup = { showSetup = true }, onUseTestPattern = onUseTestPattern)
         }
 
@@ -140,6 +146,12 @@ fun SrtIngestScreen(onUseTestPattern: () -> Unit = {}) {
             modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 18.dp),
         )
 
+        // First-run prompt: YouTube not connected and camera isn't already streaming.
+        // Show a clear call-to-action rather than hiding setup behind a long-press.
+        if (!playing && ytChannel == null) {
+            YouTubeSetupPrompt(onSetup = { showSetup = true })
+        }
+
         if (showSetup) {
             CameraSetupSheet(
                 stats = stats,
@@ -147,9 +159,41 @@ fun SrtIngestScreen(onUseTestPattern: () -> Unit = {}) {
                 profileId = cameraProfile,
                 onProfile = { cameraProfile = it; prefs.edit().putString("cam_profile", it).apply() },
                 onRestart = { source.shutdown(); connect() },
-                onClose = { showSetup = false },
+                onClose = {
+                    showSetup = false
+                    // Refresh YouTube status in case the user just connected.
+                    ytChannel = prefs.getString("yt_channel", null)
+                },
             )
         }
+    }
+}
+
+/** Shown when YouTube has never been connected — guides the user to set it up. */
+@Composable
+private fun YouTubeSetupPrompt(onSetup: () -> Unit) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier
+            .widthIn(max = 460.dp)
+            .padding(32.dp),
+    ) {
+        Icon(
+            Icons.Filled.Videocam, contentDescription = null,
+            tint = Color(0xFF5B6880),
+            modifier = Modifier.size(52.dp),
+        )
+        Text("Set up your stream", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+        Text(
+            "Connect your YouTube account and camera once, then tap Go Live at game time.",
+            color = Color(0xFF9AA0A6), fontSize = 14.sp,
+            textAlign = TextAlign.Center,
+        )
+        Button(
+            onClick = onSetup,
+            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFA3E635), contentColor = Color(0xFF0B0E13)),
+        ) { Text("Get started →", fontSize = 16.sp, fontWeight = FontWeight.Bold) }
     }
 }
 

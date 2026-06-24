@@ -1298,7 +1298,7 @@ function actionArea(){
     const hero = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:6px 0 2px;flex:none">
           <img src="icons/logo-mark.png" alt=""
             onerror="if(this.src.indexOf('icon-512')<0){this.src='icons/icon-512.png';this.style.borderRadius='20px';}else{this.style.display='none';}"
-            style="height:clamp(84px,17vh,180px);width:auto;display:block;filter:drop-shadow(0 8px 20px rgba(0,0,0,.55))">
+            style="height:clamp(130px,26vh,260px);width:auto;display:block;filter:drop-shadow(0 8px 20px rgba(0,0,0,.55))">
           <div style="font-family:${MONO};font-size:clamp(26px,4.2vw,46px);font-weight:800;letter-spacing:1.5px;line-height:1;color:#fff">ALL-STARS <span style="color:${T.lime}">LIVE</span></div></div>`;
     const resumeBtn = gameActive?`<button data-act="resume" style="${bigBtn(T.safe)};font-size:17px;padding:16px;display:flex;align-items:center;justify-content:center;gap:8px">${IC(PLAY)} Resume &middot; ${OUR.short} vs ${OPP.short}</button>`:"";
     const newGameBtn = `<button data-act="newgamestart" style="${bigBtn(T.lime,"font-size:21px;padding:17px;box-shadow:0 8px 22px rgba(163,230,53,.22)",T.field)}">${IC(PLAY)} New Game</button>`;
@@ -1357,11 +1357,11 @@ function actionArea(){
               <div style="display:flex;flex-direction:column;gap:14px">${resumeBtn}${newTile}</div>
               <div style="display:flex;flex-direction:column;gap:10px">${rightCell}</div>
             </div>
-            ${gameActive?shareBtnHome:""}
+            ${shareBtnHome}
           </div>
         </div>`;
     }
-    return `<div style="position:relative;min-height:100%;display:flex;flex-direction:column;justify-content:safe center;gap:14px;padding:6px 0">${settingsGear}${hero}${authBar}${resumeBtn}${newGameBtn}${showTeams?teamsBlock:""}${showTeams?manageBtn:""}${gameActive?shareBtnHome:""}</div>`;
+    return `<div style="position:relative;min-height:100%;display:flex;flex-direction:column;justify-content:safe center;gap:14px;padding:6px 0">${settingsGear}${hero}${authBar}${resumeBtn}${newGameBtn}${showTeams?teamsBlock:""}${showTeams?manageBtn:""}${shareBtnHome}</div>`;
   }
   if(mode==="teams"){
     const sorted=DB.teams.slice().sort((a,b)=>(b.fav?1:0)-(a.fav?1:0));
@@ -2476,7 +2476,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v48";
+var APP_VERSION="v49";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;

@@ -15,7 +15,11 @@ import android.webkit.JavascriptInterface
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
+import com.libertyclerk.allstarslive.R
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.absoluteOffset
 import androidx.compose.foundation.layout.fillMaxSize
@@ -85,6 +89,10 @@ private class ScorerBridge(private val appContext: Context) {
     /** "Start game stream" → raise the native name/privacy dialog (same as the Video tab). */
     @JavascriptInterface
     fun requestGoLive() { main.post { Broadcast.requestDialog() } }
+
+    /** Settings → "Camera & stream setup" → open the native camera/streaming screen (overlay). */
+    @JavascriptInterface
+    fun openVideo() { main.post { AppUi.setShowVideo(true) } }
 
     /** "End broadcast" from the Game page — asks for confirmation first. */
     @JavascriptInterface
@@ -157,6 +165,15 @@ fun GameScorerScreen(webView: WebView) {
     // Dark backdrop matching the scorer theme: the WebView is transparent, so this shows
     // everywhere except the monitor rect (where the camera TextureView sits).
     Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color(0xFF0B0E13))) {
+        // Blue turf behind the transparent WebView so the native app matches the web look
+        // (the web body is transparent in the app). Camera + web UI draw on top of this.
+        Image(
+            painter = painterResource(R.drawable.splash_turf),
+            contentDescription = null,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop,
+        )
+        Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color(0x99070B13)))  // scrim for contrast
         // Native camera preview, BEHIND the transparent WebView, at the web's monitor rect.
         // TextureView (not SurfaceView) so it composites in the normal view hierarchy and
         // reliably shows through the transparent WebView, with web controls drawn on top.

@@ -20,6 +20,11 @@ object AppUi {
     val inGame: StateFlow<Boolean> = _inGame
     fun setInGame(v: Boolean) { _inGame.value = v }
 
+    /** Camera & streaming setup overlay — opened from the web's Settings gear (native only). */
+    private val _showVideo = MutableStateFlow(false)
+    val showVideo: StateFlow<Boolean> = _showVideo
+    fun setShowVideo(v: Boolean) { _showVideo.value = v }
+
     /** Monitor rectangle in dp (CSS px ≈ dp at default WebView scale), or null = hide preview. */
     data class PreviewRect(val x: Float, val y: Float, val w: Float, val h: Float)
 
