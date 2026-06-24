@@ -1304,6 +1304,10 @@ function monitorPane(){
   // camera (with the scorebug already composited) behind the WebView, positioned to this
   // div's rect (see alignPreview). So the operator aims + confirms the feed right here —
   // no YouTube embed (which threw error 153 for private streams).
+  // Settings gear shown in the player (scorer only) → jumps straight to the camera/stream
+  // setup instead of backing out of the scorer.
+  const _gearSvg=`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/></svg>`;
+  const setGear=(viewMode==="viewer")?"":`<button data-act="videosetup" title="Video & camera settings" style="width:34px;height:34px;border-radius:9px;background:rgba(8,11,16,.66);border:1px solid rgba(255,255,255,.22);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer">${_gearSvg}</button>`;
   if(IS_APP){
     const camLive=!!window.__camLive, phase=window.__bcastPhase||"OFFLINE";
     const broadcasting=(phase==="LIVE"||phase==="STARTING");
@@ -1312,7 +1316,7 @@ function monitorPane(){
     const chip=`<div style="position:absolute;top:10px;left:11px;display:flex;align-items:center;gap:7px;background:rgba(8,11,16,.66);border-radius:999px;padding:5px 12px;z-index:3">
         <span class="${phase==="LIVE"?'livedot':''}" style="width:9px;height:9px;border-radius:50%;background:${dot};box-shadow:0 0 8px ${dot}"></span>
         <span style="font-family:${MONO};font-weight:800;font-size:11px;letter-spacing:1.4px;color:#fff">${label}</span></div>`;
-    const end=broadcasting?`<button data-act="appstop" title="End broadcast" style="position:absolute;top:10px;right:11px;z-index:3;height:34px;border-radius:9px;background:#FF3B5C;border:none;color:#fff;padding:0 14px;font-family:${SANS};font-weight:800;font-size:13px;cursor:pointer">End broadcast</button>`:"";
+    const end=`<div style="position:absolute;top:10px;right:11px;z-index:3;display:flex;gap:6px">${broadcasting?`<button data-act="appstop" title="End broadcast" style="height:34px;border-radius:9px;background:#FF3B5C;border:none;color:#fff;padding:0 14px;font-family:${SANS};font-weight:800;font-size:13px;cursor:pointer">End broadcast</button>`:""}${setGear}</div>`;
     const isViewer=viewMode==="viewer";
     const center = !camLive
       ? `<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;padding:0 24px;pointer-events:none">
@@ -1343,7 +1347,7 @@ function monitorPane(){
   const endBtn=`<button data-act="appstop" title="End broadcast" style="height:32px;border-radius:8px;background:#FF3B5C;border:1px solid #FF3B5C;color:#fff;display:flex;align-items:center;justify-content:center;padding:0 12px;font-family:${SANS};font-weight:800;font-size:12px;cursor:pointer">End</button>`;
   const ctrls=`<div style="position:absolute;top:9px;right:10px;display:flex;gap:6px;z-index:3">
       ${IS_APP&&appLive()?endBtn:""}
-      ${(!IS_APP&&yt)?`<button data-act="setstream" title="Change stream" style="${monBtn}">${gearIcon}</button>`:""}
+      ${setGear}
       ${yt?`<button data-act="ytopen" title="Open in YouTube" style="${monBtn}">${ytIcon}</button>`:""}
       ${yt?`<button data-act="fullscreen" title="Fullscreen" style="${monBtn}">${fsIcon}</button>`:""}
     </div>`;
@@ -1631,7 +1635,6 @@ function actionArea(){
       ? (C.user
           ? `<div style="flex:none;display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;font-size:13px;color:${T.sage}">
                <span>Signed in as <b style="color:${T.chalk}">${(C.user.email||"account").replace(/</g,"")}</b></span>
-               <button data-act="opendirectory" style="background:${T.surface};border:1px solid ${T.line};color:${T.lime};border-radius:8px;padding:6px 12px;font-weight:800;font-size:12px">🔎 Browse teams</button>
                <button data-act="signout" style="background:${T.surface};border:1px solid ${T.line};color:${T.chalk};border-radius:8px;padding:6px 12px;font-weight:800;font-size:12px">Sign out</button></div>`
           : `<div style="flex:none;display:flex;flex-direction:column;align-items:center;gap:9px">
                ${`<button data-act="signingoogle" style="display:flex;align-items:center;justify-content:center;gap:10px;background:#fff;color:#1f1f1f;border:1px solid #dadce0;border-radius:8px;padding:11px 18px;font-family:${SANS};font-weight:700;font-size:14px;min-width:240px">
@@ -1703,6 +1706,7 @@ function actionArea(){
         <div style="font-size:12px;color:${T.sage};margin-top:-6px">Manage rosters &amp; season stats.</div>
         <div style="display:flex;flex-direction:column;gap:8px">${cards}</div>
         <button data-act="newteam" style="${bigBtn(OUR.color)}">${IC('<path d="M12 5v14M5 12h14"/>')} New team</button>
+        ${(window.Cloud&&window.Cloud.enabled&&window.Cloud.user)?`<button data-act="opendirectory" style="${ghost};display:flex;align-items:center;justify-content:center;gap:9px">&#128269; Browse public teams to follow</button>`:""}
         <div style="display:flex;gap:8px"><button data-act="importteam" style="${ghost};flex:1">&#8682; Import team</button><button data-act="importgame" style="${ghost};flex:1">&#8682; Import game</button></div>
       </div>`;
   }
@@ -1833,9 +1837,9 @@ function actionArea(){
         ${toggleRow("togglestatspublic",!!t.statsPublic,"Public season stats","Let people who find your team also see its season stats.")}
       </div>` : "";
     // ----- section sub-pages (reached from the hub grid); each has a back-to-hub header -----
-    const secHdr=(title)=>`<div class="frost-card" style="display:flex;align-items:center;gap:10px;background:${T.surface};border:1px solid ${T.line};border-radius:14px;padding:12px 14px">
-        <button data-act="teamhub" style="${ghost};padding:9px 11px">&lsaquo; ${(t.name||"Team").replace(/</g,"")}</button>
-        <div style="font-family:${MONO};font-size:20px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:${T.lime}">${title}</div></div>`;
+    const secHdr=(title)=>`<div class="frost-card" style="display:flex;align-items:center;gap:12px;background:${T.surface};border:1px solid ${T.line};border-radius:14px;padding:12px 14px">
+        <button data-act="teamhub" title="Back" style="${ghost};padding:9px 13px;flex:none;font-size:15px">&lsaquo; Back</button>
+        <div style="flex:1;min-width:0;font-family:${MONO};font-size:20px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:${T.lime};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${title}</div></div>`;
     // Cap sub-pages to a comfortable reading column, centered — on a wide PC the full-width
     // #app (up to ~1680px) otherwise leaves a big dead zone in the middle of tables/forms.
     const secWrap=(inner)=>`<div style="width:100%;max-width:880px;margin:0 auto;display:flex;flex-direction:column;gap:12px">${inner}</div>`;
@@ -1937,7 +1941,7 @@ function actionArea(){
           ${hb("schedule","&#128197;","Schedule")}
           ${hb("stats","&#128202;","Stats &amp; games")}
           ${hb("photos","&#128247;","Photos")}
-          ${hb("access","&#128273;","Scorers &amp; co-owners")}
+          ${(!(C&&C.enabled)||(window.cloudIsScorer&&window.cloudIsScorer(t)))?hb("access","&#128273;","Scorers &amp; co-owners"):""}
           ${hbAct("shareteam","&#128279;","Share &amp; invite")}
         </div>
         <button data-act="startteam" style="${bigBtn(t.color)}">${IC('<path d="M8 5l11 7-11 7z" fill="currentColor" stroke="none"/>')} Start game with ${t.short}</button>
@@ -2761,6 +2765,7 @@ document.getElementById("app").addEventListener("click",e=>{
   if(act==="appgolive"){ try{ window.AllStars.requestGoLive(); }catch(e){} return; }
   if(act==="appstop"){ try{ window.AllStars.stopStream(); }catch(e){} return; }
   if(act==="setstream"){ openStream(); return; }
+  if(act==="videosetup"){ if(IS_APP&&window.AllStars&&window.AllStars.openVideo){ try{AllStars.openVideo();}catch(e){} } else { openStream(); } return; }
   if(act==="savestream"){ saveStream(); return; }
   if(act==="clearstream"){ try{localStorage.removeItem("al-stream-yt");}catch(e){} closeStream(); render(); return; }
   if(act==="closestream"){ closeStream(); return; }
@@ -3182,7 +3187,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v89";
+var APP_VERSION="v90";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
