@@ -1532,6 +1532,16 @@ function actionArea(){
     const gamesBlock=`<div class="frost-card" style="background:${T.surface};border:1px solid ${T.line};border-radius:14px;padding:12px 16px">
         <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin-bottom:2px">Recent games</div>
         ${gamesList||`<div style="font-size:12px;color:${T.sageDim};padding:8px 0">No finished games yet — each game appears here once you end it.</div>`}</div>`;
+    // Editable W-L-T record — auto-updates when a game ends, but tappable here to correct it
+    // (e.g. clear test games, or fix a game that wasn't scored to the end).
+    const canEditRec = !(window.Cloud&&window.Cloud.enabled&&window.Cloud.user) || (window.cloudCanManage&&window.cloudCanManage(t));
+    const stp=(f,d,lbl)=>`<button data-act="recadj" data-arg="${f}:${d}" style="width:34px;height:34px;border-radius:9px;background:${T.surface2};border:1px solid ${T.line};color:${T.ink};font-weight:800;font-size:18px;line-height:1">${lbl}</button>`;
+    const recCell=(f,label)=>`<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:7px">
+        <div style="font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:${T.sageDim}">${label}</div>
+        <div style="display:flex;align-items:center;gap:10px">${canEditRec?stp(f,-1,"&minus;"):""}<span style="font-family:${MONO};font-size:26px;font-weight:800;color:${T.ink};min-width:30px;text-align:center">${t.record[f]||0}</span>${canEditRec?stp(f,1,"+"):""}</div></div>`;
+    const recEditor=`<div class="frost-card" style="background:${T.surface};border:1px solid ${T.line};border-radius:14px;padding:14px 16px">
+        <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin-bottom:10px">Record${canEditRec?" &mdash; tap to adjust":""}</div>
+        <div style="display:flex;gap:8px">${recCell("w","Wins")}${recCell("l","Losses")}${recCell("t","Ties")}</div></div>`;
     // Schedule — games & practices stored on the team (syncs to the cloud with the team).
     const fmtSched=(s)=>{ try{ const dt=new Date((s.date||"")+"T"+(s.time||"00:00")); if(isNaN(dt))return s.date||""; let o=dt.toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"}); if(s.time)o+=" · "+dt.toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"}); return o; }catch(e){ return s.date||""; } };
     const sched=(t.schedule||[]).slice().sort((a,b)=>(((a.date||"")+(a.time||""))<((b.date||"")+(b.time||""))?-1:1));
@@ -1619,7 +1629,7 @@ function actionArea(){
           <button data-act="addteamp" style="${ghost}">+ Add player</button>`);
     }
     if(teamTab==="schedule") return secWrap(`${secHdr("Schedule")}${scheduleSection}`);
-    if(teamTab==="stats") return secWrap(`${secHdr("Stats &amp; games")}${gamesBlock}${statTable}`);
+    if(teamTab==="stats") return secWrap(`${secHdr("Stats &amp; games")}${recEditor}${gamesBlock}${statTable}`);
     if(teamTab==="access") return secWrap(`${secHdr("Team access")}${scorersSection}${discoverySection}`);
     if(teamTab==="rules") return secWrap(`${secHdr("League rules")}${rulesSection}`);
     // ----- HUB: team header + grid of sections + primary actions -----
@@ -1793,17 +1803,15 @@ function actionArea(){
             ${header}
             <div style="width:100%;max-width:700px;margin:0 auto;display:flex;flex-direction:column;gap:14px">${ruleCards}${doneBtn}</div>
           </div>`;
-      // Centered (safe) + width-capped so the form fills the space but still scrolls from the
-      // top when it's taller than the screen.
-      return `<div style="min-height:100%;display:flex;flex-direction:column;gap:16px;justify-content:safe center">
+      // Two BALANCED columns so the wide screen fills evenly and Start Game stays on-screen
+      // without scrolling. Left = who's playing + the two number settings; right = league/rules.
+      return `<div style="min-height:100%;display:flex;flex-direction:column;gap:14px;justify-content:safe center">
           ${header}
-          <div style="display:flex;flex-direction:column;gap:20px">
-            <div style="width:100%;max-width:1100px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:18px;align-content:center">
-              <div style="display:flex;flex-direction:column;gap:14px">${teamRow("Your team",OUR.name,OUR.color,"pickour")}${teamRow("Opponent",OPP.name,OPP.color,"pickopp")}${sideSel}</div>
-              <div style="display:flex;flex-direction:column;gap:14px">${ruleCards}</div>
-            </div>
-            <div style="width:100%;max-width:1100px;margin:0 auto">${startBtn}</div>
+          <div style="width:100%;max-width:1180px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start">
+            <div style="display:flex;flex-direction:column;gap:14px">${teamRow("Your team",OUR.name,OUR.color,"pickour")}${teamRow("Opponent",OPP.name,OPP.color,"pickopp")}${sideSel}${runCapCard}${hittersCard}</div>
+            <div style="display:flex;flex-direction:column;gap:14px">${leagueCard}${alertsCard}${pitchTypeCard}${startCard}</div>
           </div>
+          <div style="width:100%;max-width:1180px;margin:0 auto">${startBtn}</div>
         </div>`;
     }
     if(setMode) return `<div style="display:flex;flex-direction:column;gap:14px">${header}${ruleCards}${doneBtn}</div>`;
@@ -2343,6 +2351,7 @@ document.getElementById("app").addEventListener("click",e=>{
   if(act==="schedadd"){ const t=teamById(openTeamId); if(!t)return; const g=id=>{const e=document.getElementById(id);return e?(e.value||""):"";}; const date=g("schDate"); if(!date){flash("Pick a date");return;} const _sel=g("schOppSel"); const opp=(_sel==="__new__"?g("schOppNew"):_sel).trim(); if(!Array.isArray(t.schedule))t.schedule=[]; t.schedule.push({id:"s"+Date.now().toString(36),type:g("schType")||"game",date:date,time:g("schTime"),opp:opp,loc:g("schLoc").trim(),notes:g("schNotes").trim()}); saveDB(); render(); return; }
   if(act==="schedrm"){ const t=teamById(openTeamId); if(t&&Array.isArray(t.schedule)){ t.schedule=t.schedule.filter(s=>s.id!==arg); saveDB(); render(); } return; }
   if(act==="schview"){ scheduleView=(arg==="calendar"?"calendar":"list"); try{localStorage.setItem("al-sched-view",scheduleView);}catch(e){} render(); return; }
+  if(act==="recadj"){ const t=teamById(openTeamId); if(!t)return; if(window.Cloud&&window.Cloud.enabled&&window.Cloud.user&&window.cloudCanManage&&!window.cloudCanManage(t)){flash("Only the owner can edit the record");return;} const parts=(arg||"").split(":"),f=parts[0],d=+parts[1]; if(!t.record)t.record={w:0,l:0,t:0}; if(f==="w"||f==="l"||f==="t"){ t.record[f]=Math.max(0,(t.record[f]||0)+d); saveDB(); render(); } return; }
   if(act==="calprev"||act==="calnext"){ if(!calYM){const d=new Date();calYM={y:d.getFullYear(),m:d.getMonth()};} let mm=calYM.m+(act==="calnext"?1:-1),yy=calYM.y; if(mm<0){mm=11;yy--;} else if(mm>11){mm=0;yy++;} calYM={y:yy,m:mm}; calSelDay=null; render(); return; }
   if(act==="calday"){ calSelDay=(calSelDay===arg?null:arg); render(); return; }
   if(act==="invitewatch"){ openShare(); return; }
@@ -2781,7 +2790,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v75";
+var APP_VERSION="v76";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
