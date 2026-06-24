@@ -3012,12 +3012,16 @@ window.appBack=function(){
     if(mode==="lineup"){ mode=gameActive?"idle":"home"; render(); return true; }
     if(mode==="team"&&teamTab&&teamTab!=="hub"){ teamTab="hub"; render(); return true; }
     if(mode==="team"){ mode="teams"; render(); return true; }
+    if(mode==="teamstats"){ mode="directory"; render(); return true; }   // public team view → back to search
+    if(mode==="directory"){ mode="teams"; render(); return true; }       // browse teams → back to Teams
     if(mode==="settings"){ mode="home"; render(); return true; }
     if(mode==="teams"){ mode="home"; render(); return true; }
     if(mode==="summary"){ mode="idle"; render(); return true; }
     if(mode==="idle"){ mode="home"; render(); return true; }
+    // Any other non-home screen: fall back to home rather than ever backgrounding mid-app.
+    if(mode!=="home"){ mode="home"; render(); return true; }
   }catch(e){}
-  return false;   // home / unknown → let the OS send the app to the background
+  return false;   // ONLY the home screen lets the OS background the app (state is kept, not exited)
 };
 
 /* ===== fan share: fans watch the YouTube broadcast (scorebug burned into video).
@@ -3187,7 +3191,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v90";
+var APP_VERSION="v91";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
