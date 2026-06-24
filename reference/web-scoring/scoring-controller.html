@@ -1877,18 +1877,18 @@ function actionArea(){
       const member=signedIn && (!(window.cloudIsMember) || window.cloudIsMember(t));
       if(!signedIn) return secWrap(`${secHdr("Photos")}<div style="font-size:13px;color:${T.sage};padding:8px">Sign in on the Home screen to view &amp; add team photos.</div>`);
       if(!member) return secWrap(`${secHdr("Photos")}<div style="font-size:13px;color:${T.sage};padding:8px">Follow or join this team to see its photo gallery.</div>`);
-      if(photoListTeam!==t.id){ photoListTeam=t.id; photoList=null; if(window.cloudGetPhotos)window.cloudGetPhotos(t.id).then(function(l){ if(photoListTeam===t.id){ photoList=l; if(teamTab==="photos")render(); } }); }
+      if(photoListTeam!==t.id){ photoListTeam=t.id; photoList=null; try{ if(window.cloudPrunePhotos)window.cloudPrunePhotos(t.id); }catch(e){} if(window.cloudGetPhotos)window.cloudGetPhotos(t.id).then(function(l){ if(photoListTeam===t.id){ photoList=l; if(teamTab==="photos")render(); } }); }
       const addBtn=`<label style="${bigBtn(T.lime,'',T.field)};display:flex;align-items:center;justify-content:center;gap:9px;cursor:pointer">&#128247; Add photos<input type="file" accept="image/*" multiple onchange="window.uploadTeamPhotos(this,'${t.id}')" style="display:none"></label>`;
       const grid = photoList===null
         ? `<div style="font-size:13px;color:${T.sageDim};text-align:center;padding:20px">Loading photos…</div>`
         : (photoList.length
-            ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(106px,1fr));gap:8px">${photoList.map(p=>`<button data-act="photozoom" data-arg="${p.id}" style="border:1px solid ${T.line};padding:0;background:${T.surface};cursor:pointer;aspect-ratio:1;border-radius:10px;overflow:hidden"><img src="${p.img}" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block"></button>`).join("")}</div>`
+            ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(106px,1fr));gap:8px">${photoList.map(p=>`<button data-act="photozoom" data-arg="${p.id}" style="border:1px solid ${T.line};padding:0;background:${T.surface};cursor:pointer;aspect-ratio:1;border-radius:10px;overflow:hidden"><img src="${p.url||p.img}" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block"></button>`).join("")}</div>`
             : `<div style="font-size:13px;color:${T.sageDim};text-align:center;padding:24px;border:1px dashed ${T.line};border-radius:12px">No photos yet. Tap “Add photos” to start the gallery.</div>`);
       let zoomOv="";
       const zp=photoList&&photoList.find(x=>x.id===photoZoom);
       if(zp){ const canDelZ=(C.user&&zp.authorUid===C.user.uid)||(window.cloudCanManage&&window.cloudCanManage(t));
         zoomOv=`<div data-act="photoclose" style="position:fixed;inset:0;z-index:240;background:rgba(8,11,16,.93);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:13px;padding:18px">
-            <img src="${zp.img}" onclick="event.stopPropagation()" style="max-width:100%;max-height:74%;object-fit:contain;border-radius:10px;box-shadow:0 12px 40px rgba(0,0,0,.6)">
+            <img src="${zp.url||zp.img}" onclick="event.stopPropagation()" style="max-width:100%;max-height:74%;object-fit:contain;border-radius:10px;box-shadow:0 12px 40px rgba(0,0,0,.6)">
             ${zp.caption?`<div style="color:${T.chalk};font-size:13px;max-width:90%;text-align:center">${(zp.caption||"").replace(/</g,"&lt;")}</div>`:""}
             <div style="font-size:11px;color:${T.sageDim}">${(zp.authorName||"").replace(/</g,"&lt;")}</div>
             <div style="display:flex;gap:10px">${canDelZ?`<button data-act="delphoto" data-arg="${zp.id}" style="background:none;border:1px solid ${T.out};color:${T.out};border-radius:8px;padding:10px 16px;font-weight:700">&#x1F5D1; Delete</button>`:""}<button data-act="photoclose" style="background:${T.surface2};border:1px solid ${T.line};color:${T.chalk};border-radius:8px;padding:10px 18px;font-weight:700">Close</button></div></div>`;
@@ -3144,7 +3144,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v86";
+var APP_VERSION="v87";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;

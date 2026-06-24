@@ -33,6 +33,7 @@
   load(BASE + "firebase-app-compat.js")
     .then(function () { return load(BASE + "firebase-auth-compat.js"); })
     .then(function () { return load(BASE + "firebase-firestore-compat.js"); })
+    .then(function () { return load(BASE + "firebase-storage-compat.js"); })   // photo gallery → Cloud Storage
     .then(function () {
       firebase.initializeApp(cfg);
       var auth = firebase.auth();
@@ -45,6 +46,7 @@
       window.Cloud.enabled = true;
       window.Cloud.auth = auth;
       try { window.Cloud.db = firebase.firestore(); } catch (e) {}
+      try { window.Cloud.storage = firebase.storage(); } catch (e) {}
 
       // Returning from a magic-link? Finish the sign-in.
       try {

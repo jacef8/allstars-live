@@ -2,6 +2,9 @@
   "firestore": {
     "rules": "reference/web-scoring/firestore.rules"
   },
+  "storage": {
+    "rules": "reference/web-scoring/storage.rules"
+  },
   "hosting": {
     "public": "reference/web-scoring",
     "cleanUrls": true,

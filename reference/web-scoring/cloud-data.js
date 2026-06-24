@@ -276,15 +276,13 @@
       try { d.collection("teams").doc(teamId).update({ lastMsgAt: Date.now(), updatedAt: Date.now() }).catch(function () {}); } catch (e) {}
     }).catch(function (e) { ctoast("Couldn't send: " + e.message); });
   };
-  /* ===== Team photo gallery (teams/{id}/photos subcollection) — members read/add; author/owner delete ===== */
-  window.cloudSubscribePhotos = function (teamId, cb) {
-    var d = fdb(); if (!d || !teamId) return function () {};
-    try {
-      return d.collection("teams").doc(teamId).collection("photos").orderBy("ts", "desc").limit(300)
-        .onSnapshot(function (s) { var out = []; s.forEach(function (m) { out.push(Object.assign({ id: m.id }, m.data())); }); try { cb(out); } catch (e) {} },
-                    function (e) { console.warn("photos:", e.message); try { cb(null, e); } catch (x) {} });
-    } catch (e) { return function () {}; }
-  };
+  /* ===== Team photo gallery =====
+   * Image BYTES live in Cloud Storage (teams/{id}/photos/{photoId}.jpg); a small Firestore doc
+   * (teams/{id}/photos/{photoId}) holds the download URL + metadata. Members read/add; author or
+   * owner deletes. Each photo carries expireAt (1-year retention) — cloudPrunePhotos() deletes
+   * the expired ones (both the Storage object and the Firestore doc). Old inline-base64 photos
+   * (field `img`) still render via `img`. */
+  var PHOTO_RETENTION_MS = 365 * 24 * 60 * 60 * 1000;   // 1 year
   window.cloudGetPhotos = function (teamId) {
     var d = fdb(); if (!d || !teamId) return Promise.resolve([]);
     return d.collection("teams").doc(teamId).collection("photos").orderBy("ts", "desc").limit(300).get()
@@ -292,15 +290,36 @@
       .catch(function (e) { console.warn("getPhotos:", e.message); return null; });
   };
   window.cloudAddPhoto = function (teamId, dataUrl, caption) {
-    var d = fdb(), u = myUid(); if (!d || !u || !teamId || !dataUrl) return Promise.resolve();
-    return d.collection("teams").doc(teamId).collection("photos").add({
-      img: dataUrl, caption: (caption || "").slice(0, 200), authorUid: u, authorName: (window.cloudMyName ? window.cloudMyName() : myEmail()) || "Someone", ts: Date.now(),
-    }).catch(function (e) { ctoast("Couldn't add photo: " + e.message); });
+    var d = fdb(), u = myUid(), st = window.Cloud && window.Cloud.storage;
+    if (!d || !u || !teamId || !dataUrl) return Promise.resolve();
+    var meta = function (extra) {
+      return Object.assign({ caption: (caption || "").slice(0, 200), authorUid: u,
+        authorName: (window.cloudMyName ? window.cloudMyName() : myEmail()) || "Someone",
+        ts: Date.now(), expireAt: Date.now() + PHOTO_RETENTION_MS }, extra);
+    };
+    var col = d.collection("teams").doc(teamId).collection("photos");
+    if (!st) {   // Storage SDK missing → fall back to inline base64 in Firestore (old behavior)
+      return col.add(meta({ img: dataUrl })).catch(function (e) { ctoast("Couldn't add photo: " + e.message); });
+    }
+    var id = col.doc().id, path = "teams/" + teamId + "/photos/" + id + ".jpg", ref = st.ref(path);
+    return ref.putString(dataUrl, "data_url").then(function () { return ref.getDownloadURL(); })
+      .then(function (url) { return col.doc(id).set(meta({ url: url, path: path })); })
+      .catch(function (e) { ctoast("Couldn't add photo: " + (e && e.message || e)); });
   };
   window.cloudDeletePhoto = function (teamId, photoId) {
-    var d = fdb(); if (!d || !teamId || !photoId) return Promise.resolve();
-    return d.collection("teams").doc(teamId).collection("photos").doc(photoId).delete()
-      .catch(function (e) { ctoast("Couldn't delete: " + e.message); });
+    var d = fdb(), st = window.Cloud && window.Cloud.storage; if (!d || !teamId || !photoId) return Promise.resolve();
+    var ref = d.collection("teams").doc(teamId).collection("photos").doc(photoId);
+    return ref.get().then(function (doc) {
+      var p = doc.exists ? doc.data().path : null;
+      return ref.delete().then(function () { if (p && st) { return st.ref(p).delete().catch(function () {}); } });
+    }).catch(function (e) { ctoast("Couldn't delete: " + e.message); });
+  };
+  // Delete photos past their retention (expireAt < now). Best-effort, called when the gallery opens.
+  window.cloudPrunePhotos = function (teamId) {
+    var d = fdb(); if (!d || !teamId) return Promise.resolve();
+    return d.collection("teams").doc(teamId).collection("photos").where("expireAt", "<", Date.now()).limit(50).get()
+      .then(function (s) { var ps = []; s.forEach(function (m) { ps.push(window.cloudDeletePhoto(teamId, m.id)); }); return Promise.all(ps); })
+      .catch(function () {});
   };
 
   window.cloudDeleteMessage = function (teamId, msgId) {
