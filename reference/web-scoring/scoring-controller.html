@@ -1087,12 +1087,13 @@ function monitorPane(){
         <span class="${phase==="LIVE"?'livedot':''}" style="width:9px;height:9px;border-radius:50%;background:${dot};box-shadow:0 0 8px ${dot}"></span>
         <span style="font-family:${MONO};font-weight:800;font-size:11px;letter-spacing:1.4px;color:#fff">${label}</span></div>`;
     const end=broadcasting?`<button data-act="appstop" title="End broadcast" style="position:absolute;top:10px;right:11px;z-index:3;height:34px;border-radius:9px;background:#FF3B5C;border:none;color:#fff;padding:0 14px;font-family:${SANS};font-weight:800;font-size:13px;cursor:pointer">End broadcast</button>`:"";
+    const isViewer=viewMode==="viewer";
     const center = !camLive
       ? `<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;padding:0 24px;pointer-events:none">
           <svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="${T.sageDim}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
-          <div style="font-family:${MONO};font-weight:800;letter-spacing:1.5px;font-size:14px;color:${T.sage}">WAITING FOR CAMERA</div>
-          <div style="font-size:12px;color:${T.sageDim};max-width:300px;line-height:1.45">In Mevo Multicam, Go Live to the “AllStars App” destination — the feed shows here once it’s connected.</div></div>`
-      : (!broadcasting
+          <div style="font-family:${MONO};font-weight:800;letter-spacing:1.5px;font-size:14px;color:${T.sage}">${isViewer?"WAITING FOR VIDEO":"WAITING FOR CAMERA"}</div>
+          <div style="font-size:12px;color:${T.sageDim};max-width:300px;line-height:1.45">${isViewer?"The video will appear here once the game is live.":"Connect your camera's stream to this app — set it up in <b style='color:"+T.sage+"'>Settings → Camera &amp; stream setup</b>. The feed shows here once it's connected."}</div></div>`
+      : ((!broadcasting && !isViewer)
           ? `<button data-act="appgolive" style="position:absolute;bottom:14px;left:50%;transform:translateX(-50%);z-index:3;background:${T.live};color:#fff;border:none;border-radius:10px;padding:12px 22px;font-family:${SANS};font-weight:800;font-size:16px;display:inline-flex;align-items:center;gap:9px;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.55)">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="#fff" stroke="none"><path d="M5 3l14 9-14 9V3z"/></svg>Go Live</button>`
           : "");
@@ -1556,7 +1557,7 @@ function actionArea(){
     const startVal=G.startedAt?(()=>{const d=new Date(G.startedAt),p=n=>String(n).padStart(2,"0");return p(d.getHours())+":"+p(d.getMinutes());})():"";
     const startCard=`<div style="${rowCard}">
           <div><div style="font-weight:800;color:${T.ink};font-size:19px">Actual start time</div>
-            <div style="color:${T.sage};font-size:14px;margin-top:3px">When the game really started${G.startedAt?"":" — auto-set when you start"}</div></div>
+            <div style="color:${T.sage};font-size:14px;margin-top:3px">${G.startedAt?"When the game actually began (tap to change).":"Leave blank — it fills in automatically at the first pitch. Or set it here."}</div></div>
           <input type="time" value="${startVal}" onchange="ngStartTime(this.value)" style="background:${T.surface2};border:1px solid ${T.line};color:${T.ink};border-radius:10px;padding:13px 12px;font-family:${MONO};font-size:20px;font-weight:800;outline:none"></div>`;
     const pitchTypeCard=`<div style="${rowCard}">
           <div><div style="font-weight:800;color:${T.ink};font-size:19px">Track pitch types</div>
@@ -1902,12 +1903,15 @@ function render(){
     // Preserve scroll position across a same-mode re-render (e.g. flipping a toggle), so the
     // page doesn't jump back to the top. A genuine page change (mode changed) starts at top.
     const prevScroll=(scroll&&mode===_lastMode)?(()=>{const c=document.querySelector("#content > div");return c?c.scrollTop:0;})():0;
+    // Preserve the lineup list's scroll across a reorder re-render so it doesn't snap to the top.
+    const prevLineup=(mode==="lineup")?(()=>{const l=document.getElementById("lineup-list");return l?l.scrollTop:0;})():0;
     // page-zoom (scroll pages only) scales the UI up on big monitors; lineup is excluded so
     // its drag coordinates stay accurate.
     const cls=`${mode!==_lastMode?"screen-in ":""}${scroll?"page-zoom":""}`;
-    document.getElementById("content").innerHTML=`<div class="${cls}" style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px;${scroll?"overflow-y:auto;-webkit-overflow-scrolling:touch":""}">${actionArea()}</div>`;
+    document.getElementById("content").innerHTML=`<div class="${cls}" style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px;${scroll?"overflow-y:auto;-webkit-overflow-scrolling:touch":""}">${actionArea()}</div>${confirmOverlay()}`;
     _lastMode=mode;
     if(prevScroll){ const c=document.querySelector("#content > div"); if(c)c.scrollTop=prevScroll; }
+    if(prevLineup){ const l=document.getElementById("lineup-list"); if(l)l.scrollTop=prevLineup; }
     if(mode==="lineup")setupLineupDrag();
     return;
   }
@@ -2217,7 +2221,7 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="teamcolor"){const t=teamById(openTeamId);if(t){t.color=arg;saveDB();}render();}
   else if(act==="newteam"){const t=newTeam("");openTeamId=t.id;teamTab="hub";mode="team";render();}
   else if(act==="teamsback"){mode="teams";render();}
-  else if(act==="deleteteam"){ const delId=openTeamId; const td=teamById(delId); if(!td)return; let ok=false; try{ok=confirm("Delete "+td.name+"?\n\nThis removes the roster and all season stats and cannot be undone.");}catch(e){} if(ok){ try{ if(window.cloudDeleteTeam)cloudDeleteTeam(delId); }catch(e){} DB.teams=DB.teams.filter(t=>t.id!==delId); if(curTeamId===delId)curTeamId=null; openTeamId=null; saveDB(); mode="teams"; render(); } }
+  else if(act==="deleteteam"){ const delId=openTeamId; const td=teamById(delId); if(!td)return; confirmAct={title:"Delete "+(td.name||"team")+"?",msg:"This removes the roster and all season stats and can't be undone.",yes:"Delete",danger:true,run:function(){ try{ if(window.cloudDeleteTeam)cloudDeleteTeam(delId); }catch(e){} DB.teams=DB.teams.filter(t=>t.id!==delId); if(curTeamId===delId)curTeamId=null; openTeamId=null; teamTab="hub"; saveDB(); mode="teams"; render(); }}; render(); }
   else if(act==="addteamp"){const t=teamById(openTeamId);if(t)teamAddPlayer(t);render();}
   else if(act==="rmteamp"){const t=teamById(openTeamId);if(t)teamRemovePlayer(t,arg);render();}
   else if(act==="startteam"){newgameFrom="team";selectTeam(openTeamId);G=initGame();loadTeamLineup(teamById(curTeamId));hist=[];resetUI();mode="newgame";render();broadcast();}
@@ -2293,7 +2297,7 @@ function renderToolbar(){
 }
 window.onLinkChange=renderToolbar;   // relay open/close → repaint the dot
 window.cloudMyName=function(){ const u=window.Cloud&&window.Cloud.user; if(!u)return ""; return u.displayName||(u.email||"").split("@")[0]||"Someone"; };
-window.onCloudAuth=function(u){ try{ if(u&&window.cloudSyncTeams)window.cloudSyncTeams(); }catch(e){} try{ if(u&&window.cloudClaimInvite)window.cloudClaimInvite(); }catch(e){} try{ if(u&&window.cloudClaimFollow)window.cloudClaimFollow(); }catch(e){} try{ render(); }catch(e){} };
+window.onCloudAuth=function(u){ try{ if(u&&window.cloudSyncTeams)window.cloudSyncTeams(); }catch(e){} try{ if(u&&window.cloudClaimInvite)window.cloudClaimInvite(); }catch(e){} try{ if(u&&window.cloudClaimFollow)window.cloudClaimFollow(); }catch(e){} try{ if(u && ["home","settings","teams","pickteam"].includes(mode)) mode="home"; }catch(e){} try{ render(); }catch(e){} };   // after sign-in, land on Home
 
 /* ===== Team chat (modal) — real-time messages; owner/scorers/followers can post, owner can delete ===== */
 let chatTeamId=null, chatUnsub=null, chatMsgs=[];
@@ -2509,7 +2513,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v57";
+var APP_VERSION="v58";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
