@@ -792,6 +792,7 @@ function applyRemote(raw){
 }
 let _seq=0,_event=null,_eventId=0,_pitch=null;
 let phonePane="score";   // phone-only paging: "score" | "video" (large screens show both)
+let summaryTeam="us";    // end-game box score: which team's batting/pitching to show ("us" | "opp")
 let monitorOn=(()=>{try{ const p=new URLSearchParams(location.search); if(p.get("feed")==="1") return false; if(p.get("yt")) return true; return localStorage.getItem("al-monitor-on")!=="0";}catch(e){return true;}})();  // wide: video shown/hidden; shared ?feed=1 opens feed-only
 let viewMode=(()=>{try{ const p=new URLSearchParams(location.search); if(p.get("view")==="viewer") return "viewer"; return localStorage.getItem("al-view-mode")||"scorer";}catch(e){return "scorer";}})();  // "scorer" | "viewer"; shared links (?view=viewer) open as viewer
 let viewerRight=(()=>{try{return localStorage.getItem("al-viewer-right")||"field";}catch(e){return "field";}})();  // viewer + video on: which of field/feed is the big one
@@ -1067,10 +1068,11 @@ function batterCard(){
   const nameLine=b.ours?pBug(b):TEAMS[k].name.toUpperCase();
   const sub=b.ours
     ? `${TEAMS[k].short}${b.pos?` · ${b.pos}`:""} &middot; ${ord} in order`
-    : `${ord} batter`;   // opponent: the big name already shows the team — don't repeat it
+    : `${TEAMS[k].short||"OPP"} &middot; ${ord} batter`;   // include the team so it's unmistakable
   return `<div data-act="reviewbatter" data-arg="${batterKeyOf(b)}" class="frost-card" style="display:flex;align-items:center;gap:13px;background:rgba(13,19,32,.82);border:1px solid ${c}66;border-left:5px solid ${c};border-radius:10px;padding:9px 14px;flex-shrink:0;cursor:pointer">
     <span style="font-family:${MONO};font-size:34px;font-weight:700;color:${c};line-height:1;min-width:46px;text-align:center">${big}</span>
     <div style="flex:1;min-width:0">
+      <div style="display:inline-flex;align-items:center;gap:6px;background:${c};color:#fff;border-radius:999px;padding:2px 9px;font-family:${MONO};font-size:10px;font-weight:800;letter-spacing:1px;margin-bottom:4px">&#9678; AT BAT</div>
       <div style="font-family:${MONO};font-size:23px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;line-height:1;color:${T.chalk};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${nameLine}</div>
       <div style="font-size:11px;color:${T.sage};font-weight:500;margin-top:3px">${sub}</div></div>
     <div style="text-align:right;line-height:1.1;min-width:58px">
@@ -1921,8 +1923,7 @@ function actionArea(){
     return `<div class="frost-card" style="flex-shrink:0;display:flex;align-items:center;gap:10px;background:${T.surface};border:1px solid ${T.line};border-radius:14px;padding:10px 12px">
         <button data-act="lineupback" style="${ghost};padding:9px 13px;flex:none">&lsaquo; Back</button>
         <div style="flex:1;min-width:0"><div style="font-family:${MONO};font-size:20px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:${T.lime}">Lineups</div>
-          <div style="font-size:11px;color:${T.sage};margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${OUR.name} &middot; batting ${n}${n>9?" (continuous)":""} &middot; drag to reorder</div></div>
-        <button data-act="newgame" title="Game setup & rules" style="${ghost};padding:9px 13px;flex:none;font-size:18px">&#9881;</button></div>
+          <div style="font-size:11px;color:${T.sage};margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${OUR.name} &middot; batting ${n}${n>9?" (continuous)":""} &middot; drag to reorder</div></div></div>
       ${luToggle}
       <div style="flex-shrink:0;display:flex;align-items:center;justify-content:space-between;background:${T.surface2};border:1px solid ${T.line};border-radius:9px;padding:9px 12px">
         <span style="font-size:14px;color:${T.sage}">Pitcher</span>
@@ -1975,12 +1976,26 @@ function actionArea(){
     const maxI=Math.max(1,G.inning);
     const lineHead=`<th style="text-align:left;padding:4px 6px">Team</th>`+Array.from({length:maxI},(_,i)=>`<th style="padding:10px 7px">${i+1}</th>`).join("")+`<th style="padding:10px 7px">R</th><th style="padding:10px 7px">H</th><th style="padding:10px 7px">E</th>`;
     const lineRow=side=>{let c=`<td style="text-align:left;padding:4px 6px;font-weight:800">${TEAMS[side].short}</td>`;for(let i=1;i<=maxI;i++)c+=`<td style="padding:10px 7px">${(G.line[side]&&G.line[side][i])||0}</td>`;c+=`<td style="padding:10px 7px;font-weight:800;color:${T.ink}">${box.totals[side].r}</td><td style="padding:10px 7px">${box.totals[side].h}</td><td style="padding:10px 7px">${box.totals[side].e}</td>`;return `<tr style="border-top:1px solid ${T.line}">${c}</tr>`;};
-    const bb=(box[G.ourSide]||[]).map(b=>`<tr style="border-top:1px solid ${T.line}"><td style="text-align:left;padding:5px 6px;font-weight:700;white-space:nowrap">#${b.num} ${b.name}</td><td style="padding:11px 6px">${b.ab}</td><td style="padding:11px 6px">${b.r}</td><td style="padding:11px 6px">${b.h}</td><td style="padding:11px 6px">${b.rbi}</td><td style="padding:11px 6px">${b.bb}</td><td style="padding:11px 6px">${b.k}</td></tr>`).join("");
-    // Pitching: per-pitcher line for OUR pitchers (keys "o"+rosterIdx). outs/3 = IP; P = pitch count.
-    const pitchers=Object.keys(G.pstats||{}).filter(k=>k[0]==="o").map(k=>{const idx=+k.slice(1),pl=ROSTER[idx],ps=G.pstats[k]||{},pc=(G.pitches&&G.pitches[k])||0,outs=ps.outs||0;return {name:pl?("#"+pl.num+" "+pl.name):"Pitcher",ip:Math.floor(outs/3)+"."+(outs%3),pc:pc,h:ps.h||0,r:ps.r||0,bb:ps.bb||0,k:ps.k||0,outs:outs};}).filter(x=>x.outs>0||x.pc>0).sort((a,b)=>b.outs-a.outs);
+    // ----- Box score for EITHER team (toggle). selSide = the chosen team's batting side. -----
+    const oppSide=G.ourSide==="home"?"away":"home";
+    const selSide=summaryTeam==="us"?G.ourSide:oppSide;
+    const selName=summaryTeam==="us"?OUR.name:(OPP.name||"Opponent");
+    const bb=(box[selSide]||[]).map(b=>`<tr style="border-top:1px solid ${T.line}"><td style="text-align:left;padding:5px 6px;font-weight:700;white-space:nowrap">#${b.num} ${b.name}</td><td style="padding:11px 6px">${b.ab}</td><td style="padding:11px 6px">${b.r}</td><td style="padding:11px 6px">${b.h}</td><td style="padding:11px 6px">${b.rbi}</td><td style="padding:11px 6px">${b.bb}</td><td style="padding:11px 6px">${b.k}</td></tr>`).join("");
+    // Pitching for the chosen team. OUR pitchers are keyed "o"+rosterIdx (note: /^o\d/, NOT k[0]==="o",
+    // so the opponent's pitcher key "oppP" no longer leaks into our table). The opponent uses "oppP".
+    let pitchers;
+    if(summaryTeam==="us"){
+      pitchers=Object.keys(G.pstats||{}).filter(k=>/^o\d/.test(k)).map(k=>{const idx=+k.slice(1),pl=ROSTER[idx],ps=G.pstats[k]||{},pc=(G.pitches&&G.pitches[k])||0,outs=ps.outs||0;return {name:pl?("#"+pl.num+" "+pl.name):"Pitcher",ip:Math.floor(outs/3)+"."+(outs%3),pc:pc,h:ps.h||0,r:ps.r||0,bb:ps.bb||0,k:ps.k||0,outs:outs};});
+    } else {
+      const ps=(G.pstats&&G.pstats.oppP)||{},pc=(G.pitches&&G.pitches.oppP)||0,outs=ps.outs||0;
+      pitchers=[{name:(OPP.short||"OPP")+" pitcher",ip:Math.floor(outs/3)+"."+(outs%3),pc:pc,h:ps.h||0,r:ps.r||0,bb:ps.bb||0,k:ps.k||0,outs:outs}];
+    }
+    pitchers=pitchers.filter(x=>x.outs>0||x.pc>0).sort((a,b)=>b.outs-a.outs);
     const pp=pitchers.map(x=>`<tr style="border-top:1px solid ${T.line}"><td style="text-align:left;padding:5px 6px;font-weight:700;white-space:nowrap">${(x.name||'').replace(/</g,'')}</td><td style="padding:11px 6px">${x.ip}</td><td style="padding:11px 6px">${x.pc}</td><td style="padding:11px 6px">${x.h}</td><td style="padding:11px 6px">${x.r}</td><td style="padding:11px 6px">${x.bb}</td><td style="padding:11px 6px">${x.k}</td></tr>`).join("");
-    const pitchBlock=pitchers.length?`<div><div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin:0 2px 4px">${OUR.name} &mdash; pitching</div>
+    const pitchBlock=pitchers.length?`<div><div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin:0 2px 4px">${selName} &mdash; pitching</div>
           <div style="overflow-x:auto;background:${T.surface};border:1px solid ${T.line};border-radius:10px;padding:4px 6px"><table style="width:100%;border-collapse:collapse;font-family:${MONO};font-size:17px;text-align:center;color:${T.chalk}"><thead><tr style="color:${T.sageDim};font-size:13px"><th style="text-align:left;padding:4px 6px">Pitcher</th><th title="Innings pitched">IP</th><th title="Pitches">P</th><th>H</th><th>R</th><th>BB</th><th>K</th></tr></thead><tbody>${pp}</tbody></table></div></div>`:"";
+    const stBtn=(v,lbl)=>`<button data-act="sumteam" data-arg="${v}" style="flex:1;background:${summaryTeam===v?T.lime:T.surface2};color:${summaryTeam===v?T.field:T.sage};border:1px solid ${summaryTeam===v?T.lime:T.line};border-radius:9px;padding:9px 0;font-family:${MONO};font-weight:800;font-size:13px;letter-spacing:.4px;text-transform:uppercase">${lbl}</button>`;
+    const teamToggle=`<div style="display:flex;gap:6px">${stBtn("us",OUR.short||"Us")}${stBtn("opp",(OPP.short||"Opp"))}</div>`;
     return `<div style="display:flex;flex-direction:column;gap:14px">
         <div style="text-align:center">
           <div style="font-family:${MONO};font-size:19px;font-weight:800;letter-spacing:1.5px;color:${resCol}">FINAL &middot; ${res}</div>
@@ -1990,7 +2005,8 @@ function actionArea(){
             <div style="text-align:center"><div style="font-family:${MONO};font-size:14px;font-weight:700;color:${T.sage}">${TEAMS.home.short}</div><div style="font-family:${MONO};font-size:44px;font-weight:800;line-height:.9;color:${T.ink}">${G.home}</div></div>
           </div></div>
         <div style="overflow-x:auto;background:${T.surface};border:1px solid ${T.line};border-radius:10px;padding:6px"><table style="width:100%;border-collapse:collapse;font-family:${MONO};font-size:17px;text-align:center;color:${T.chalk}"><thead><tr style="color:${T.sageDim};font-size:13px">${lineHead}</tr></thead><tbody>${lineRow("away")}${lineRow("home")}</tbody></table></div>
-        <div><div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin:0 2px 4px">${OUR.name} &mdash; batting</div>
+        ${teamToggle}
+        <div><div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin:0 2px 4px">${selName} &mdash; batting</div>
           <div style="overflow-x:auto;background:${T.surface};border:1px solid ${T.line};border-radius:10px;padding:4px 6px"><table style="width:100%;border-collapse:collapse;font-family:${MONO};font-size:17px;text-align:center;color:${T.chalk}"><thead><tr style="color:${T.sageDim};font-size:13px"><th style="text-align:left;padding:4px 6px">Batter</th><th>AB</th><th>R</th><th>H</th><th>RBI</th><th>BB</th><th>K</th></tr></thead><tbody>${bb||`<tr><td colspan="7" style="padding:8px;color:${T.sageDim}">No at-bats recorded</td></tr>`}</tbody></table></div></div>
         ${pitchBlock}
         <div style="display:flex;gap:10px">
@@ -2345,10 +2361,13 @@ function render(){
     // item), and the bases already show in the scorebug — so in idle we drop it for a slim
     // pitch-count line and push the buttons to the thumb zone. The field returns full-screen
     // for locate/runners (focusPlay).
+    const pitchTeam=fielding()?(OUR.short||"US"):(OPP.short||"OPP");
     const pcLine=`<div style="flex:none;display:flex;align-items:center;gap:10px;background:${T.surface};border:1px solid ${T.line};border-radius:10px;padding:9px 14px">
         <span style="font-family:${MONO};font-size:24px;font-weight:800;color:${T.amber}">${currentPitchCount()}</span>
         <span style="font-size:11px;font-weight:800;letter-spacing:1.2px;color:${T.sageDim}">PITCHES</span>
-        <span style="font-size:12px;color:${T.sage};font-weight:600;margin-left:auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${currentPitcherName()}</span></div>`;
+        <span style="display:flex;align-items:center;gap:7px;margin-left:auto;min-width:0">
+          <span style="background:${fielding()?OUR.color:OPP.color};color:#fff;border-radius:999px;padding:2px 8px;font-family:${MONO};font-size:9px;font-weight:800;letter-spacing:1px;flex:none">&#9899; PITCHING</span>
+          <span style="font-size:12px;color:${T.chalk};font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${currentPitcherName()} &middot; ${pitchTeam}</span></span></div>`;
     const tab=(id,label)=>`<button data-act="pane" data-arg="${id}" style="flex:1;background:${phonePane===id?T.lime:T.surface};border:2px solid ${phonePane===id?T.lime:T.line};color:${phonePane===id?T.field:T.sage};border-radius:10px;padding:9px;font-family:${MONO};font-weight:800;font-size:14px;letter-spacing:.6px;text-transform:uppercase">${label}</button>`;
     const pane=phonePane==="video"
       ? `<div style="flex:1;min-height:0;display:flex;flex-direction:column;justify-content:center;gap:11px">${monitorPane()}${isView?"":shareBtn}</div>`
@@ -2446,6 +2465,7 @@ document.getElementById("app").addEventListener("click",e=>{
   if(act==="ptype"){ pitchType=(pitchType===arg?null:arg); render(); return; }
   if(act==="pane"){ phonePane=arg; render(); return; }
   if(act==="feedview"){ feedView=(arg==="pitch"?"pitch":"play"); try{localStorage.setItem("al-feed-view",feedView);}catch(e){} render(); return; }
+  if(act==="sumteam"){ summaryTeam=(arg==="opp"?"opp":"us"); render(); return; }
   if(act==="swapviewer"){ viewerRight=viewerRight==="field"?"feed":"field"; try{localStorage.setItem("al-viewer-right",viewerRight);}catch(e){} render(); return; }
   if(act==="inviteadd"){ const e=document.getElementById("inviteWho"); if(!e)return; const v=(e.value||"").trim(); if(!v){flash("Enter an email or phone number");return;}
     const url=appBaseUrl()+"?invite="+encodeURIComponent(openTeamId); const t=teamById(openTeamId);
@@ -2878,7 +2898,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v79";
+var APP_VERSION="v80";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
