@@ -1288,7 +1288,8 @@ function actionArea(){
             <button data-act="opent" data-arg="${t.id}" style="flex:1;background:${t.color};color:#fff;border:none;border-radius:9px;padding:13px;font-family:${MONO};font-weight:800;font-size:16px;letter-spacing:.8px;display:flex;align-items:center;justify-content:center;gap:8px">${IC(GEAR)} MANAGE TEAM</button>
           </div></div>`;};
     const teamsBlock = DB.teams.length
-      ? `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;align-content:start">${list.map(card).join("")}</div>`
+      ? `<div style="font-size:13px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:${T.lime};margin:2px 2px 0">My teams</div>
+         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;align-content:start">${list.map(card).join("")}</div>`
       : "";
 
     // Home header = the transparent "A" logo floating over the turf (no banner box).
@@ -1312,7 +1313,7 @@ function actionArea(){
     // When cloud IS configured and the user is signed OUT, hide the team cards — they can't
     // sync/access team data until signed in. In the native app Cloud is always disabled
     // (file:// blocks Firebase), so this is a no-op there and teams always show.
-    const showTeams=!(C&&C.enabled&&!C.user);
+    const showTeams=true;   // always show My Teams on home (local teams cache; cloud merges when signed in)
     const authBar = (C&&C.enabled)
       ? (C.user
           ? `<div style="flex:none;display:flex;align-items:center;justify-content:center;gap:10px;font-size:13px;color:${T.sage}">
@@ -2508,7 +2509,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v56";
+var APP_VERSION="v57";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
