@@ -743,7 +743,15 @@ let _lastInteract=0;
 ["pointerdown","touchstart","keydown","focusin","change"].forEach(function(ev){ try{ window.addEventListener(ev,function(){ _lastInteract=Date.now(); },true); }catch(e){} });
 function uiBusy(){ try{ const ae=document.activeElement; if(ae&&/^(INPUT|SELECT|TEXTAREA)$/.test(ae.tagName)) return true; }catch(e){} return (Date.now()-_lastInteract)<1500; }
 let noFieldChip=false;  // when true, diamondSVG draws no in-field pitch chip (used for the tiny viewer thumbnail)
-let gameFeed=[];   // live play-by-play (most recent last) for the viewer feed
+let gameFeed=[];   // live feed (most recent last). Each entry is type "play" (an at-bat result) or "pitch".
+// Feed view: "play" = one line per at-bat (default); "pitch" = every pitch + the result. Per-device.
+let feedView=(()=>{try{return localStorage.getItem("al-feed-view")||"play";}catch(e){return "play";}})();
+// Log one pitch (ball/strike/foul) to the feed — only surfaced in "pitch" view.
+function feedPitch(label,detail){
+  if(!gameFeed)gameFeed=[];
+  gameFeed.push({id:++_eventId,inn:G.inning,half:G.half,type:"pitch",head:label,sub:detail||"",away:G.away,home:G.home});
+  if(gameFeed.length>220)gameFeed.shift();
+}
 // Advanced pitch tracking: when on, the scorer arms a pitch type that's recorded with
 // each pitch. reviewBatter / reviewInn drive the tap-to-review modals (read-only).
 let advPitch=(()=>{try{return localStorage.getItem("al-adv-pitch")==="1";}catch(e){return false;}})();
@@ -759,8 +767,8 @@ function bcastEvent(kind,sub,team){
   const head=PLAYHEAD[kind]||kind.toUpperCase();
   _event={id:++_eventId,head,sub:sub||"",team};
   // Append to the live game feed (play-by-play) shown to viewers.
-  gameFeed.push({id:_eventId,inn:G.inning,half:G.half,head,sub:sub||"",away:G.away,home:G.home});
-  if(gameFeed.length>80)gameFeed.shift();
+  gameFeed.push({id:_eventId,inn:G.inning,half:G.half,type:"play",head,sub:sub||"",away:G.away,home:G.home});
+  if(gameFeed.length>220)gameFeed.shift();
 }
 /* Assemble the live box score (per-batter rows + R/H/E totals), mapped to away/home. */
 function buildBox(){
@@ -794,10 +802,11 @@ function broadcast(){
 }
 
 function pitch(type){
-  snapshot();const k0=battingKey(),bn=batter().name;_pitch=type;recordPitch(type);
-  if(type==="ball"){G.balls++;if(G.balls>=4){applyPlanInline("walk");flash("Walk");bcastEvent("walk","Ball four · "+bn,k0);}}
-  else if(type==="strike"){G.strikes++;if(G.strikes>=3){G.outs++;creditBatter("strikeout",0);nextBatter();flipIfNeeded();flash("Strikeout");bcastEvent("strikeout",bn,k0);}}
-  else if(type==="foul"){if(G.strikes<2)G.strikes++;}
+  snapshot();const k0=battingKey(),b0=batter(),bn=b0.name,bnum=b0.num;_pitch=type;recordPitch(type);
+  const pt=(advPitch&&pitchType)?" "+pitchType:"";   // pitch type tag (if advanced tracking on)
+  if(type==="ball"){G.balls++;feedPitch("Ball"+pt,"#"+bnum+" · "+G.balls+"-"+G.strikes);if(G.balls>=4){applyPlanInline("walk");flash("Walk");bcastEvent("walk","Ball four · "+bn,k0);}}
+  else if(type==="strike"){G.strikes++;feedPitch("Strike"+pt,"#"+bnum+" · "+G.balls+"-"+G.strikes);if(G.strikes>=3){G.outs++;creditBatter("strikeout",0);nextBatter();flipIfNeeded();flash("Strikeout");bcastEvent("strikeout",bn,k0);}}
+  else if(type==="foul"){if(G.strikes<2)G.strikes++;feedPitch("Foul"+pt,"#"+bnum+" · "+G.balls+"-"+G.strikes);}
   render();broadcast();
 }
 function manual(kind,label){snapshot();const k0=battingKey(),bn=batter().name;if(kind==="hbp")recordPitch("hbp");applyPlanInline(kind);bcastEvent(kind,bn,k0);flash(label);render();broadcast();}
@@ -1241,15 +1250,21 @@ function inningLogModal(){
   return modalWrap("Inning log","Totals by half-inning",`${cur}${rows}`,"closeinnlog");
 }
 
-/* Live play-by-play feed (viewer). Most recent on top. */
+/* Live feed (viewer + scorer). Most recent on top. Toggle: "play" = one line per at-bat;
+   "pitch" = every pitch + the result. */
 function feedPanel(){
-  const rows=gameFeed.slice(-40).reverse().map(e=>`<div style="display:flex;align-items:baseline;gap:12px;padding:11px 15px;border-bottom:1px solid ${T.line}">
-      <span style="font-family:${MONO};font-size:15px;font-weight:800;color:${T.lime};min-width:38px">${e.half==="T"?"▲":"▼"}${e.inn}</span>
-      <span style="flex:1;min-width:0;color:${T.chalk};font-size:17px;font-weight:700">${e.head}${e.sub?` <span style="color:${T.sage};font-weight:600">— ${e.sub}</span>`:""}</span>
-      <span style="font-family:${MONO};font-size:15px;color:${T.sage};white-space:nowrap">${TEAMS.away.short} ${e.away}-${e.home} ${TEAMS.home.short}</span>
-    </div>`).join("");
+  const items=gameFeed.filter(e=> feedView==="pitch" ? true : e.type!=="pitch");
+  const rows=items.slice(-70).reverse().map(e=>{ const pit=e.type==="pitch";
+    return `<div style="display:flex;align-items:baseline;gap:12px;padding:${pit?"6px 15px":"11px 15px"};border-bottom:1px solid ${T.line}${pit?";background:rgba(255,255,255,.02)":""}">
+      <span style="font-family:${MONO};font-size:${pit?"13px":"15px"};font-weight:800;color:${pit?T.sageDim:T.lime};min-width:38px">${e.half==="T"?"▲":"▼"}${e.inn}</span>
+      <span style="flex:1;min-width:0;color:${pit?T.sage:T.chalk};font-size:${pit?"14px":"17px"};font-weight:${pit?"600":"700"}">${e.head}${e.sub?` <span style="color:${T.sageDim};font-weight:600">— ${e.sub}</span>`:""}</span>
+      <span style="font-family:${MONO};font-size:${pit?"13px":"15px"};color:${T.sage};white-space:nowrap">${TEAMS.away.short} ${e.away}-${e.home} ${TEAMS.home.short}</span>
+    </div>`;}).join("");
+  const seg=(v,lbl)=>`<button data-act="feedview" data-arg="${v}" style="padding:5px 11px;border:none;font-family:${MONO};font-weight:800;font-size:11px;letter-spacing:.4px;cursor:pointer;background:${feedView===v?T.lime:"transparent"};color:${feedView===v?T.field:T.sage}">${lbl}</button>`;
   return `<div style="flex:1;min-height:0;display:flex;flex-direction:column;background:${T.surface};border:1px solid ${T.line};border-radius:12px;overflow:hidden">
-      <div style="padding:12px 15px;font-family:${MONO};font-weight:800;font-size:15px;letter-spacing:1.4px;color:${T.lime};border-bottom:1px solid ${T.line};flex:none">GAME FEED</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 13px;border-bottom:1px solid ${T.line};flex:none">
+        <span style="font-family:${MONO};font-weight:800;font-size:15px;letter-spacing:1.4px;color:${T.lime}">GAME FEED</span>
+        <div style="display:inline-flex;background:${T.surface2};border:1px solid ${T.line};border-radius:8px;overflow:hidden">${seg("play","At-bat")}${seg("pitch","Pitch")}</div></div>
       <div style="flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch">${rows||`<div style="padding:16px;color:${T.sageDim};font-size:13px">Plays show here as the game happens.</div>`}</div>
     </div>`;
 }
@@ -2168,6 +2183,7 @@ document.getElementById("app").addEventListener("click",e=>{
   if(act==="settingsdone"){ settingsMode=false; mode="idle"; render(); broadcast(); return; }
   if(act==="ptype"){ pitchType=(pitchType===arg?null:arg); render(); return; }
   if(act==="pane"){ phonePane=arg; render(); return; }
+  if(act==="feedview"){ feedView=(arg==="pitch"?"pitch":"play"); try{localStorage.setItem("al-feed-view",feedView);}catch(e){} render(); return; }
   if(act==="swapviewer"){ viewerRight=viewerRight==="field"?"feed":"field"; try{localStorage.setItem("al-viewer-right",viewerRight);}catch(e){} render(); return; }
   if(act==="inviteadd"){ const e=document.getElementById("inviteWho"); if(!e)return; const v=(e.value||"").trim(); if(!v){flash("Enter an email or phone number");return;}
     const url=appBaseUrl()+"?invite="+encodeURIComponent(openTeamId); const t=teamById(openTeamId);
@@ -2569,7 +2585,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v66";
+var APP_VERSION="v67";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
