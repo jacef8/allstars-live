@@ -542,6 +542,7 @@ const LEAGUES=[
 const leagueById=id=>LEAGUES.find(l=>l.id===id)||LEAGUES[0];
 window.ngLeague=function(v){ const L=leagueById(v); G.league=L.id; G.innings=L.innings; G.runCap=L.runCap; G.mercy=L.mercy?{r15:L.mercy.r15,r10:L.mercy.r10}:null; G.pitchMax=L.pitch||0; render(); };
 let settingsMode=false;   // true = Game Setup opened mid-game (Done returns to play, never resets)
+let teamTab="hub";        // team page: "hub" (grid of sections) or a section: roster/schedule/stats/access/rules
 
 /* ===== rule-reminder popups (run cap / run rule / pitch limit / final inning) ===== */
 let activeAlert=null, firedAlerts=new Set(), dismissedAlerts=new Set();
@@ -1439,30 +1440,51 @@ function actionArea(){
         ${(t.scorers&&t.scorers.length)?t.scorers.map(s=>`<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 0;border-top:1px solid ${T.line}"><span style="font-size:13px;color:${T.chalk};word-break:break-all">${s.replace(/</g,"")}</span>${owner?`<button data-act="rmscorer" data-arg="${s}" style="background:none;border:1px solid ${T.line};color:${T.out};border-radius:7px;padding:5px 10px;font-weight:800;font-size:12px">Remove</button>`:""}</div>`).join(""):`<div style="font-size:12px;color:${T.sageDim};padding:4px 0">No authorized scorers yet.</div>`}
         ${owner?`<div style="display:flex;gap:8px;margin-top:10px"><input id="inviteWho" type="text" autocomplete="off" autocapitalize="off" placeholder="Email or phone number" style="${cell};flex:1;min-width:0"><button data-act="inviteadd" style="background:${T.lime};color:${T.field};border:none;border-radius:8px;padding:9px 16px;font-weight:800;font-size:13px">Invite</button></div>
           <div style="font-size:11px;color:${T.sageDim};margin-top:6px">Enter an <b style="color:${T.sage}">email</b> to authorize a scorer, or a <b style="color:${T.sage}">phone number</b> to text them a join link. Either way they sign in once and they're in.</div>`:`<div style="font-size:11px;color:${T.sageDim};margin-top:6px">Only the owner can add scorers.</div>`}</div>`;
+    // ----- section sub-pages (reached from the hub grid); each has a back-to-hub header -----
+    const secHdr=(title)=>`<div style="display:flex;align-items:center;gap:10px">
+        <button data-act="teamhub" style="${ghost};padding:9px 11px">&lsaquo; ${(t.name||"Team").replace(/</g,"")}</button>
+        <div style="font-family:${MONO};font-size:20px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:${T.lime}">${title}</div></div>`;
+    if(teamTab==="roster"){
+      const detailsBlock=`<div style="display:flex;align-items:center;gap:10px">
+            <input value="${(t.name||"").replace(/"/g,"&quot;")}" oninput="edTeamName(this.value)" placeholder="Team name" style="${cell};flex:1;font-family:${MONO};font-size:18px;font-weight:800;background:${T.surface};border-left:5px solid ${t.color}"></div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime}">Scoreboard abbr</div>
+            <input value="${(t.short||"").replace(/"/g,"&quot;")}" oninput="edTeamAbbr(this.value)" maxlength="6" placeholder="TIGERS" style="${cell};width:128px;text-align:center;font-family:${MONO};font-weight:800;letter-spacing:.5px;text-transform:uppercase">
+            <span style="font-size:11px;color:${T.sageDim}">up to 6 chars</span></div>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};width:100%;margin-bottom:2px">Team color</div>
+            ${["#2E6BE6","#0EA5E9","#12A150","#E08A12","#E2574C","#EC4899","#8B5CF6","#0F172A"].map(c=>`<button data-act="teamcolor" data-arg="${c}" style="width:32px;height:32px;border-radius:8px;background:${c};border:3px solid ${t.color.toLowerCase()===c.toLowerCase()?T.ink:"transparent"};box-shadow:0 0 0 1px ${T.line}"></button>`).join("")}</div>`;
+      return `<div style="display:flex;flex-direction:column;gap:12px">${secHdr("Roster &amp; details")}${detailsBlock}
+          <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin:2px 2px -2px">Roster — tap to edit #/name</div>
+          <div style="display:flex;flex-direction:column;gap:6px">${roster}</div>
+          <button data-act="addteamp" style="${ghost}">+ Add player</button></div>`;
+    }
+    if(teamTab==="schedule") return `<div style="display:flex;flex-direction:column;gap:12px">${secHdr("Schedule")}${scheduleSection}</div>`;
+    if(teamTab==="stats") return `<div style="display:flex;flex-direction:column;gap:12px">${secHdr("Season stats")}${statTable}</div>`;
+    if(teamTab==="access") return `<div style="display:flex;flex-direction:column;gap:12px">${secHdr("Team access")}${scorersSection}</div>`;
+    if(teamTab==="rules") return `<div style="display:flex;flex-direction:column;gap:12px">${secHdr("League rules")}${rulesSection}</div>`;
+    // ----- HUB: team header + grid of sections + primary actions -----
+    const rec=`${t.record.w}-${t.record.l}${t.record.t?"-"+t.record.t:""}`;
+    const hb=(arg,icon,label)=>`<button data-act="teamtab" data-arg="${arg}" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;background:${T.surface};border:1px solid ${T.line};border-radius:14px;padding:18px 10px;min-height:96px;cursor:pointer"><span style="font-size:26px">${icon}</span><span style="font-weight:800;color:${T.ink};font-size:15px;text-align:center;line-height:1.2">${label}</span></button>`;
     return `<div style="display:flex;flex-direction:column;gap:12px">
         <div style="display:flex;align-items:center;gap:10px">
           <button data-act="teamsback" style="${ghost};padding:9px 11px">&lsaquo; Teams</button>
-          <input value="${(t.name||"").replace(/"/g,"&quot;")}" oninput="edTeamName(this.value)" placeholder="Team name" style="${cell};flex:1;font-family:${MONO};font-size:18px;font-weight:800;background:${T.surface};border-left:5px solid ${t.color}"></div>
-        <div style="display:flex;align-items:center;gap:10px">
-          <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime}">Scoreboard abbr</div>
-          <input value="${(t.short||"").replace(/"/g,"&quot;")}" oninput="edTeamAbbr(this.value)" maxlength="6" placeholder="TIGERS" style="${cell};width:128px;text-align:center;font-family:${MONO};font-weight:800;letter-spacing:.5px;text-transform:uppercase">
-          <span style="font-size:11px;color:${T.sageDim}">up to 6 chars</span></div>
-        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-          <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};width:100%;margin-bottom:2px">Team color</div>
-          ${["#2E6BE6","#0EA5E9","#12A150","#E08A12","#E2574C","#EC4899","#8B5CF6","#0F172A"].map(c=>`<button data-act="teamcolor" data-arg="${c}" style="width:32px;height:32px;border-radius:8px;background:${c};border:3px solid ${t.color.toLowerCase()===c.toLowerCase()?T.ink:"transparent"};box-shadow:0 0 0 1px ${T.line}"></button>`).join("")}</div>
-        <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin:2px 2px -2px">Roster — tap to edit #/name</div>
-        <div style="display:flex;flex-direction:column;gap:6px">${roster}</div>
-        <button data-act="addteamp" style="${ghost}">+ Add player</button>
-        ${statTable}
-        ${scheduleSection}
-        ${rulesSection}
-        ${scorersSection}
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <button data-act="teamchat" style="${ghost};flex:1;min-width:140px">&#128172; Team chat</button>
-          <button data-act="invitewatch" style="${ghost};flex:1;min-width:140px">&#128227; Invite to watch</button>
-          <button data-act="exportteam" style="${ghost};flex:1;min-width:140px">&#8681; Export team</button>
-          <button data-act="deleteteam" style="background:none;border:1px solid ${T.out};color:${T.out};border-radius:8px;padding:11px 14px;font-family:${MONO};font-size:13px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;flex:none">&#x1F5D1; Delete</button></div>
+          <div style="flex:1;min-width:0;border-left:5px solid ${t.color};padding-left:10px">
+            <div style="font-family:${MONO};font-size:22px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${(t.name||"Team").replace(/</g,"")}</div>
+            <div style="font-size:13px;color:${T.sage};margin-top:2px"><span style="color:${t.color};font-weight:800">${rec}</span> &middot; ${t.players.length} players</div></div></div>
+        <button data-act="teamchat" style="${bigBtn(T.lime,'',T.field)};font-size:17px">&#128172; Team chat</button>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          ${hb("roster","&#128101;","Roster &amp; details")}
+          ${hb("schedule","&#128197;","Schedule")}
+          ${hb("stats","&#128202;","Season stats")}
+          ${hb("access","&#128273;","Team access")}
+          ${hb("rules","&#128214;","League rules")}
+          <button data-act="invitewatch" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;background:${T.surface};border:1px solid ${T.line};border-radius:14px;padding:18px 10px;min-height:96px;cursor:pointer"><span style="font-size:26px">&#128227;</span><span style="font-weight:800;color:${T.ink};font-size:15px;text-align:center;line-height:1.2">Invite to watch</span></button>
+        </div>
         <button data-act="startteam" style="${bigBtn(t.color)}">${IC('<path d="M8 5l11 7-11 7z" fill="currentColor" stroke="none"/>')} Start game with ${t.short}</button>
+        <div style="display:flex;gap:8px">
+          <button data-act="exportteam" style="${ghost};flex:1">&#8681; Export team</button>
+          <button data-act="deleteteam" style="background:none;border:1px solid ${T.out};color:${T.out};border-radius:8px;padding:11px 16px;font-family:${MONO};font-size:13px;font-weight:700;letter-spacing:.5px;text-transform:uppercase">&#x1F5D1; Delete</button></div>
       </div>`;
   }
   if(mode==="pickteam"){
@@ -2181,10 +2203,12 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="newgamestart"){newgameFrom="home";mode="newgame";render();}
   else if(act==="homestart"){newgameFrom="home";selectTeam(arg);G=initGame();loadTeamLineup(teamById(curTeamId));hist=[];resetUI();mode="newgame";render();broadcast();}
   else if(act==="gototeams"){mode="teams";render();}
-  else if(act==="opent"){openTeamId=arg;mode="team";render();}
+  else if(act==="opent"){openTeamId=arg;teamTab="hub";mode="team";render();}
+  else if(act==="teamtab"){teamTab=arg;render();}
+  else if(act==="teamhub"){teamTab="hub";render();}
   else if(act==="favteam"){const t=teamById(arg);if(t){t.fav=!t.fav;saveDB();}render();}
   else if(act==="teamcolor"){const t=teamById(openTeamId);if(t){t.color=arg;saveDB();}render();}
-  else if(act==="newteam"){const t=newTeam("");openTeamId=t.id;mode="team";render();}
+  else if(act==="newteam"){const t=newTeam("");openTeamId=t.id;teamTab="hub";mode="team";render();}
   else if(act==="teamsback"){mode="teams";render();}
   else if(act==="deleteteam"){ const delId=openTeamId; const td=teamById(delId); if(!td)return; let ok=false; try{ok=confirm("Delete "+td.name+"?\n\nThis removes the roster and all season stats and cannot be undone.");}catch(e){} if(ok){ try{ if(window.cloudDeleteTeam)cloudDeleteTeam(delId); }catch(e){} DB.teams=DB.teams.filter(t=>t.id!==delId); if(curTeamId===delId)curTeamId=null; openTeamId=null; saveDB(); mode="teams"; render(); } }
   else if(act==="addteamp"){const t=teamById(openTeamId);if(t)teamAddPlayer(t);render();}
@@ -2313,6 +2337,7 @@ window.appBack=function(){
     if(mode==="newgame"&&settingsMode){ settingsMode=false; mode="idle"; render(); return true; }
     if(mode==="newgame"){ if(newgameFrom==="team"&&openTeamId){mode="team";}else{mode=gameActive?"idle":"home";} render(); return true; }
     if(mode==="lineup"){ mode=gameActive?"idle":"home"; render(); return true; }
+    if(mode==="team"&&teamTab!=="hub"){ teamTab="hub"; render(); return true; }
     if(mode==="team"){ mode="teams"; render(); return true; }
     if(mode==="settings"){ mode="home"; render(); return true; }
     if(mode==="teams"){ mode="home"; render(); return true; }
@@ -2477,7 +2502,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v53";
+var APP_VERSION="v54";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
