@@ -85,6 +85,24 @@ service cloud.firestore {
         allow delete: if request.auth != null &&
           (resource.data.authorUid == request.auth.uid || team().ownerUid == request.auth.uid);
       }
+
+      // ===== Team photo gallery ===== (members read + add; author or owner deletes)
+      match /photos/{photoId} {
+        function pteam() { return get(/databases/$(database)/documents/teams/$(teamId)).data; }
+        function isMember() {
+          return request.auth != null && (
+            pteam().ownerUid == request.auth.uid ||
+            (pteam().coOwners is list && (request.auth.token.email in pteam().coOwners)) ||
+            (pteam().scorers is list && (request.auth.token.email in pteam().scorers)) ||
+            (pteam().followers is list && (request.auth.token.email in pteam().followers))
+          );
+        }
+        allow read:   if isMember();
+        allow create: if isMember() && request.resource.data.authorUid == request.auth.uid;
+        allow update: if false;
+        allow delete: if request.auth != null &&
+          (resource.data.authorUid == request.auth.uid || pteam().ownerUid == request.auth.uid);
+      }
     }
 
     // ===== Live / persistent games =====

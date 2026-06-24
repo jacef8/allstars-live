@@ -276,6 +276,33 @@
       try { d.collection("teams").doc(teamId).update({ lastMsgAt: Date.now(), updatedAt: Date.now() }).catch(function () {}); } catch (e) {}
     }).catch(function (e) { ctoast("Couldn't send: " + e.message); });
   };
+  /* ===== Team photo gallery (teams/{id}/photos subcollection) — members read/add; author/owner delete ===== */
+  window.cloudSubscribePhotos = function (teamId, cb) {
+    var d = fdb(); if (!d || !teamId) return function () {};
+    try {
+      return d.collection("teams").doc(teamId).collection("photos").orderBy("ts", "desc").limit(300)
+        .onSnapshot(function (s) { var out = []; s.forEach(function (m) { out.push(Object.assign({ id: m.id }, m.data())); }); try { cb(out); } catch (e) {} },
+                    function (e) { console.warn("photos:", e.message); try { cb(null, e); } catch (x) {} });
+    } catch (e) { return function () {}; }
+  };
+  window.cloudGetPhotos = function (teamId) {
+    var d = fdb(); if (!d || !teamId) return Promise.resolve([]);
+    return d.collection("teams").doc(teamId).collection("photos").orderBy("ts", "desc").limit(300).get()
+      .then(function (s) { var out = []; s.forEach(function (m) { out.push(Object.assign({ id: m.id }, m.data())); }); return out; })
+      .catch(function (e) { console.warn("getPhotos:", e.message); return null; });
+  };
+  window.cloudAddPhoto = function (teamId, dataUrl, caption) {
+    var d = fdb(), u = myUid(); if (!d || !u || !teamId || !dataUrl) return Promise.resolve();
+    return d.collection("teams").doc(teamId).collection("photos").add({
+      img: dataUrl, caption: (caption || "").slice(0, 200), authorUid: u, authorName: (window.cloudMyName ? window.cloudMyName() : myEmail()) || "Someone", ts: Date.now(),
+    }).catch(function (e) { ctoast("Couldn't add photo: " + e.message); });
+  };
+  window.cloudDeletePhoto = function (teamId, photoId) {
+    var d = fdb(); if (!d || !teamId || !photoId) return Promise.resolve();
+    return d.collection("teams").doc(teamId).collection("photos").doc(photoId).delete()
+      .catch(function (e) { ctoast("Couldn't delete: " + e.message); });
+  };
+
   window.cloudDeleteMessage = function (teamId, msgId) {
     var d = fdb(); if (!d || !teamId || !msgId) return Promise.resolve();
     return d.collection("teams").doc(teamId).collection("messages").doc(msgId).delete()
