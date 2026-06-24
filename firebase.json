@@ -1,4 +1,7 @@
 {
+  "firestore": {
+    "rules": "reference/web-scoring/firestore.rules"
+  },
   "hosting": {
     "public": "reference/web-scoring",
     "cleanUrls": true,
