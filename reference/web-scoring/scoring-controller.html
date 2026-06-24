@@ -715,10 +715,10 @@ const leagueById=id=>LEAGUES.find(l=>l.id===id)||LEAGUES[0];
    one (t.rulebookId), and it carries into each game so it's a tap away during a dispute. ===== */
 const RULEBOOKS=[
   {id:"dyb",          name:"Diamond Youth Baseball (DYB) 2026", kind:"text", src:"rules-dyb-2026.txt"},
-  {id:"littleleague", name:"Little League",                     kind:"url",  src:"https://www.littleleague.org/playing-rules/"},
-  {id:"usssa",        name:"USSSA Baseball",                     kind:"url",  src:"https://www.usssa.com/baseball/"},
+  {id:"usssa",        name:"USSSA Baseball (official PDF)",      kind:"url",  src:"https://www.usssa.com/docs/baseball/usssa_bb_rules.pdf"},
+  {id:"pony",         name:"PONY Baseball (rulebook PDFs)",      kind:"url",  src:"https://www.pony.org/Default.aspx?tabid=1026027"},
+  {id:"littleleague", name:"Little League (free app + rules)",   kind:"url",  src:"https://www.littleleague.org/playing-rules/rules-regulations-policies/"},
   {id:"caripken",     name:"Cal Ripken / Babe Ruth League",     kind:"url",  src:"https://www.baberuthleague.org/"},
-  {id:"pony",         name:"PONY Baseball",                     kind:"url",  src:"https://www.pony.org/"},
   {id:"dixie",        name:"Dixie Youth Baseball",              kind:"url",  src:"https://www.dixie.org/"},
   {id:"obr",          name:"Official Baseball Rules (MLB)",     kind:"url",  src:"https://www.mlb.com/glossary/rules"},
 ];
@@ -1783,7 +1783,7 @@ function actionArea(){
     const rbRow=(r)=>`<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid ${T.line}">
         <button data-act="setrulebook" data-arg="${r.id}" title="Use for this team" style="width:22px;height:22px;flex:none;border-radius:50%;border:2px solid ${rbSel===r.id?T.lime:T.line};background:${rbSel===r.id?T.lime:'transparent'};cursor:pointer"></button>
         <div style="flex:1;min-width:0"><div style="font-weight:700;color:${T.ink};font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${(r.name||'').replace(/</g,'&lt;')}</div>
-          <div style="font-size:11px;color:${T.sageDim}">${r.kind==="text"?"&#128214; Searchable in-app":"&#128279; Opens official site"}</div></div>
+          <div style="font-size:11px;color:${T.sageDim}">${r.kind==="text"?"&#128214; Searchable in-app":(/\.pdf($|\?)/i.test(r.src||"")?"&#128196; Official PDF &mdash; searchable":"&#128279; Opens official site")}</div></div>
         <button data-act="viewrulebook" data-arg="${r.id}" style="background:${T.surface2};color:${T.lime};border:1px solid ${T.line};border-radius:8px;padding:8px 12px;font-weight:800;font-size:12px;white-space:nowrap">View &rsaquo;</button>
         ${r.custom?`<button data-act="rmrulebook" data-arg="${r.id}" style="background:none;border:1px solid ${T.line};color:${T.out};border-radius:8px;padding:8px 10px;font-weight:800;font-size:12px">&times;</button>`:""}</div>`;
     const rulebookSection=`<div class="frost-card" style="background:${T.surface};border:1px solid ${T.line};border-radius:14px;padding:14px 16px">
@@ -3182,7 +3182,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v88";
+var APP_VERSION="v89";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
