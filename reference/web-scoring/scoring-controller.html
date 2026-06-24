@@ -1302,6 +1302,31 @@ function pitchBtn(act,label,icon,accent){
 }
 function chip(c){const a=contact===c;return `<button data-act="contact" data-arg="${c}" style="background:${a?T.clay:T.surface};border:1px solid ${a?T.clay:T.line};color:${a?"#FFFFFF":T.chalk};border-radius:8px;padding:12px 6px;font-family:${MONO};font-size:14px;font-weight:800;letter-spacing:.5px;text-transform:uppercase">${c}</button>`;}
 
+/* Custom time picker — the native <input type=time> popup renders its OK/Cancel off-screen in
+   this WebView, so use plain Hour:Min:AM/PM selects. Renders the 3 selects + a hidden input
+   #<idp> holding the combined 24h "HH:MM" (so existing readers like g("schTime") still work).
+   Pass cb to fire a callback (e.g. ngStartTime) with the value on every change. */
+function timeSelects(idp, val24, cb){
+  if(cb) window["_tpcb_"+idp]=cb;
+  val24=val24||""; let h24=-1,mn=0; if(/^\d{1,2}:\d{2}$/.test(val24)){const a=val24.split(":");h24=+a[0];mn=+a[1];}
+  const ap=h24>=12?"PM":"AM"; const h12=h24<0?-1:(h24%12===0?12:h24%12); const mn5=Math.round(mn/5)*5%60;
+  const sel=`background:${T.surface2};border:1px solid ${T.line};color:${T.ink};border-radius:8px;padding:10px 6px;font-family:${MONO};font-size:16px;font-weight:800;outline:none`;
+  const oc=`onchange="window._tpSync('${idp}')"`;
+  const hOpts=`<option value="">--</option>`+Array.from({length:12},(_,i)=>i+1).map(n=>`<option value="${n}"${n===h12?" selected":""}>${n}</option>`).join("");
+  const mOpts=Array.from({length:12},(_,i)=>i*5).map(n=>`<option value="${n}"${(h12>0&&n===mn5)?" selected":""}>${String(n).padStart(2,"0")}</option>`).join("");
+  const aOpts=["AM","PM"].map(x=>`<option value="${x}"${x===ap?" selected":""}>${x}</option>`).join("");
+  return `<input id="${idp}" type="hidden" value="${val24}"><div style="display:flex;align-items:center;gap:6px">
+      <select id="${idp}H" ${oc} style="${sel};flex:1">${hOpts}</select><span style="color:${T.sageDim};font-weight:800">:</span>
+      <select id="${idp}M" ${oc} style="${sel};flex:1">${mOpts}</select>
+      <select id="${idp}A" ${oc} style="${sel};flex:1">${aOpts}</select></div>`;
+}
+window._tpSync=function(idp){
+  const gv=id=>{const e=document.getElementById(id);return e?e.value:"";};
+  const h=+gv(idp+"H")||0, m=+gv(idp+"M")||0, a=gv(idp+"A")||"PM"; let val="";
+  if(h>=1){ let h24=h%12; if(a==="PM")h24+=12; val=String(h24).padStart(2,"0")+":"+String(m).padStart(2,"0"); }
+  const hid=document.getElementById(idp); if(hid)hid.value=val;
+  const cb=window["_tpcb_"+idp]; if(typeof cb==="function") try{cb(val);}catch(e){}
+};
 function actionArea(){
   if(mode==="home"){
     const PLAY='<path d="M8 5l11 7-11 7z" fill="currentColor" stroke="none"/>';
@@ -1454,7 +1479,7 @@ function actionArea(){
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           ${fld("Type",`<select id="schType" style="${cell}"><option value="game">Game</option><option value="practice">Practice</option></select>`)}
           ${fld("Date",`<input id="schDate" type="date" style="${cell}">`)}
-          ${fld("Time",`<input id="schTime" type="time" style="${cell}">`)}</div>
+          ${fld("Time",timeSelects("schTime",""))}</div>
         ${fld("Opponent (games only)",`<select id="schOppSel" onchange="var n=document.getElementById('schOppNew');if(n)n.style.display=this.value==='__new__'?'block':'none'" style="${cell}"><option value="">— pick a team —</option>${(DB.teams||[]).filter(x=>x.id!==t.id).map(x=>`<option value="${(x.name||'').replace(/"/g,'&quot;')}">${(x.name||'').replace(/</g,'')}</option>`).join("")}<option value="__new__">➕ New opponent…</option></select><input id="schOppNew" placeholder="New opponent name" style="${cell};margin-top:6px;display:none">`)}
         ${fld("Location",`<input id="schLoc" placeholder="e.g. City Park — Field 2" style="${cell}">`)}
         ${fld("Notes (optional)",`<input id="schNotes" placeholder="e.g. arrive 45 min early, white jerseys" style="${cell}">`)}
@@ -1623,7 +1648,7 @@ function actionArea(){
     const startCard=`<div style="${rowCard}">
           <div><div style="font-weight:800;color:${T.ink};font-size:19px">Actual start time</div>
             <div style="color:${T.sage};font-size:14px;margin-top:3px">${G.startedAt?"When the game actually began (tap to change).":"Leave blank — it fills in automatically at the first pitch. Or set it here."}</div></div>
-          <input type="time" value="${startVal}" onchange="ngStartTime(this.value)" style="background:${T.surface2};border:1px solid ${T.line};color:${T.ink};border-radius:10px;padding:13px 12px;font-family:${MONO};font-size:20px;font-weight:800;outline:none"></div>`;
+          ${timeSelects("ngStart", startVal, window.ngStartTime)}</div>`;
     const pitchTypeCard=`<div style="${rowCard}">
           <div><div style="font-weight:800;color:${T.ink};font-size:19px">Track pitch types</div>
             <div style="color:${T.sage};font-size:14px;margin-top:3px">Adds FB/CB/CH/SL/OTH per pitch while scoring</div></div>
@@ -2599,7 +2624,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v69";
+var APP_VERSION="v70";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
