@@ -3,10 +3,27 @@
 > **Read this first.** This is the single source of truth for picking up the project — e.g. from a
 > fresh Claude Code session or a different account. The code is the truth; this explains the rest.
 
-_Last updated: 2026‑06‑23 (app version **v54**). **Keep this file current as work continues** —
+_Last updated: 2026‑06‑24 (app version **v60**). **Keep this file current as work continues** —
 update the version, status, and pending lists with each meaningful change._
 
-> Recent: v52 unified Email/phone invite + fixed delete; v53 delete-tombstones + turf launcher icon;
+> Recent: **v60 — two tablet fixes** (verified live via WebView CDP). (1) Tablet/wide home was
+> HIDING all team cards: the card list wrapper used `max-height:46vh` but `vh` resolves to **0px**
+> in this Android WebView, collapsing the wrapper to height:0 and clipping every card (phone/narrow
+> layout was fine). Now uses a JS px height from `window.innerHeight`. **Rule: avoid `vh`/`vw` units
+> in the native WebView — compute px from innerHeight/innerWidth.** (2) Scorer **invite** fired
+> `mailto:`/`sms:` via the native VIEW intent, which opens the mail/SMS app with NO subject/body, so
+> the operator had no link to send. Now it authorizes the scorer and shows the `?invite=` link in an
+> in-app dialog with a **Copy link** button (clipboard works in the https WebView). Also: Firestore
+> rules now deploy via **`deploy-rules.bat`** / `firebase deploy --only firestore:rules` (CLI login
+> `groundlinkapp@gmail.com`; app login `jaceford08@gmail.com`; same `allstars-live` project). The
+> `is list` guard was removed from the team `isScorer()/isFollower()` because it broke Firestore's
+> array-contains QUERY analyzer (scorer/follower listeners were permission-denied).
+> **v59 FIX — Firebase auth now survives app restart.** In the Android WebView the SDK
+> silently used in-memory persistence (`firebaseLocalStorageDb` existed but was EMPTY), so the
+> signed-in session was lost on every restart ("it's like I'm not getting signed in"). Fix:
+> `auth.setPersistence(LOCAL)` after init and again before `signInWithCredential` (auth.js). Web-only,
+> no APK rebuild. Diagnosed live via WebView CDP (`adb forward tcp:9222 localabstract:webview_devtools_remote_<pid>`).
+> v52 unified Email/phone invite + fixed delete; v53 delete-tombstones + turf launcher icon;
 > v54 **team page is now a hub** (grid of sections: Roster, Schedule, Stats, Access, Rules, + a
 > prominent Team chat) driven by `teamTab`. v55 **native Google sign-in** built: web
 > `Continue with Google` → `AllStars.googleSignIn()` → GoogleSignIn(requestIdToken=WEB_CLIENT_ID in
