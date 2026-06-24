@@ -1468,20 +1468,21 @@ function actionArea(){
       // Cards only (no "My teams" label) so the card tops line up with the New Game tile.
       const cardsGrid = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;align-content:start">${list.map(card).join("")}</div>`;
       const rightCell = showTeams && DB.teams.length
-        ? `<div style="display:flex;flex-direction:column;gap:10px">
-             <div style="max-height:${teamsMaxH}px;overflow-y:auto;-webkit-overflow-scrolling:touch;display:flex;flex-direction:column;gap:10px">${cardsGrid}</div>
-             ${manageBtn}</div>`
+        ? `<div style="display:flex;flex-direction:column;gap:10px;min-height:0;flex:1">
+             <div style="flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;display:flex;flex-direction:column;gap:10px">${cardsGrid}</div>
+             <div style="flex:none">${manageBtn}</div></div>`
         : manageTile;
-      // Top-aligned, width-capped. Scrolls if content is tall (never overlaps the logo).
-      return `<div style="position:relative;min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:clamp(14px,calc(var(--avh) * 2.5),26px);padding:clamp(14px,calc(var(--avh) * 3),34px) 12px">
+      // Fill exactly the available height (no page scroll). The hero + tiles are fixed; the team
+      // list flexes to fill what's left and scrolls INSIDE its own column if it's long.
+      return `<div style="position:relative;height:100%;overflow:hidden;display:flex;flex-direction:column;align-items:center;gap:clamp(12px,calc(var(--avh) * 2),22px);padding:clamp(12px,calc(var(--avh) * 2.5),28px) 12px">
           ${settingsGear}
-          <div style="width:100%;max-width:1000px;display:flex;flex-direction:column;gap:16px">
+          <div style="width:100%;max-width:1000px;flex:1;min-height:0;display:flex;flex-direction:column;gap:14px">
             ${hero}
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start">
-              <div style="display:flex;flex-direction:column;gap:14px">${resumeBtn}${newTile}</div>
-              <div style="display:flex;flex-direction:column;gap:10px">${rightCell}</div>
+            <div style="flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:stretch">
+              <div style="display:flex;flex-direction:column;gap:14px;min-height:0">${resumeBtn}${newTile}</div>
+              <div style="display:flex;flex-direction:column;gap:10px;min-height:0">${rightCell}</div>
             </div>
-            ${shareBtnHome}${authBar}
+            <div style="flex:none">${shareBtnHome}${authBar}</div>
           </div>
         </div>`;
     }
@@ -2348,7 +2349,20 @@ document.getElementById("app").addEventListener("click",e=>{
   if(act==="alerttoggle"){ const c=alertsCfg(); c[arg]=!c[arg]; render(); return; }
   if(act==="alertdismiss"||act==="alertbackdrop"){ activeAlert=null; render(); return; }
   if(act==="alertsilence"){ if(activeAlert)dismissedAlerts.add(activeAlert.key); activeAlert=null; render(); return; }
-  if(act==="schedadd"){ const t=teamById(openTeamId); if(!t)return; const g=id=>{const e=document.getElementById(id);return e?(e.value||""):"";}; const date=g("schDate"); if(!date){flash("Pick a date");return;} const _sel=g("schOppSel"); const opp=(_sel==="__new__"?g("schOppNew"):_sel).trim(); if(!Array.isArray(t.schedule))t.schedule=[]; t.schedule.push({id:"s"+Date.now().toString(36),type:g("schType")||"game",date:date,time:g("schTime"),opp:opp,loc:g("schLoc").trim(),notes:g("schNotes").trim()}); saveDB(); render(); return; }
+  if(act==="schedadd"){ const t=teamById(openTeamId); if(!t)return; const g=id=>{const e=document.getElementById(id);return e?(e.value||""):"";}; const date=g("schDate"); if(!date){flash("Pick a date");return;} const _sel=g("schOppSel"); const opp=(_sel==="__new__"?g("schOppNew"):_sel).trim(); if(!Array.isArray(t.schedule))t.schedule=[];
+    const ev={id:"s"+Date.now().toString(36),type:g("schType")||"game",date:date,time:g("schTime"),opp:opp,loc:g("schLoc").trim(),notes:g("schNotes").trim()};
+    t.schedule.push(ev); saveDB();
+    // Announce the new event in team chat so everyone following/joined sees it (this also bumps
+    // the team's lastMsgAt → the "NEW" badge on their home team card = the in-app notification).
+    let posted=false;
+    try{ if(window.cloudSendMessage&&window.Cloud&&window.Cloud.enabled&&window.Cloud.user){
+      let when=ev.date; try{ const dt=new Date(ev.date+"T"+(ev.time||"00:00")); if(!isNaN(dt)){ when=dt.toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"}); if(ev.time)when+=" · "+dt.toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"}); } }catch(e){}
+      const head=ev.type==="practice"?"⚾ Practice added":("🏟️ Game added"+(ev.opp?(" vs "+ev.opp):""));
+      let msg="📅 "+head+"\n"+when; if(ev.loc)msg+=" · "+ev.loc; if(ev.notes)msg+="\n"+ev.notes;
+      window.cloudSendMessage(openTeamId,msg); posted=true;
+    } }catch(e){}
+    flash(posted?"Added — posted to team chat":"Added to schedule");
+    render(); return; }
   if(act==="schedrm"){ const t=teamById(openTeamId); if(t&&Array.isArray(t.schedule)){ t.schedule=t.schedule.filter(s=>s.id!==arg); saveDB(); render(); } return; }
   if(act==="schview"){ scheduleView=(arg==="calendar"?"calendar":"list"); try{localStorage.setItem("al-sched-view",scheduleView);}catch(e){} render(); return; }
   if(act==="recadj"){ const t=teamById(openTeamId); if(!t)return; if(window.Cloud&&window.Cloud.enabled&&window.Cloud.user&&window.cloudCanManage&&!window.cloudCanManage(t)){flash("Only the owner can edit the record");return;} const parts=(arg||"").split(":"),f=parts[0],d=+parts[1]; if(!t.record)t.record={w:0,l:0,t:0}; if(f==="w"||f==="l"||f==="t"){ t.record[f]=Math.max(0,(t.record[f]||0)+d); saveDB(); render(); } return; }
@@ -2790,7 +2804,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v76";
+var APP_VERSION="v77";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
