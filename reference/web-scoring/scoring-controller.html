@@ -97,10 +97,11 @@
   @keyframes screenIn{0%{opacity:0;transform:translateY(7px);}100%{opacity:1;transform:translateY(0);}}
 
   /* Branded splash / intro — fades out on load */
-  #splash{position:fixed;inset:0;z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;
-    background:radial-gradient(60% 48% at 50% 38%, rgba(29,58,102,.55), transparent 70%), linear-gradient(180deg,#12161D,#0B0E13);
+  #splash{position:fixed;inset:0;z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;
+    background:linear-gradient(rgba(7,11,19,.20),rgba(7,11,19,.48)), url("bg-turf.jpg") center center / cover no-repeat #0B0E13;
     animation:splashOut .55s var(--ease-soft) 1.3s forwards;}
-  #splash .sp-logo{font-family:var(--mono);font-weight:800;font-size:clamp(46px,13vw,72px);line-height:.88;letter-spacing:2px;text-align:center;color:#EAEDF2;animation:spPop .7s var(--ease) both;}
+  #splash .sp-a{width:min(80vw,460px);height:auto;display:block;filter:drop-shadow(0 12px 34px rgba(0,0,0,.6));animation:spPop .7s var(--ease) both;}
+  #splash .sp-logo{font-family:var(--mono);font-weight:800;font-size:clamp(30px,7vw,54px);line-height:.9;letter-spacing:2px;text-align:center;color:#fff;animation:spPop .7s var(--ease) .12s both;}
   #splash .sp-logo span{color:var(--lime);}
   #splash .sp-bar{width:56px;height:4px;border-radius:2px;background:var(--lime);box-shadow:0 0 14px rgba(163,230,53,.6);animation:spPop .7s var(--ease) .1s both;}
   #splash .sp-sub{font-size:12px;font-weight:700;letter-spacing:5px;color:var(--sage);animation:spPop .7s var(--ease) .18s both;}
@@ -129,7 +130,7 @@
 </style>
 </head>
 <body>
-<div id="splash"><div class="sp-logo">ALL-STARS<br><span>LIVE</span></div><div class="sp-bar"></div></div>
+<div id="splash"><img class="sp-a" src="icons/logo-mark.png" alt="" onerror="if(this.src.indexOf('icon-512')<0){this.src='icons/icon-512.png';this.style.borderRadius='22px';}else{this.style.display='none';}"><div class="sp-logo">ALL-STARS <span>LIVE</span></div></div>
 <div id="wrap"><div id="app">
   <div id="toolbar" style="flex-shrink:0"></div>
   <div id="content" style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px"></div>
@@ -2568,7 +2569,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v65";
+var APP_VERSION="v66";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
