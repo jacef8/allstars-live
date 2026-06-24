@@ -306,11 +306,11 @@ function brandBar(tag){ return '<div class="brand"><div class="wm">ALL-STARS <i>
 function brandFt(){ return '<div class="brandft"><span>Generated with <b>ALL-STARS LIVE</b></span><span>allstarslive</span></div>'; }
 /* Printable "lineup card" — opens a clean print view (Save as PDF) with the team logo, color,
  * record and a standard batting-order grid + substitutes + pitcher log. */
-function printLineupCard(t){
-  if(!t)return;
+function printLineupCard(t,ctx){
+  if(!t)return; ctx=ctx||{};
   const esc=s=>(s==null?"":String(s)).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
   const R=teamRec(t), rec=`${R.w}-${R.l}${R.t?"-"+R.t:""}`;
-  const today=new Date().toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric",year:"numeric"});
+  const today=ctx.date||new Date().toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric",year:"numeric"});
   const color=esc(t.color||"#2E6BE6");
   const players=(t.players||[]).slice();
   const total=Math.max(players.length, players.length>9?players.length:9);   // 9 slots min, or full roster (continuous)
@@ -336,7 +336,7 @@ function printLineupCard(t){
     +brandBar("Lineup Card")
     +'<div class="inner">'
     +'<div class="hd">'+logo+'<div class="nm">'+esc(t.name||"Team")+'<small>Record '+esc(rec)+'</small></div>'
-    +'<div class="meta"><div class="f"><span>Date</span><b>'+esc(today)+'</b></div><div class="f"><span>Opponent</span><b>&nbsp;</b></div><div class="f"><span>Location</span><b>&nbsp;</b></div><div class="f"><span>Coach</span><b>&nbsp;</b></div></div></div>'
+    +'<div class="meta"><div class="f"><span>Date</span><b>'+esc(today)+'</b></div><div class="f"><span>Time</span><b>'+(ctx.time?esc(ctx.time):"&nbsp;")+'</b></div><div class="f"><span>Opponent</span><b>'+(ctx.opp?esc(ctx.opp):"&nbsp;")+'</b></div><div class="f"><span>Location</span><b>'+(ctx.loc?esc(ctx.loc):"&nbsp;")+'</b></div><div class="f"><span>Coach</span><b>&nbsp;</b></div></div></div>'
     +'<h2>Batting order</h2>'
     +'<table><thead><tr><th>Order</th><th class="num">No.</th><th class="nm">Player</th><th class="pos">Pos</th><th class="sub">Sub</th></tr></thead><tbody>'+rows+'</tbody></table>'
     +'<div class="two"><div><h2>Substitutes</h2><table><thead><tr><th class="num">No.</th><th class="nm">Player</th><th class="pos">Pos</th></tr></thead><tbody>'+subs+'</tbody></table></div>'
@@ -2063,6 +2063,8 @@ function actionArea(){
             <div style="color:${T.sage};font-size:14px;margin-top:3px">Adds FB/CB/CH/SL/OTH per pitch while scoring</div></div>
           <button data-act="advtoggle" style="background:${advPitch?T.lime:T.surface2};border:1px solid ${advPitch?T.lime:T.line};color:${advPitch?T.field:T.sage};border-radius:999px;padding:10px 20px;font-family:${MONO};font-weight:800;font-size:15px;min-width:66px">${advPitch?"ON":"OFF"}</button></div>`;
     const startBtn=`<button data-act="ng-start" style="${bigBtn(T.lime,"width:100%;font-size:25px;padding:24px;box-shadow:0 8px 22px rgba(163,230,53,.22)",T.field)};flex:none;margin-top:2px">Start game &rarr;</button>`;
+    // Print a lineup card pre-filled with the opponent + date/time from this game setup.
+    const lineupCardBtn=`<button data-act="nglineupcard" style="${ghost};display:flex;align-items:center;justify-content:center;gap:9px;width:100%;flex:none">&#128196; Print lineup card</button>`;
     // In settings mode (mid-game) we show ONLY the rule cards + Done — no team/side pickers,
     // and no "Start game" (that would reset the live game).
     const ruleCards=`${leagueCard}${runCapCard}${hittersCard}${pitchTypeCard}${alertsCard}${startCard}`;
@@ -2080,15 +2082,15 @@ function actionArea(){
             <div style="display:flex;flex-direction:column;gap:14px">${teamRow("Your team",OUR.name,OUR.color,"pickour")}${teamRow("Opponent",OPP.name,OPP.color,"pickopp")}${sideSel}${runCapCard}${hittersCard}</div>
             <div style="display:flex;flex-direction:column;gap:14px">${leagueCard}${alertsCard}${pitchTypeCard}${startCard}</div>
           </div>
-          <div style="width:100%;max-width:1180px;margin:0 auto">${startBtn}</div>
+          <div style="width:100%;max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:10px">${startBtn}${lineupCardBtn}</div>
         </div>`;
     }
-    if(setMode) return `<div style="display:flex;flex-direction:column;gap:14px">${header}${ruleCards}${doneBtn}</div>`;
+    if(setMode) return `<div style="display:flex;flex-direction:column;gap:14px">${header}${ruleCards}${lineupCardBtn}${doneBtn}</div>`;
     return `<div style="display:flex;flex-direction:column;gap:14px">
         ${header}
         ${teamRow("Your team",OUR.name,OUR.color,"pickour")}
         ${teamRow("Opponent",OPP.name,OPP.color,"pickopp")}
-        ${sideSel}${ruleCards}${startBtn}
+        ${sideSel}${ruleCards}${startBtn}${lineupCardBtn}
       </div>`;
   }
   if(mode==="lineup"){
@@ -2809,6 +2811,7 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="quickgame"){curTeamId=null;ROSTER=genericRoster();OUR.name="Your Team";OUR.short="HOME";OUR.color="#2E6BE6";G=initGame();hist=[];resetUI();mode="newgame";render();broadcast();}
   else if(act==="ng-side"){G.ourSide=arg;render();broadcast();}
   else if(act==="ng-start")startNewGame();
+  else if(act==="nglineupcard"){ const tt=curTeam()||{name:OUR.name,short:OUR.short,color:OUR.color,players:ROSTER,record:{w:0,l:0,t:0},games:[]}; const opp=(OPP.name&&OPP.name!=="Opponent")?OPP.name:""; let tm=""; if(G&&G.startedAt){ try{ tm=new Date(G.startedAt).toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"}); }catch(e){} } printLineupCard(tt,{opp:opp,time:tm}); }
   else if(act==="addbatter"){addBatter();render();}
   else if(act==="rembatter"){removeBatter();render();}
   else if(act==="share")openShare();
@@ -3141,7 +3144,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v85";
+var APP_VERSION="v86";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
