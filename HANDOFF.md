@@ -3,8 +3,13 @@
 > **Read this first.** This is the single source of truth for picking up the project — e.g. from a
 > fresh Claude Code session or a different account. The code is the truth; this explains the rest.
 
-_Last updated: 2026‑06‑23 (app version **v51**). **Keep this file current as work continues** —
+_Last updated: 2026‑06‑23 (app version **v54**). **Keep this file current as work continues** —
 update the version, status, and pending lists with each meaningful change._
+
+> Recent: v52 unified Email/phone invite + fixed delete; v53 delete-tombstones + turf launcher icon;
+> v54 **team page is now a hub** (grid of sections: Roster, Schedule, Stats, Access, Rules, + a
+> prominent Team chat) driven by `teamTab`. Native Google sign-in still pending (WebView blocks
+> Google OAuth — needs native Credential Manager + the OAuth Web client ID); email-link works in-app.
 
 > **v51 ARCHITECTURE CHANGE:** the native app now loads the **live https web app** (offline‑cached),
 > not bundled `file://` assets. → **web pushes reach the native app with no APK rebuild**; rebuild the
