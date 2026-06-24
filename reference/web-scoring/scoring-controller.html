@@ -3,6 +3,10 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<!-- The Android WebView resolves CSS `vh` to 0 (vw is fine). Maintain a real px-per-1vh value in
+     --avh from window.innerHeight so styles use calc(var(--avh)*N) instead of Nvh. Updated on resize
+     (keyboard open/close) and rotation. Runs before first paint so modals/containers size correctly. -->
+<script>(function(){function setAvh(){try{document.documentElement.style.setProperty("--avh",(window.innerHeight*0.01)+"px");}catch(e){}}setAvh();window.addEventListener("resize",setAvh);window.addEventListener("orientationchange",setAvh);}());</script>
 <title>All-Stars Live</title>
 <!-- PWA: installable, app-like, offline-resilient (see manifest.webmanifest + sw.js). -->
 <meta name="description" content="Live youth baseball — scorebug, play-by-play, and the game stream." />
@@ -173,7 +177,7 @@
 
 <!-- Team chat: real-time messages for owner/scorers/followers (parents). DORMANT until cloud is on. -->
 <div id="chatmodal" style="display:none;position:fixed;inset:0;z-index:200;background:rgba(8,11,16,.84);align-items:center;justify-content:center;padding:14px">
-  <div style="max-width:460px;width:100%;height:min(82vh,660px);display:flex;flex-direction:column;background:#0E1420;border:1px solid #2A3650;border-radius:18px;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,.6)">
+  <div style="max-width:460px;width:100%;height:min(calc(var(--avh) * 82),660px);display:flex;flex-direction:column;background:#0E1420;border:1px solid #2A3650;border-radius:18px;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,.6)">
     <div style="display:flex;align-items:center;gap:8px;padding:13px 15px;border-bottom:1px solid #2A3650;flex:none">
       <div id="chatTitle" style="font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:19px;letter-spacing:.5px;color:#EAEDF2;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Team chat</div>
       <button data-act="chatinvite" title="Invite parents to the chat" style="background:#1A2233;border:1px solid #2A3650;color:#A3E635;border-radius:8px;padding:7px 11px;font-weight:800;font-size:12px;cursor:pointer">&#43; Invite</button>
@@ -1106,10 +1110,10 @@ function monitorPane(){
     ? `<iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(yt)}?autoplay=1&mute=1&playsinline=1&modestbranding=1&rel=0" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen style="position:absolute;inset:0;width:100%;height:100%;border:0"></iframe>`
     : `<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;padding:0 20px 104px;background:radial-gradient(circle at 50% 34%, #16202e, #0b0f15)">
         <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="${T.sageDim}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
-        <div style="font-family:${MONO};font-weight:800;letter-spacing:2px;font-size:14px;color:${T.sage}">CAMERA FEED</div>
-        <div style="font-size:11px;color:${T.sageDim};max-width:260px;line-height:1.45">${IS_APP?"Start the stream to put the game on YouTube with the scorebug.":"Connect your YouTube Live stream to see it here with the scorebug."}</div>
-        <button data-act="${IS_APP?'appgolive':'setstream'}" style="margin-top:4px;background:${T.lime};color:${T.field};border:none;border-radius:9px;padding:10px 16px;font-family:${SANS};font-weight:800;font-size:13px;display:inline-flex;align-items:center;gap:7px;cursor:pointer">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="${T.field}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3l14 9-14 9V3z"/></svg>${IS_APP?(appLive()?"Going live…":"Start game stream"):"Connect your stream"}</button></div>`;
+        <div style="font-family:${MONO};font-weight:800;letter-spacing:2px;font-size:14px;color:${T.sage}">${(viewerLocked||viewMode==="viewer")?"WAITING FOR VIDEO":"CAMERA FEED"}</div>
+        <div style="font-size:11px;color:${T.sageDim};max-width:260px;line-height:1.45">${(viewerLocked||viewMode==="viewer")?"The video will appear here once the game is live.":(IS_APP?"Start the stream to put the game on YouTube with the scorebug.":"Connect your YouTube Live stream to see it here with the scorebug.")}</div>
+        ${(viewerLocked||viewMode==="viewer")?"":`<button data-act="${IS_APP?'appgolive':'setstream'}" style="margin-top:4px;background:${T.lime};color:${T.field};border:none;border-radius:9px;padding:10px 16px;font-family:${SANS};font-weight:800;font-size:13px;display:inline-flex;align-items:center;gap:7px;cursor:pointer">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="${T.field}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3l14 9-14 9V3z"/></svg>${IS_APP?(appLive()?"Going live…":"Start game stream"):"Connect your stream"}</button>`}</div>`;
   const monBtn="width:32px;height:32px;border-radius:8px;background:rgba(8,11,16,.6);border:1px solid rgba(255,255,255,.2);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer";
   const fsIcon=`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>`;
   const ytIcon=`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M9 7h8v8"/></svg>`;
@@ -1298,7 +1302,7 @@ function actionArea(){
     const hero = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:6px 0 2px;flex:none">
           <img src="icons/logo-mark.png" alt=""
             onerror="if(this.src.indexOf('icon-512')<0){this.src='icons/icon-512.png';this.style.borderRadius='20px';}else{this.style.display='none';}"
-            style="height:clamp(130px,26vh,260px);width:auto;display:block;filter:drop-shadow(0 8px 20px rgba(0,0,0,.55))">
+            style="height:clamp(130px,calc(var(--avh) * 26),260px);width:auto;display:block;filter:drop-shadow(0 8px 20px rgba(0,0,0,.55))">
           <div style="font-family:${MONO};font-size:clamp(26px,4.2vw,46px);font-weight:800;letter-spacing:1.5px;line-height:1;color:#fff">ALL-STARS <span style="color:${T.lime}">LIVE</span></div></div>`;
     const resumeBtn = gameActive?`<button data-act="resume" style="${bigBtn(T.safe)};font-size:17px;padding:16px;display:flex;align-items:center;justify-content:center;gap:8px">${IC(PLAY)} Resume &middot; ${OUR.short} vs ${OPP.short}</button>`:"";
     const newGameBtn = `<button data-act="newgamestart" style="${bigBtn(T.lime,"font-size:21px;padding:17px;box-shadow:0 8px 22px rgba(163,230,53,.22)",T.field)}">${IC(PLAY)} New Game</button>`;
@@ -1306,8 +1310,10 @@ function actionArea(){
       ? `<button data-act="gototeams" style="${ghost};padding:17px;font-size:17px;border:2px solid #3F6CA8;color:${T.ink};display:flex;align-items:center;justify-content:center;gap:9px">${IC('<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>')} Manage teams &amp; rosters</button>`
       : `<button data-act="gototeams" style="${bigBtn(T.lime,"font-size:19px;padding:17px;box-shadow:0 8px 22px rgba(163,230,53,.22)",T.field)}">${IC('<path d="M12 5v14M5 12h14"/>')} Create Your First Team</button>`;
     // Share only makes sense once a game (and its stream link) exists.
-    const shareBtnHome = `<button data-act="share" style="flex:none;display:flex;align-items:center;justify-content:center;gap:9px;background:${T.surface};border:1px solid ${T.line};color:${T.chalk};border-radius:12px;padding:13px;font-family:${SANS};font-weight:800;font-size:15px">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="${T.lime}" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="19" r="2.6"/><path d="M8.3 10.8 15.7 6.4M8.3 13.2l7.4 4.4"/></svg>Share game link</button>`;
+    // "Share game link" only makes sense once a game is live (it shares the viewer/watch link).
+    // No game in progress → no button (was confusing on a fresh home screen).
+    const shareBtnHome = gameActive ? `<button data-act="share" style="flex:none;display:flex;align-items:center;justify-content:center;gap:9px;background:${T.surface};border:1px solid ${T.line};color:${T.chalk};border-radius:12px;padding:13px;font-family:${SANS};font-weight:800;font-size:15px">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="${T.lime}" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="19" r="2.6"/><path d="M8.3 10.8 15.7 6.4M8.3 13.2l7.4 4.4"/></svg>Share game link</button>` : "";
     // Cloud sign-in bar — only appears once Firebase is configured (firebase-config.js apiKey).
     // Until then it's empty and the home looks/works exactly as the local-only version.
     const C=window.Cloud;
@@ -1338,7 +1344,7 @@ function actionArea(){
       // Title full-width on top; two equal tiles fill the rest evenly (no scrolling).
       // Solid tile heights (min-height, not flex:1) so they can never collapse on the tablet's
       // zoomed layout. The page scrolls if it's tight, instead of overlapping the logo.
-      const tile=(act,label,bg,fg,svg,sub)=>`<button data-act="${act}" style="min-height:clamp(150px,26vh,220px);width:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:${bg};color:${fg};border:none;border-radius:16px;cursor:pointer;box-shadow:0 8px 22px rgba(0,0,0,.35)">
+      const tile=(act,label,bg,fg,svg,sub)=>`<button data-act="${act}" style="min-height:clamp(150px,calc(var(--avh) * 26),220px);width:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:${bg};color:${fg};border:none;border-radius:16px;cursor:pointer;box-shadow:0 8px 22px rgba(0,0,0,.35)">
           <svg viewBox="0 0 24 24" width="42" height="42" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${svg}</svg>
           <span style="font-family:${MONO};font-weight:800;font-size:27px;letter-spacing:.6px">${label}</span>
           ${sub?`<span style="font-size:13px;font-weight:600;opacity:.85">${sub}</span>`:""}</button>`;
@@ -1355,7 +1361,7 @@ function actionArea(){
              ${manageBtn}</div>`
         : manageTile;
       // Top-aligned, width-capped. Scrolls if content is tall (never overlaps the logo).
-      return `<div style="position:relative;min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:clamp(14px,2.5vh,26px);padding:clamp(14px,3vh,34px) 12px">
+      return `<div style="position:relative;min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:clamp(14px,calc(var(--avh) * 2.5),26px);padding:clamp(14px,calc(var(--avh) * 3),34px) 12px">
           ${settingsGear}
           <div style="width:100%;max-width:1000px;display:flex;flex-direction:column;gap:16px">
             ${hero}${authBar}
@@ -1929,7 +1935,7 @@ function render(){
   // Focus the field while a play is being entered: drop the score box / video tabs / role
   // toggle so the diamond gets the room. Restored automatically when back to idle.
   const focusPlay=(mode==="locate"||mode==="runners"||pickerModal);
-  const fieldStyle=mode==="runners"?"flex:0 0 auto;height:min(30vh,210px);min-height:140px":"flex:1;min-height:0";
+  const fieldStyle=mode==="runners"?"flex:0 0 auto;height:min(calc(var(--avh) * 30),210px);min-height:140px":"flex:1;min-height:0";
   const actionStyle=mode==="runners"?"flex:1 1 auto;min-height:0;display:flex;flex-direction:column;gap:8px":"flex-shrink:0";
   // Responsive event picker: bottom-sheet on phone/portrait, SIDE panel on tablet/landscape
   // (more room, no scroll) — the first step toward the operator split-screen.
@@ -1939,7 +1945,7 @@ function render(){
     : `position:fixed;left:0;right:0;bottom:0;z-index:50;display:flex;justify-content:center;background:rgba(8,11,16,.55)`;
   const sheetCard=wide
     ? `width:min(440px,46vw);height:100%;border:2px solid ${T.lime};border-right:none;border-radius:18px 0 0 18px;box-shadow:-16px 0 48px rgba(0,0,0,.6)`
-    : `width:100%;max-width:420px;max-height:78vh;border:2px solid ${T.lime};border-bottom:none;border-radius:18px 18px 0 0;box-shadow:0 -16px 48px rgba(0,0,0,.6)`;
+    : `width:100%;max-width:420px;max-height:calc(var(--avh) * 78);border:2px solid ${T.lime};border-bottom:none;border-radius:18px 18px 0 0;box-shadow:0 -16px 48px rgba(0,0,0,.6)`;
   const footer=playing?"":`<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-shrink:0">
       <button data-act="undo" style="background:transparent;border:1px solid ${T.line};color:${hist.length?T.chalk:T.sageDim};border-radius:8px;padding:7px 11px;font-size:13px;font-weight:600">↶ Undo</button>
       ${mode==="idle"?`<button data-act="home" style="background:${T.surface};border:1px solid ${T.line};color:${T.chalk};border-radius:8px;padding:7px 12px;font-size:13px;font-weight:700">⌂ Home</button>
@@ -2303,7 +2309,11 @@ function renderToolbar(){
 }
 window.onLinkChange=renderToolbar;   // relay open/close → repaint the dot
 window.cloudMyName=function(){ const u=window.Cloud&&window.Cloud.user; if(!u)return ""; return u.displayName||(u.email||"").split("@")[0]||"Someone"; };
-window.onCloudAuth=function(u){ try{ if(u&&window.cloudSyncTeams)window.cloudSyncTeams(); }catch(e){} try{ if(u&&window.cloudClaimInvite)window.cloudClaimInvite(); }catch(e){} try{ if(u&&window.cloudClaimFollow)window.cloudClaimFollow(); }catch(e){} try{ if(u && ["home","settings","teams","pickteam"].includes(mode)) mode="home"; }catch(e){} try{ render(); }catch(e){} };   // after sign-in, land on Home
+window.onCloudAuth=function(u){
+  // Signed OUT → drop the cloud listeners AND the local team cache so a shared tablet doesn't keep
+  // showing the previous account's teams. (Signing back in re-syncs them from the cloud.)
+  if(!u){ try{ if(window.cloudStopSync)window.cloudStopSync(); }catch(e){} try{ DB.teams=[]; curTeamId=null; openTeamId=null; saveDB(); }catch(e){} try{ if(["team","teams","pickteam","settings"].includes(mode)) mode="home"; }catch(e){} try{ render(); }catch(e){} return; }
+  try{ if(window.cloudSyncTeams)window.cloudSyncTeams(); }catch(e){} try{ if(window.cloudClaimInvite)window.cloudClaimInvite(); }catch(e){} try{ if(window.cloudClaimFollow)window.cloudClaimFollow(); }catch(e){} try{ if(["home","settings","teams","pickteam"].includes(mode)) mode="home"; }catch(e){} try{ render(); }catch(e){} };   // after sign-in, land on Home
 
 /* ===== Team chat (modal) — real-time messages; owner/scorers/followers can post, owner can delete ===== */
 let chatTeamId=null, chatUnsub=null, chatMsgs=[];
@@ -2519,7 +2529,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v60";
+var APP_VERSION="v61";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;

@@ -12,6 +12,9 @@
   function myUid() { return window.Cloud && window.Cloud.user && window.Cloud.user.uid; }
   function myEmail(){ return ((window.Cloud && window.Cloud.user && window.Cloud.user.email) || "").toLowerCase(); }
   var _unsub = [];
+  // Stop all team onSnapshot listeners (called on sign-out so the next person on a shared
+  // tablet doesn't keep receiving / seeing the previous account's teams).
+  window.cloudStopSync = function () { _unsub.forEach(function (f) { try { f(); } catch (e) {} }); _unsub = []; };
 
   // Whitelist the fields we persist (drop any runtime junk).
   function teamDoc(t) {
