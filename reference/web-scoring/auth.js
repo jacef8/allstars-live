@@ -36,6 +36,11 @@
     .then(function () {
       firebase.initializeApp(cfg);
       var auth = firebase.auth();
+      // Force durable LOCAL persistence. In some Android WebViews the SDK's auto-detection
+      // silently falls back to IN-MEMORY persistence (the signed-in session is lost on every
+      // app restart) even though IndexedDB/localStorage work fine. Setting it explicitly makes
+      // the session survive restarts. LOCAL = IndexedDB, with a localStorage fallback.
+      try { auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(function (e) { console.warn("auth persistence:", e && e.message); }); } catch (e) {}
       try { firebase.firestore(); } catch (e) {}
       window.Cloud.enabled = true;
       window.Cloud.auth = auth;
@@ -89,7 +94,11 @@
     try {
       if (!window.Cloud || !window.Cloud.auth || typeof firebase === "undefined" || !idToken) return;
       var cred = firebase.auth.GoogleAuthProvider.credential(idToken);
-      window.Cloud.auth.signInWithCredential(cred).catch(function (e) { cloudToast("Google sign-in failed: " + (e.message || e)); });
+      // Make sure the session is stored durably (survives app restart) BEFORE signing in.
+      window.Cloud.auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL)
+        .catch(function () {})
+        .then(function () { return window.Cloud.auth.signInWithCredential(cred); })
+        .catch(function (e) { cloudToast("Google sign-in failed: " + (e.message || e)); });
     } catch (e) { cloudToast("Google sign-in failed."); }
   };
   window.__googleFail = function (msg) { cloudToast(msg || "Google sign-in didn't complete."); };
