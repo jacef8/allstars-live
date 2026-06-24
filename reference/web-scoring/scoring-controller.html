@@ -176,6 +176,21 @@
   </div>
 </div>
 
+<!-- Searchable rulebook: load the league rules text on demand; filter/highlight for disputes. -->
+<div id="rulesmodal" style="display:none;position:fixed;left:0;right:0;top:0;height:calc(var(--avh) * 100);z-index:200;background:rgba(8,11,16,.84);align-items:center;justify-content:center;padding:14px">
+  <div style="max-width:680px;width:100%;height:min(calc(var(--avh) * 90),820px);display:flex;flex-direction:column;background:#0E1420;border:1px solid #2A3650;border-radius:18px;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,.6)">
+    <div style="display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid #2A3650;flex:none">
+      <div style="font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:19px;letter-spacing:.5px;color:#EAEDF2;flex:1">&#128214; Rulebook</div>
+      <button data-act="closerules" style="background:#1A2233;border:1px solid #2A3650;color:#B7C2D6;border-radius:8px;padding:7px 11px;font-weight:700;font-size:13px;cursor:pointer">&times;</button>
+    </div>
+    <div style="padding:10px 14px;border-bottom:1px solid #2A3650;flex:none;display:flex;gap:8px;align-items:center">
+      <input id="rulesSearch" oninput="window.rulesSearch&&window.rulesSearch(this.value)" placeholder="Search the rules (e.g. courtesy runner, pitch count, batting out of order)…" autocomplete="off" style="flex:1;min-width:0;background:#10141A;border:1px solid #2A3650;color:#EAEDF2;border-radius:9px;padding:11px 12px;font-size:14px;outline:none">
+      <span id="rulesCount" style="font-size:12px;color:#8290AC;white-space:nowrap"></span>
+    </div>
+    <div id="rulesBody" style="flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px 16px;font-size:14px;line-height:1.5;color:#D6DCE8;white-space:pre-wrap;word-break:break-word"></div>
+  </div>
+</div>
+
 <!-- Team chat: real-time messages for owner/scorers/followers (parents). DORMANT until cloud is on. -->
 <div id="chatmodal" style="display:none;position:fixed;left:0;right:0;top:0;height:calc(var(--avh) * 100);z-index:200;background:rgba(8,11,16,.84);align-items:center;justify-content:center;padding:14px">
   <div style="max-width:460px;width:100%;height:min(calc(var(--avh) * 82),660px);display:flex;flex-direction:column;background:#0E1420;border:1px solid #2A3650;border-radius:18px;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,.6)">
@@ -310,6 +325,55 @@ function printLineupCard(t){
 }
 window.importTeam=function(){ pickJSON(function(o){ const t=(o&&o.team&&o.team.players)?o.team:(o&&o.players?o:null); if(!t||!t.players){try{alert("That's not a team file.");}catch(e){} return;} t.id=nextId("t"); delete t.ownerUid; delete t.ownerEmail; delete t.scorers; (t.players||[]).forEach(ensureName); if(!t.record)t.record={w:0,l:0,t:0}; if(!t.season)t.season={}; DB.teams.push(t); saveDB(); openTeamId=t.id; mode="team"; render(); }); };
 window.exportGame=function(){ downloadJSON("game-"+((OUR.short||"home"))+"-vs-"+((OPP.short||"opp"))+".allstars-game.json",{kind:"allstars-game",v:1,G,OUR,OPP,curTeamId,oppTeamId}); };
+/* Polished printable GAME SCORECARD (Save as PDF): team logos + records, final score,
+ * line score by inning, and both teams' batting + pitching box scores. */
+function printGameCard(){
+  if(!G||!G.line){ flash("No game to print"); return; }
+  const esc=s=>(s==null?"":String(s)).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+  const box=buildBox(), maxI=Math.max(1,G.inning);
+  const ourObj=(typeof curTeam==="function"&&curTeam())||null, oppObj=oppTeamId?teamById(oppTeamId):null;
+  const meta=side=>{ const tm=TEAMS[side], isOur=side===G.ourSide, obj=isOur?ourObj:oppObj, R=obj?teamRec(obj):null;
+    return {name:tm.name,short:tm.short,color:tm.color||"#2E6BE6",logo:obj&&obj.logo,rec:R?(R.w+"-"+R.l+(R.t?"-"+R.t:"")):"",runs:side==="away"?G.away:G.home}; };
+  const A=meta("away"), H=meta("home"), winA=A.runs>H.runs, winH=H.runs>A.runs;
+  let lhead='<th class="tm"></th>'; for(let i=1;i<=maxI;i++)lhead+='<th>'+i+'</th>'; lhead+='<th class="rhe">R</th><th class="rhe">H</th><th class="rhe">E</th>';
+  const lrow=(side,m)=>{ let c='<td class="tm">'+esc(m.short)+'</td>'; for(let i=1;i<=maxI;i++)c+='<td>'+(((G.line[side])&&G.line[side][i])||0)+'</td>'; const t=box.totals[side]; c+='<td class="rhe b">'+t.r+'</td><td class="rhe">'+t.h+'</td><td class="rhe">'+t.e+'</td>'; return '<tr>'+c+'</tr>'; };
+  const batTable=(side,m)=>{ const rows=(box[side]||[]).map(b=>'<tr><td class="nm">#'+esc(b.num)+' '+esc(b.name)+'</td><td>'+b.ab+'</td><td>'+b.r+'</td><td>'+b.h+'</td><td>'+b.rbi+'</td><td>'+b.bb+'</td><td>'+b.k+'</td></tr>').join('');
+    return '<h3 style="border-color:'+m.color+'">'+esc(m.name)+' — Batting</h3><table class="grid"><thead><tr><th class="nm">Batter</th><th>AB</th><th>R</th><th>H</th><th>RBI</th><th>BB</th><th>K</th></tr></thead><tbody>'+(rows||'<tr><td colspan="7">No at-bats recorded</td></tr>')+'</tbody></table>'; };
+  const pitchersForSide=side=>{ let list; if(side===G.ourSide){ list=Object.keys(G.pstats||{}).filter(k=>/^o\d/.test(k)).map(k=>{const idx=+k.slice(1),pl=ROSTER[idx],ps=G.pstats[k]||{},pc=(G.pitches&&G.pitches[k])||0,outs=ps.outs||0;return {name:pl?("#"+pl.num+" "+pl.name):"Pitcher",ip:Math.floor(outs/3)+"."+(outs%3),pc:pc,h:ps.h||0,r:ps.r||0,bb:ps.bb||0,k:ps.k||0,outs:outs};}); } else { const ps=(G.pstats&&G.pstats.oppP)||{},pc=(G.pitches&&G.pitches.oppP)||0,outs=ps.outs||0; list=[{name:(TEAMS[side].short||"OPP")+" pitcher",ip:Math.floor(outs/3)+"."+(outs%3),pc:pc,h:ps.h||0,r:ps.r||0,bb:ps.bb||0,k:ps.k||0,outs:outs}]; } return list.filter(x=>x.outs>0||x.pc>0).sort((a,b)=>b.outs-a.outs); };
+  const pitchTable=(side,m)=>{ const list=pitchersForSide(side); if(!list.length)return ''; const rows=list.map(x=>'<tr><td class="nm">'+esc(x.name)+'</td><td>'+x.ip+'</td><td>'+x.pc+'</td><td>'+x.h+'</td><td>'+x.r+'</td><td>'+x.bb+'</td><td>'+x.k+'</td></tr>').join('');
+    return '<h3 style="border-color:'+m.color+'">'+esc(m.name)+' — Pitching</h3><table class="grid"><thead><tr><th class="nm">Pitcher</th><th>IP</th><th>P</th><th>H</th><th>R</th><th>BB</th><th>K</th></tr></thead><tbody>'+rows+'</tbody></table>'; };
+  const teamHead=(m,win)=>'<div class="team">'+(m.logo?'<img src="'+m.logo+'">':'<div class="ph"></div>')+'<div class="ti"><div class="tn">'+esc(m.name)+'</div>'+(m.rec?'<div class="tc">'+esc(m.rec)+'</div>':'')+'</div><div class="ts" style="color:'+m.color+'">'+m.runs+'</div>'+(win?'<div class="wb">WIN</div>':'')+'</div>';
+  const today=new Date().toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric",year:"numeric"});
+  const html='<!doctype html><html><head><meta charset="utf-8"><title>'+esc(A.short)+' vs '+esc(H.short)+' — Scorecard</title><style>'
+    +'*{box-sizing:border-box}body{margin:0;font-family:Arial,Helvetica,sans-serif;color:#0B0E13;padding:22px}'
+    +'.top{display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid #0B0E13;padding-bottom:6px;margin-bottom:14px}'
+    +'.top .ttl{font-size:13px;letter-spacing:2px;font-weight:800;color:#444}.top .dt{font-size:12px;color:#666}'
+    +'.score{display:flex;align-items:stretch;gap:14px;margin-bottom:16px}'
+    +'.team{flex:1;display:flex;align-items:center;gap:12px;border:1px solid #ccd2db;border-radius:10px;padding:12px 14px;position:relative}'
+    +'.team img{width:54px;height:54px;object-fit:contain}.team .ph{width:54px;height:54px;border-radius:8px;background:#eef0f4}'
+    +'.team .ti{flex:1}.team .tn{font-size:18px;font-weight:800;line-height:1.1}.team .tc{font-size:12px;color:#666;margin-top:2px}'
+    +'.team .ts{font-size:46px;font-weight:800;line-height:1}'
+    +'.team .wb{position:absolute;top:-9px;left:12px;background:#15a34a;color:#fff;font-size:10px;font-weight:800;letter-spacing:1px;padding:2px 8px;border-radius:999px}'
+    +'.vs{display:flex;align-items:center;font-weight:800;color:#999;font-size:14px}'
+    +'h3{font-size:13px;letter-spacing:.5px;text-transform:uppercase;margin:16px 0 6px;border-left:5px solid #0B0E13;padding-left:8px}'
+    +'table{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:4px}'
+    +'.ls th,.ls td{border:1px solid #c8ccd4;padding:6px 8px;text-align:center;width:34px}.ls td.tm,.ls th.tm{text-align:left;font-weight:800;width:auto}.ls .rhe{background:#f2f4f7;font-weight:800}.ls td.b{font-weight:800}'
+    +'.grid th,.grid td{border:1px solid #c8ccd4;padding:6px;text-align:center;height:26px}.grid th{background:#0B0E13;color:#fff;font-size:10px;letter-spacing:.5px}.grid td.nm,.grid th.nm{text-align:left;font-weight:700;width:40%}'
+    +'.cols{display:flex;gap:18px}.cols>div{flex:1}'
+    +'.ft{margin-top:14px;font-size:11px;color:#888;text-align:right}'
+    +'@media print{body{padding:0}@page{margin:12mm}}'
+    +'</style></head><body>'
+    +'<div class="top"><div class="ttl">FINAL SCORE</div><div class="dt">'+esc(today)+'</div></div>'
+    +'<div class="score">'+teamHead(A,winA)+'<div class="vs">vs</div>'+teamHead(H,winH)+'</div>'
+    +'<h3>Line score</h3><table class="ls"><thead><tr>'+lhead+'</tr></thead><tbody>'+lrow("away",A)+lrow("home",H)+'</tbody></table>'
+    +'<div class="cols"><div>'+batTable("away",A)+pitchTable("away",A)+'</div><div>'+batTable("home",H)+pitchTable("home",H)+'</div></div>'
+    +'<div class="ft">All-Stars Live</div>'
+    +'<scr'+'ipt>window.onload=function(){setTimeout(function(){try{window.print();}catch(e){}},350);};</scr'+'ipt>'
+    +'</body></html>';
+  const w=window.open("","_blank");
+  if(!w){ flash("Allow pop-ups to open the scorecard"); return; }
+  w.document.open(); w.document.write(html); w.document.close();
+}
 window.importGame=function(){ pickJSON(function(o){ if(!o||!o.G){try{alert("That's not a game file.");}catch(e){} return;} G=o.G; if(o.OUR)Object.assign(OUR,o.OUR); if(o.OPP)Object.assign(OPP,o.OPP); curTeamId=o.curTeamId||null; oppTeamId=o.oppTeamId||null; const t=curTeamId&&teamById(curTeamId); if(t)ROSTER=t.players; gameActive=true; resetUI(); render(); try{broadcast();}catch(e){} }); };
 /* Season accumulation row, keyed by player id (full box). */
 function seasonRow(t,pid){if(!t.season[pid])t.season[pid]={bat:{ab:0,r:0,h:0,rbi:0,bb:0,k:0},pitch:{ip:0,k:0,bb:0,h:0,r:0},field:{po:0,a:0,e:0}};return t.season[pid];}
@@ -1622,14 +1686,17 @@ function actionArea(){
     const scheduleSection=scheduleViewCard+scheduleEditCard;
     // Per-team league rules URL. Only the owner can edit it; scorers/followers see it read-only.
     const canEditRules = !(window.Cloud&&window.Cloud.enabled&&window.Cloud.user) || (window.cloudCanManage&&window.cloudCanManage(t));
-    const rulesSection=`<div style="background:${T.surface};border:1px solid ${T.line};border-radius:10px;padding:12px 14px">
+    const rulesSection=`<div class="frost-card" style="background:${T.surface};border:1px solid ${T.line};border-radius:14px;padding:14px 16px">
         <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin-bottom:8px">League rulebook</div>
+        <button data-act="openrulebook" style="${bigBtn(T.lime,'',T.field)};display:flex;align-items:center;justify-content:center;gap:9px">&#128269; Open searchable rulebook</button>
+        <div style="font-size:11px;color:${T.sageDim};margin:6px 2px 12px;line-height:1.4">Diamond Youth Baseball 2026 — the full rules, searchable on the spot for disputes.</div>
+        <div style="font-size:10px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:${T.sageDim};margin-bottom:4px">Or link a different rulebook (URL)</div>
         <div style="display:flex;gap:8px;align-items:center">
           ${canEditRules
             ? `<input value="${(t.rulesUrl||"").replace(/"/g,"&quot;")}" oninput="edTeamRulesUrl(this.value)" placeholder="Paste rules URL (optional)" type="url" inputmode="url" autocapitalize="off" style="${cell};flex:1;min-width:0;font-size:13px">`
-            : `<div style="flex:1;min-width:0;font-size:13px;color:${t.rulesUrl?T.sage:T.sageDim};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.rulesUrl?(t.rulesUrl||"").replace(/</g,"&lt;"):"No rulebook set by the team owner."}</div>`}
-          ${t.rulesUrl?`<button data-act="openrules" style="background:${T.lime};color:${T.field};border:none;border-radius:8px;padding:9px 13px;font-weight:800;font-size:13px;white-space:nowrap">Open ↗</button>`:""}
-        </div>${canEditRules?"":`<div style="font-size:11px;color:${T.sageDim};margin-top:6px">Only the team owner can change the rulebook.</div>`}</div>`;
+            : `<div style="flex:1;min-width:0;font-size:13px;color:${t.rulesUrl?T.sage:T.sageDim};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.rulesUrl?(t.rulesUrl||"").replace(/</g,"&lt;"):"No custom rulebook linked."}</div>`}
+          ${t.rulesUrl?`<button data-act="openrules" style="background:${T.surface2};color:${T.lime};border:1px solid ${T.line};border-radius:8px;padding:9px 13px;font-weight:800;font-size:13px;white-space:nowrap">Open ↗</button>`:""}
+        </div>${canEditRules?"":`<div style="font-size:11px;color:${T.sageDim};margin-top:6px">Only the team owner can change the linked rulebook.</div>`}</div>`;
     // Team access (cloud) — owner + authorized scorers. Only when signed in.
     const C=window.Cloud, signedIn=!!(C&&C.enabled&&C.user);
     const owner=signedIn && typeof window.cloudIsOwner==="function" && window.cloudIsOwner(t);
@@ -2009,9 +2076,10 @@ function actionArea(){
         <div><div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin:0 2px 4px">${selName} &mdash; batting</div>
           <div style="overflow-x:auto;background:${T.surface};border:1px solid ${T.line};border-radius:10px;padding:4px 6px"><table style="width:100%;border-collapse:collapse;font-family:${MONO};font-size:17px;text-align:center;color:${T.chalk}"><thead><tr style="color:${T.sageDim};font-size:13px"><th style="text-align:left;padding:4px 6px">Batter</th><th>AB</th><th>R</th><th>H</th><th>RBI</th><th>BB</th><th>K</th></tr></thead><tbody>${bb||`<tr><td colspan="7" style="padding:8px;color:${T.sageDim}">No at-bats recorded</td></tr>`}</tbody></table></div></div>
         ${pitchBlock}
+        <button data-act="gamecard" style="${ghost};display:flex;align-items:center;justify-content:center;gap:9px">&#128196; Scorecard (PDF)</button>
         <div style="display:flex;gap:10px">
           <button data-act="resumegame" style="${ghost};flex:1;padding:14px">&lsaquo; Resume game</button>
-          <button data-act="exportgame" style="${ghost};flex:1;padding:14px">&#8681; Export</button>
+          <button data-act="exportgame" style="${ghost};flex:1;padding:14px">&#8681; Data</button>
           <button data-act="summary-done" style="${bigBtn(OUR.color)};flex:2">Done</button></div>
       </div>`;
   }
@@ -2487,9 +2555,12 @@ document.getElementById("app").addEventListener("click",e=>{
   if(act==="rmcoowner"){ const t=teamById(openTeamId); if(t&&Array.isArray(t.coOwners)){ t.coOwners=t.coOwners.filter(x=>x!==arg); } if(window.cloudRemoveCoOwner)window.cloudRemoveCoOwner(openTeamId,arg); render(); return; }
   if(act==="lineupback"){ mode=gameActive?"idle":"home"; render(); return; }
   if(act==="openrules"){ const _t=teamById(openTeamId); const _u=_t&&_t.rulesUrl; if(_u){ if(IS_APP&&window.AllStars&&window.AllStars.openExternal)AllStars.openExternal(_u); else window.open(_u,"_blank","noopener"); } return; }
+  if(act==="openrulebook"){ if(window.openRulebook)window.openRulebook(); return; }
+  if(act==="closerules"){ closeRules(); return; }
   if(act==="exportteam"){ if(window.exportTeam)window.exportTeam(openTeamId); return; }
   if(act==="importteam"){ if(window.importTeam)window.importTeam(); return; }
   if(act==="exportgame"){ if(window.exportGame)window.exportGame(); return; }
+  if(act==="gamecard"){ try{printGameCard();}catch(e){flash("Couldn't build the scorecard");} return; }
   if(act==="importgame"){ if(window.importGame)window.importGame(); return; }
   if(act==="signingoogle"){ if(window.cloudSignInGoogle)window.cloudSignInGoogle(); return; }
   if(act==="signin"){ const e=document.getElementById("authEmail"); if(e&&window.cloudSignIn)window.cloudSignIn(e.value); return; }
@@ -2702,6 +2773,34 @@ function openChat(teamId){
 }
 function closeChat(){ if(chatUnsub){try{chatUnsub();}catch(e){}chatUnsub=null;} const m=document.getElementById("chatmodal"); if(m)m.style.display="none"; chatTeamId=null; if(mode==="home"){try{render();}catch(e){}} }
 function sendChat(){ const inp=document.getElementById("chatInput"); if(!inp)return; const v=(inp.value||"").trim(); if(!v)return; if(!chatCanPost()){flash("You can't post here");return;} window.cloudSendMessage(chatTeamId,v); inp.value=""; }
+
+/* ===== Searchable rulebook (loads the league rules text on demand, filters/highlights) ===== */
+let _rulesParas=null;
+window.openRulebook=function(){
+  const m=document.getElementById("rulesmodal"); if(!m)return; m.style.display="flex";
+  const body=document.getElementById("rulesBody"), si=document.getElementById("rulesSearch");
+  if(_rulesParas){ window.rulesSearch(si?si.value:""); try{si&&si.focus();}catch(e){} return; }
+  if(body)body.textContent="Loading rules…";
+  fetch("rules-dyb-2026.txt").then(r=>r.ok?r.text():Promise.reject()).then(txt=>{
+    txt=txt.replace(/\r/g,"");
+    let paras=txt.split(/\n\s*\n/).map(s=>s.trim()).filter(s=>s.length>1);
+    if(paras.length<20)paras=txt.split(/\n/).map(s=>s.trim()).filter(s=>s.length>1);   // fallback: per line
+    _rulesParas=paras;
+    window.rulesSearch(""); try{si&&si.focus();}catch(e){}
+  }).catch(()=>{ if(body)body.textContent="Couldn't load the rulebook — check your connection and try again."; });
+};
+function closeRules(){ const m=document.getElementById("rulesmodal"); if(m)m.style.display="none"; }
+window.rulesSearch=function(q){
+  const body=document.getElementById("rulesBody"), cnt=document.getElementById("rulesCount"); if(!body||!_rulesParas)return;
+  const esc=s=>s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  q=(q||"").trim();
+  if(!q){ body.innerHTML=_rulesParas.map(p=>`<p style="margin:0 0 12px">${esc(p)}</p>`).join(""); if(cnt)cnt.textContent=_rulesParas.length+" sections"; body.scrollTop=0; return; }
+  const ql=q.toLowerCase(); const re=new RegExp("("+q.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+")","ig");
+  const hits=_rulesParas.filter(p=>p.toLowerCase().indexOf(ql)>=0);
+  body.innerHTML = hits.length ? hits.map(p=>`<p style="margin:0 0 12px">${esc(p).replace(re,'<mark style="background:#A3E635;color:#08111f">$1</mark>')}</p>`).join("") : `<div style="color:#8290AC;text-align:center;padding:24px">No rule text matches &ldquo;${esc(q)}&rdquo;.</div>`;
+  if(cnt)cnt.textContent=hits.length+" match"+(hits.length===1?"":"es"); body.scrollTop=0;
+};
+(function(){ const rm=document.getElementById("rulesmodal"); if(rm)rm.addEventListener("click",e=>{ if(e.target.id==="rulesmodal")closeRules(); }); })();
 (function(){ const cm=document.getElementById("chatmodal"); if(cm)cm.addEventListener("click",e=>{ if(e.target.id==="chatmodal")closeChat(); });
   const ci=document.getElementById("chatInput"); if(ci)ci.addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); sendChat(); } }); })();   // sign-in → sync teams, claim texted invite, repaint
 // OS back button (native): go BACK one screen instead of exiting. Returns true if it handled
@@ -2709,6 +2808,7 @@ function sendChat(){ const inp=document.getElementById("chatInput"); if(!inp)ret
 window.appBack=function(){
   try{
     // An open overlay/modal swallows Back first — dismiss it instead of leaving the app.
+    const rmod=document.getElementById("rulesmodal"); if(rmod&&rmod.style.display==="flex"){ closeRules(); return true; }
     const cm=document.getElementById("chatmodal"); if(cm&&cm.style.display==="flex"){ closeChat(); return true; }
     const qm=document.getElementById("qrmodal"); if(qm&&qm.style.display==="flex"){ closeShare(); return true; }
     const ym=document.getElementById("ytmodal"); if(ym&&ym.style.display==="flex"){ ym.style.display="none"; return true; }
@@ -2898,7 +2998,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v80";
+var APP_VERSION="v81";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
