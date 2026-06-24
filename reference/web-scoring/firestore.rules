@@ -12,8 +12,11 @@ service cloud.firestore {
 
     match /teams/{teamId} {
       function isOwner()    { return request.auth != null && resource.data.ownerUid == request.auth.uid; }
-      function isScorer()   { return request.auth != null && resource.data.scorers is list && (request.auth.token.email in resource.data.scorers); }
-      function isFollower() { return request.auth != null && resource.data.followers is list && (request.auth.token.email in resource.data.followers); }
+      // NOTE: no `is list` guard here on purpose — it breaks Cloud Firestore's QUERY analyzer
+      // (the `where('scorers','array-contains', myEmail)` listener in cloud-data.js gets denied
+      // outright). Team docs always create scorers/followers as [], so the field always exists.
+      function isScorer()   { return request.auth != null && (request.auth.token.email in resource.data.scorers); }
+      function isFollower() { return request.auth != null && (request.auth.token.email in resource.data.followers); }
 
       allow read: if isOwner() || isScorer() || isFollower();
 
