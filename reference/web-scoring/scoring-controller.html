@@ -2124,8 +2124,14 @@ document.getElementById("app").addEventListener("click",e=>{
   if(act==="swapviewer"){ viewerRight=viewerRight==="field"?"feed":"field"; try{localStorage.setItem("al-viewer-right",viewerRight);}catch(e){} render(); return; }
   if(act==="inviteadd"){ const e=document.getElementById("inviteWho"); if(!e)return; const v=(e.value||"").trim(); if(!v){flash("Enter an email or phone number");return;}
     const url=appBaseUrl()+"?invite="+encodeURIComponent(openTeamId); const t=teamById(openTeamId);
-    if(v.indexOf("@")>=0){ if(window.cloudAddScorer)window.cloudAddScorer(openTeamId,v); e.value=""; flash("Scorer added"); }
-    else { const num=v.replace(/[^0-9+]/g,""); const body="You're invited to score "+((t&&t.name)?t.name:"our team")+" on All-Stars Live. Tap to join (sign in once): "+url; const sms="sms:"+num+"?body="+encodeURIComponent(body); if(IS_APP&&window.AllStars&&window.AllStars.openExternal)AllStars.openExternal(sms); else location.href=sms; }
+    const team=(t&&t.name)?t.name:"our team";
+    if(v.indexOf("@")>=0){ if(window.cloudAddScorer)window.cloudAddScorer(openTeamId,v);   // authorize this email as a scorer
+      const subj="You're invited to score "+team+" on All-Stars Live";
+      const body="You're invited to score "+team+" on All-Stars Live.\n\nTap this link to join (you'll sign in once): "+url+"\n\nUse this same email address when you sign in.";
+      const mail="mailto:"+encodeURIComponent(v)+"?subject="+encodeURIComponent(subj)+"&body="+encodeURIComponent(body);
+      if(IS_APP&&window.AllStars&&window.AllStars.openExternal)AllStars.openExternal(mail); else location.href=mail;
+      e.value=""; flash("Scorer authorized — invite email drafted"); }
+    else { const num=v.replace(/[^0-9+]/g,""); const body="You're invited to score "+team+" on All-Stars Live. Tap to join (sign in once): "+url; const sms="sms:"+num+"?body="+encodeURIComponent(body); if(IS_APP&&window.AllStars&&window.AllStars.openExternal)AllStars.openExternal(sms); else location.href=sms; e.value=""; }
     return; }
   if(act==="rmscorer"){ if(window.cloudRemoveScorer)window.cloudRemoveScorer(openTeamId,arg); return; }
   if(act==="lineupback"){ mode=gameActive?"idle":"home"; render(); return; }
@@ -2502,7 +2508,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v55";
+var APP_VERSION="v56";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
