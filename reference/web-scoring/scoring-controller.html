@@ -180,7 +180,7 @@
 <div id="rulesmodal" style="display:none;position:fixed;left:0;right:0;top:0;height:calc(var(--avh) * 100);z-index:200;background:rgba(8,11,16,.84);align-items:center;justify-content:center;padding:14px">
   <div style="max-width:680px;width:100%;height:min(calc(var(--avh) * 90),820px);display:flex;flex-direction:column;background:#0E1420;border:1px solid #2A3650;border-radius:18px;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,.6)">
     <div style="display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid #2A3650;flex:none">
-      <div style="font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:19px;letter-spacing:.5px;color:#EAEDF2;flex:1">&#128214; Rulebook</div>
+      <div id="rulesTitle" style="font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:19px;letter-spacing:.5px;color:#EAEDF2;flex:1">&#128214; Rulebook</div>
       <button data-act="closerules" style="background:#1A2233;border:1px solid #2A3650;color:#B7C2D6;border-radius:8px;padding:7px 11px;font-weight:700;font-size:13px;cursor:pointer">&times;</button>
     </div>
     <div style="padding:10px 14px;border-bottom:1px solid #2A3650;flex:none;display:flex;gap:8px;align-items:center">
@@ -710,7 +710,26 @@ const LEAGUES=[
   {id:"dyb-oz",  name:"DYB \"O\"Zone",         innings:6, runCap:0, mercy:{r15:3,r10:4}, pitch:85, note:"6 inn · 15-after-3 / 10-after-4 · 85 pitches/day."},
 ];
 const leagueById=id=>LEAGUES.find(l=>l.id===id)||LEAGUES[0];
+/* ===== Rulebook repository — a library of leagues. DYB ships as searchable in-app text; the
+   others link to their official rules pages. Users can add their own (name + URL). A team picks
+   one (t.rulebookId), and it carries into each game so it's a tap away during a dispute. ===== */
+const RULEBOOKS=[
+  {id:"dyb",          name:"Diamond Youth Baseball (DYB) 2026", kind:"text", src:"rules-dyb-2026.txt"},
+  {id:"littleleague", name:"Little League",                     kind:"url",  src:"https://www.littleleague.org/playing-rules/"},
+  {id:"usssa",        name:"USSSA Baseball",                     kind:"url",  src:"https://www.usssa.com/baseball/"},
+  {id:"caripken",     name:"Cal Ripken / Babe Ruth League",     kind:"url",  src:"https://www.baberuthleague.org/"},
+  {id:"pony",         name:"PONY Baseball",                     kind:"url",  src:"https://www.pony.org/"},
+  {id:"dixie",        name:"Dixie Youth Baseball",              kind:"url",  src:"https://www.dixie.org/"},
+  {id:"obr",          name:"Official Baseball Rules (MLB)",     kind:"url",  src:"https://www.mlb.com/glossary/rules"},
+];
+function getCustomRulebooks(){ try{ return JSON.parse(localStorage.getItem("al-rulebooks")||"[]"); }catch(e){ return []; } }
+function saveCustomRulebooks(l){ try{ localStorage.setItem("al-rulebooks",JSON.stringify(l)); }catch(e){} }
+function allRulebooks(){ return RULEBOOKS.concat(getCustomRulebooks()); }
+function rulebookById(id){ return allRulebooks().find(r=>r.id===id)||RULEBOOKS[0]; }
+function openRulebookEntry(id){ const rb=rulebookById(id); if(!rb)return; if(rb.kind==="text"){ window.openRulebook(rb.src,rb.name); } else { const u=rb.src; if(IS_APP&&window.AllStars&&window.AllStars.openExternal)AllStars.openExternal(u); else window.open(u,"_blank","noopener"); } }
+window.setTeamRulebook=function(v){ const t=teamById(openTeamId); if(t){ t.rulebookId=v; saveDB(); } };
 window.ngLeague=function(v){ const L=leagueById(v); G.league=L.id; G.innings=L.innings; G.runCap=L.runCap; G.mercy=L.mercy?{r15:L.mercy.r15,r10:L.mercy.r10}:null; G.pitchMax=L.pitch||0; render(); };
+window.ngRulebook=function(v){ G.rulebookId=v; render(); };
 let settingsMode=false;   // true = Game Setup opened mid-game (Done returns to play, never resets)
 let teamTab="hub";        // team page: "hub" (grid of sections) or a section: roster/schedule/stats/access/rules
 let viewGameId=null;      // when teamTab==="gameview": which finished game (t.games[].id) to show
@@ -1759,19 +1778,23 @@ function actionArea(){
         <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime}">Past games &mdash; tap to see the score &amp; stats</div>
         ${pastRows||`<div style="font-size:12px;color:${T.sageDim}">No finished games yet — each game lands here once you end it.</div>`}</div>`;
     const scheduleSection=scheduleViewCard+pastGamesCard+scheduleEditCard;
-    // Per-team league rules URL. Only the owner can edit it; scorers/followers see it read-only.
-    const canEditRules = !(window.Cloud&&window.Cloud.enabled&&window.Cloud.user) || (window.cloudCanManage&&window.cloudCanManage(t));
-    const rulesSection=`<div class="frost-card" style="background:${T.surface};border:1px solid ${T.line};border-radius:14px;padding:14px 16px">
-        <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin-bottom:8px">League rulebook</div>
-        <button data-act="openrulebook" style="${bigBtn(T.lime,'',T.field)};display:flex;align-items:center;justify-content:center;gap:9px">&#128269; Open searchable rulebook</button>
-        <div style="font-size:11px;color:${T.sageDim};margin:6px 2px 12px;line-height:1.4">Diamond Youth Baseball 2026 — the full rules, searchable on the spot for disputes.</div>
-        <div style="font-size:10px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:${T.sageDim};margin-bottom:4px">Or link a different rulebook (URL)</div>
-        <div style="display:flex;gap:8px;align-items:center">
-          ${canEditRules
-            ? `<input value="${(t.rulesUrl||"").replace(/"/g,"&quot;")}" oninput="edTeamRulesUrl(this.value)" placeholder="Paste rules URL (optional)" type="url" inputmode="url" autocapitalize="off" style="${cell};flex:1;min-width:0;font-size:13px">`
-            : `<div style="flex:1;min-width:0;font-size:13px;color:${t.rulesUrl?T.sage:T.sageDim};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.rulesUrl?(t.rulesUrl||"").replace(/</g,"&lt;"):"No custom rulebook linked."}</div>`}
-          ${t.rulesUrl?`<button data-act="openrules" style="background:${T.surface2};color:${T.lime};border:1px solid ${T.line};border-radius:8px;padding:9px 13px;font-weight:800;font-size:13px;white-space:nowrap">Open ↗</button>`:""}
-        </div>${canEditRules?"":`<div style="font-size:11px;color:${T.sageDim};margin-top:6px">Only the team owner can change the linked rulebook.</div>`}</div>`;
+    // Rulebook repository — pick the team's league (radio), view any rulebook, add your own.
+    const rbSel=t.rulebookId||"dyb";
+    const rbRow=(r)=>`<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid ${T.line}">
+        <button data-act="setrulebook" data-arg="${r.id}" title="Use for this team" style="width:22px;height:22px;flex:none;border-radius:50%;border:2px solid ${rbSel===r.id?T.lime:T.line};background:${rbSel===r.id?T.lime:'transparent'};cursor:pointer"></button>
+        <div style="flex:1;min-width:0"><div style="font-weight:700;color:${T.ink};font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${(r.name||'').replace(/</g,'&lt;')}</div>
+          <div style="font-size:11px;color:${T.sageDim}">${r.kind==="text"?"&#128214; Searchable in-app":"&#128279; Opens official site"}</div></div>
+        <button data-act="viewrulebook" data-arg="${r.id}" style="background:${T.surface2};color:${T.lime};border:1px solid ${T.line};border-radius:8px;padding:8px 12px;font-weight:800;font-size:12px;white-space:nowrap">View &rsaquo;</button>
+        ${r.custom?`<button data-act="rmrulebook" data-arg="${r.id}" style="background:none;border:1px solid ${T.line};color:${T.out};border-radius:8px;padding:8px 10px;font-weight:800;font-size:12px">&times;</button>`:""}</div>`;
+    const rulebookSection=`<div class="frost-card" style="background:${T.surface};border:1px solid ${T.line};border-radius:14px;padding:14px 16px">
+        <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin-bottom:4px">Rulebook</div>
+        <div style="font-size:11px;color:${T.sageDim};margin-bottom:4px;line-height:1.45">Tap the dot to set this team's league (it carries into each game for quick dispute lookups). Tap <b style="color:${T.sage}">View</b> to read any rulebook.</div>
+        ${allRulebooks().map(rbRow).join("")}
+        <div style="font-size:10px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:${T.sageDim};margin:12px 0 4px">Add a rulebook (name + link)</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <input id="rbName" placeholder="League name" autocomplete="off" style="${cell};flex:1;min-width:120px;font-size:13px">
+          <input id="rbUrl" placeholder="https://… rules link" type="url" inputmode="url" autocapitalize="off" style="${cell};flex:1.4;min-width:140px;font-size:13px">
+          <button data-act="addrulebook" style="background:${T.surface2};color:${T.lime};border:1px solid ${T.line};border-radius:8px;padding:9px 16px;font-weight:800;font-size:13px">Add</button></div></div>`;
     // Team access (cloud) — owner + authorized scorers. Only when signed in.
     const C=window.Cloud, signedIn=!!(C&&C.enabled&&C.user);
     const owner=signedIn && typeof window.cloudIsOwner==="function" && window.cloudIsOwner(t);
@@ -1838,7 +1861,8 @@ function actionArea(){
       return secWrap(`${secHdr("Roster &amp; details")}${detailsBlock}
           <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin:2px 2px -2px">Roster — tap to edit #/name</div>
           <div class="frost-card" style="background:${T.surface};border:1px solid ${T.line};border-radius:12px;padding:4px 12px">${roster}</div>
-          <button data-act="addteamp" style="${ghost}">+ Add player</button>`);
+          <button data-act="addteamp" style="${ghost}">+ Add player</button>
+          ${rulebookSection}`);
     }
     if(teamTab==="schedule") return secWrap(`${secHdr("Schedule")}${scheduleSection}`);
     if(teamTab==="gameview"){
@@ -1871,7 +1895,7 @@ function actionArea(){
     }
     if(teamTab==="stats") return secWrap(`${secHdr("Stats &amp; games")}${recEditor}${gamesBlock}${statTable}`);
     if(teamTab==="access") return secWrap(`${secHdr("Team access")}${scorersSection}${discoverySection}`);
-    if(teamTab==="rules") return secWrap(`${secHdr("League rules")}${rulesSection}`);
+    if(teamTab==="rules"){ teamTab="roster"; return actionArea(); }   // rules folded into Roster & details
     if(teamTab==="photos"){
       const C=window.Cloud, signedIn=!!(C&&C.enabled&&C.user);
       const member=signedIn && (!(window.cloudIsMember) || window.cloudIsMember(t));
@@ -1913,7 +1937,6 @@ function actionArea(){
           ${hb("schedule","&#128197;","Schedule")}
           ${hb("stats","&#128202;","Stats &amp; games")}
           ${hb("photos","&#128247;","Photos")}
-          ${hb("rules","&#128214;","League rules")}
           ${hb("access","&#128273;","Scorers &amp; co-owners")}
           ${hbAct("shareteam","&#128279;","Share &amp; invite")}
         </div>
@@ -2038,6 +2061,13 @@ function actionArea(){
           <div style="flex:1;min-width:150px"><div style="font-weight:800;color:${T.ink};font-size:19px">League</div>
             <div style="color:${T.sage};font-size:13px;margin-top:3px;line-height:1.35">${curL.note}</div></div>
           <select onchange="ngLeague(this.value)" style="${selStyle}">${LEAGUES.map(l=>`<option value="${l.id}"${G.league===l.id?" selected":""}>${l.name}</option>`).join("")}</select></div>`;
+    // Rulebook for THIS game (defaults to the team's; viewable here for a dispute).
+    const grb=(G.rulebookId)||(curTeam()&&curTeam().rulebookId)||"dyb";
+    const rulebookCard=`<div style="${rowCard};flex-wrap:wrap">
+          <div style="flex:1;min-width:150px"><div style="font-weight:800;color:${T.ink};font-size:19px">Rulebook</div>
+            <div style="color:${T.sage};font-size:13px;margin-top:3px;line-height:1.35">Pulled into this game — tap View to settle a dispute.</div></div>
+          <select onchange="ngRulebook(this.value)" style="${selStyle}">${allRulebooks().map(r=>`<option value="${r.id}"${grb===r.id?" selected":""}>${(r.name||'').replace(/</g,'&lt;')}</option>`).join("")}</select>
+          <button data-act="viewgamerulebook" style="width:100%;margin-top:8px;background:${T.surface2};color:${T.lime};border:1px solid ${T.line};border-radius:9px;padding:11px;font-family:${MONO};font-weight:800;font-size:14px;display:flex;align-items:center;justify-content:center;gap:8px">&#128214; View rulebook</button></div>`;
     const ac=alertsCfg();
     const aChip=(k,lbl)=>`<button data-act="alerttoggle" data-arg="${k}" style="background:${ac[k]?T.lime:T.surface2};border:1px solid ${ac[k]?T.lime:T.line};color:${ac[k]?T.field:T.sage};border-radius:999px;padding:7px 13px;font-family:${MONO};font-weight:800;font-size:12px">${lbl}</button>`;
     const alertsCard=`<div style="${rowCard};flex-wrap:wrap">
@@ -2067,7 +2097,7 @@ function actionArea(){
     const lineupCardBtn=`<button data-act="nglineupcard" style="${ghost};display:flex;align-items:center;justify-content:center;gap:9px;width:100%;flex:none">&#128196; Print lineup card</button>`;
     // In settings mode (mid-game) we show ONLY the rule cards + Done — no team/side pickers,
     // and no "Start game" (that would reset the live game).
-    const ruleCards=`${leagueCard}${runCapCard}${hittersCard}${pitchTypeCard}${alertsCard}${startCard}`;
+    const ruleCards=`${leagueCard}${rulebookCard}${runCapCard}${hittersCard}${pitchTypeCard}${alertsCard}${startCard}`;
     const doneBtn=`<button data-act="settingsdone" style="${bigBtn(T.lime,"width:100%;font-size:22px;padding:20px",T.field)};flex:none;margin-top:2px">Done &#10003;</button>`;
     if(isWide()){
       if(setMode) return `<div style="min-height:100%;display:flex;flex-direction:column;gap:16px;justify-content:safe center">
@@ -2700,6 +2730,11 @@ document.getElementById("app").addEventListener("click",e=>{
   if(act==="openrules"){ const _t=teamById(openTeamId); const _u=_t&&_t.rulesUrl; if(_u){ if(IS_APP&&window.AllStars&&window.AllStars.openExternal)AllStars.openExternal(_u); else window.open(_u,"_blank","noopener"); } return; }
   if(act==="openrulebook"){ if(window.openRulebook)window.openRulebook(); return; }
   if(act==="closerules"){ closeRules(); return; }
+  if(act==="viewrulebook"){ openRulebookEntry(arg); return; }
+  if(act==="setrulebook"){ const t=teamById(openTeamId); if(t){ t.rulebookId=arg; saveDB(); render(); } return; }
+  if(act==="rmrulebook"){ const list=getCustomRulebooks().filter(r=>r.id!==arg); saveCustomRulebooks(list); const t=teamById(openTeamId); if(t&&t.rulebookId===arg){t.rulebookId="dyb";saveDB();} render(); return; }
+  if(act==="addrulebook"){ const n=document.getElementById("rbName"), u=document.getElementById("rbUrl"); const name=(n&&n.value||"").trim(), url=(u&&u.value||"").trim(); if(!name||!url){flash("Enter a name and a link");return;} let href=url; if(!/^https?:\/\//i.test(href))href="https://"+href; const list=getCustomRulebooks(); list.push({id:"rb"+Date.now().toString(36),name:name,kind:"url",src:href,custom:true}); saveCustomRulebooks(list); flash("Rulebook added"); render(); return; }
+  if(act==="viewgamerulebook"){ openRulebookEntry((G&&G.rulebookId)||(curTeam()&&curTeam().rulebookId)||"dyb"); return; }
   if(act==="exportteam"){ if(window.exportTeam)window.exportTeam(openTeamId); return; }
   if(act==="importteam"){ if(window.importTeam)window.importTeam(); return; }
   if(act==="exportgame"){ if(window.exportGame)window.exportGame(); return; }
@@ -2920,13 +2955,16 @@ function closeChat(){ if(chatUnsub){try{chatUnsub();}catch(e){}chatUnsub=null;} 
 function sendChat(){ const inp=document.getElementById("chatInput"); if(!inp)return; const v=(inp.value||"").trim(); if(!v)return; if(!chatCanPost()){flash("You can't post here");return;} window.cloudSendMessage(chatTeamId,v); inp.value=""; }
 
 /* ===== Searchable rulebook (loads the league rules text on demand, filters/highlights) ===== */
-let _rulesParas=null;
-window.openRulebook=function(){
+let _rulesParas=null, _rulesSrc=null;
+window.openRulebook=function(src,title){
+  src=src||"rules-dyb-2026.txt"; title=title||"Rulebook";
   const m=document.getElementById("rulesmodal"); if(!m)return; m.style.display="flex";
+  const ttl=document.getElementById("rulesTitle"); if(ttl)ttl.innerHTML="&#128214; "+title.replace(/</g,"&lt;");
   const body=document.getElementById("rulesBody"), si=document.getElementById("rulesSearch");
-  if(_rulesParas){ window.rulesSearch(si?si.value:""); try{si&&si.focus();}catch(e){} return; }
+  if(_rulesParas&&_rulesSrc===src){ window.rulesSearch(si?si.value:""); try{si&&si.focus();}catch(e){} return; }
+  _rulesParas=null; _rulesSrc=src; if(si)si.value="";
   if(body)body.textContent="Loading rules…";
-  fetch("rules-dyb-2026.txt").then(r=>r.ok?r.text():Promise.reject()).then(txt=>{
+  fetch(src).then(r=>r.ok?r.text():Promise.reject()).then(txt=>{
     txt=txt.replace(/\r/g,"");
     let paras=txt.split(/\n\s*\n/).map(s=>s.trim()).filter(s=>s.length>1);
     if(paras.length<20)paras=txt.split(/\n/).map(s=>s.trim()).filter(s=>s.length>1);   // fallback: per line
@@ -3144,7 +3182,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v87";
+var APP_VERSION="v88";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
