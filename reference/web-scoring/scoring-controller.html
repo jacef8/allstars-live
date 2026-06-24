@@ -1288,8 +1288,8 @@ function actionArea(){
           </div></div>`;};
     const teamsBlock = DB.teams.length
       ? `<div style="display:flex;align-items:center;justify-content:space-between;margin:4px 2px -2px">
-            <span style="font-size:13px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:${T.lime}">${favs.length?"★ Your teams":"Teams"}</span>
-            <button data-act="gototeams" style="background:none;border:none;color:${T.lime};font-weight:800;font-size:14px;letter-spacing:.4px;cursor:pointer">All teams &rsaquo;</button></div>
+            <span style="font-size:17px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime}">${favs.length?"★ Your teams":"Your teams"}</span>
+            <button data-act="gototeams" style="background:${T.surface};border:1px solid ${T.line};color:${T.lime};font-weight:800;font-size:14px;letter-spacing:.3px;cursor:pointer;border-radius:9px;padding:8px 13px">All teams &rsaquo;</button></div>
           <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px">${list.map(card).join("")}</div>`
       : "";
 
@@ -1364,10 +1364,11 @@ function actionArea(){
     const cards=sorted.map(t=>{const rec=`${t.record.w}-${t.record.l}${t.record.t?"-"+t.record.t:""}`;
       return `<div style="display:flex;align-items:center;gap:8px;background:${T.surface};border:2px solid ${t.color};border-left:7px solid ${t.color};border-radius:12px;padding:11px 13px;box-shadow:0 6px 16px rgba(0,0,0,.35)">
         <button data-act="favteam" data-arg="${t.id}" style="background:none;border:none;color:${t.fav?T.amber:T.sageDim};font-size:25px;line-height:1;padding:2px 4px;cursor:pointer">${t.fav?"★":"☆"}</button>
-        <button data-act="opent" data-arg="${t.id}" style="flex:1;min-width:0;text-align:left;background:none;border:none;padding:4px 2px">
-          <div style="font-family:${MONO};font-size:22px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.name}</div>
-          <div style="font-family:${MONO};font-size:14px;color:${T.sage};margin-top:3px"><span style="color:${t.color};font-weight:800">${rec}</span> &middot; ${t.players.length} players</div></button>
-        <button data-act="opent" data-arg="${t.id}" style="background:none;border:none;color:${t.color};font-weight:800;font-size:15px;letter-spacing:.5px;cursor:pointer;padding:4px 0">MANAGE &rsaquo;</button></div>`;}).join("")
+        <button data-act="opent" data-arg="${t.id}" style="flex:1;min-width:0;display:flex;align-items:center;gap:10px;text-align:left;background:none;border:none;padding:6px 2px;cursor:pointer">
+          <div style="flex:1;min-width:0">
+            <div style="font-family:${MONO};font-size:22px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.name}</div>
+            <div style="font-family:${MONO};font-size:14px;color:${T.sage};margin-top:3px"><span style="color:${t.color};font-weight:800">${rec}</span> &middot; ${t.players.length} players</div></div>
+          <span style="color:${t.color};font-weight:800;font-size:15px;letter-spacing:.5px;white-space:nowrap">MANAGE &rsaquo;</span></button></div>`;}).join("")
       ||`<div style="color:${T.sage};font-size:15px;text-align:center;padding:24px 8px;border:1px dashed ${T.line};border-radius:12px">No teams yet — create one to start tracking rosters &amp; season stats.</div>`;
     return `<div style="display:flex;flex-direction:column;gap:14px">
         <div style="display:flex;align-items:center;gap:10px">
@@ -2450,7 +2451,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v45";
+var APP_VERSION="v46";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
