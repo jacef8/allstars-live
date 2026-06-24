@@ -3,8 +3,13 @@
 > **Read this first.** This is the single source of truth for picking up the project — e.g. from a
 > fresh Claude Code session or a different account. The code is the truth; this explains the rest.
 
-_Last updated: 2026‑06‑23 (app version **v49**). **Keep this file current as work continues** —
+_Last updated: 2026‑06‑23 (app version **v51**). **Keep this file current as work continues** —
 update the version, status, and pending lists with each meaningful change._
+
+> **v51 ARCHITECTURE CHANGE:** the native app now loads the **live https web app** (offline‑cached),
+> not bundled `file://` assets. → **web pushes reach the native app with no APK rebuild**; rebuild the
+> APK only for native Kotlin (camera/streaming, splash, icon, WebView loader). Sign‑in (Google +
+> email) + cloud now work on native. (See `createScorerWebView` in `GameScorerScreen.kt`: `APP_URL`.)
 
 ---
 
