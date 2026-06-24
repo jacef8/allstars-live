@@ -1584,20 +1584,30 @@ function actionArea(){
     const C=window.Cloud, signedIn=!!(C&&C.enabled&&C.user);
     const owner=signedIn && typeof window.cloudIsOwner==="function" && window.cloudIsOwner(t);
     const canManage=signedIn && typeof window.cloudCanManage==="function" && window.cloudCanManage(t);
-    const scorersSection = !(C&&C.enabled) ? ""
-      : !signedIn ? `<div style="background:${T.surface};border:1px solid ${T.line};border-radius:10px;padding:12px 14px">
-          <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin-bottom:6px">Team access — authorized scorers</div>
-          <div style="font-size:12px;color:${T.sageDim}">Sign in on the Home screen to see and manage who can score this team.</div></div>`
-      : `<div style="background:${T.surface};border:1px solid ${T.line};border-radius:10px;padding:12px 14px">
-        <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin-bottom:6px">Team access — authorized scorers</div>
-        <div style="font-size:13px;color:${T.sage};margin-bottom:6px">Owner: <b style="color:${T.chalk};word-break:break-all">${(t.ownerEmail||C.user.email||"you").replace(/</g,"")}</b></div>
-        <div style="font-size:11px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:${T.sage};margin:6px 0 2px">Co-owners — full management access</div>
-        ${(t.coOwners&&t.coOwners.length)?t.coOwners.map(co=>`<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 0;border-top:1px solid ${T.line}"><span style="font-size:13px;color:${T.chalk};word-break:break-all">★ ${co.replace(/</g,"")}</span>${owner?`<button data-act="rmcoowner" data-arg="${co}" style="background:none;border:1px solid ${T.line};color:${T.out};border-radius:7px;padding:5px 10px;font-weight:800;font-size:12px">Remove</button>`:""}</div>`).join(""):`<div style="font-size:12px;color:${T.sageDim};padding:2px 0">No co-owners. A co-owner can manage the roster, schedule, scorers &amp; settings — but only you can delete the team or change co-owners.</div>`}
-        ${owner?`<div style="display:flex;gap:8px;margin:8px 0 4px"><input id="coOwnerWho" type="email" autocomplete="off" autocapitalize="off" placeholder="Co-owner email" style="${cell};flex:1;min-width:0"><button data-act="addcoowner" style="background:${T.surface2};color:${T.lime};border:1px solid ${T.line};border-radius:8px;padding:9px 16px;font-weight:800;font-size:13px">Add</button></div>`:""}
-        <div style="font-size:11px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:${T.sage};margin:8px 0 2px">Authorized scorers</div>
-        ${(t.scorers&&t.scorers.length)?t.scorers.map(s=>`<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 0;border-top:1px solid ${T.line}"><span style="font-size:13px;color:${T.chalk};word-break:break-all">${s.replace(/</g,"")}</span>${canManage?`<button data-act="rmscorer" data-arg="${s}" style="background:none;border:1px solid ${T.line};color:${T.out};border-radius:7px;padding:5px 10px;font-weight:800;font-size:12px">Remove</button>`:""}</div>`).join(""):`<div style="font-size:12px;color:${T.sageDim};padding:4px 0">No authorized scorers yet.</div>`}
+    const ownerEmail=(t.ownerEmail||C.user.email||"you").replace(/</g,"");
+    const cardCss=`background:${T.surface};border:1px solid ${T.line};border-radius:14px;padding:14px 16px`;
+    const subLbl=`font-size:11px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:${T.sage};margin:8px 0 2px`;
+    // OWNERS box: the primary owner + co-owners (full management). SCORERS box: authorized scorers.
+    const ownersCard=`<div class="frost-card" style="${cardCss}">
+        <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin-bottom:8px">Owners</div>
+        <div style="display:flex;align-items:center;gap:10px;padding:4px 0">
+          <span style="font-size:20px">👑</span>
+          <div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:700;color:${T.chalk};word-break:break-all">${ownerEmail}</div><div style="font-size:11px;color:${T.sageDim}">Primary owner &middot; full control</div></div></div>
+        <div style="${subLbl}">Co-owners &mdash; full management access</div>
+        ${(t.coOwners&&t.coOwners.length)?t.coOwners.map(co=>`<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 0;border-top:1px solid ${T.line}"><span style="font-size:13px;color:${T.chalk};word-break:break-all">★ ${co.replace(/</g,"")}</span>${owner?`<button data-act="rmcoowner" data-arg="${co}" style="background:none;border:1px solid ${T.line};color:${T.out};border-radius:7px;padding:5px 10px;font-weight:800;font-size:12px">Remove</button>`:""}</div>`).join(""):`<div style="font-size:12px;color:${T.sageDim};padding:2px 0">No co-owners yet.</div>`}
+        ${owner?`<div style="display:flex;gap:8px;margin:10px 0 4px"><input id="coOwnerWho" type="email" autocomplete="off" autocapitalize="off" placeholder="Co-owner email" style="${cell};flex:1;min-width:0"><button data-act="addcoowner" style="background:${T.surface2};color:${T.lime};border:1px solid ${T.line};border-radius:8px;padding:9px 16px;font-weight:800;font-size:13px">Add</button></div>
+          <div style="font-size:11px;color:${T.sageDim};margin-top:4px">A co-owner can manage the roster, schedule, scorers &amp; settings — only you can delete the team or change co-owners.</div>`:`<div style="font-size:11px;color:${T.sageDim};margin-top:6px">Only the primary owner can add or remove co-owners.</div>`}</div>`;
+    const scorersCard=`<div class="frost-card" style="${cardCss}">
+        <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin-bottom:4px">Scorers</div>
+        <div style="font-size:12px;color:${T.sageDim};margin-bottom:4px">Can score games &amp; edit the team — but can't manage owners or delete the team.</div>
+        ${(t.scorers&&t.scorers.length)?t.scorers.map(s=>`<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 0;border-top:1px solid ${T.line}"><span style="font-size:13px;color:${T.chalk};word-break:break-all">${s.replace(/</g,"")}</span>${canManage?`<button data-act="rmscorer" data-arg="${s}" style="background:none;border:1px solid ${T.line};color:${T.out};border-radius:7px;padding:5px 10px;font-weight:800;font-size:12px">Remove</button>`:""}</div>`).join(""):`<div style="font-size:12px;color:${T.sageDim};padding:4px 0">No authorized scorers yet.</div>`}
         ${canManage?`<div style="display:flex;gap:8px;margin-top:10px"><input id="inviteWho" type="text" autocomplete="off" autocapitalize="off" placeholder="Email or phone number" style="${cell};flex:1;min-width:0">${(window.AllStars&&window.AllStars.pickContact)?`<button data-act="pickcontact" title="Pick from contacts" style="background:${T.surface2};color:${T.lime};border:1px solid ${T.line};border-radius:8px;padding:9px 13px;font-size:16px">📇</button>`:""}<button data-act="inviteadd" style="background:${T.lime};color:${T.field};border:none;border-radius:8px;padding:9px 16px;font-weight:800;font-size:13px">Invite</button></div>
           <div style="font-size:11px;color:${T.sageDim};margin-top:6px">Enter an <b style="color:${T.sage}">email</b> to authorize a scorer, or a <b style="color:${T.sage}">phone number</b> to text them a join link. Either way they sign in once and they're in.</div>`:`<div style="font-size:11px;color:${T.sageDim};margin-top:6px">Only the owner or a co-owner can add scorers.</div>`}</div>`;
+    const scorersSection = !(C&&C.enabled) ? ""
+      : !signedIn ? `<div style="${cardCss}">
+          <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin-bottom:6px">Owners &amp; scorers</div>
+          <div style="font-size:12px;color:${T.sageDim}">Sign in on the Home screen to see and manage who owns and scores this team.</div></div>`
+      : ownersCard + scorersCard;
     // Owner-only discovery toggles (public team directory + public stats).
     const toggleRow=(act,on,label,sub)=>`<button data-act="${act}" style="display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;background:${T.surface};border:1px solid ${T.line};border-radius:10px;padding:12px 14px;text-align:left;cursor:pointer">
         <div style="flex:1;min-width:0"><div style="font-weight:800;color:${T.ink};font-size:14px">${label}</div><div style="font-size:11px;color:${T.sageDim};margin-top:2px;line-height:1.35">${sub}</div></div>
@@ -2804,7 +2814,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v77";
+var APP_VERSION="v78";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
