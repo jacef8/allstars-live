@@ -139,8 +139,8 @@
 <!-- Share / QR modal: fans scan to open the live viewer -->
 <div id="qrmodal" style="display:none;position:fixed;inset:0;z-index:200;background:rgba(8,11,16,.84);align-items:center;justify-content:center;padding:20px">
   <div style="max-width:330px;width:100%;background:#212A38;border:1px solid #4A5870;border-radius:18px;padding:20px;text-align:center;box-shadow:0 24px 60px rgba(0,0,0,.6)">
-    <div style="font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:20px;letter-spacing:.5px;color:#EAEDF2">SHARE THE GAME</div>
-    <div style="font-size:12px;color:#B7C2D6;margin:3px 0 12px">Nearby? Have them <b style="color:#A3E635">scan</b>. Far away? Send the link.</div>
+    <div id="qrTitle" style="font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:20px;letter-spacing:.5px;color:#EAEDF2">SHARE THE GAME</div>
+    <div id="qrSub" style="font-size:12px;color:#B7C2D6;margin:3px 0 12px">Nearby? Have them <b style="color:#A3E635">scan</b>. Far away? Send the link.</div>
     <div id="shareToggle"></div>
     <div id="qrbox" style="background:#fff;border-radius:12px;padding:12px;width:244px;height:244px;margin:0 auto;display:flex;align-items:center;justify-content:center;color:#677281;font-size:12px"></div>
     <div id="qrurl" style="font-size:11px;color:#B7C2D6;word-break:break-all;margin:12px 4px 14px"></div>
@@ -1339,7 +1339,7 @@ function recordRecentOpp(o){ if(!o||!o.name||o.name==="Opponent")return; try{ le
 /* Live client-side filter for the opponent picker (no re-render → keeps the input focused). */
 window._oppFilter=function(v){ v=(v||"").trim().toLowerCase(); try{ document.querySelectorAll('[data-tname]').forEach(function(el){ el.style.display=(!v||(el.getAttribute('data-tname')||'').indexOf(v)>=0)?"":"none"; }); }catch(e){} };
 /* Schedule month-calendar view (toggle with the list). calYM = {y,m} of the shown month. */
-let calYM=null, scheduleView=(()=>{try{return localStorage.getItem("al-sched-view")||"list";}catch(e){return "list";}})();
+let calYM=null, calSelDay=null, scheduleView=(()=>{try{return localStorage.getItem("al-sched-view")||"list";}catch(e){return "list";}})();
 /* Public-team directory browser + read-only stats viewer (any team that opted public). */
 let dirResults=null, viewTeam=null;
 function calendarHtml(t){
@@ -1348,19 +1348,37 @@ function calendarHtml(t){
   const monthName=first.toLocaleDateString(undefined,{month:"long",year:"numeric"});
   const pad=n=>String(n).padStart(2,"0"), byDate={};
   (t.schedule||[]).forEach(s=>{ if(s.date){(byDate[s.date]=byDate[s.date]||[]).push(s);} });
+  const todayStr=(()=>{const n=new Date();return `${n.getFullYear()}-${pad(n.getMonth()+1)}-${pad(n.getDate())}`;})();
   const total=Math.ceil((startDow+daysIn)/7)*7; let cells="";
   for(let i=0;i<total;i++){ const dn=i-startDow+1, inM=dn>=1&&dn<=daysIn, ds=inM?`${y}-${pad(m+1)}-${pad(dn)}`:""; const evs=ds?(byDate[ds]||[]):[];
-    cells+=`<div style="min-height:52px;border:1px solid ${T.line};border-radius:7px;padding:3px 4px;background:${inM?T.surface2:'transparent'};opacity:${inM?1:.25};display:flex;flex-direction:column;gap:2px">
-        <div style="font-family:${MONO};font-size:12px;font-weight:800;color:${T.sage}">${inM?dn:""}</div>
-        ${evs.length?`<div style="font-size:9px;line-height:1.15;overflow:hidden">${evs.slice(0,2).map(s=>`<div style="color:${s.type==="practice"?T.sage:t.color};font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${s.type==="practice"?"⚾":"🏟️"}${s.opp?" "+(s.opp||"").replace(/</g,"&lt;"):""}</div>`).join("")}${evs.length>2?`<div style="color:${T.sageDim}">+${evs.length-2}</div>`:""}</div>`:""}
-      </div>`; }
-  const dow=["Su","Mo","Tu","We","Th","Fr","Sa"].map(d=>`<div style="text-align:center;font-family:${MONO};font-size:11px;font-weight:800;color:${T.sageDim};padding:2px 0">${d}</div>`).join("");
+    const sel=inM&&calSelDay===ds, isToday=inM&&ds===todayStr;
+    const dots=evs.length?`<div style="display:flex;gap:3px;flex-wrap:wrap;justify-content:center;max-width:100%">${evs.slice(0,4).map(s=>`<span style="width:8px;height:8px;border-radius:50%;background:${s.type==="practice"?T.sage:t.color}"></span>`).join("")}</div>`:`<div style="height:8px"></div>`;
+    cells+=inM
+      ? `<button data-act="calday" data-arg="${ds}" style="min-height:62px;border:1.5px solid ${sel?t.color:(isToday?T.lime:T.line)};border-radius:9px;padding:5px 2px;background:${sel?T.surface:T.surface2};display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:5px;cursor:pointer">
+          <div style="font-family:${MONO};font-size:17px;font-weight:800;color:${sel?t.color:(isToday?T.lime:T.ink)}">${dn}</div>${dots}</button>`
+      : `<div style="min-height:62px;opacity:.18;border:1px solid ${T.line};border-radius:9px"></div>`; }
+  const dow=["Su","Mo","Tu","We","Th","Fr","Sa"].map(d=>`<div style="text-align:center;font-family:${MONO};font-size:12px;font-weight:800;color:${T.sageDim};padding:2px 0">${d}</div>`).join("");
+  // Selected-day detail strip (tap a day to expand what's on it).
+  const selEvs=calSelDay?(byDate[calSelDay]||[]):[];
+  let detail="";
+  if(calSelDay){
+    const dlabel=(()=>{try{return new Date(calSelDay+"T00:00").toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric"});}catch(e){return calSelDay;}})();
+    const evRows=selEvs.map(s=>{const isG=s.type!=="practice";const tm=s.time?(()=>{try{return new Date("2000-01-01T"+s.time).toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"});}catch(e){return s.time;}})():"";
+      return `<div style="display:flex;align-items:center;gap:8px;background:${T.surface2};border:1px solid ${T.line};border-left:5px solid ${isG?t.color:T.sage};border-radius:9px;padding:9px 11px">
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:800;color:${T.ink};font-size:16px">${isG?"🏟️ "+(s.opp?("vs "+(s.opp||"").replace(/</g,"&lt;")):"Game"):"⚾ Practice"}</div>
+            <div style="font-size:13px;color:${T.sage};margin-top:2px">${tm||"Time TBD"}${s.loc?(" · "+(s.loc||"").replace(/</g,"&lt;")):""}${s.notes?(" · "+(s.notes||"").replace(/</g,"&lt;")):""}</div></div>
+          <button data-act="schedrm" data-arg="${s.id}" style="background:none;border:1px solid ${T.line};color:${T.out};border-radius:7px;padding:7px 9px;font-weight:800">&times;</button></div>`;}).join("");
+    detail=`<div style="margin-top:10px;border-top:1px solid ${T.line};padding-top:10px;display:flex;flex-direction:column;gap:7px">
+        <div style="font-size:12px;font-weight:800;letter-spacing:.4px;color:${T.lime}">${dlabel}</div>
+        ${selEvs.length?evRows:`<div style="font-size:12px;color:${T.sageDim}">Nothing scheduled. The date is filled into the editor below — add a game or practice.</div>`}</div>`;
+  }
   return `<div style="background:${T.surface};border:1px solid ${T.line};border-radius:10px;padding:10px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-        <button data-act="calprev" style="${ghost};padding:7px 13px">&lsaquo;</button>
-        <div style="font-family:${MONO};font-size:16px;font-weight:800;color:${T.ink}">${monthName}</div>
-        <button data-act="calnext" style="${ghost};padding:7px 13px">&rsaquo;</button></div>
-      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px">${dow}${cells}</div></div>`;
+        <button data-act="calprev" style="${ghost};padding:9px 15px;font-size:18px">&lsaquo;</button>
+        <div style="font-family:${MONO};font-size:17px;font-weight:800;color:${T.ink}">${monthName}</div>
+        <button data-act="calnext" style="${ghost};padding:9px 15px;font-size:18px">&rsaquo;</button></div>
+      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:5px">${dow}${cells}</div>${detail}</div>`;
 }
 function actionArea(){
   if(mode==="home"){
@@ -1488,7 +1506,7 @@ function actionArea(){
   if(mode==="team"){
     const t=teamById(openTeamId); if(!t){mode="teams";return actionArea();}
     const cell=`background:${T.surface2};border:1px solid ${T.line};color:${T.ink};border-radius:7px;padding:8px 8px;font-weight:700;outline:none`;
-    const roster=t.players.map(p=>`<div style="display:flex;align-items:center;gap:6px;background:${T.surface};border:1px solid ${T.line};border-radius:9px;padding:6px 8px">
+    const roster=t.players.map((p,i)=>`<div style="display:flex;align-items:center;gap:6px;padding:7px 0;${i>0?`border-top:1px solid ${T.line};`:""}">
         <input value="${(p.num||"").replace(/"/g,"&quot;")}" oninput="teamPNum('${p.id}',this.value)" inputmode="numeric" maxlength="3" style="${cell};width:46px;text-align:center;font-family:${MONO};font-weight:800">
         <input value="${(p.first||"").replace(/"/g,"&quot;")}" oninput="teamPFirst('${p.id}',this.value)" placeholder="First" style="${cell};flex:1;min-width:0">
         <input value="${(p.last||"").replace(/"/g,"&quot;")}" oninput="teamPLast('${p.id}',this.value)" placeholder="Last" style="${cell};flex:1;min-width:0">
@@ -1511,20 +1529,21 @@ function actionArea(){
     const fLbl=`font-size:10px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:${T.sageDim};margin:0 2px 3px`;
     const fld=(lbl,inner)=>`<div style="flex:1;min-width:120px;display:flex;flex-direction:column">${lbl?`<div style="${fLbl}">${lbl}</div>`:""}${inner}</div>`;
     const svBtn=(v,lbl)=>`<button data-act="schview" data-arg="${v}" style="flex:1;background:${scheduleView===v?T.lime:T.surface2};color:${scheduleView===v?T.field:T.sage};border:1px solid ${scheduleView===v?T.lime:T.line};border-radius:8px;padding:8px 0;font-weight:800;font-size:12px;letter-spacing:.4px">${lbl}</button>`;
-    const scheduleSection=`<div style="background:${T.surface};border:1px solid ${T.line};border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:8px">
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
-          <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime}">Schedule — games &amp; practices</div></div>
+    const scheduleViewCard=`<div class="frost-card" style="background:${T.surface};border:1px solid ${T.line};border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:8px">
+        <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime}">Upcoming — games &amp; practices</div>
         <div style="display:flex;gap:6px">${svBtn("list","☰ List")}${svBtn("calendar","▦ Calendar")}</div>
-        ${scheduleView==="calendar" ? calendarHtml(t) : (schedRows||`<div style="font-size:12px;color:${T.sageDim}">Nothing scheduled yet.</div>`)}
-        <div style="font-size:11px;color:${T.sage};margin-top:4px">Add a game or practice:</div>
+        ${scheduleView==="calendar" ? calendarHtml(t) : (schedRows||`<div style="font-size:12px;color:${T.sageDim}">Nothing scheduled yet.</div>`)}</div>`;
+    const scheduleEditCard=`<div class="frost-card" style="background:${T.surface};border:1px solid ${T.line};border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:8px">
+        <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime}">Add a game or practice</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           ${fld("Type",`<select id="schType" style="${cell}"><option value="game">Game</option><option value="practice">Practice</option></select>`)}
-          ${fld("Date",`<input id="schDate" type="date" style="${cell}">`)}
+          ${fld("Date",`<input id="schDate" type="date" value="${calSelDay||''}" style="${cell}">`)}
           ${fld("Time",timeSelects("schTime",""))}</div>
         ${fld("Opponent (games only)",`<select id="schOppSel" onchange="var n=document.getElementById('schOppNew');if(n)n.style.display=this.value==='__new__'?'block':'none'" style="${cell}"><option value="">— pick a team —</option>${(DB.teams||[]).filter(x=>x.id!==t.id).map(x=>`<option value="${(x.name||'').replace(/"/g,'&quot;')}">${(x.name||'').replace(/</g,'')}</option>`).join("")}<option value="__new__">➕ New opponent…</option></select><input id="schOppNew" placeholder="New opponent name" style="${cell};margin-top:6px;display:none">`)}
         ${fld("Location",`<input id="schLoc" placeholder="e.g. City Park — Field 2" style="${cell}">`)}
         ${fld("Notes (optional)",`<input id="schNotes" placeholder="e.g. arrive 45 min early, white jerseys" style="${cell}">`)}
         <button data-act="schedadd" style="${bigBtn(T.lime,'',T.field)};margin-top:4px">+ Add to schedule</button></div>`;
+    const scheduleSection=scheduleViewCard+scheduleEditCard;
     // Per-team league rules URL. Only the owner can edit it; scorers/followers see it read-only.
     const canEditRules = !(window.Cloud&&window.Cloud.enabled&&window.Cloud.user) || (window.cloudCanManage&&window.cloudCanManage(t));
     const rulesSection=`<div style="background:${T.surface};border:1px solid ${T.line};border-radius:10px;padding:12px 14px">
@@ -1578,7 +1597,7 @@ function actionArea(){
             ${["#2E6BE6","#0EA5E9","#12A150","#E08A12","#E2574C","#EC4899","#8B5CF6","#0F172A"].map(c=>`<button data-act="teamcolor" data-arg="${c}" style="width:32px;height:32px;border-radius:8px;background:${c};border:3px solid ${t.color.toLowerCase()===c.toLowerCase()?T.ink:"transparent"};box-shadow:0 0 0 1px ${T.line}"></button>`).join("")}</div>`;
       return `<div style="display:flex;flex-direction:column;gap:12px">${secHdr("Roster &amp; details")}${detailsBlock}
           <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin:2px 2px -2px">Roster — tap to edit #/name</div>
-          <div style="display:flex;flex-direction:column;gap:6px">${roster}</div>
+          <div class="frost-card" style="background:${T.surface};border:1px solid ${T.line};border-radius:12px;padding:4px 12px">${roster}</div>
           <button data-act="addteamp" style="${ghost}">+ Add player</button></div>`;
     }
     if(teamTab==="schedule") return `<div style="display:flex;flex-direction:column;gap:12px">${secHdr("Schedule")}${scheduleSection}</div>`;
@@ -2305,7 +2324,8 @@ document.getElementById("app").addEventListener("click",e=>{
   if(act==="schedadd"){ const t=teamById(openTeamId); if(!t)return; const g=id=>{const e=document.getElementById(id);return e?(e.value||""):"";}; const date=g("schDate"); if(!date){flash("Pick a date");return;} const _sel=g("schOppSel"); const opp=(_sel==="__new__"?g("schOppNew"):_sel).trim(); if(!Array.isArray(t.schedule))t.schedule=[]; t.schedule.push({id:"s"+Date.now().toString(36),type:g("schType")||"game",date:date,time:g("schTime"),opp:opp,loc:g("schLoc").trim(),notes:g("schNotes").trim()}); saveDB(); render(); return; }
   if(act==="schedrm"){ const t=teamById(openTeamId); if(t&&Array.isArray(t.schedule)){ t.schedule=t.schedule.filter(s=>s.id!==arg); saveDB(); render(); } return; }
   if(act==="schview"){ scheduleView=(arg==="calendar"?"calendar":"list"); try{localStorage.setItem("al-sched-view",scheduleView);}catch(e){} render(); return; }
-  if(act==="calprev"||act==="calnext"){ if(!calYM){const d=new Date();calYM={y:d.getFullYear(),m:d.getMonth()};} let mm=calYM.m+(act==="calnext"?1:-1),yy=calYM.y; if(mm<0){mm=11;yy--;} else if(mm>11){mm=0;yy++;} calYM={y:yy,m:mm}; render(); return; }
+  if(act==="calprev"||act==="calnext"){ if(!calYM){const d=new Date();calYM={y:d.getFullYear(),m:d.getMonth()};} let mm=calYM.m+(act==="calnext"?1:-1),yy=calYM.y; if(mm<0){mm=11;yy--;} else if(mm>11){mm=0;yy++;} calYM={y:yy,m:mm}; calSelDay=null; render(); return; }
+  if(act==="calday"){ calSelDay=(calSelDay===arg?null:arg); render(); return; }
   if(act==="invitewatch"){ openShare(); return; }
   if(act==="teamchat"){ openChat(openTeamId); return; }
   if(act==="closechat"){ closeChat(); return; }
@@ -2323,13 +2343,15 @@ document.getElementById("app").addEventListener("click",e=>{
     const team=(t&&t.name)?t.name:"our team"; const isEmail=v.indexOf("@")>=0;
     if(isEmail && window.cloudAddScorer) window.cloudAddScorer(openTeamId,v);   // authorize this email as a scorer now
     e.value="";
-    // Show a COPYABLE link in-app. We don't rely on mailto:/sms: carrying the body — in the native
-    // WebView the mail/SMS app opens blank (it ignores subject/body from a generic VIEW intent), so
-    // the operator was left with no link to send. A copy-to-clipboard link works everywhere.
-    const msg=`<div style="font-size:13px;color:${T.sage};line-height:1.5">${isEmail?`<b style="color:${T.ink}">${v.replace(/</g,"")}</b> is now an authorized scorer. `:""}Send them this link — they sign in once${isEmail?" with that email":""} and they're in:</div>
-      <div style="user-select:all;-webkit-user-select:all;word-break:break-all;margin-top:10px;background:${T.surface2};border:1px solid ${T.line};border-radius:8px;padding:11px;font-family:${MONO};font-size:12px;color:${T.ink}">${url}</div>`;
-    confirmAct={title:"Invite to "+team, msg:msg, yes:"Copy link", run:function(){ try{ if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(url); }catch(e){} flash("Link copied — paste it into a text or email"); }};
-    render(); return; }
+    // Same share sheet as the game (QR + Email / Text / Copy) so the operator can send the
+    // join link any way they like — consistent with "Share the game".
+    const sub=isEmail
+      ? `<b style="color:#A3E635">${v.replace(/</g,"&lt;")}</b> is authorized. Send them the link to join.`
+      : `Scan it, or send the link — they sign in once and they're in.`;
+    openShareLink({ url:url, title:"INVITE TO "+team.toUpperCase().replace(/</g,"&lt;"),
+      sub:sub, subject:"Join "+team+" on All-Stars Live",
+      body:"Join "+team+" on All-Stars Live to score/follow the team — sign in once and you're in:" });
+    return; }
   if(act==="rmscorer"){ if(window.cloudRemoveScorer)window.cloudRemoveScorer(openTeamId,arg); return; }
   if(act==="pickcontact"){ try{ if(window.AllStars&&window.AllStars.pickContact)window.AllStars.pickContact(); }catch(e){} return; }
   if(act==="addcoowner"){ const e=document.getElementById("coOwnerWho"); if(!e)return; const v=(e.value||"").trim().toLowerCase(); if(v.indexOf("@")<0){flash("Enter a valid email");return;} const t=teamById(openTeamId); if(t){ if(!Array.isArray(t.coOwners))t.coOwners=[]; if(t.coOwners.indexOf(v)<0)t.coOwners.push(v); } if(window.cloudAddCoOwner)window.cloudAddCoOwner(openTeamId,v); e.value=""; flash(v+" is now a co-owner"); render(); return; }
@@ -2418,10 +2440,11 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="newteam"){const t=newTeam("");openTeamId=t.id;teamTab="hub";mode="team";render();}
   else if(act==="teamsback"){mode="teams";render();}
   else if(act==="deleteteam"){ const delId=openTeamId; const td=teamById(delId); if(!td)return; confirmAct={title:"Delete "+(td.name||"team")+"?",msg:"This removes the roster and all season stats and can't be undone.",yes:"Delete",danger:true,run:function(){ try{ if(window.cloudDeleteTeam)cloudDeleteTeam(delId); }catch(e){} DB.teams=DB.teams.filter(t=>t.id!==delId); if(curTeamId===delId)curTeamId=null; openTeamId=null; teamTab="hub"; saveDB(); mode="teams"; render(); }}; render(); }
-  else if(act==="shareteam"){ const t=teamById(openTeamId); if(!t)return; const url=appBaseUrl()+"?follow="+encodeURIComponent(openTeamId); const nm=(t.name||"our team").replace(/</g,"&lt;");
-    const msg=`<div style="font-size:13px;color:${T.sage};line-height:1.5">Anyone with this link can <b style="color:${T.ink}">follow ${nm}</b> — watch games live and join the team chat (no scoring). Send it to parents and fans:</div>
-      <div style="user-select:all;-webkit-user-select:all;word-break:break-all;margin-top:10px;background:${T.surface2};border:1px solid ${T.line};border-radius:8px;padding:11px;font-family:${MONO};font-size:12px;color:${T.ink}">${url}</div>`;
-    confirmAct={title:"Share team",msg:msg,yes:"Copy link",run:function(){ try{ if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(url); }catch(e){} flash("Link copied — paste it into a text or email"); }}; render(); }
+  else if(act==="shareteam"){ const t=teamById(openTeamId); if(!t)return; const url=appBaseUrl()+"?follow="+encodeURIComponent(openTeamId); const nm=(t.name||"our team"); const nmE=nm.replace(/</g,"&lt;");
+    openShareLink({ url:url, title:"SHARE "+nm.toUpperCase().replace(/</g,"&lt;"),
+      sub:`Parents &amp; fans can <b style="color:#A3E635">follow ${nmE}</b> — watch live &amp; chat (no scoring).`,
+      subject:"Follow "+nm+" on All-Stars Live",
+      body:"Follow "+nm+" on All-Stars Live — watch games live and join the team chat:" }); }
   else if(act==="togglepublic"){ const t=teamById(openTeamId); if(t&&window.cloudIsOwner&&window.cloudIsOwner(t)){ t.public=!t.public; saveDB(); flash(t.public?"Team is now public":"Team is now private"); render(); } }
   else if(act==="togglestatspublic"){ const t=teamById(openTeamId); if(t&&window.cloudIsOwner&&window.cloudIsOwner(t)){ t.statsPublic=!t.statsPublic; saveDB(); render(); } }
   else if(act==="addteamp"){const t=teamById(openTeamId);if(t)teamAddPlayer(t);render();}
@@ -2590,8 +2613,17 @@ function shareUrl(){
   if(shareMode==="video"){ const yt=streamYt(); if(yt) return base+"?view=viewer&yt="+encodeURIComponent(yt)+teamQ; }
   return base+"?view=viewer&feed=1"+teamQ;   // feed-only viewer
 }
+// Generic link-share sheet (invite scorers / share team to follow): same QR + Email/Text/Copy
+// UI as the game share, just a different URL + message. Pass null to restore the game share.
+let shareCtx=null;
+function openShareLink(ctx){ shareCtx=ctx||null; openShare(); }
+function curShareUrl(){ return shareCtx?shareCtx.url:shareUrl(); }
 function openShare(){
-  const hasVid=!!streamYt();
+  // Title + subtitle: game share by default, custom when sharing an invite/team link.
+  const tEl=document.getElementById("qrTitle"), sEl=document.getElementById("qrSub");
+  if(tEl) tEl.textContent = shareCtx ? (shareCtx.title||"SHARE LINK") : "SHARE THE GAME";
+  if(sEl) sEl.innerHTML = shareCtx ? (shareCtx.sub||'Nearby? Have them <b style="color:#A3E635">scan</b>. Far away? send the link.') : 'Nearby? Have them <b style="color:#A3E635">scan</b>. Far away? Send the link.';
+  const hasVid=!shareCtx&&!!streamYt();
   if(!hasVid) shareMode="feed";
   const tog=document.getElementById("shareToggle");
   if(tog){
@@ -2600,7 +2632,7 @@ function openShare(){
       ? `<div style="display:inline-flex;background:#10141A;border:1px solid #4A5870;border-radius:9px;overflow:hidden;margin-bottom:12px">${pill("feed","Game feed")}${pill("video","Feed + video")}</div>`
       : "";
   }
-  const url=shareUrl();
+  const url=curShareUrl();
   document.getElementById("qrurl").textContent=url;
   const box=document.getElementById("qrbox"); box.innerHTML="";
   if(window.QRCode){
@@ -2611,22 +2643,25 @@ function openShare(){
   const nb=document.getElementById("navShareBtn"); if(nb) nb.style.display = navigator.share ? "flex" : "none";
   document.getElementById("qrmodal").style.display="flex";
 }
-function closeShare(){ document.getElementById("qrmodal").style.display="none"; }
+function closeShare(){ document.getElementById("qrmodal").style.display="none"; shareCtx=null; }
 document.getElementById("qrmodal").addEventListener("click",e=>{
   if(e.target.id==="qrmodal"){ closeShare(); return; }      // tap backdrop to close
   const a=e.target.closest("[data-act]"); if(!a)return;
   if(a.dataset.act==="closeshare") closeShare();
   else if(a.dataset.act==="shareemail"){
-    const u=shareUrl(); if(!u)return;
-    location.href="mailto:?subject="+encodeURIComponent("Watch All-Stars Live")+"&body="+encodeURIComponent("Follow the game live:\n"+u);
+    const u=curShareUrl(); if(!u)return;
+    const subj=shareCtx?(shareCtx.subject||"All-Stars Live"):"Watch All-Stars Live";
+    const body=shareCtx?((shareCtx.body||"")+"\n"+u):("Follow the game live:\n"+u);
+    location.href="mailto:?subject="+encodeURIComponent(subj)+"&body="+encodeURIComponent(body);
   }
   else if(a.dataset.act==="sharetext"){
-    const u=shareUrl(); if(!u)return;
-    location.href="sms:?body="+encodeURIComponent("Watch All-Stars Live: "+u);
+    const u=curShareUrl(); if(!u)return;
+    const body=shareCtx?((shareCtx.body?shareCtx.body+" ":"")+u):("Watch All-Stars Live: "+u);
+    location.href="sms:?body="+encodeURIComponent(body);
   }
   else if(a.dataset.act==="sharemode"){ shareMode=a.dataset.arg; openShare(); return; }
   else if(a.dataset.act==="sharecopy"){
-    const u=shareUrl(); if(!u)return;
+    const u=curShareUrl(); if(!u)return;
     const done=()=>{ const o=a.innerHTML; a.innerHTML="Copied &#10003;"; setTimeout(()=>{ a.innerHTML=o; },1500); };
     if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(u).then(done).catch(done); } else { done(); }
   }
@@ -2727,7 +2762,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v73";
+var APP_VERSION="v74";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
