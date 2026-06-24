@@ -8,8 +8,12 @@ update the version, status, and pending lists with each meaningful change._
 
 > Recent: v52 unified Email/phone invite + fixed delete; v53 delete-tombstones + turf launcher icon;
 > v54 **team page is now a hub** (grid of sections: Roster, Schedule, Stats, Access, Rules, + a
-> prominent Team chat) driven by `teamTab`. Native Google sign-in still pending (WebView blocks
-> Google OAuth — needs native Credential Manager + the OAuth Web client ID); email-link works in-app.
+> prominent Team chat) driven by `teamTab`. v55 **native Google sign-in** built: web
+> `Continue with Google` → `AllStars.googleSignIn()` → GoogleSignIn(requestIdToken=WEB_CLIENT_ID in
+> MainActivity) → `window.__googleCredential(idToken)` → firebase `signInWithCredential`.
+> **Needs the app's signing SHA-1 registered in Firebase** (debug SHA-1:
+> D2:D3:46:06:8E:DD:EC:BD:B0:23:AC:51:D1:1C:32:F0:BD:8B:A1:8F) or Google returns error 10. A release/
+> Play build needs its own SHA-1 added too.
 
 > **v51 ARCHITECTURE CHANGE:** the native app now loads the **live https web app** (offline‑cached),
 > not bundled `file://` assets. → **web pushes reach the native app with no APK rebuild**; rebuild the
