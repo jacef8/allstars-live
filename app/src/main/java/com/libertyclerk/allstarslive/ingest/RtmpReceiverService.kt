@@ -36,9 +36,16 @@ object RtmpHub {
     private var receiver: RtmpReceiver? = null
     private var decoder: MediaCodecVideoDecoder? = null
     private var compositor: VideoCompositor? = null
+    private var deviceCamera: DeviceCamera? = null   // all-in-one (this device's camera) mode
 
     /** The compositor, once the pipeline is up — for encoder (stream/record) + overlay. */
     val videoCompositor: VideoCompositor? get() = compositor
+
+    /** How video gets in: "external" = a camera pushes RTMP to us; "device" = our own camera. */
+    @Volatile var captureMode = "external"   // == MODE_EXTERNAL (const declared below)
+    @Volatile var lensBack = true
+    private var camFrames = 0L
+    private var camFpsAnchorMs = 0L
 
     private var sps: ByteArray? = null   // Annex-B (from the AVC config record)
     private var pps: ByteArray? = null
@@ -47,7 +54,7 @@ object RtmpHub {
     private var watchdog: Thread? = null
     private var pendingPreview: Surface? = null
 
-    val isRunning: Boolean get() = receiver != null
+    val isRunning: Boolean get() = receiver != null || deviceCamera != null
 
     /** True once the camera has actually delivered a decodable frame (not just connected). */
     val hasVideo: Boolean get() = firstFrameSeen
@@ -108,6 +115,59 @@ object RtmpHub {
         }.apply { isDaemon = true; start() }
     }
 
+    /**
+     * All-in-one mode: bring the compositor up and feed it from THIS device's camera instead of
+     * an RTMP receiver. Everything downstream (overlay, preview, Go Live, record) is identical —
+     * it just draws frames from the built-in camera. Runs in-process (no foreground service):
+     * the operator stays in the app while scoring, so the camera stays foreground-active.
+     */
+    @Synchronized
+    fun startDeviceCamera(context: Context) {
+        captureMode = MODE_DEVICE
+        if (compositor != null) return
+        firstFrameSeen = false; camFrames = 0; camFpsAnchorMs = 0
+
+        val comp = VideoCompositor().also { it.start() }   // headless; preview attaches later
+        compositor = comp
+        pendingPreview?.let { comp.attachPreview(it) }
+        _stats.value = VideoStats(state = IngestState.CONNECTING, message = "Starting camera…")
+
+        deviceCamera = DeviceCamera(context.applicationContext).also { cam ->
+            cam.start(
+                target = comp.inputSurface,
+                facingBack = lensBack,
+                onSize = { w, h -> comp.setVideoSize(w, h); comp.setInputSize(w, h) },
+                onFrame = { onCameraFrame() },
+                onError = { msg -> _stats.value = _stats.value.copy(state = IngestState.ERROR, message = msg) },
+            )
+        }
+    }
+
+    /** Per-frame callback from the device camera: flip to PLAYING, keep a light fps estimate. */
+    private fun onCameraFrame() {
+        lastFrameMs = System.currentTimeMillis()
+        if (!firstFrameSeen) {
+            firstFrameSeen = true
+            camFpsAnchorMs = lastFrameMs; camFrames = 0
+            _stats.value = _stats.value.copy(state = IngestState.PLAYING, message = "")
+        }
+        camFrames++
+        val dt = lastFrameMs - camFpsAnchorMs
+        if (camFrames >= 30 && dt > 0) {
+            _stats.value = _stats.value.copy(fps = camFrames * 1000.0 / dt, framesRendered = _stats.value.framesRendered + camFrames)
+            camFrames = 0; camFpsAnchorMs = lastFrameMs
+        }
+    }
+
+    /** Bring the pipeline up in whichever mode is selected — used by Go Live so a broadcast
+     *  works even if the operator never opened the Video screen first. */
+    @Synchronized
+    fun ensureStarted(context: Context) {
+        if (compositor != null) return
+        if (captureMode == MODE_DEVICE) startDeviceCamera(context)
+        else { RtmpReceiverService.start(context, port); start(port) }
+    }
+
     private fun onVideo(au: ByteArray, ptsMs: Long, keyframe: Boolean) {
         lastFrameMs = System.currentTimeMillis()
         if (!firstFrameSeen) {
@@ -147,6 +207,7 @@ object RtmpHub {
     @Synchronized
     fun stop() {
         receiver?.stop(); receiver = null
+        deviceCamera?.stop(); deviceCamera = null
         watchdog?.interrupt(); watchdog = null
         decoder?.stop(); decoder = null
         compositor?.release(); compositor = null
@@ -168,6 +229,8 @@ object RtmpHub {
             ?.hostAddress
     } catch (e: Exception) { Log.w(TAG, "ip lookup failed", e); null }
 
+    const val MODE_EXTERNAL = "external"   // a camera pushes RTMP to this tablet
+    const val MODE_DEVICE = "device"       // this device's own built-in camera (all-in-one)
     private const val TAG = "RtmpHub"
 }
 

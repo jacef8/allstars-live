@@ -64,8 +64,8 @@ object Broadcast {
         if (isActive) return
         // Ensure the camera pipeline is running even if the operator went straight to the
         // Game tab and never opened Video — otherwise there'd be no compositor to stream.
-        RtmpReceiverService.start(context, RtmpHub.port)
-        if (RtmpHub.videoCompositor == null) RtmpHub.start(RtmpHub.port)
+        // Mode-aware: device-camera (all-in-one) vs an external camera pushing RTMP to us.
+        RtmpHub.ensureStarted(context)
         val comp = RtmpHub.videoCompositor
         if (comp == null) {
             _state.value = State(phase = Phase.ERROR, status = "Camera link not ready — try again")

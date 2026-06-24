@@ -4,6 +4,8 @@ import android.view.Surface
 import android.view.SurfaceHolder
 import android.view.SurfaceView
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -79,14 +81,55 @@ fun SrtIngestScreen(onUseTestPattern: () -> Unit = {}) {
     // Which camera the operator uses — picks the right setup instructions. Persisted.
     val prefs = remember { ctx.getSharedPreferences("allstars", android.content.Context.MODE_PRIVATE) }
     var cameraProfile by remember { mutableStateOf(prefs.getString("cam_profile", "mevo") ?: "mevo") }
+    // How video is captured: "allInOne" = this device's own camera (films AND streams); "phoneCam"
+    // = a second phone pushes RTMP to us; "external" = a Mevo/GoPro/etc. pushes RTMP. The last two
+    // both receive RTMP — only allInOne uses our built-in camera.
+    var setupMode by remember { mutableStateOf(prefs.getString("setup_mode", "external") ?: "external") }
+    var lensBack by remember { mutableStateOf(prefs.getBoolean("lens_back", true)) }
     // Track YouTube connection so we can show a first-run prompt when it's not set up.
     var ytChannel by remember { mutableStateOf(prefs.getString("yt_channel", null)) }
 
+    fun isDevice() = setupMode == "allInOne"
+
+    fun startDevicePreview() {
+        val s = surface ?: return
+        RtmpHub.lensBack = lensBack
+        // Off the main thread: starting GL + opening the camera blocks briefly.
+        Thread { RtmpHub.attachPreview(s); RtmpHub.startDeviceCamera(ctx) }.start()
+    }
+
+    // Ask for CAMERA the first time the operator chooses all-in-one mode.
+    val camPermLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) startDevicePreview()
+        else Toast.makeText(ctx, "Camera permission is needed to film with this device", Toast.LENGTH_LONG).show()
+    }
+
     fun connect() {
         val s = surface ?: return
-        // Off the main thread: start() spins up the GL compositor, decoder, and the
-        // RTMP listener, which together block long enough to freeze the UI.
-        Thread { source.start("", s) }.start()
+        if (isDevice()) {
+            if (ctx.checkSelfPermission(android.Manifest.permission.CAMERA) == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                startDevicePreview()
+            } else {
+                camPermLauncher.launch(android.Manifest.permission.CAMERA)
+            }
+        } else {
+            // Off the main thread: start() spins up the GL compositor, decoder, and the RTMP listener.
+            Thread { source.start("", s) }.start()
+        }
+    }
+
+    fun applyMode(mode: String) {
+        setupMode = mode
+        val cap = if (mode == "allInOne") RtmpHub.MODE_DEVICE else RtmpHub.MODE_EXTERNAL
+        RtmpHub.captureMode = cap
+        prefs.edit().putString("setup_mode", mode).putString("capture_mode", cap).apply()
+    }
+
+    fun restart() {
+        source.shutdown()          // detach preview + stop the RTMP receiver service (external)
+        RtmpHub.stop()             // release compositor + device camera (idempotent)
+        RtmpHub.captureMode = if (isDevice()) RtmpHub.MODE_DEVICE else RtmpHub.MODE_EXTERNAL
+        connect()
     }
 
     DisposableEffect(Unit) { onDispose { source.stop() } }
@@ -134,7 +177,7 @@ fun SrtIngestScreen(onUseTestPattern: () -> Unit = {}) {
             // Camera not live yet, but YouTube is set up → show the "waiting for camera" status.
             // (When YouTube isn't connected we show the first-run prompt below INSTEAD, so the two
             // never overlap.)
-            CameraStatus(stats.state, stats.message, onSetup = { showSetup = true }, onUseTestPattern = onUseTestPattern)
+            CameraStatus(stats.state, stats.message, isDevice(), onSetup = { showSetup = true }, onUseTestPattern = onUseTestPattern)
         }
 
         // Go Live control — reflects the shared broadcast state (synced with the Game
@@ -160,7 +203,11 @@ fun SrtIngestScreen(onUseTestPattern: () -> Unit = {}) {
                 publishUrl = RtmpHub.publishHint,
                 profileId = cameraProfile,
                 onProfile = { cameraProfile = it; prefs.edit().putString("cam_profile", it).apply() },
-                onRestart = { source.shutdown(); connect() },
+                setupMode = setupMode,
+                onSetupMode = { applyMode(it); restart() },
+                lensBack = lensBack,
+                onLens = { lensBack = it; prefs.edit().putBoolean("lens_back", it).apply(); if (isDevice()) restart() },
+                onRestart = { restart() },
                 onClose = {
                     showSetup = false
                     // Refresh YouTube status in case the user just connected.
@@ -201,13 +248,21 @@ private fun YouTubeSetupPrompt(onSetup: () -> Unit) {
 
 /** Friendly, jargon-free status shown when there's no live picture. */
 @Composable
-private fun CameraStatus(state: IngestState, message: String, onSetup: () -> Unit, onUseTestPattern: () -> Unit) {
+private fun CameraStatus(state: IngestState, message: String, deviceMode: Boolean, onSetup: () -> Unit, onUseTestPattern: () -> Unit) {
     val looking = state == IngestState.CONNECTING || state == IngestState.BUFFERING || state == IngestState.RECONNECTING
-    val title = if (looking) "Waiting for your camera…" else "Camera not connected"
-    // While waiting, RtmpVideoSource puts the exact publish URL in the message so the
-    // operator can type it into the Mevo's Custom RTMP destination.
-    val urlHint = message.substringAfter("rtmp://", "").let { if (it.isNotEmpty()) "rtmp://$it" else "" }
-    val sub = if (looking) "On your camera, set the RTMP destination to:" else "Tap Camera setup to get started."
+    val title = when {
+        deviceMode && looking -> "Starting this device's camera…"
+        looking -> "Waiting for your camera…"
+        else -> "Camera not connected"
+    }
+    // While waiting (external mode), RtmpVideoSource puts the exact publish URL in the message so the
+    // operator can type it into the Mevo's Custom RTMP destination. In device mode there's no URL.
+    val urlHint = if (deviceMode) "" else message.substringAfter("rtmp://", "").let { if (it.isNotEmpty()) "rtmp://$it" else "" }
+    val sub = when {
+        deviceMode && looking -> "Pointing this tablet's camera at the field…"
+        looking -> "On your camera, set the RTMP destination to:"
+        else -> "Tap Camera setup to get started."
+    }
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -317,6 +372,10 @@ private fun CameraSetupSheet(
     publishUrl: String,
     profileId: String,
     onProfile: (String) -> Unit,
+    setupMode: String,
+    onSetupMode: (String) -> Unit,
+    lensBack: Boolean,
+    onLens: (Boolean) -> Unit,
     onRestart: () -> Unit,
     onClose: () -> Unit,
 ) {
@@ -324,6 +383,8 @@ private fun CameraSetupSheet(
     val ctx = LocalContext.current
     val url = if (publishUrl.startsWith("rtmp://")) publishUrl else ""
     val profile = profileOf(profileId)
+    val isDevice = setupMode == "allInOne"
+    val isPhone = setupMode == "phoneCam"
     Box(
         Modifier.fillMaxSize().background(Color(0xCC05080C)).clickable(onClick = onClose).imePadding(),
         contentAlignment = Alignment.Center,
@@ -341,86 +402,145 @@ private fun CameraSetupSheet(
         ) {
             Text("Camera setup", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
             Text(
-                "The camera streams to this tablet; we add the scorebug and send it to YouTube.",
+                if (isDevice) "This tablet's own camera films AND streams — point it at the field and tap Go Live."
+                else "The camera streams to this tablet; we add the scorebug and send it to YouTube.",
                 color = Color(0xFF9AA0A6), fontSize = 13.sp,
             )
-            // Camera picker — instructions below adapt to the selected camera.
-            Text("YOUR CAMERA", color = Color(0xFF6B7585), fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
-            Row(
-                Modifier.horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                CAMERA_PROFILES.forEach { p ->
-                    val on = p.id == profileId
+
+            // ----- Capture mode chooser: how is video being filmed? -----
+            Text("HOW ARE YOU FILMING?", color = Color(0xFF6B7585), fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf(
+                    "allInOne" to "This device",
+                    "phoneCam" to "A phone",
+                    "external" to "External camera",
+                ).forEach { (id, label) ->
+                    val on = id == setupMode
                     Text(
-                        p.name,
+                        label,
                         color = if (on) Color(0xFF05080C) else Color(0xFFE8EAED),
-                        fontSize = 14.sp, fontWeight = if (on) FontWeight.Bold else FontWeight.Normal,
+                        fontSize = 13.sp, fontWeight = if (on) FontWeight.Bold else FontWeight.Normal,
+                        textAlign = TextAlign.Center,
                         modifier = Modifier
-                            .background(if (on) Color(0xFFA3E635) else Color(0xFF222B36), RoundedCornerShape(999.dp))
-                            .clickable { onProfile(p.id) }
-                            .padding(horizontal = 14.dp, vertical = 8.dp),
+                            .weight(1f)
+                            .background(if (on) Color(0xFFA3E635) else Color(0xFF222B36), RoundedCornerShape(10.dp))
+                            .clickable { if (!on) onSetupMode(id) }
+                            .padding(vertical = 10.dp, horizontal = 6.dp),
                     )
                 }
             }
-            profile.steps.forEachIndexed { i, step ->
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("${i + 1}", color = Color(0xFF4C9AFF), fontSize = 15.sp, fontFamily = FontFamily.Monospace)
-                    Text(step, color = Color(0xFFE8EAED), fontSize = 14.sp)
-                }
-            }
-            // The address to type into the Mevo's Custom RTMP destination.
-            Text(
-                "CAMERA RTMP ADDRESS", color = Color(0xFF6B7585),
-                fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp,
-            )
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color(0xFF101720), RoundedCornerShape(8.dp))
-                    .clickable {
-                        if (url.isNotEmpty()) {
-                            clipboard.setText(AnnotatedString(url))
-                            Toast.makeText(ctx, "Copied — paste into the Mevo", Toast.LENGTH_SHORT).show()
-                        }
-                    }
-                    .padding(horizontal = 12.dp, vertical = 10.dp),
-            ) {
-                Text(
-                    url.ifEmpty { "Connect the tablet to the camera's Wi-Fi first…" },
-                    color = if (url.isNotEmpty()) Color(0xFFA3E635) else Color(0xFF9AA0A6),
-                    fontSize = 15.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace,
-                    modifier = Modifier.weight(1f),
-                )
-                if (url.isNotEmpty()) {
-                    Icon(Icons.Filled.ContentCopy, contentDescription = "Copy", tint = Color(0xFF9AA0A6), modifier = Modifier.size(18.dp))
-                }
-            }
-            Text("Stream key: anything (e.g. live).  SRT must be OFF in the Mevo.", color = Color(0xFF6B7585), fontSize = 12.sp)
 
-            // ----- Use a phone as the camera: scan this in Larix Broadcaster to auto-configure -----
-            if (url.isNotEmpty()) {
-                val groveQr = remember(url) { QrUtil.encode(QrUtil.larixGrove(url), 560) }
+            if (isDevice) {
+                // ----- All-in-one: pick the lens; the rest is automatic -----
+                Text("WHICH LENS", color = Color(0xFF6B7585), fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(true to "Back (recommended)", false to "Front (selfie)").forEach { (back, label) ->
+                        val on = back == lensBack
+                        Text(
+                            label,
+                            color = if (on) Color(0xFF05080C) else Color(0xFFE8EAED),
+                            fontSize = 13.sp, fontWeight = if (on) FontWeight.Bold else FontWeight.Normal,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier
+                                .weight(1f)
+                                .background(if (on) Color(0xFFA3E635) else Color(0xFF222B36), RoundedCornerShape(10.dp))
+                                .clickable { if (!on) onLens(back) }
+                                .padding(vertical = 10.dp, horizontal = 6.dp),
+                        )
+                    }
+                }
                 Text(
-                    "USE A PHONE AS THE CAMERA", color = Color(0xFF6B7585),
-                    fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp,
-                )
-                Text(
-                    "No camera? On a second phone, install the free \"Larix Broadcaster\" app, scan this code in it (Settings → Connections → import / QR), then tap the red button. The phone becomes the camera — it must be on the same Wi-Fi as this tablet.",
+                    "Prop the tablet on a tripod or fence with the lens facing the field. The live scorebug is added automatically.",
                     color = Color(0xFF9AA0A6), fontSize = 13.sp,
                 )
-                if (groveQr != null) {
-                    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                        Image(
-                            bitmap = groveQr.asImageBitmap(),
-                            contentDescription = "Scan in Larix Broadcaster to use this phone as the camera",
-                            modifier = Modifier
-                                .size(200.dp)
-                                .background(Color.White, RoundedCornerShape(10.dp))
-                                .padding(8.dp),
-                        )
+            } else {
+                // ----- External / phone-as-camera: instructions + the RTMP address to push to -----
+                if (isPhone) {
+                    PHONE_STEPS.forEachIndexed { i, step ->
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Text("${i + 1}", color = Color(0xFF4C9AFF), fontSize = 15.sp, fontFamily = FontFamily.Monospace)
+                            Text(step, color = Color(0xFFE8EAED), fontSize = 14.sp)
+                        }
+                    }
+                } else {
+                    Text("YOUR CAMERA", color = Color(0xFF6B7585), fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                    Row(
+                        Modifier.horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        CAMERA_PROFILES.forEach { p ->
+                            val on = p.id == profileId
+                            Text(
+                                p.name,
+                                color = if (on) Color(0xFF05080C) else Color(0xFFE8EAED),
+                                fontSize = 14.sp, fontWeight = if (on) FontWeight.Bold else FontWeight.Normal,
+                                modifier = Modifier
+                                    .background(if (on) Color(0xFFA3E635) else Color(0xFF222B36), RoundedCornerShape(999.dp))
+                                    .clickable { onProfile(p.id) }
+                                    .padding(horizontal = 14.dp, vertical = 8.dp),
+                            )
+                        }
+                    }
+                    profile.steps.forEachIndexed { i, step ->
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Text("${i + 1}", color = Color(0xFF4C9AFF), fontSize = 15.sp, fontFamily = FontFamily.Monospace)
+                            Text(step, color = Color(0xFFE8EAED), fontSize = 14.sp)
+                        }
+                    }
+                }
+                // The address the camera/phone pushes RTMP to.
+                Text(
+                    "CAMERA RTMP ADDRESS", color = Color(0xFF6B7585),
+                    fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp,
+                )
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color(0xFF101720), RoundedCornerShape(8.dp))
+                        .clickable {
+                            if (url.isNotEmpty()) {
+                                clipboard.setText(AnnotatedString(url))
+                                Toast.makeText(ctx, "Copied — paste into the camera app", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                ) {
+                    Text(
+                        url.ifEmpty { "Connect the tablet to the camera's Wi-Fi first…" },
+                        color = if (url.isNotEmpty()) Color(0xFFA3E635) else Color(0xFF9AA0A6),
+                        fontSize = 15.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace,
+                        modifier = Modifier.weight(1f),
+                    )
+                    if (url.isNotEmpty()) {
+                        Icon(Icons.Filled.ContentCopy, contentDescription = "Copy", tint = Color(0xFF9AA0A6), modifier = Modifier.size(18.dp))
+                    }
+                }
+                Text("Stream key: anything (e.g. live).", color = Color(0xFF6B7585), fontSize = 12.sp)
+
+                // ----- Phone-as-camera: scan this in Larix Broadcaster to auto-configure -----
+                if (isPhone && url.isNotEmpty()) {
+                    val groveQr = remember(url) { QrUtil.encode(QrUtil.larixGrove(url), 560) }
+                    Text(
+                        "SCAN TO SET UP THE PHONE", color = Color(0xFF6B7585),
+                        fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp,
+                    )
+                    Text(
+                        "On the phone, install the free \"Larix Broadcaster\" app, scan this code in it (Settings → import / QR), then tap the red button. The phone becomes the camera — it must be on the same Wi-Fi as this tablet.",
+                        color = Color(0xFF9AA0A6), fontSize = 13.sp,
+                    )
+                    if (groveQr != null) {
+                        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                            Image(
+                                bitmap = groveQr.asImageBitmap(),
+                                contentDescription = "Scan in Larix Broadcaster to use this phone as the camera",
+                                modifier = Modifier
+                                    .size(200.dp)
+                                    .background(Color.White, RoundedCornerShape(10.dp))
+                                    .padding(8.dp),
+                            )
+                        }
                     }
                 }
             }
@@ -429,7 +549,9 @@ private fun CameraSetupSheet(
             // so Go Live can create the broadcast and stream without a stream key.
             com.libertyclerk.allstarslive.YouTubeAccountSection()
 
-            Button(onClick = onRestart, modifier = Modifier.fillMaxWidth()) { Text("Restart camera link") }
+            Button(onClick = onRestart, modifier = Modifier.fillMaxWidth()) {
+                Text(if (isDevice) "Restart camera" else "Restart camera link")
+            }
             // Raw diagnostics — for setup/troubleshooting only.
             Text(
                 "state ${stats.state}   ${"%.0f".format(stats.fps)} fps   " +
@@ -441,6 +563,14 @@ private fun CameraSetupSheet(
         }
     }
 }
+
+/** Steps for the "use a phone as the camera" path (the QR does most of the work). */
+private val PHONE_STEPS = listOf(
+    "On the phone, install the free \"Larix Broadcaster\" app.",
+    "Put the phone on the SAME Wi-Fi as this tablet.",
+    "Scan the code below in Larix (it auto-fills the connection).",
+    "Tap the red record button — the phone is now the camera.",
+)
 
 /** A camera type + its RTMP-push setup steps. All push to the same address below. */
 private data class CameraProfile(val id: String, val name: String, val steps: List<String>)

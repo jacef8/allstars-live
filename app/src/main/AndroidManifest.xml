@@ -11,6 +11,9 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <!-- M3: mic audio for the YouTube stream (Live requires an audio track). -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- All-in-one mode: capture this device's own camera (the camera is also the scorer). -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera.any" android:required="false" />
     <!-- Keep the RTMP receiver listening while the Mevo app is foreground (one-tablet
          reality: you leave our app to press Go Live, which would otherwise freeze us). -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
