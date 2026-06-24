@@ -49,20 +49,34 @@ import com.libertyclerk.allstarslive.stream.Broadcast
  * live. (This replaces the old in-app YouTube embed, which threw error 153 for private
  * broadcasts.)
  */
+// Load the LIVE web app (so web changes reach the app with no rebuild, and Firebase/sign-in work —
+// they can't run from file://). The service worker (sw.js) caches the shell for offline use at the
+// field after the first online load.
+private const val APP_HOST = "web-production-77d34.up.railway.app"
+private const val APP_URL = "https://web-production-77d34.up.railway.app/scoring-controller.html"
+
 @SuppressLint("SetJavaScriptEnabled")
 fun createScorerWebView(context: Context): WebView {
     WebView.setWebContentsDebuggingEnabled(true)
     return WebView(context).apply {
         settings.javaScriptEnabled = true
         settings.domStorageEnabled = true          // team DB / season stats / settings persist
+        settings.databaseEnabled = true
         settings.mediaPlaybackRequiresUserGesture = false
         settings.allowFileAccess = true
+        settings.cacheMode = android.webkit.WebSettings.LOAD_DEFAULT   // service worker handles offline
+        // Drop the "; wv" WebView marker so Google OAuth / Firebase are happier with the user agent.
+        settings.userAgentString = settings.userAgentString?.replace("; wv", "")
         setBackgroundColor(Color.TRANSPARENT)       // see-through so the native camera preview shows behind
         addJavascriptInterface(ScorerBridge(context.applicationContext), "AllStars")
         webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(view: WebView, req: WebResourceRequest): Boolean {
                 val u = req.url
-                // Real links (YouTube) + email/text share open in their native apps, not the WebView.
+                // Keep navigation to OUR app (Railway) inside the WebView; open everything else
+                // (YouTube, mailto, sms, tel, other sites) in the native app/browser.
+                if ((u.scheme == "http" || u.scheme == "https") && u.host.equals(APP_HOST, true)) {
+                    return false
+                }
                 if (u.scheme in setOf("http", "https", "mailto", "sms", "smsto", "tel")) {
                     runCatching {
                         view.context.startActivity(
@@ -74,7 +88,7 @@ fun createScorerWebView(context: Context): WebView {
                 return false
             }
         }
-        loadUrl("file:///android_asset/scorer/scoring-controller.html")
+        loadUrl(APP_URL)
     }
 }
 
