@@ -1300,14 +1300,12 @@ function actionArea(){
     // Favorite-team cards: quick "Start" + manage, with record at a glance.
     const favs=DB.teams.filter(t=>t.fav), list=favs.length?favs:DB.teams;
     const card=t=>{const rec=`${t.record.w}-${t.record.l}${t.record.t?"-"+t.record.t:""}`;const games=t.record.w+t.record.l+t.record.t;
-      return `<div style="position:relative;background:${T.surface};border:2px solid ${t.color};border-left:7px solid ${t.color};border-radius:14px;padding:14px;box-shadow:0 0 0 1px rgba(0,0,0,.35), 0 8px 20px rgba(0,0,0,.4)">
+      return `<div data-act="opent" data-arg="${t.id}" style="position:relative;background:${T.surface};border:2px solid ${t.color};border-left:7px solid ${t.color};border-radius:14px;padding:14px;box-shadow:0 0 0 1px rgba(0,0,0,.35), 0 8px 20px rgba(0,0,0,.4);cursor:pointer">
           ${(window.cloudIsScorer&&window.cloudIsScorer(t))?"":`<button data-act="favteam" data-arg="${t.id}" title="Follow this team" style="position:absolute;top:9px;right:11px;background:none;border:none;color:${t.fav?T.amber:T.sageDim};font-size:24px;line-height:1;padding:0;cursor:pointer">${t.fav?"★":"☆"}</button>`}
           <div style="font-family:${MONO};font-size:23px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:30px">${t.name}</div>
           <div style="display:flex;align-items:center;gap:10px;margin-top:7px;font-family:${MONO};font-size:18px;color:${T.sage}">
             <span style="font-weight:800;color:${t.color}">${rec}</span><span style="opacity:.45">·</span><span>${t.players.length} players</span></div>
-          <div style="display:flex;gap:8px;margin-top:14px">
-            <button data-act="opent" data-arg="${t.id}" style="flex:1;background:${t.color};color:#fff;border:none;border-radius:9px;padding:13px;font-family:${MONO};font-weight:800;font-size:16px;letter-spacing:.8px;display:flex;align-items:center;justify-content:center;gap:8px">${IC(GEAR)} MANAGE TEAM</button>
-          </div></div>`;};
+          <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:14px;background:${t.color};color:#fff;border-radius:9px;padding:13px;font-family:${MONO};font-weight:800;font-size:16px;letter-spacing:.8px;pointer-events:none">${IC(GEAR)} MANAGE TEAM</div></div>`;};
     const teamsBlock = DB.teams.length
       ? `<div style="font-size:13px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:${T.lime};margin:2px 2px 0">My teams</div>
          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;align-content:start">${list.map(card).join("")}</div>`
@@ -2585,7 +2583,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v67";
+var APP_VERSION="v68";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
