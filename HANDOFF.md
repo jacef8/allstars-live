@@ -3,9 +3,48 @@
 > **Read this first.** This is the single source of truth for picking up the project — e.g. from a
 > fresh Claude Code session or a different account. The code is the truth; this explains the rest.
 
-_Last updated: 2026‑06‑24 (app version **v60**). **Keep this file current as work continues** —
+_Last updated: 2026‑06‑24 (app version **v64**). **Keep this file current as work continues** —
 update the version, status, and pending lists with each meaningful change._
 
+> ## ⚠️ FILE LOCATION — the code is NOT on OneDrive
+> **All real project files live in `C:\Users\jford\Documents\Baseball`** (a normal local git repo).
+> They are **deliberately NOT under OneDrive.** There is a second, near‑empty folder at
+> `C:\Users\jford\OneDrive - Liberty County Clerk of Court\Desktop\Jace\Apps\Baseball` that only
+> holds `.claude\launch.json` (a pointer to the real repo) — **do not edit code there.** Why it
+> matters: OneDrive sync can silently revert, duplicate ("file (1)"), or lock files mid‑edit, which
+> corrupts a single‑file app like `scoring-controller.html`. Always edit and run git from
+> `Documents\Baseball`. If a tool/editor ever opens the OneDrive path, switch to `Documents\Baseball`.
+
+> ## 🛟 RECOVERY — if `scoring-controller.html` gets gutted / app goes blank
+> The whole app is one file; an accidental overwrite (an editor/agent replacing it with a stub) makes
+> the app blank. **It's always recoverable from git** — the full file is every committed version:
+> 1. `cd "C:\Users\jford\Documents\Baseball"`
+> 2. `git restore --source=HEAD -- reference/web-scoring/scoring-controller.html` (restores last commit)
+> 3. Confirm it's whole: `wc -l reference/web-scoring/scoring-controller.html` → should be **~2640 lines**
+>    (a ~115‑line file is the broken stub), and it contains `var APP_VERSION="vNN"`.
+> 4. If the **live site** is also broken (Railway serves whatever is on `origin/main`): check
+>    `git log --oneline origin/main` for bogus "Update scoring-controller.html" commits, restore the
+>    good file, bump the version, commit, and push so Railway redeploys. (This happened on 2026‑06‑24:
+>    two stub commits had reached origin and blanked the live app; recovered to **v64** via an
+>    `git merge -s ours origin/main` so the bad commits couldn't resurrect.)
+
+> Recent: **v61–v64.** v64 = **recovery** (above) + version bump. v63 = home polish: "signed in as"
+> moved to the bottom, team cards top‑align with New Game (dropped offsetting label), removed useless
+> "0 games", bigger hub/schedule fonts, **chat‑keyboard fix** (`--avh` now tracks the *visual*
+> viewport so the keyboard no longer pushes the chat box off‑screen), league‑rulebook URL is
+> owner‑only. v62 = **public team directory** (owner `public`/`statsPublic` toggles in Team access →
+> Discovery; `cloudSearchTeams()`; "Find a public team" search in the opponent picker; rules allow
+> read when `public==true` — needs `deploy-rules.bat`), plus Refresh moved into **Settings**, a
+> **Share team** button (copyable `?follow=` link), and the favorite **star now means "follow"** and
+> is hidden on teams you own/score. v61 = **WebView `vh`=0 root‑cause fix** — `vh` resolves to 0 in
+> this WebView (vw is fine), which had been collapsing the chat modal and in‑game event picker to
+> zero size; now a JS‑maintained `--avh` (px‑per‑1vh from innerHeight/visualViewport) is used via
+> `calc(var(--avh)*N)` instead of `Nvh`. Sign‑out now clears the local team cache.
+> **STILL OPEN (requested, not yet built):** add/transfer/remove **co‑owners**; opponent‑picker
+> **autocomplete + recent opponents**; **calendar view** of the schedule; **custom time picker**
+> (native `<input type=time>` OK/Cancel buttons overflow the popup in the WebView); native
+> email/text **invite autocomplete** (needs an APK rebuild). YouTube streaming works (API enabled).
+>
 > Recent: **v60 — two tablet fixes** (verified live via WebView CDP). (1) Tablet/wide home was
 > HIDING all team cards: the card list wrapper used `max-height:46vh` but `vh` resolves to **0px**
 > in this Android WebView, collapsing the wrapper to height:0 and clipping every card (phone/narrow
