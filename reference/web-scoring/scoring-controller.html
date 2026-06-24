@@ -6,7 +6,7 @@
 <!-- The Android WebView resolves CSS `vh` to 0 (vw is fine). Maintain a real px-per-1vh value in
      --avh from window.innerHeight so styles use calc(var(--avh)*N) instead of Nvh. Updated on resize
      (keyboard open/close) and rotation. Runs before first paint so modals/containers size correctly. -->
-<script>(function(){function setAvh(){try{document.documentElement.style.setProperty("--avh",(window.innerHeight*0.01)+"px");}catch(e){}}setAvh();window.addEventListener("resize",setAvh);window.addEventListener("orientationchange",setAvh);}());</script>
+<script>(function(){function setAvh(){try{var h=(window.visualViewport&&window.visualViewport.height)||window.innerHeight;document.documentElement.style.setProperty("--avh",(h*0.01)+"px");}catch(e){}}setAvh();window.addEventListener("resize",setAvh);window.addEventListener("orientationchange",setAvh);if(window.visualViewport){window.visualViewport.addEventListener("resize",setAvh);window.visualViewport.addEventListener("scroll",setAvh);}}());</script>
 <title>All-Stars Live</title>
 <!-- PWA: installable, app-like, offline-resilient (see manifest.webmanifest + sw.js). -->
 <meta name="description" content="Live youth baseball — scorebug, play-by-play, and the game stream." />
@@ -176,7 +176,7 @@
 </div>
 
 <!-- Team chat: real-time messages for owner/scorers/followers (parents). DORMANT until cloud is on. -->
-<div id="chatmodal" style="display:none;position:fixed;inset:0;z-index:200;background:rgba(8,11,16,.84);align-items:center;justify-content:center;padding:14px">
+<div id="chatmodal" style="display:none;position:fixed;left:0;right:0;top:0;height:calc(var(--avh) * 100);z-index:200;background:rgba(8,11,16,.84);align-items:center;justify-content:center;padding:14px">
   <div style="max-width:460px;width:100%;height:min(calc(var(--avh) * 82),660px);display:flex;flex-direction:column;background:#0E1420;border:1px solid #2A3650;border-radius:18px;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,.6)">
     <div style="display:flex;align-items:center;gap:8px;padding:13px 15px;border-bottom:1px solid #2A3650;flex:none">
       <div id="chatTitle" style="font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:19px;letter-spacing:.5px;color:#EAEDF2;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Team chat</div>
@@ -1287,8 +1287,8 @@ function actionArea(){
       return `<div style="position:relative;background:${T.surface};border:2px solid ${t.color};border-left:7px solid ${t.color};border-radius:14px;padding:14px;box-shadow:0 0 0 1px rgba(0,0,0,.35), 0 8px 20px rgba(0,0,0,.4)">
           ${(window.cloudIsScorer&&window.cloudIsScorer(t))?"":`<button data-act="favteam" data-arg="${t.id}" title="Follow this team" style="position:absolute;top:9px;right:11px;background:none;border:none;color:${t.fav?T.amber:T.sageDim};font-size:24px;line-height:1;padding:0;cursor:pointer">${t.fav?"★":"☆"}</button>`}
           <div style="font-family:${MONO};font-size:23px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:30px">${t.name}</div>
-          <div style="display:flex;align-items:center;gap:8px;margin-top:6px;font-family:${MONO};font-size:15px;color:${T.sage}">
-            <span style="font-weight:800;color:${t.color}">${rec}</span><span style="opacity:.45">·</span><span>${games} game${games===1?"":"s"}</span><span style="opacity:.45">·</span><span>${t.players.length} players</span></div>
+          <div style="display:flex;align-items:center;gap:10px;margin-top:7px;font-family:${MONO};font-size:18px;color:${T.sage}">
+            <span style="font-weight:800;color:${t.color}">${rec}</span><span style="opacity:.45">·</span><span>${t.players.length} players</span></div>
           <div style="display:flex;gap:8px;margin-top:14px">
             <button data-act="opent" data-arg="${t.id}" style="flex:1;background:${t.color};color:#fff;border:none;border-radius:9px;padding:13px;font-family:${MONO};font-weight:800;font-size:16px;letter-spacing:.8px;display:flex;align-items:center;justify-content:center;gap:8px">${IC(GEAR)} MANAGE TEAM</button>
           </div></div>`;};
@@ -1355,25 +1355,27 @@ function actionArea(){
       // height:0 and clipping ALL team cards out of view (cards were in the DOM at top:428 but
       // never painted). innerHeight is reliable; vh is not here.
       const teamsMaxH = Math.max(220, Math.round((window.innerHeight || 700) * 0.5));
+      // Cards only (no "My teams" label) so the card tops line up with the New Game tile.
+      const cardsGrid = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;align-content:start">${list.map(card).join("")}</div>`;
       const rightCell = showTeams && DB.teams.length
         ? `<div style="display:flex;flex-direction:column;gap:10px">
-             <div style="max-height:${teamsMaxH}px;overflow-y:auto;-webkit-overflow-scrolling:touch;display:flex;flex-direction:column;gap:10px">${teamsBlock}</div>
+             <div style="max-height:${teamsMaxH}px;overflow-y:auto;-webkit-overflow-scrolling:touch;display:flex;flex-direction:column;gap:10px">${cardsGrid}</div>
              ${manageBtn}</div>`
         : manageTile;
       // Top-aligned, width-capped. Scrolls if content is tall (never overlaps the logo).
       return `<div style="position:relative;min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:clamp(14px,calc(var(--avh) * 2.5),26px);padding:clamp(14px,calc(var(--avh) * 3),34px) 12px">
           ${settingsGear}
           <div style="width:100%;max-width:1000px;display:flex;flex-direction:column;gap:16px">
-            ${hero}${authBar}
+            ${hero}
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start">
               <div style="display:flex;flex-direction:column;gap:14px">${resumeBtn}${newTile}</div>
               <div style="display:flex;flex-direction:column;gap:10px">${rightCell}</div>
             </div>
-            ${shareBtnHome}
+            ${shareBtnHome}${authBar}
           </div>
         </div>`;
     }
-    return `<div style="position:relative;min-height:100%;display:flex;flex-direction:column;justify-content:safe center;gap:14px;padding:6px 0">${settingsGear}${hero}${authBar}${resumeBtn}${newGameBtn}${showTeams?teamsBlock:""}${showTeams?manageBtn:""}${shareBtnHome}</div>`;
+    return `<div style="position:relative;min-height:100%;display:flex;flex-direction:column;justify-content:safe center;gap:14px;padding:6px 0">${settingsGear}${hero}${resumeBtn}${newGameBtn}${showTeams?teamsBlock:""}${showTeams?manageBtn:""}${shareBtnHome}${authBar}</div>`;
   }
   if(mode==="teams"){
     const sorted=DB.teams.slice().sort((a,b)=>(b.fav?1:0)-(a.fav?1:0));
@@ -1416,8 +1418,8 @@ function actionArea(){
     const schedRows=sched.map(s=>{const isG=s.type!=="practice";
       return `<div style="display:flex;align-items:center;gap:8px;background:${T.surface2};border:1px solid ${T.line};border-left:5px solid ${isG?OUR.color:T.sage};border-radius:9px;padding:9px 11px">
           <div style="flex:1;min-width:0">
-            <div style="font-weight:800;color:${T.ink};font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${isG?"🏟️ "+(s.opp?("vs "+(s.opp||"").replace(/</g,"")):"Game"):"⚾ Practice"}</div>
-            <div style="font-size:12px;color:${T.sage};margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${fmtSched(s)}${s.loc?(" · "+(s.loc||"").replace(/</g,"")):""}${s.notes?(" · "+(s.notes||"").replace(/</g,"")):""}</div></div>
+            <div style="font-weight:800;color:${T.ink};font-size:18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${isG?"🏟️ "+(s.opp?("vs "+(s.opp||"").replace(/</g,"")):"Game"):"⚾ Practice"}</div>
+            <div style="font-size:15px;color:${T.sage};margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${fmtSched(s)}${s.loc?(" · "+(s.loc||"").replace(/</g,"")):""}${s.notes?(" · "+(s.notes||"").replace(/</g,"")):""}</div></div>
           <button data-act="schedrm" data-arg="${s.id}" style="background:none;border:1px solid ${T.line};color:${T.out};border-radius:7px;padding:7px 9px;font-weight:800">&times;</button></div>`;}).join("");
     const fLbl=`font-size:10px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:${T.sageDim};margin:0 2px 3px`;
     const fld=(lbl,inner)=>`<div style="flex:1;min-width:120px;display:flex;flex-direction:column">${lbl?`<div style="${fLbl}">${lbl}</div>`:""}${inner}</div>`;
@@ -1433,13 +1435,16 @@ function actionArea(){
         ${fld("Location",`<input id="schLoc" placeholder="e.g. City Park — Field 2" style="${cell}">`)}
         ${fld("Notes (optional)",`<input id="schNotes" placeholder="e.g. arrive 45 min early, white jerseys" style="${cell}">`)}
         <button data-act="schedadd" style="${bigBtn(T.lime,'',T.field)};margin-top:4px">+ Add to schedule</button></div>`;
-    // Per-team league rules URL
+    // Per-team league rules URL. Only the owner can edit it; scorers/followers see it read-only.
+    const canEditRules = !(window.Cloud&&window.Cloud.enabled&&window.Cloud.user) || (window.cloudIsOwner&&window.cloudIsOwner(t));
     const rulesSection=`<div style="background:${T.surface};border:1px solid ${T.line};border-radius:10px;padding:12px 14px">
         <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin-bottom:8px">League rulebook</div>
         <div style="display:flex;gap:8px;align-items:center">
-          <input value="${(t.rulesUrl||"").replace(/"/g,"&quot;")}" oninput="edTeamRulesUrl(this.value)" placeholder="Paste rules URL (optional)" type="url" inputmode="url" autocapitalize="off" style="${cell};flex:1;min-width:0;font-size:13px">
+          ${canEditRules
+            ? `<input value="${(t.rulesUrl||"").replace(/"/g,"&quot;")}" oninput="edTeamRulesUrl(this.value)" placeholder="Paste rules URL (optional)" type="url" inputmode="url" autocapitalize="off" style="${cell};flex:1;min-width:0;font-size:13px">`
+            : `<div style="flex:1;min-width:0;font-size:13px;color:${t.rulesUrl?T.sage:T.sageDim};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.rulesUrl?(t.rulesUrl||"").replace(/</g,"&lt;"):"No rulebook set by the team owner."}</div>`}
           ${t.rulesUrl?`<button data-act="openrules" style="background:${T.lime};color:${T.field};border:none;border-radius:8px;padding:9px 13px;font-weight:800;font-size:13px;white-space:nowrap">Open ↗</button>`:""}
-        </div></div>`;
+        </div>${canEditRules?"":`<div style="font-size:11px;color:${T.sageDim};margin-top:6px">Only the team owner can change the rulebook.</div>`}</div>`;
     // Team access (cloud) — owner + authorized scorers. Only when signed in.
     const C=window.Cloud, signedIn=!!(C&&C.enabled&&C.user);
     const owner=signedIn && typeof window.cloudIsOwner==="function" && window.cloudIsOwner(t);
@@ -1493,7 +1498,7 @@ function actionArea(){
           <button data-act="teamsback" style="${ghost};padding:9px 11px">&lsaquo; Teams</button>
           <div style="flex:1;min-width:0;border-left:5px solid ${t.color};padding-left:10px">
             <div style="font-family:${MONO};font-size:22px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${(t.name||"Team").replace(/</g,"")}</div>
-            <div style="font-size:13px;color:${T.sage};margin-top:2px"><span style="color:${t.color};font-weight:800">${rec}</span> &middot; ${t.players.length} players</div></div></div>
+            <div style="font-family:${MONO};font-size:18px;color:${T.sage};margin-top:4px"><span style="color:${t.color};font-weight:800">${rec}</span> &middot; ${t.players.length} players</div></div></div>
         <button data-act="teamchat" style="${bigBtn(T.lime,'',T.field)};font-size:17px">&#128172; Team chat</button>
         <button data-act="shareteam" style="${ghost};display:flex;align-items:center;justify-content:center;gap:9px">&#128279; Share team — let parents follow (watch &amp; chat)</button>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
@@ -2563,7 +2568,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v62";
+var APP_VERSION="v63";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
