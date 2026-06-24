@@ -18,7 +18,9 @@ service cloud.firestore {
       function isScorer()   { return request.auth != null && (request.auth.token.email in resource.data.scorers); }
       function isFollower() { return request.auth != null && (request.auth.token.email in resource.data.followers); }
 
-      allow read: if isOwner() || isScorer() || isFollower();
+      // Public teams (owner set public:true) are readable by anyone — powers the searchable
+      // team directory. The `where('public','==',true)` query authorizes against this clause.
+      allow read: if isOwner() || isScorer() || isFollower() || resource.data.public == true;
 
       // Create: must stamp yourself as the owner.
       allow create: if request.auth != null && request.resource.data.ownerUid == request.auth.uid;

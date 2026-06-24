@@ -24,8 +24,28 @@
       schedule: t.schedule || [], lineup: t.lineup || null, rulesUrl: t.rulesUrl || "",
       ownerUid: t.ownerUid || myUid(), ownerEmail: t.ownerEmail || myEmail(),
       scorers: t.scorers || [], followers: t.followers || [], updatedAt: Date.now(),
+      public: !!t.public, statsPublic: !!t.statsPublic,   // owner-controlled discoverability
     };
   }
+
+  // Search the public team directory. Returns lightweight cards (no full season detail).
+  // Firestore can't substring-search, so we pull public teams and filter by name client-side.
+  window.cloudSearchTeams = function (qtext) {
+    var d = fdb(); if (!d) return Promise.resolve([]);
+    var q = (qtext || "").trim().toLowerCase();
+    return d.collection("teams").where("public", "==", true).limit(100).get()
+      .then(function (snap) {
+        var out = [];
+        snap.forEach(function (doc) {
+          var c = doc.data(); if (!c || !c.id) return;
+          if (q && (c.name || "").toLowerCase().indexOf(q) < 0 && (c.short || "").toLowerCase().indexOf(q) < 0) return;
+          out.push({ id: c.id, name: c.name || "Team", short: c.short || "", color: c.color || "#2E6BE6",
+            players: (c.players || []).length, record: c.record || { w: 0, l: 0, t: 0 }, statsPublic: !!c.statsPublic });
+        });
+        return out;
+      })
+      .catch(function (e) { console.warn("cloudSearchTeams:", e.message); return []; });
+  };
 
   // Push one team up (claims ownership if it has none / is mine).
   window.cloudSaveTeam = function (t) {
