@@ -2076,14 +2076,12 @@ function actionArea(){
       // each a consistent label-left / control-right row.
       const dLbl=`font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:${T.lime};flex:none;width:120px;padding-top:8px`;
       const dRow=(label,inner,first)=>`<div style="display:flex;gap:12px;flex-wrap:wrap;padding:11px 2px;${first?"":`border-top:1px solid ${T.line}`}"><div style="${dLbl}">${label}</div><div style="flex:1;min-width:180px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">${inner}</div></div>`;
-      const colorBtn=`<label title="Pick team colour" style="display:inline-flex;align-items:center;gap:9px;background:${T.surface2};border:1px solid ${T.line};border-radius:10px;padding:9px 14px;cursor:pointer;position:relative"><span style="width:24px;height:24px;border-radius:7px;background:${t.color};box-shadow:0 0 0 1px ${T.line}"></span><span style="font-weight:700;color:${T.ink};font-size:13px">Choose color</span>${ICN.palette}<input type="color" value="${t.color}" onchange="window.edTeamColor(this.value)" style="position:absolute;left:0;top:0;width:100%;height:100%;opacity:0;cursor:pointer"></label>`;
       const logoCtl=`<div style="width:50px;height:50px;flex:none;border-radius:11px;border:1px solid ${T.line};background:${t.logo?"#fff":T.surface2}${t.logo?`;background-image:url('${t.logo}');background-size:contain;background-repeat:no-repeat;background-position:center`:""};display:flex;align-items:center;justify-content:center;color:${T.sageDim}">${t.logo?"":IC('flag',22)}</div>
             <label style="display:inline-flex;align-items:center;gap:7px;background:${T.surface2};border:1px solid ${T.line};border-radius:10px;padding:9px 14px;cursor:pointer;font-size:13px;font-weight:700;color:${T.ink}">&#8593; ${t.logo?"Change":"Upload"}<input type="file" accept="image/*" onchange="window.uploadTeamLogo(this)" style="display:none"></label>${t.logo?`<button data-act="rmlogo" style="background:none;border:1px solid ${T.line};color:${T.out};border-radius:10px;padding:9px 12px;font-weight:700;font-size:12px">Remove</button>`:""}`;
       const detailsBlock=`<div class="frost-card" style="background:${T.surface};border:1px solid ${T.line};border-radius:14px;padding:4px 14px 12px">
           <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};padding:11px 2px 2px">Team details</div>
-          ${dRow("Team name",`<input value="${(t.name||"").replace(/"/g,"&quot;")}" oninput="edTeamName(this.value)" placeholder="Team name" style="${cell};flex:1;min-width:160px;font-family:${MONO};font-weight:800;font-size:16px;border-left:5px solid ${t.color}">`,true)}
-          ${dRow("Scoreboard abbr",`<input value="${(t.short||"").replace(/"/g,"&quot;")}" oninput="edTeamAbbr(this.value)" maxlength="6" placeholder="TIGERS" style="${cell};width:120px;text-align:center;font-family:${MONO};font-weight:800;letter-spacing:.5px;text-transform:uppercase"><span style="font-size:11px;color:${T.sageDim}">up to 6 chars</span>`)}
-          ${dRow("Color",colorBtn)}
+          ${dRow("Team name",`<label title="Team color — tap to change" style="position:relative;width:16px;align-self:stretch;min-height:44px;flex:none;border-radius:6px;background:${t.color};box-shadow:0 0 0 1px ${T.line};cursor:pointer"><input type="color" value="${t.color}" onchange="window.edTeamColor(this.value)" style="position:absolute;left:0;top:0;width:100%;height:100%;opacity:0;cursor:pointer"></label><input value="${(t.name||"").replace(/"/g,"&quot;")}" oninput="edTeamName(this.value)" placeholder="Team name" style="${cell};flex:1;min-width:150px;font-family:${MONO};font-weight:800;font-size:16px">`,true)}
+          ${dRow("Scoreboard abbr",`<input value="${(t.short||"").replace(/"/g,"&quot;")}" oninput="edTeamAbbr(this.value)" maxlength="6" placeholder="TIGERS" style="${cell};width:120px;text-align:center;font-family:${MONO};font-weight:800;letter-spacing:.5px;text-transform:uppercase"><span style="font-size:11px;color:${T.sageDim}">up to 6 chars &middot; tap the colour bar by the name to set the team colour</span>`)}
           ${dRow("Logo",logoCtl)}
           <div style="font-size:11px;color:${T.sageDim};line-height:1.4;padding:8px 2px 0">The logo shows on team cards, the lineup card &amp; (soon) the scoreboard. A square PNG with a transparent background looks best.</div>
         </div>`;
@@ -3558,7 +3556,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v114";
+var APP_VERSION="v115";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
