@@ -5,7 +5,7 @@
  * network — only the static shell is cached here. Bump CACHE to ship an update. */
 // ⬆️ BUMP THIS STRING ON EVERY DEPLOY. Changing it is what makes the installed PWA
 // notice a new version, activate it, and auto-reload (see the SW-update code in the page).
-const CACHE = "allstars-v107";
+const CACHE = "allstars-v108";
 const SHELL = [
   "./",
   "./scoring-controller.html",
@@ -46,12 +46,20 @@ self.addEventListener("fetch", (e) => {
   const url = new URL(req.url);
   if (url.origin !== location.origin) return;        // relay / firebase / youtube → network
 
-  // The app page: network-first so updates land, fall back to cache when offline.
+  // The app page: stale-while-revalidate. Serve the cached shell INSTANTLY (so a weak/slow
+  // signal at the field never blocks the load — it doesn't wait on the network), and fetch a
+  // fresh copy in the background to update the cache for next launch. A new deploy still lands
+  // because the SW itself updates (CACHE bump) and the page auto-reloads on the new SW; the
+  // SHELL list is pre-cached on install so the first post-update load is already cached too.
   if (req.mode === "navigate" || req.destination === "document") {
+    const net = fetch(req)
+      .then((r) => { const cp = r.clone(); caches.open(CACHE).then((c) => c.put(req, cp)); return r; })
+      .catch(() => null);
+    e.waitUntil(net.catch(() => {}));   // keep the SW alive to finish the background refresh
     e.respondWith(
-      fetch(req)
-        .then((r) => { const cp = r.clone(); caches.open(CACHE).then((c) => c.put(req, cp)); return r; })
-        .catch(() => caches.match(req).then((m) => m || caches.match("./scoring-controller.html"))),
+      caches.match(req).then((cached) =>
+        cached || net.then((r) => r || caches.match("./scoring-controller.html")),
+      ),
     );
     return;
   }
