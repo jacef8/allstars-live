@@ -2168,21 +2168,21 @@ function actionArea(){
       const posOpts=cur=>["",...POSLIST].map(P=>`<option value="${P}"${P===cur?" selected":""}>${P||"EH"}</option>`).join("");
       const rows=lu.order.map((id,i)=>{ const p=t.players.find(x=>x.id===id)||{num:"",name:"?"};
         const cur=Object.keys(lu.pos||{}).find(k=>lu.pos[k]===id)||"";
-        return `<div style="display:flex;align-items:center;gap:6px;background:${T.surface};border:1px solid ${T.line};border-radius:9px;padding:7px 8px">
-          <span style="font-family:${MONO};font-size:16px;font-weight:800;color:${T.lime};width:18px;text-align:center">${i+1}</span>
+        return `<div data-lurow data-id="${id}" style="display:flex;align-items:center;gap:5px;background:${T.surface};border:1px solid ${T.line};border-radius:9px;padding:7px 8px">
+          <span data-ludrag title="Drag to reorder" style="cursor:grab;color:${T.sageDim};display:flex;align-items:center;padding:4px 1px;touch-action:none">${IC('<path d="M4 7h16M4 12h16M4 17h16"/>')}</span>
+          <span style="font-family:${MONO};font-size:16px;font-weight:800;color:${T.lime};width:16px;text-align:center">${i+1}</span>
           <span style="flex:1;min-width:0;display:flex;align-items:center;gap:7px;overflow:hidden"><span style="font-family:${MONO};color:${t.color};min-width:32px">#${esc(p.num)}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700">${esc(p.name)}</span></span>
           <select onchange="window.luSetPos('${id}',this.value)" style="background:${T.surface2};border:1px solid ${T.line};color:${T.chalk};border-radius:7px;padding:7px 6px;font-family:${MONO};font-weight:800;font-size:14px">${posOpts(cur)}</select>
-          <button data-act="lumoveup" data-arg="${i}" ${i===0?"disabled":""} style="background:${T.surface2};border:1px solid ${T.line};color:${i===0?T.sageDim:T.chalk};border-radius:7px;padding:7px 9px;font-size:13px">&#9650;</button>
-          <button data-act="lumovedn" data-arg="${i}" ${i===n-1?"disabled":""} style="background:${T.surface2};border:1px solid ${T.line};color:${i===n-1?T.sageDim:T.chalk};border-radius:7px;padding:7px 9px;font-size:13px">&#9660;</button>
           <button data-act="luremove" data-arg="${id}" ${n<=9?"disabled":""} title="Move to bench" style="background:none;border:1px solid ${T.line};color:${n<=9?T.sageDim:T.out};border-radius:7px;padding:7px 9px;font-weight:800">&times;</button></div>`; }).join("");
       const benchIds=t.players.filter(p=>lu.order.indexOf(p.id)<0);
       const bench=benchIds.length?benchIds.map(p=>`<button data-act="luadd" data-arg="${p.id}" ${n>=12?"disabled":""} style="display:inline-flex;align-items:center;gap:6px;background:${T.surface};border:1px solid ${T.line};color:${n>=12?T.sageDim:T.chalk};border-radius:8px;padding:7px 11px;font-size:13px;font-weight:700"><span style="font-family:${MONO};color:${t.color}">#${esc(p.num)}</span>${esc(p.name)} <span style="color:${T.lime};font-weight:800">+</span></button>`).join(" "):`<span style="font-size:12px;color:${T.sageDim}">Everyone is in the order</span>`;
       return secWrap(`${back}${nameCard}
           <div class="frost-card" style="background:${T.surface};border:1px solid ${T.line};border-radius:12px;padding:11px 12px;display:flex;flex-direction:column;gap:6px">
             <div style="display:flex;align-items:center;justify-content:space-between;margin:0 2px 2px">
-              <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime}">Batting order &amp; field</div>
+              <div><div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime}">Batting order &amp; field</div>
+                <div style="font-size:11px;color:${T.sageDim};margin-top:1px">Drag &#9776; to reorder</div></div>
               <button data-act="luauto" style="background:${T.surface2};border:1px solid ${T.line};color:${T.sage};border-radius:7px;padding:6px 10px;font-size:11px;font-weight:700">Auto-fill positions</button></div>
-            ${rows}</div>
+            <div id="lu-list" style="display:flex;flex-direction:column;gap:6px">${rows}</div></div>
           <div class="frost-card" style="background:${T.surface};border:1px solid ${T.line};border-radius:12px;padding:11px 12px">
             <div style="font-size:10px;color:${T.sageDim};letter-spacing:.6px;margin:0 2px 7px">BENCH &middot; ${n>=12?"max 12 batters":"tap to add to the order"}</div>
             <div style="display:flex;flex-wrap:wrap;gap:6px">${bench}</div></div>
@@ -2874,6 +2874,36 @@ function setupLineupDrag(){
     });
   });
 }
+/* ---- drag-to-reorder a SAVED lineup in the builder (teamTab==="lineupedit") ---- */
+function setupBuilderDrag(){
+  const list=document.getElementById("lu-list"); if(!list)return;
+  list.querySelectorAll('[data-ludrag]').forEach(handle=>{
+    handle.addEventListener('pointerdown',e=>{
+      e.preventDefault();
+      const row=handle.closest('[data-lurow]'); if(!row)return;
+      row.style.opacity='0.55'; row.style.boxShadow='0 6px 16px rgba(15,30,60,.25)';
+      document.body.style.userSelect='none';
+      const move=ev=>{
+        const rows=[...list.querySelectorAll('[data-lurow]')];
+        for(const r of rows){ if(r===row)continue;
+          const b=r.getBoundingClientRect();
+          if(ev.clientY < b.top + b.height/2){ list.insertBefore(row,r); return; } }
+        list.appendChild(row);
+      };
+      const up=()=>{
+        window.removeEventListener('pointermove',move);
+        window.removeEventListener('pointerup',up);
+        document.body.style.userSelect='';
+        row.style.opacity=''; row.style.boxShadow='';
+        const t=teamById(openTeamId), lu=t&&lineupById(t,editLineupId);
+        if(lu){ lu.order=[...list.querySelectorAll('[data-lurow]')].map(r=>r.dataset.id); saveDB(); }
+        render();
+      };
+      window.addEventListener('pointermove',move);
+      window.addEventListener('pointerup',up);
+    });
+  });
+}
 /* Tablet-in-landscape = wide enough for a side panel instead of a bottom sheet. */
 function isWide(){return window.innerWidth>=760 && window.innerWidth>window.innerHeight;}
 function render(){
@@ -2915,12 +2945,14 @@ function render(){
     const prevLineup=(mode==="lineup")?(()=>{const l=document.getElementById("lineup-list");return l?l.scrollTop:0;})():0;
     // page-zoom (scroll pages only) scales the UI up on big monitors; lineup is excluded so
     // its drag coordinates stay accurate.
-    const cls=`${mode!==_lastMode?"screen-in ":""}${scroll?"page-zoom":""}`;
+    const building=(mode==="team"&&teamTab==="lineupedit");   // exclude page-zoom so drag coords stay accurate
+    const cls=`${mode!==_lastMode?"screen-in ":""}${(scroll&&!building)?"page-zoom":""}`;
     document.getElementById("content").innerHTML=`<div class="${cls}" style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px;${scroll?"overflow-y:auto;-webkit-overflow-scrolling:touch":""}">${actionArea()}</div>${confirmOverlay()}`;
     _lastMode=mode;
     if(prevScroll){ const c=document.querySelector("#content > div"); if(c)c.scrollTop=prevScroll; }
     if(prevLineup){ const l=document.getElementById("lineup-list"); if(l)l.scrollTop=prevLineup; }
     if(mode==="lineup")setupLineupDrag();
+    if(building)setupBuilderDrag();
     return;
   }
   maybeAlert();   // rule-reminder popups (run cap / run rule / pitch limit / final inning)
@@ -3302,8 +3334,6 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="ludup"){ const t=teamById(openTeamId); const lu=t&&lineupById(t,arg); if(lu){ const c={id:nextId("lu"),name:lu.name+" (copy)",order:(lu.order||[]).slice(),pos:Object.assign({},lu.pos||{})}; teamLineups(t).push(c); saveDB(); render(); } }
   else if(act==="ludel"){ const t=teamById(openTeamId); const lu=t&&lineupById(t,arg); if(lu){ let ok=true; try{ok=confirm('Delete lineup "'+lu.name+'"?');}catch(e){} if(ok){ t.lineups=teamLineups(t).filter(l=>l.id!==arg); if(t.activeLineupId===arg)t.activeLineupId=(t.lineups[0]&&t.lineups[0].id)||null; saveDB(); render(); } } }
   else if(act==="luprintcard"){ const t=teamById(openTeamId); const lu=t&&lineupById(t,arg); if(t&&lu){ printLineupCard(t,{lineup:lineupToIdx(t,lu)}); } }
-  else if(act==="lumoveup"){ const t=teamById(openTeamId); const lu=t&&lineupById(t,editLineupId); const i=+arg; if(lu&&i>0){ const o=lu.order; const x=o[i];o[i]=o[i-1];o[i-1]=x; saveDB(); render(); } }
-  else if(act==="lumovedn"){ const t=teamById(openTeamId); const lu=t&&lineupById(t,editLineupId); const i=+arg; if(lu&&i<lu.order.length-1){ const o=lu.order; const x=o[i];o[i]=o[i+1];o[i+1]=x; saveDB(); render(); } }
   else if(act==="luremove"){ const t=teamById(openTeamId); const lu=t&&lineupById(t,editLineupId); if(lu&&lu.order.length>9){ lu.order=lu.order.filter(id=>id!==arg); Object.keys(lu.pos||{}).forEach(P=>{if(lu.pos[P]===arg)delete lu.pos[P];}); saveDB(); render(); } }
   else if(act==="luadd"){ const t=teamById(openTeamId); const lu=t&&lineupById(t,editLineupId); if(lu&&lu.order.length<12&&lu.order.indexOf(arg)<0){ lu.order.push(arg); saveDB(); render(); } }
   else if(act==="luauto"){ const t=teamById(openTeamId); const lu=t&&lineupById(t,editLineupId); if(lu){ lu.pos={}; let f=0; lu.order.forEach(id=>{ if(f<POSLIST.length){lu.pos[POSLIST[f]]=id;f++;} }); saveDB(); render(); } }
@@ -3695,7 +3725,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v117";
+var APP_VERSION="v118";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
