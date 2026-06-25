@@ -20,6 +20,11 @@ target_compile_features(srtjni PRIVATE cxx_std_17)
 find_library(log-lib log)
 target_link_libraries(srtjni ${log-lib})
 
+# 16 KB page-size alignment — required for Android 15+ / 16 KB-page devices (Play Store mandate).
+# NDK r25 defaults to 4 KB; this aligns the .so's LOAD segments to 16 KB (NDK r28 does it by
+# default). Fixes the "libsrtjni.so: LOAD segment not aligned" compatibility warning.
+target_link_options(srtjni PRIVATE "-Wl,-z,max-page-size=16384")
+
 if(USE_LIBSRT)
     message(STATUS "srtjni: linking vendored libsrt for ${ANDROID_ABI}")
     target_compile_definitions(srtjni PRIVATE USE_LIBSRT=1)
