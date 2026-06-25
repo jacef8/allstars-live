@@ -54,7 +54,11 @@
   /* Team-color tinted cards (batter card, team tiles): same frosted dark backing so text is
      readable over the turf, with the team color kept as the left accent (set inline). */
   .frost-card{ -webkit-backdrop-filter:blur(13px) saturate(1.1);backdrop-filter:blur(13px) saturate(1.1); }
-  button{font-family:var(--sans);cursor:pointer;
+  button{font-family:var(--sans);cursor:pointer;color:var(--chalk);
+    /* Default to the light page text color. <button> does NOT inherit `color` (it resets to
+       black), so any button that draws a currentColor icon without setting its own color was
+       getting a black, near-invisible icon on the dark surfaces. Buttons that need dark text
+       (lime/green/amber, etc.) set their own color inline and override this. */
     transition:transform .12s var(--ease-soft), filter .15s ease, box-shadow .18s ease, background .15s ease;}
   button:active{transform:scale(.94);filter:brightness(1.14) drop-shadow(0 0 7px rgba(163,230,53,.32));}
   button:disabled{opacity:.4;filter:none;cursor:default;}
@@ -196,7 +200,7 @@
   <div style="max-width:460px;width:100%;height:min(calc(var(--avh) * 82),660px);display:flex;flex-direction:column;background:#0E1420;border:1px solid #2A3650;border-radius:18px;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,.6)">
     <div style="display:flex;align-items:center;gap:8px;padding:13px 15px;border-bottom:1px solid #2A3650;flex:none">
       <div id="chatTitle" style="font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:19px;letter-spacing:.5px;color:#EAEDF2;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Team chat</div>
-      <button data-act="closechat" style="background:#1A2233;border:1px solid #2A3650;color:#B7C2D6;border-radius:8px;padding:7px 11px;font-weight:700;font-size:13px;cursor:pointer">&times;</button>
+      <button data-act="closechat" aria-label="Close chat" style="flex:none;background:#1A2233;border:1px solid #2A3650;color:#EAEDF2;border-radius:10px;width:40px;height:40px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:26px;line-height:1;cursor:pointer">&times;</button>
     </div>
     <div id="chatList" style="flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px 14px;display:flex;flex-direction:column;gap:8px"></div>
     <div style="display:flex;gap:8px;padding:11px 14px;border-top:1px solid #2A3650;flex:none">
@@ -1657,7 +1661,7 @@ function actionArea(){
             onerror="if(this.src.indexOf('icon-512')<0){this.src='icons/icon-512.png';this.style.borderRadius='20px';}else{this.style.display='none';}"
             style="height:clamp(130px,calc(var(--avh) * 26),260px);width:auto;display:block;filter:drop-shadow(0 8px 20px rgba(0,0,0,.55))">
           <div style="font-family:${MONO};font-size:clamp(26px,4.2vw,46px);font-weight:800;letter-spacing:1.5px;line-height:1;color:#fff">ALL-STARS <span style="color:${T.lime}">LIVE</span></div></div>`;
-    const resumeBtn = gameActive?`<button data-act="resume" style="${bigBtn(T.safe)};font-size:17px;padding:16px;display:flex;align-items:center;justify-content:center;gap:8px">${IC(PLAY)} Resume &middot; ${OUR.short} vs ${OPP.short}</button>`:"";
+    const resumeBtn = gameActive?`<button data-act="resume" style="${bigBtn(T.safe,"",T.field)};font-size:17px;padding:16px;display:flex;align-items:center;justify-content:center;gap:8px">${IC(PLAY)} Resume &middot; ${OUR.short} vs ${OPP.short}</button>`:"";
     const newGameBtn = `<button data-act="newgamestart" style="${bigBtn(T.lime,"font-size:21px;padding:17px;box-shadow:0 8px 22px rgba(163,230,53,.22)",T.field)}">${IC(PLAY)} New Game</button>`;
     const manageBtn = DB.teams.length
       ? `<button data-act="gototeams" style="${ghost};padding:17px;font-size:17px;border:2px solid #3F6CA8;color:${T.ink};display:flex;align-items:center;justify-content:center;gap:9px">${IC('<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>')} Manage teams &amp; rosters</button>`
@@ -1969,9 +1973,9 @@ function actionArea(){
     }
     // ----- HUB: team header + grid of sections + primary actions -----
     const rec=(()=>{const R=teamRec(t);return `${R.w}-${R.l}${R.t?"-"+R.t:""}`;})();
-    const hb=(arg,icon,label)=>`<button data-act="teamtab" data-arg="${arg}" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;background:${T.surface};border:1px solid ${T.line};border-radius:14px;padding:14px 10px;min-height:84px;cursor:pointer"><span style="font-size:25px">${icon}</span><span style="font-weight:800;color:${T.ink};font-size:15px;text-align:center;line-height:1.2">${label}</span></button>`;
+    const hb=(arg,icon,label)=>`<button data-act="teamtab" data-arg="${arg}" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;background:${T.surface};border:1px solid ${T.line};border-radius:14px;padding:14px 10px;min-height:84px;cursor:pointer"><span style="font-size:25px;color:${T.lime}">${icon}</span><span style="font-weight:800;color:${T.ink};font-size:15px;text-align:center;line-height:1.2">${label}</span></button>`;
     // Hub tile that fires a non-tab action (Share) — same look as hb() but its own data-act.
-    const hbAct=(act,icon,label)=>`<button data-act="${act}" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;background:${T.surface};border:1px solid ${T.line};border-radius:14px;padding:14px 10px;min-height:84px;cursor:pointer"><span style="font-size:25px">${icon}</span><span style="font-weight:800;color:${T.ink};font-size:15px;text-align:center;line-height:1.2">${label}</span></button>`;
+    const hbAct=(act,icon,label)=>`<button data-act="${act}" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;background:${T.surface};border:1px solid ${T.line};border-radius:14px;padding:14px 10px;min-height:84px;cursor:pointer"><span style="font-size:25px;color:${T.lime}">${icon}</span><span style="font-weight:800;color:${T.ink};font-size:15px;text-align:center;line-height:1.2">${label}</span></button>`;
     return secWrap(`
         <div class="frost-card" style="display:flex;align-items:center;gap:10px;background:${T.surface};border:1px solid ${T.line};border-radius:14px;padding:12px 14px">
           <button data-act="teamsback" style="${ghost};padding:9px 11px">&lsaquo; Teams</button>
@@ -2906,7 +2910,11 @@ document.getElementById("app").addEventListener("click",e=>{
 function renderToolbar(){
   const tb=document.getElementById("toolbar"); if(!tb)return;
   const inGame=!["home","teams","team","pickteam"].includes(mode);
-  const playMode2=!["home","teams","team","pickteam","newgame","lineup","pickplayer","pickpos","editplayer","summary","settings"].includes(mode);
+  // Menu / non-game screens that must NOT show the in-game top bar (Scorer/Viewer toggle, Share,
+  // LIVE dot). "directory" (Find a team) and "teamstats" (public team stats) were missing, so the
+  // toolbar wrongly appeared on those browse pages.
+  const menuModes=["home","teams","team","pickteam","newgame","lineup","pickplayer","pickpos","editplayer","summary","settings","directory","teamstats"];
+  const playMode2=!menuModes.includes(mode);
   // No top bar on menu screens (home/teams/etc.) — it duplicated the page title and
   // showed a misleading "LIVE" relay dot before any game. Reclaims that space.
   if(!playMode2){ tb.innerHTML=""; return; }
@@ -2926,7 +2934,7 @@ function renderToolbar(){
   const conn=LINK.connected(), hasRelay=LINK.hasRelay();
   const dot = !hasRelay ? {c:T.sageDim,l:"LOCAL"} : conn ? {c:T.safe,l:"LIVE"} : {c:T.out,l:"OFFLINE"};
   // Wide-only: slide the video monitor in/out for distraction-free scoring.
-  const playMode=!["home","teams","team","pickteam","newgame","lineup","pickplayer","pickpos","editplayer","summary","settings"].includes(mode);
+  const playMode=!menuModes.includes(mode);
   const vidToggle=(isWide()&&playMode)?`<button data-act="togglevideo" title="${monitorOn?"Hide video":"Show video"}" style="display:flex;align-items:center;gap:7px;background:${monitorOn?T.surface2:T.lime};border:1px solid ${monitorOn?T.line:T.lime};color:${monitorOn?T.chalk:T.field};border-radius:10px;padding:9px 13px;font-size:14px;font-weight:800">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>${monitorOn?"Hide video":"Show video"}</button>`:"";
   // Game controls moved UP into the top bar (wide + scorer + idle) so the bottom row is
@@ -2945,7 +2953,7 @@ function renderToolbar(){
       <span class="${conn?'livedot':''}" style="width:8px;height:8px;border-radius:50%;background:${dot.c};${conn?`box-shadow:0 0 7px ${dot.c}`:""}"></span>
       <span style="font-family:${MONO};font-size:10px;font-weight:700;letter-spacing:1px;color:${dot.c}">${dot.l}</span></div>`;
   // Batter readout fills the empty middle of the top row (wide scorer in a live game).
-  const bstrip=(isWide()&&viewMode==="scorer"&&!["home","teams","team","pickteam","newgame","lineup","pickplayer","pickpos","editplayer","summary","settings"].includes(mode))
+  const bstrip=(isWide()&&viewMode==="scorer"&&!menuModes.includes(mode))
     ? `<div style="flex:1;min-width:0;display:flex;justify-content:center;padding:0 6px">${batterStrip()}</div>` : `<div style="flex:1"></div>`;
   // Hide-video + Share slid to the LEFT next to the controls; only LIVE stays on the far right.
   tb.innerHTML=`<div style="display:flex;align-items:center;gap:8px;padding:4px 2px 2px;flex-wrap:nowrap">
@@ -3248,7 +3256,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v97";
+var APP_VERSION="v98";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
