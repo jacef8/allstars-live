@@ -1980,8 +1980,7 @@ function actionArea(){
       `<div style="display:flex;flex-direction:column;gap:8px">${recentBlock}${filterInput}${cards}
         <button data-act="newteampick" style="${ghost}">+ New team</button>
         ${pickFor==="opp"?`<button data-act="oppnoroster" style="${ghost}">Unnamed opponent (no roster)</button>`:""}
-        ${searchBlock}
-        <button data-act="ngback" style="${ghost}">&lsaquo; Back</button></div>`);
+        ${searchBlock}</div>`,"ngback");
   }
   if(mode==="directory"){
     const inpCss=`background:${T.surface2};border:1px solid ${T.line};color:${T.ink};border-radius:8px;padding:10px 12px;font-size:14px;outline:none`;
@@ -1995,12 +1994,11 @@ function actionArea(){
     return step("Find a team","Browse teams that have opted to be public.",
       `<div style="display:flex;flex-direction:column;gap:8px">
           <div style="display:flex;gap:8px"><input id="dirQ" placeholder="Search team name" value="${(window._dirQ||'').replace(/"/g,'&quot;')}" autocomplete="off" style="${inpCss};flex:1;min-width:0"><button data-act="dirsearch" style="background:${T.lime};color:${T.field};border:none;border-radius:8px;padding:9px 16px;font-weight:800;font-size:13px">Search</button></div>
-          ${results}
-          <button data-act="gohome" style="${ghost}">&lsaquo; Back</button></div>`);
+          ${results}</div>`,"gototeams");
   }
   if(mode==="teamstats"){
     const vt=viewTeam;
-    if(!vt) return step("Team stats","",`<div style="font-size:13px;color:${T.sage};padding:8px">Couldn't load that team — it may no longer be public.</div><button data-act="opendirectory" style="${ghost}">&lsaquo; Back to search</button>`);
+    if(!vt) return step("Team stats","",`<div style="font-size:13px;color:${T.sage};padding:8px">Couldn't load that team — it may no longer be public.</div>`,"opendirectory");
     const rec=vt.record||{w:0,l:0,t:0}, players=vt.players||[], season=vt.season||{}, sp=!!vt.statsPublic;
     const recLine=`${rec.w}-${rec.l}${rec.t?"-"+rec.t:""}`;
     const head=`<div class="frost-card" style="background:${T.surface};border:1px solid ${T.line};border-left:6px solid ${vt.color||T.lime};border-radius:14px;padding:14px 16px">
@@ -2024,7 +2022,7 @@ function actionArea(){
     const favBtn=alreadyFav
       ? `<button data-act="favpublicteam" style="${ghost};display:flex;align-items:center;justify-content:center;gap:9px;color:${T.amber}">★ Following — tap to remove from my home</button>`
       : `<button data-act="favpublicteam" style="${bigBtn(T.lime,'',T.field)};display:flex;align-items:center;justify-content:center;gap:9px">☆ Follow this team — add to my home</button>`;
-    return step("Team stats","",`<div style="display:flex;flex-direction:column;gap:12px">${head}${favBtn}<div style="font-size:11px;color:${T.sageDim};text-align:center;margin-top:-4px">Following just keeps this team on your home to watch — it does NOT make you a member.</div>${roster}${statBlock}<button data-act="opendirectory" style="${ghost}">&lsaquo; Back to search</button></div>`);
+    return step("Team stats","",`<div style="display:flex;flex-direction:column;gap:12px">${head}${favBtn}<div style="font-size:11px;color:${T.sageDim};text-align:center;margin-top:-4px">Following just keeps this team on your home to watch — it does NOT make you a member.</div>${roster}${statBlock}</div>`,"opendirectory");
   }
   if(mode==="settings"){
     const C=window.Cloud, signedIn=!!(C&&C.enabled&&C.user);
@@ -2178,21 +2176,21 @@ function actionArea(){
         <span style="font-family:${MONO};font-size:11px;color:${T.sage}">${tag}</span></button>`;}).join("");
     return step(pitcherPick?"Pitching change":`Batting ${editSlot+1} — choose player`,
       pitcherPick?"Pick the new pitcher — a bench arm subs in for the current one.":"A bench player subs in; a starter swaps spots.",
-      `<div style="display:flex;flex-direction:column;gap:6px">${list}<button data-act="backlineup" style="${ghost}">Back</button></div>`);
+      `<div style="display:flex;flex-direction:column;gap:6px">${list}</div>`,"backlineup");
   }
   if(mode==="pickpos"){
     const ri=G.lineup.order[editSlot],cur=posOfPlayer(ri);
     const cells=POSLIST.map(p=>{const who=playerAtPos(p),sel=p===cur;
       return `<button data-act="setpos" data-arg="${p}" style="display:flex;flex-direction:column;gap:4px;align-items:center;background:${sel?OUR.color:T.surface};border:1px solid ${sel?OUR.color:T.line};color:${sel?"#08111f":T.chalk};border-radius:9px;padding:16px 6px;font-family:${MONO};font-weight:800;font-size:23px">${p}<span style="font-size:13px;font-weight:600;color:${sel?"#08111f":T.sage};max-width:96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${who?who.name:"—"}</span></button>`;}).join("");
     return step(`${ROSTER[ri].name} — position`,"Tap a spot. It swaps with whoever's there now.",
-      `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">${cells}</div><button data-act="backlineup" style="${ghost};margin-top:8px;width:100%">Back</button>`);
+      `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">${cells}</div>`,"backlineup");
   }
   if(mode==="editplayer"){
     const ri=G.lineup.order[editSlot],p=ROSTER[ri]||{num:"",first:"",last:""};
     const fld=`background:${T.surface};border:1px solid ${T.line};color:${T.ink};border-radius:10px;padding:14px 16px;font-family:${SANS};font-size:16px;font-weight:700;outline:none;width:100%`;
     const lb=`font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin:0 2px 6px`;
     return step("Edit player",`Batting ${editSlot+1} &middot; set number, first &amp; last name.`,
-      `<div style="display:flex;flex-direction:column;gap:12px">
+      (`<div style="display:flex;flex-direction:column;gap:12px">
         <div style="display:flex;gap:10px">
           <div style="flex:none;width:92px"><div style="${lb}">Number</div>
             <input type="text" inputmode="numeric" maxlength="3" value="${(p.num||"").replace(/"/g,"&quot;")}" oninput="edNum(this.value)" style="${fld};text-align:center;font-family:${MONO};font-weight:800"></div>
@@ -2201,7 +2199,7 @@ function actionArea(){
         <div><div style="${lb}">Last name</div>
           <input type="text" value="${(p.last||"").replace(/"/g,"&quot;")}" placeholder="Last" oninput="edLast(this.value)" style="${fld}"></div>
         <button data-act="backlineup" style="${bigBtn(OUR.color)}">Done</button>
-      </div>`);
+      </div>`),"backlineup");
   }
   if(mode==="summary"){
     const box=buildBox(),o=ourRuns(),p=oppRuns();
@@ -2378,10 +2376,12 @@ function actionArea(){
   }
   return "";
 }
-function step(title,hint,inner){
+function step(title,hint,inner,backAct){
   return `<div style="display:flex;flex-direction:column;gap:8px">
-    <div class="frost-card" style="background:${T.surface};border:1px solid ${T.line};border-radius:14px;padding:12px 14px"><div style="font-family:${MONO};font-size:19px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;line-height:1.05">${title}</div>
-      <div style="font-size:11px;color:${T.sage};margin-top:3px">${hint}</div></div>${inner}</div>`;
+    <div class="frost-card" style="display:flex;align-items:center;gap:12px;background:${T.surface};border:1px solid ${T.line};border-radius:14px;padding:12px 14px">
+      ${backAct?`<button data-act="${backAct}" title="Back" style="${ghost};padding:9px 13px;flex:none;font-size:15px">&lsaquo; Back</button>`:""}
+      <div style="flex:1;min-width:0"><div style="font-family:${MONO};font-size:19px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;line-height:1.05">${title}</div>
+      ${hint?`<div style="font-size:11px;color:${T.sage};margin-top:3px">${hint}</div>`:""}</div></div>${inner}</div>`;
 }
 
 /* ---- confirmation modal (set confirmAct={title,msg,yes,danger,run}) ---- */
@@ -3191,7 +3191,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v91";
+var APP_VERSION="v92";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
