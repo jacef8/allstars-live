@@ -98,6 +98,13 @@ private const val WEB_CLIENT_ID = "55677156135-jj5069itokdpgnti217jq91mmqfpn2bo.
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Phones & small screens run PORTRAIT; tablets (>= 600dp wide) stay LANDSCAPE for the wide
+        // scorer/monitor layout. (Replaces the manifest's hard android:screenOrientation="landscape".)
+        requestedOrientation =
+            if (resources.configuration.smallestScreenWidthDp >= 600)
+                android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+            else
+                android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
         enableEdgeToEdge()
         // The scorer is handheld for a whole game on top of live video — keep the screen on.
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
