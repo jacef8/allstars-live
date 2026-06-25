@@ -1607,6 +1607,21 @@ window._oppFilter=function(v){ v=(v||"").trim().toLowerCase(); try{ document.que
 let calYM=null, calSelDay=null, scheduleView=(()=>{try{return localStorage.getItem("al-sched-view")||"list";}catch(e){return "list";}})();
 /* Public-team directory browser + read-only stats viewer (any team that opted public). */
 let dirResults=null, viewTeam=null;
+
+/* ---- Follow individual players. A followed player = "teamId:playerId"; their stats are
+   t.season[pid] and their schedule is their team's schedule. Stored locally. Drives the player
+   detail screen, the Home "Following" drawer, and the combined multi-player calendar. ---- */
+let openPlayer=null, openPlayerFrom="home", playerTab="stats";
+let teamsOpen=(()=>{try{return localStorage.getItem("al-teams-open")!=="0";}catch(e){return true;}})();
+let followOpen=(()=>{try{return localStorage.getItem("al-follow-open")!=="0";}catch(e){return true;}})();
+let followHidden=(()=>{try{return JSON.parse(localStorage.getItem("al-follow-hidden")||"{}");}catch(e){return {};}})();
+function followKeys(){try{return JSON.parse(localStorage.getItem("al-follow-players")||"[]");}catch(e){return [];}}
+function setFollowKeys(a){try{localStorage.setItem("al-follow-players",JSON.stringify(a));}catch(e){}}
+function isFollowingPlayer(tid,pid){return followKeys().indexOf(tid+":"+pid)>=0;}
+function toggleFollowPlayer(tid,pid){var k=tid+":"+pid,a=followKeys(),i=a.indexOf(k);if(i>=0)a.splice(i,1);else a.push(k);setFollowKeys(a);}
+function followedPlayers(){return followKeys().map(function(k){var i=k.indexOf(":"),t=teamById(k.slice(0,i));if(!t)return null;var p=(t.players||[]).find(function(x){return x.id===k.slice(i+1);});return p?{key:k,team:t,player:p}:null;}).filter(Boolean);}
+const FOLLOW_COLORS=["#E11D2E","#2E6BE6","#F0B43E","#19A0E0","#7C5CFF","#2EC98A","#E0974F","#EC4899"];
+function playerHue(key){var i=followKeys().indexOf(key);return FOLLOW_COLORS[(i<0?0:i)%FOLLOW_COLORS.length];}
 function calendarHtml(t){
   if(!calYM){ const d=new Date(); calYM={y:d.getFullYear(),m:d.getMonth()}; }
   const y=calYM.y, m=calYM.m, first=new Date(y,m,1), startDow=first.getDay(), daysIn=new Date(y,m+1,0).getDate();
@@ -1645,6 +1660,47 @@ function calendarHtml(t){
         <button data-act="calnext" style="${ghost};padding:9px 15px;font-size:18px">&rsaquo;</button></div>
       <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:5px">${dow}${cells}</div>${detail}</div>`;
 }
+
+/* Combined month calendar across all (visible) followed players. Each player's team games are
+   coloured by that player's hue; tap a day to see whose game it is. Shares calYM/calSelDay +
+   calprev/calnext/calday with the single-team calendar. */
+function multiCalendarHtml(fps){
+  if(!calYM){ const d=new Date(); calYM={y:d.getFullYear(),m:d.getMonth()}; }
+  const y=calYM.y,m=calYM.m,first=new Date(y,m,1),startDow=first.getDay(),daysIn=new Date(y,m+1,0).getDate();
+  const monthName=first.toLocaleDateString(undefined,{month:"long",year:"numeric"});
+  const pad=n=>String(n).padStart(2,"0"),byDate={};
+  fps.forEach(f=>{ if(followHidden[f.key])return; const col=playerHue(f.key);
+    (f.team.schedule||[]).forEach(s=>{ if(s.date){ (byDate[s.date]=byDate[s.date]||[]).push(Object.assign({},s,{__col:col,__who:"#"+(f.player.num||"–")+" "+(f.player.name||""),__tcolor:f.team.color})); } }); });
+  const todayStr=(()=>{const n=new Date();return `${n.getFullYear()}-${pad(n.getMonth()+1)}-${pad(n.getDate())}`;})();
+  const total=Math.ceil((startDow+daysIn)/7)*7; let cells="";
+  for(let i=0;i<total;i++){ const dn=i-startDow+1, inM=dn>=1&&dn<=daysIn, ds=inM?`${y}-${pad(m+1)}-${pad(dn)}`:""; const evs=ds?(byDate[ds]||[]):[];
+    const sel=inM&&calSelDay===ds, isToday=inM&&ds===todayStr;
+    const dots=evs.length?`<div style="display:flex;gap:3px;flex-wrap:wrap;justify-content:center;max-width:100%">${evs.slice(0,4).map(s=>`<span style="width:8px;height:8px;border-radius:50%;background:${s.__col}"></span>`).join("")}</div>`:`<div style="height:8px"></div>`;
+    cells+=inM
+      ? `<button data-act="calday" data-arg="${ds}" style="min-height:62px;border:1.5px solid ${sel?T.lime:(isToday?T.lime:T.line)};border-radius:9px;padding:5px 2px;background:${sel?T.surface:T.surface2};display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:5px;cursor:pointer">
+          <div style="font-family:${MONO};font-size:17px;font-weight:800;color:${sel||isToday?T.lime:T.ink}">${dn}</div>${dots}</button>`
+      : `<div style="min-height:62px;opacity:.18;border:1px solid ${T.line};border-radius:9px"></div>`; }
+  const dow=["Su","Mo","Tu","We","Th","Fr","Sa"].map(d=>`<div style="text-align:center;font-family:${MONO};font-size:12px;font-weight:800;color:${T.sageDim};padding:2px 0">${d}</div>`).join("");
+  let detail="";
+  if(calSelDay){
+    const selEvs=byDate[calSelDay]||[];
+    const dlabel=(()=>{try{return new Date(calSelDay+"T00:00").toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric"});}catch(e){return calSelDay;}})();
+    const evRows=selEvs.map(s=>{const isG=s.type!=="practice";const tm=s.time?(()=>{try{return new Date("2000-01-01T"+s.time).toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"});}catch(e){return s.time;}})():"";
+      return `<div style="display:flex;align-items:center;gap:8px;background:${T.surface2};border:1px solid ${T.line};border-left:5px solid ${s.__col};border-radius:9px;padding:9px 11px">
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:800;color:${T.ink};font-size:15px">${(s.__who||"").replace(/</g,"&lt;")}</div>
+            <div style="font-size:12px;color:${T.sage};margin-top:2px">${isG?(s.opp?("vs "+(s.opp||"").replace(/</g,"&lt;")):"Game"):"Practice"}${tm?(" · "+tm):""}${s.loc?(" · "+(s.loc||"").replace(/</g,"&lt;")):""}</div></div></div>`;}).join("");
+    detail=`<div style="margin-top:10px;border-top:1px solid ${T.line};padding-top:10px;display:flex;flex-direction:column;gap:7px">
+        <div style="font-size:12px;font-weight:800;letter-spacing:.4px;color:${T.lime}">${dlabel}</div>
+        ${selEvs.length?evRows:`<div style="font-size:12px;color:${T.sageDim}">Nothing scheduled for any followed player.</div>`}</div>`;
+  }
+  return `<div style="background:${T.surface};border:1px solid ${T.line};border-radius:10px;padding:10px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <button data-act="calprev" style="${ghost};padding:9px 15px;font-size:18px">&lsaquo;</button>
+        <div style="font-family:${MONO};font-size:17px;font-weight:800;color:${T.ink}">${monthName}</div>
+        <button data-act="calnext" style="${ghost};padding:9px 15px;font-size:18px">&rsaquo;</button></div>
+      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:5px">${dow}${cells}</div>${detail}</div>`;
+}
 function actionArea(){
   if(mode==="home"){
     const PLAY='<path d="M8 5l11 7-11 7z" fill="currentColor" stroke="none"/>';
@@ -1663,9 +1719,22 @@ function actionArea(){
           <div style="display:flex;align-items:center;gap:10px;margin-top:7px;font-family:${MONO};font-size:18px;color:${T.sage}">
             <span style="font-weight:800;color:${t.color}">${rec}</span><span style="opacity:.45">·</span><span>${t.players.length} players</span></div>
           <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:14px;background:${t.color};color:#fff;border-radius:9px;padding:13px;font-family:${MONO};font-weight:800;font-size:16px;letter-spacing:.8px;pointer-events:none">${IC(GEAR)} ${t.external?"VIEW TEAM":"MANAGE TEAM"}</div></div>`;};
+    // Collapsible section headers (drawers) for Home — tap to open/close the list beneath.
+    const drawerHdr=(act,label,open)=>`<button data-act="${act}" style="display:flex;align-items:center;justify-content:space-between;width:100%;background:rgba(13,19,32,.55);border:1px solid ${T.line};border-radius:11px;padding:11px 14px;cursor:pointer;margin-top:2px">
+        <span style="font-size:13px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:${T.lime}">${label}</span>
+        <span style="color:${T.lime};font-size:17px;display:inline-block;transition:transform .2s;transform:rotate(${open?90:0}deg)">&rsaquo;</span></button>`;
     const teamsBlock = DB.teams.length
-      ? `<div style="font-size:13px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:${T.lime};margin:2px 2px 0">My teams</div>
-         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;align-content:start">${list.map(card).join("")}</div>`
+      ? `${drawerHdr("toggleteams","My teams ("+DB.teams.length+")",teamsOpen)}${teamsOpen?`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;align-content:start">${list.map(card).join("")}</div>`:""}`
+      : "";
+    // Followed-players drawer (only shows once you follow someone) + the combined calendar.
+    const _fps=followedPlayers();
+    const followCard=f=>`<button data-act="openplayer" data-arg="${f.key}" style="display:flex;align-items:center;gap:11px;width:100%;text-align:left;background:${T.surface};border:1px solid ${T.line};border-left:5px solid ${playerHue(f.key)};border-radius:11px;padding:11px 13px;cursor:pointer">
+        <span style="width:34px;height:34px;flex:none;border-radius:8px;background:${f.team.color};color:#fff;display:flex;align-items:center;justify-content:center;font-family:${MONO};font-weight:800;font-size:15px">${(f.player.num||"–")}</span>
+        <div style="flex:1;min-width:0"><div style="font-weight:800;color:${T.ink};font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${(f.player.name||"Player").replace(/</g,"&lt;")}</div>
+          <div style="font-size:12px;color:${T.sage}">${(f.team.name||"").replace(/</g,"&lt;")}</div></div>
+        <span style="color:${T.lime};font-weight:800;font-size:16px">&rsaquo;</span></button>`;
+    const followingBlock = _fps.length
+      ? `${drawerHdr("togglefollow","Following ("+_fps.length+")",followOpen)}${followOpen?`<div style="display:flex;flex-direction:column;gap:8px">${_fps.map(followCard).join("")}<button data-act="openfollowcal" style="${ghost};display:flex;align-items:center;justify-content:center;gap:9px;margin-top:2px">${IC('calendar',18)} Players calendar</button></div>`:""}`
       : "";
 
     // Home header = the transparent "A" logo floating over the turf (no banner box).
@@ -1747,7 +1816,7 @@ function actionArea(){
           </div>
         </div>`;
     }
-    return `<div style="position:relative;min-height:100%;display:flex;flex-direction:column;justify-content:safe center;gap:14px;padding:6px 0">${settingsGear}${hero}${resumeBtn}${newGameBtn}${showTeams?teamsBlock:""}${showTeams?manageBtn:""}${shareBtnHome}${authBar}</div>`;
+    return `<div style="position:relative;min-height:100%;display:flex;flex-direction:column;justify-content:safe center;gap:14px;padding:6px 0">${settingsGear}${hero}${resumeBtn}${newGameBtn}${showTeams?teamsBlock:""}${showTeams?manageBtn:""}${followingBlock}${shareBtnHome}${authBar}</div>`;
   }
   if(mode==="teams"){
     const sorted=DB.teams.slice().sort((a,b)=>(b.fav?1:0)-(a.fav?1:0));
@@ -1778,6 +1847,7 @@ function actionArea(){
         <input value="${(p.num||"").replace(/"/g,"&quot;")}" oninput="teamPNum('${p.id}',this.value)" inputmode="numeric" maxlength="3" style="${cell};width:46px;text-align:center;font-family:${MONO};font-weight:800">
         <input value="${(p.first||"").replace(/"/g,"&quot;")}" oninput="teamPFirst('${p.id}',this.value)" placeholder="First" style="${cell};flex:1;min-width:0">
         <input value="${(p.last||"").replace(/"/g,"&quot;")}" oninput="teamPLast('${p.id}',this.value)" placeholder="Last" style="${cell};flex:1;min-width:0">
+        <button data-act="openplayer" data-arg="${t.id}:${p.id}" title="View / follow player" style="background:${T.surface2};border:1px solid ${T.line};color:${isFollowingPlayer(t.id,p.id)?T.amber:T.lime};border-radius:7px;padding:8px 10px;font-weight:800;flex:none;line-height:1">${isFollowingPlayer(t.id,p.id)?IC('starFill',16):"&rsaquo;"}</button>
         <button data-act="rmteamp" data-arg="${p.id}" style="background:none;border:1px solid ${T.line};color:${T.out};border-radius:7px;padding:8px 10px;font-weight:800"${t.players.length<=9?" disabled":""}>&times;</button></div>`).join("");
     const sRows=t.players.map(p=>{const s=(t.season[p.id]||{}).bat||{};const ab=s.ab||0,h=s.h||0;const avg=ab?(h/ab).toFixed(3).replace(/^0/,""):"—";
       return `<tr style="border-top:1px solid ${T.line}"><td style="text-align:left;padding:10px 8px;font-weight:700;white-space:nowrap">#${p.num} ${p.name}</td><td style="padding:10px 6px">${ab}</td><td style="padding:10px 6px">${s.r||0}</td><td style="padding:10px 6px">${h}</td><td style="padding:10px 6px">${s.rbi||0}</td><td style="padding:10px 6px">${s.bb||0}</td><td style="padding:10px 6px">${s.k||0}</td><td style="padding:10px 6px;font-weight:800">${avg}</td></tr>`;}).join("");
@@ -2158,6 +2228,48 @@ function actionArea(){
           <button data-act="opendebug" style="${ghost};flex:1;display:flex;align-items:center;justify-content:center;gap:8px">${ICN.refresh} Refresh</button>
           <button data-act="copydiag" style="${ghost};flex:1;display:flex;align-items:center;justify-content:center;gap:8px">${ICN.doc} Copy</button></div>
       </div>`;
+  }
+  if(mode==="player"){
+    const t=openPlayer&&teamById(openPlayer.teamId);
+    const p=t&&(t.players||[]).find(x=>x.id===openPlayer.pid);
+    if(!t||!p){ mode="home"; return actionArea(); }
+    const following=isFollowingPlayer(t.id,p.id);
+    const s=((t.season&&t.season[p.id])||{}).bat||{}; const ab=s.ab||0,h=s.h||0,avg=ab?(h/ab).toFixed(3).replace(/^0/,""):"—";
+    const ps=((t.season&&t.season[p.id])||{}).pitch||{};
+    const head=`<div class="frost-card" style="display:flex;align-items:center;gap:10px;background:${T.surface};border:1px solid ${T.line};border-radius:14px;padding:12px 14px">
+        <button data-act="playerback" style="${ghost};padding:9px 13px;flex:none">&lsaquo; Back</button>
+        <div style="flex:1;min-width:0;border-left:5px solid ${t.color};padding-left:10px">
+          <div style="font-family:${MONO};font-size:20px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">#${p.num||"–"} ${(p.name||"").replace(/</g,"&lt;")}</div>
+          <div style="font-size:12px;color:${T.sage}">${(t.name||"").replace(/</g,"&lt;")}</div></div>
+        <button data-act="followplayer" data-arg="${t.id}:${p.id}" title="${following?"Following":"Follow this player"}" style="background:none;border:none;color:${following?T.amber:T.sageDim};line-height:1;padding:4px;cursor:pointer">${following?IC('starFill',26):IC('star',26)}</button></div>`;
+    const tab=(id,lbl)=>`<button data-act="playertab" data-arg="${id}" style="flex:1;background:${playerTab===id?T.lime:T.surface2};color:${playerTab===id?"#fff":T.sage};border:1px solid ${playerTab===id?T.lime:T.line};border-radius:9px;padding:10px;font-family:${MONO};font-weight:800;font-size:14px;letter-spacing:.4px;text-transform:uppercase">${lbl}</button>`;
+    const tabs=`<div style="display:flex;gap:8px">${tab("stats","Stats")}${tab("schedule","Schedule")}</div>`;
+    let body;
+    if(playerTab==="schedule"){
+      body=calendarHtml(t);
+    } else {
+      const stat=(l,v)=>`<div style="flex:1;min-width:64px;background:${T.surface2};border:1px solid ${T.line};border-radius:10px;padding:10px 6px;text-align:center"><div style="font-family:${MONO};font-size:23px;font-weight:800;color:${T.ink}">${v}</div><div style="font-size:11px;font-weight:800;letter-spacing:.5px;color:${T.sageDim};margin-top:2px">${l}</div></div>`;
+      const pitchBlk=(ps.ip||ps.k||ps.bb||ps.h||ps.r)?`<div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin:14px 0 10px">Season &middot; Pitching</div><div style="display:flex;flex-wrap:wrap;gap:8px">${stat("IP",ps.ip||0)}${stat("K",ps.k||0)}${stat("BB",ps.bb||0)}${stat("H",ps.h||0)}${stat("R",ps.r||0)}</div>`:"";
+      body=`<div class="frost-card" style="background:${T.surface};border:1px solid ${T.line};border-radius:14px;padding:14px">
+          <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin-bottom:10px">Season &middot; Batting</div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px">${stat("AVG",avg)}${stat("AB",ab)}${stat("H",h)}${stat("R",s.r||0)}${stat("RBI",s.rbi||0)}${stat("BB",s.bb||0)}${stat("K",s.k||0)}</div>
+          ${pitchBlk}
+          <div style="font-size:12px;color:${T.sageDim};margin-top:12px">Season totals across ${(t.name||"the team").replace(/</g,"&lt;")}&#39;s scored games.</div></div>`;
+    }
+    return `<div style="display:flex;flex-direction:column;gap:12px">${head}${tabs}${body}</div>`;
+  }
+  if(mode==="followcal"){
+    const fps=followedPlayers();
+    const head=`<div class="frost-card" style="display:flex;align-items:center;gap:10px;background:${T.surface};border:1px solid ${T.line};border-radius:14px;padding:12px 14px">
+        <button data-act="gohome" style="${ghost};padding:9px 13px;flex:none">&lsaquo; Home</button>
+        <div style="font-family:${MONO};font-size:20px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:${T.lime}">Players calendar</div></div>`;
+    if(!fps.length) return `<div style="display:flex;flex-direction:column;gap:12px">${head}<div style="font-size:13px;color:${T.sage};text-align:center;padding:24px;border:1px dashed ${T.line};border-radius:12px">Follow a player first — open a team roster, tap a player (&rsaquo;), then the &#9733; star. Their games show up here on one calendar.</div></div>`;
+    const chips=fps.map(f=>{const hid=followHidden[f.key],col=playerHue(f.key);
+      return `<button data-act="calfollowtog" data-arg="${f.key}" style="display:flex;align-items:center;gap:7px;background:${hid?T.surface2:col};border:1px solid ${hid?T.line:col};color:${hid?T.sage:"#fff"};border-radius:999px;padding:7px 12px;font-weight:800;font-size:12px"><span style="width:9px;height:9px;border-radius:50%;background:${hid?T.sageDim:"#fff"}"></span>#${f.player.num||"–"} ${(f.player.name||"").replace(/</g,"&lt;")}</button>`;}).join("");
+    return `<div style="display:flex;flex-direction:column;gap:12px">${head}
+        <div style="font-size:12px;color:${T.sage};margin:0 2px">Tap a name to show/hide that player&#39;s games.</div>
+        <div style="display:flex;flex-wrap:wrap;gap:7px">${chips}</div>
+        ${multiCalendarHtml(fps)}</div>`;
   }
   if(mode==="newgame"){
     const setMode=settingsMode;   // mid-game Game Setup (Done returns to play, no reset)
@@ -2563,7 +2675,7 @@ function render(){
   // canScoreNow() is permissive during sync, so this never strands a real scorer in Viewer.
   if(viewMode==="scorer" && !canScoreNow()) viewMode="viewer";
   renderToolbar();
-  const menu=(mode==="home"||mode==="teams"||mode==="team"||mode==="pickteam"||mode==="newgame"||mode==="lineup"||mode==="pickplayer"||mode==="pickpos"||mode==="editplayer"||mode==="summary"||mode==="settings"||mode==="directory"||mode==="teamstats"||mode==="debug");
+  const menu=(mode==="home"||mode==="teams"||mode==="team"||mode==="pickteam"||mode==="newgame"||mode==="lineup"||mode==="pickplayer"||mode==="pickpos"||mode==="editplayer"||mode==="summary"||mode==="settings"||mode==="directory"||mode==="teamstats"||mode==="debug"||mode==="player"||mode==="followcal");
   if(IS_APP&&window.AllStars.setInGame){ try{ AllStars.setInGame(!menu); }catch(e){} }   // hide native tabs during a game
   // Push the live score to the native compositor so it's burned into the broadcast.
   if(IS_APP&&!menu&&window.AllStars.setScore){ try{
@@ -2924,6 +3036,14 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="opendebug"){mode="debug";render();}
   else if(act==="opensettings"){mode="settings";render();}
   else if(act==="copydiag"){ const u=window.__diagText||""; const done=()=>flash("Diagnostics copied"); if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(u).then(done).catch(done);}else{done();} }
+  else if(act==="toggleteams"){teamsOpen=!teamsOpen;try{localStorage.setItem("al-teams-open",teamsOpen?"1":"0");}catch(e){}render();}
+  else if(act==="togglefollow"){followOpen=!followOpen;try{localStorage.setItem("al-follow-open",followOpen?"1":"0");}catch(e){}render();}
+  else if(act==="openplayer"){const i=arg.indexOf(":");openPlayer={teamId:arg.slice(0,i),pid:arg.slice(i+1)};openPlayerFrom=(mode==="team"?"team":"home");playerTab="stats";mode="player";render();}
+  else if(act==="playerback"){mode=(openPlayerFrom==="team"?"team":"home");if(mode==="team")teamTab="roster";render();}
+  else if(act==="playertab"){playerTab=(arg==="schedule"?"schedule":"stats");render();}
+  else if(act==="followplayer"){const i=arg.indexOf(":");toggleFollowPlayer(arg.slice(0,i),arg.slice(i+1));render();}
+  else if(act==="openfollowcal"){calYM=null;calSelDay=null;mode="followcal";render();}
+  else if(act==="calfollowtog"){followHidden[arg]=!followHidden[arg];try{localStorage.setItem("al-follow-hidden",JSON.stringify(followHidden));}catch(e){}render();}
   else if(act==="refresh"){ try{ if(window.cloudSyncTeams)cloudSyncTeams(); }catch(e){} flash("Refreshed"); render(); }
   else if(act==="apprefresh"){ flash("Refreshing…"); try{ if(navigator.serviceWorker&&navigator.serviceWorker.getRegistrations) navigator.serviceWorker.getRegistrations().then(function(rs){rs.forEach(function(r){try{r.update();}catch(e){}});}); }catch(e){} try{ if(window.cloudSyncTeams)cloudSyncTeams(); }catch(e){} setTimeout(function(){ try{ location.reload(); }catch(e){} }, 500); }
   else if(act==="settings"){mode="settings";render();}
@@ -2979,7 +3099,7 @@ function renderToolbar(){
   // Menu / non-game screens that must NOT show the in-game top bar (Scorer/Viewer toggle, Share,
   // LIVE dot). "directory" (Find a team) and "teamstats" (public team stats) were missing, so the
   // toolbar wrongly appeared on those browse pages.
-  const menuModes=["home","teams","team","pickteam","newgame","lineup","pickplayer","pickpos","editplayer","summary","settings","directory","teamstats","debug"];
+  const menuModes=["home","teams","team","pickteam","newgame","lineup","pickplayer","pickpos","editplayer","summary","settings","directory","teamstats","debug","player","followcal"];
   const playMode2=!menuModes.includes(mode);
   // No top bar on menu screens (home/teams/etc.) — it duplicated the page title and
   // showed a misleading "LIVE" relay dot before any game. Reclaims that space.
@@ -3134,6 +3254,8 @@ window.appBack=function(){
     if(mode==="teamstats"){ mode="directory"; render(); return true; }   // public team view → back to search
     if(mode==="directory"){ mode="teams"; render(); return true; }       // browse teams → back to Teams
     if(mode==="debug"){ mode="settings"; render(); return true; }
+    if(mode==="player"){ mode=(openPlayerFrom==="team"?"team":"home"); if(mode==="team")teamTab="roster"; render(); return true; }
+    if(mode==="followcal"){ mode="home"; render(); return true; }
     if(mode==="settings"){ mode="home"; render(); return true; }
     if(mode==="teams"){ mode="home"; render(); return true; }
     if(mode==="summary"){ mode="idle"; render(); return true; }
@@ -3324,7 +3446,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v101";
+var APP_VERSION="v102";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
