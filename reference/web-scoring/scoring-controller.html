@@ -1114,6 +1114,32 @@ function planPaths(movers){
     return {out:false,scored:m.dest===4,color:m.color,pts};
   });
 }
+/* ---- minimal sound FX, synthesized with Web Audio (no files/licensing/hosting; works offline).
+   crack() = bat hit, cheer() = soft crowd swell on a run. Audio unlocks on the first user gesture
+   (mobile policy); a toggle mutes it. ---- */
+const Snd=(function(){
+  let ctx=null, on=(()=>{try{return localStorage.getItem("al-sound")!=="0";}catch(e){return true;}})();
+  function ac(){ try{ if(!ctx)ctx=new (window.AudioContext||window.webkitAudioContext)(); if(ctx&&ctx.state==="suspended")ctx.resume(); }catch(e){ctx=null;} return ctx; }
+  function unlock(){ ac(); }
+  function isOn(){ return on; }
+  function setOn(v){ on=!!v; try{localStorage.setItem("al-sound",on?"1":"0");}catch(e){} if(on)unlock(); }
+  function env(g,t,peak,dur,atk){ g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(peak,t+(atk||0.002)); g.gain.exponentialRampToValueAtTime(0.0006,t+dur); }
+  function noise(c,dur,shape){ const b=c.createBuffer(1,Math.max(1,Math.floor(c.sampleRate*dur)),c.sampleRate),d=b.getChannelData(0); for(let i=0;i<d.length;i++){d[i]=(Math.random()*2-1)*(shape?Math.pow(1-i/d.length,shape):1);} const s=c.createBufferSource(); s.buffer=b; return s; }
+  function crack(){ if(!on)return; const c=ac(); if(!c)return; const t=c.currentTime;
+    const s=noise(c,0.12,2.4), bp=c.createBiquadFilter(); bp.type="bandpass"; bp.frequency.value=2300; bp.Q.value=0.8;
+    const g=c.createGain(); env(g,t,0.55,0.12); s.connect(bp); bp.connect(g); g.connect(c.destination); s.start(t); s.stop(t+0.13);
+    const o=c.createOscillator(); o.type="triangle"; o.frequency.setValueAtTime(440,t); o.frequency.exponentialRampToValueAtTime(150,t+0.07);
+    const og=c.createGain(); env(og,t,0.4,0.1); o.connect(og); og.connect(c.destination); o.start(t); o.stop(t+0.11);
+  }
+  function cheer(){ if(!on)return; const c=ac(); if(!c)return; const t=c.currentTime;
+    const s=noise(c,0.95), bp=c.createBiquadFilter(); bp.type="bandpass"; bp.frequency.value=850; bp.Q.value=0.5;
+    const g=c.createGain(); g.gain.setValueAtTime(0.0001,t); g.gain.linearRampToValueAtTime(0.16,t+0.4); g.gain.exponentialRampToValueAtTime(0.0008,t+0.95);
+    s.connect(bp); bp.connect(g); g.connect(c.destination); s.start(t); s.stop(t+0.95);
+  }
+  return {unlock:unlock,isOn:isOn,setOn:setOn,crack:crack,cheer:cheer};
+})();
+try{ document.addEventListener("pointerdown",function(){Snd.unlock();},{once:true,passive:true}); }catch(e){}
+
 /* ---- one-shot play animation for the diamond: the ball flies to where it was hit and the
    runners travel the bases. Built from tap (hit location) + planPaths (runner paths) at commit,
    ridden to viewers on the full-G broadcast, played once (deduped by id, skipped if stale). ---- */
@@ -1122,6 +1148,7 @@ function triggerAnim(a){
   if(!a||!a.id||a.id===_lastAnimId) return;
   if(a.ts&&(Date.now()-a.ts)>6000){ _lastAnimId=a.id; return; }   // reload / late join — don't replay an old play
   _lastAnimId=a.id; playAnim=a;
+  try{ if(a.hit)Snd.crack(); if((a.paths||[]).some(p=>p.scored))setTimeout(function(){Snd.cheer();},650); }catch(e){}
   if(_animTimer)clearTimeout(_animTimer);
   try{render();}catch(e){}
   _animTimer=setTimeout(function(){ playAnim=null; try{render();}catch(e){} },1800);
@@ -2991,6 +3018,7 @@ document.getElementById("app").addEventListener("click",e=>{
   if(act==="delgame"){ const t=teamById(openTeamId); if(!t)return; if(window.Cloud&&window.Cloud.enabled&&window.Cloud.user&&window.cloudCanManage&&!window.cloudCanManage(t)){flash("Only the owner can delete a game");return;} confirmAct={title:"Delete this game?",msg:"This permanently removes the game and its stats from the team's record.",yes:"Delete game",danger:true,run:function(){ t.games=(t.games||[]).filter(x=>x.id!==arg); t.record=teamRec(t); saveDB(); teamTab="schedule"; viewGameId=null; render(); }}; render(); return; }
   if(act==="swapviewer"){ viewerRight=viewerRight==="field"?"feed":"field"; try{localStorage.setItem("al-viewer-right",viewerRight);}catch(e){} render(); return; }
   if(act==="viewerphone"){ viewerPhone=(arg==="field"||arg==="feed")?arg:"both"; try{localStorage.setItem("al-viewer-phone",viewerPhone);}catch(e){} render(); return; }
+  if(act==="soundtoggle"){ Snd.setOn(!Snd.isOn()); if(Snd.isOn())Snd.crack(); renderToolbar(); return; }
   if(act==="inviteadd"){ const e=document.getElementById("inviteWho"); if(!e)return; const v=(e.value||"").trim(); if(!v){flash("Enter an email or phone number");return;}
     const url=appBaseUrl()+"?invite="+encodeURIComponent(openTeamId); const t=teamById(openTeamId);
     const team=(t&&t.name)?t.name:"our team"; const isEmail=v.indexOf("@")>=0;
@@ -3191,6 +3219,9 @@ function renderToolbar(){
   const liveDot=`<div title="${dot.l}" style="flex:none;display:flex;align-items:center;gap:5px;background:${T.surface};border:1px solid ${T.line};border-radius:999px;padding:5px 9px">
       <span class="${conn?'livedot':''}" style="width:8px;height:8px;border-radius:50%;background:${dot.c};${conn?`box-shadow:0 0 7px ${dot.c}`:""}"></span>
       <span style="font-family:${MONO};font-size:10px;font-weight:700;letter-spacing:1px;color:${dot.c}">${dot.l}</span></div>`;
+  const sOn=Snd.isOn();
+  const soundBtn=`<button data-act="soundtoggle" title="${sOn?"Mute sounds":"Unmute sounds"}" style="flex:none;display:flex;align-items:center;justify-content:center;background:${T.surface2};border:1px solid ${T.line};color:${sOn?T.lime:T.sageDim};border-radius:10px;width:42px;height:38px">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4z"/>${sOn?'<path d="M15.5 8.5a5 5 0 0 1 0 7M18.8 6a9 9 0 0 1 0 12"/>':'<path d="M22 9l-6 6M16 9l6 6"/>'}</svg></button>`;
   // Batter readout fills the empty middle of the top row (wide scorer in a live game).
   const bstrip=(isWide()&&viewMode==="scorer"&&!menuModes.includes(mode))
     ? `<div style="flex:1;min-width:0;display:flex;justify-content:center;padding:0 6px">${batterStrip()}</div>` : `<div style="flex:1"></div>`;
@@ -3201,6 +3232,7 @@ function renderToolbar(){
     ${vidToggle}
     ${shareBtnTop}
     ${bstrip}
+    ${soundBtn}
     ${liveDot}
   </div>`;
 }
@@ -3498,7 +3530,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v105";
+var APP_VERSION="v106";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
