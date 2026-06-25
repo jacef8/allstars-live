@@ -2496,9 +2496,12 @@ function actionArea(){
         <span style="width:26px;height:26px;border-radius:7px;background:${OPP.color};box-shadow:0 0 0 1px ${T.line}"></span>
         <span style="font-weight:800;color:${T.ink};font-size:14px">Opponent color</span>${ICN.palette}
         <input type="color" value="${OPP.color||"#E11D2E"}" onchange="window.setOppColor(this.value)" style="position:absolute;left:0;top:0;width:100%;height:100%;opacity:0;cursor:pointer"></label>`;
+    // Actual new-game setup gets the Start button right in the header bar. Mid-game Game Settings
+    // (setMode) does NOT — starting there would reset the live game; it keeps its Done button.
+    const startTop=setMode?"":`<button data-act="ng-start" style="flex:none;background:${T.lime};border:none;color:#fff;border-radius:11px;padding:12px 20px;font-family:${MONO};font-weight:800;font-size:16px;letter-spacing:.5px;display:inline-flex;align-items:center;gap:7px;box-shadow:0 4px 14px rgba(225,29,46,.28)">Start game &rarr;</button>`;
     const header=`<div class="frost-card" style="display:flex;align-items:center;gap:10px;flex:none;background:${T.surface};border:1px solid ${T.line};border-radius:14px;padding:12px 14px">
-          <button data-act="${setMode?"settingsdone":"gohome"}" style="${ghost};padding:9px 11px">&lsaquo; ${setMode?"Done":"Home"}</button>
-          <div style="font-family:${MONO};font-size:23px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:${T.lime}">${setMode?"Game Settings":"New Game"}</div></div>`;
+          <button data-act="${setMode?"settingsdone":"gohome"}" style="${ghost};padding:9px 11px;flex:none">&lsaquo; ${setMode?"Done":"Home"}</button>
+          <div style="flex:1;min-width:0;font-family:${MONO};font-size:23px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:${T.lime};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${setMode?"Game Settings":"New Game"}</div>${startTop}</div>`;
     const sideSel=`<div><div style="${lbl}">Is ${OUR.name} home or away?</div>
           <div style="display:flex;gap:8px">${sideBtn("home","Home")}${sideBtn("away","Away")}</div></div>`;
     const selStyle=`background:${T.surface2};border:1px solid ${T.line};color:${T.ink};border-radius:10px;padding:13px 12px;font-family:${MONO};font-size:16px;font-weight:800;outline:none;max-width:190px`;
@@ -2538,7 +2541,6 @@ function actionArea(){
           <div><div style="font-weight:800;color:${T.ink};font-size:19px">Track pitch types</div>
             <div style="color:${T.sage};font-size:14px;margin-top:3px">Adds FB/CB/CH/SL/OTH per pitch while scoring</div></div>
           <button data-act="advtoggle" style="background:${advPitch?T.lime:T.surface2};border:1px solid ${advPitch?T.lime:T.line};color:${advPitch?"#fff":T.sage};border-radius:999px;padding:10px 20px;font-family:${MONO};font-weight:800;font-size:15px;min-width:66px">${advPitch?"ON":"OFF"}</button></div>`;
-    const startBtn=`<button data-act="ng-start" style="${bigBtn(T.lime,"width:100%;font-size:25px;padding:24px;box-shadow:0 8px 22px rgba(225,29,46,.22)",T.field)};flex:none;margin-top:2px">Start game &rarr;</button>`;
     // Print a lineup card pre-filled with the opponent + date/time from this game setup.
     const lineupCardBtn=`<button data-act="nglineupcard" style="${ghost};display:flex;align-items:center;justify-content:center;gap:9px;width:100%;flex:none">${ICN.doc} Print lineup card</button>`;
     // In settings mode (mid-game) we show ONLY the rule cards + Done — no team/side pickers,
@@ -2558,7 +2560,7 @@ function actionArea(){
             <div style="display:flex;flex-direction:column;gap:14px">${teamRow("Your team",OUR.name,OUR.short,OUR.color,"pickour")}${teamRow("Opponent",OPP.name,OPP.short,OPP.color,"pickopp")}${oppColorRow}${sideSel}${runCapCard}${hittersCard}</div>
             <div style="display:flex;flex-direction:column;gap:14px">${leagueCard}${alertsCard}${pitchTypeCard}${startCard}</div>
           </div>
-          <div style="width:100%;max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:10px">${startBtn}${lineupCardBtn}</div>
+          <div style="width:100%;max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:10px">${lineupCardBtn}</div>
         </div>`;
     }
     if(setMode) return `<div style="display:flex;flex-direction:column;gap:14px">${header}${ruleCards}${lineupCardBtn}${doneBtn}</div>`;
@@ -2567,7 +2569,7 @@ function actionArea(){
         ${teamRow("Your team",OUR.name,OUR.short,OUR.color,"pickour")}
         ${teamRow("Opponent",OPP.name,OPP.short,OPP.color,"pickopp")}
         ${oppColorRow}
-        ${sideSel}${ruleCards}${startBtn}${lineupCardBtn}
+        ${sideSel}${ruleCards}${lineupCardBtn}
       </div>`;
   }
   if(mode==="lineup"){
@@ -3725,7 +3727,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v118";
+var APP_VERSION="v119";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
