@@ -941,6 +941,20 @@ let viewerRight=(()=>{try{return localStorage.getItem("al-viewer-right")||"field
 // Opened via a watch/share link → this person is ONLY a viewer (no scoring). Lock them to viewer
 // mode and hide the Scorer/Viewer toggle (and reuse that space for the matchup they're watching).
 let viewerLocked=(()=>{try{ const p=new URLSearchParams(location.search); return p.get("view")==="viewer"||p.get("feed")==="1"||!!p.get("watch"); }catch(e){return false;}})();
+// May the current user actually SCORE right now? Used to grey the Scorer toggle + hide scoring
+// for followers/viewers. Intentionally permissive so it NEVER bumps a legit scorer out:
+//  • watch-link viewer → no
+//  • no cloud / signed out → yes (local play; the relay gates remote sync anyway)
+//  • game not tied to a loaded cloud team (incl. while teams are still syncing) → yes
+//  • otherwise only yes if owner / co-owner / listed scorer of this game's team
+function canScoreNow(){
+  if(viewerLocked) return false;
+  var C=window.Cloud;
+  if(!(C&&C.enabled&&C.user)) return true;
+  var t=curTeamId&&teamById(curTeamId);
+  if(!t) return true;
+  return !!(window.cloudIsScorer&&window.cloudIsScorer(t));
+}
 let watchTeamName=(()=>{try{ return new URLSearchParams(location.search).get("tn")||""; }catch(e){return "";}})();  // team name carried on a watch link (for the "no game yet" lobby)
 // Track recent user interaction so BACKGROUND re-renders (cloud snapshots) never rebuild the DOM
 // while the user is mid-tap — on phones that race closed native <select>/date dropdowns instantly.
@@ -2084,11 +2098,65 @@ function actionArea(){
           <div style="font-family:${MONO};font-size:23px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:${T.lime}">Settings</div></div>
         ${IS_APP?item("opencamera",IC('video',24),"Camera &amp; stream setup","Connect your camera and go live"):`<div style="font-size:13px;color:${T.sageDim};background:${T.surface};border:1px dashed ${T.line};border-radius:12px;padding:16px 18px;line-height:1.5">${IC('video',15)} Camera &amp; streaming is available in the All-Stars Live app (Android/iOS). This web view is for watching shared games.</div>`}
         ${item("apprefresh",IC('refresh',24),"Refresh app","Reload &amp; check for the latest version + sync teams")}
+        ${item("opendebug",IC('alert',24),"Diagnostics","Camera, stream, network &amp; sync status — for field troubleshooting")}
         ${signedIn?`<div style="background:${T.surface};border:1px solid ${T.line};border-radius:12px;padding:16px 18px">
             <div style="font-size:12px;color:${T.sage}">Signed in as</div>
             <div style="font-weight:800;color:${T.chalk};word-break:break-all;margin:2px 0 10px">${(C.user.email||"account").replace(/</g,"")}</div>
             <button data-act="signout" style="${ghost}">Sign out</button></div>`:""}
         <div style="font-size:12px;color:${T.sageDim};text-align:center;margin-top:6px">All-Stars Live &middot; ${(window.APP_VERSION||"")}</div>
+      </div>`;
+  }
+  if(mode==="debug"){
+    // Field-troubleshooting page: live status of the things that go wrong at the field —
+    // camera link, stream, relay, network, cloud sign-in. Read-only; a Refresh re-samples and
+    // Copy puts a plain-text summary on the clipboard for support.
+    const C=window.Cloud, signedIn=!!(C&&C.enabled&&C.user);
+    const online=navigator.onLine;
+    const camLive=!!window.__camLive;
+    const phase=window.__bcastPhase||"OFFLINE";
+    const yt=streamYt();
+    const hasRelay=!!(window.LINK&&LINK.hasRelay&&LINK.hasRelay());
+    const relayConn=!!(window.LINK&&LINK.connected&&LINK.connected());
+    const dotC=(s)=>s===true?T.safe:s===false?T.out:s==="warn"?T.amber:T.sageDim;
+    const drow=(label,value,st,sub)=>`<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;background:${T.surface};border:1px solid ${T.line};border-radius:11px;padding:13px 15px">
+        <div style="min-width:0"><div style="display:flex;align-items:center;gap:9px"><span style="width:10px;height:10px;border-radius:50%;flex:none;background:${dotC(st)};box-shadow:0 0 6px ${dotC(st)}"></span><span style="font-weight:800;color:${T.ink};font-size:14px">${label}</span></div>${sub?`<div style="font-size:11px;color:${T.sageDim};margin:2px 0 0 19px">${sub}</div>`:""}</div>
+        <span style="font-family:${MONO};font-size:13px;font-weight:700;color:${T.sage};text-align:right;word-break:break-word;max-width:54%">${value}</span></div>`;
+    const rows=[
+      drow("App version",(window.APP_VERSION||"—"),null),
+      drow("Platform",IS_APP?"Native app":"Web browser",null),
+      drow("Internet",online?"Online":"Offline",online),
+      drow("Camera",IS_APP?(camLive?"Connected":"Not connected"):"App only",IS_APP?camLive:null,IS_APP?"":"Camera &amp; stream run in the Android app"),
+      drow("Stream",phase==="LIVE"?("LIVE"+(yt?" · "+yt:"")):(phase==="STARTING"?"Going live…":"Offline"),phase==="LIVE"?true:(phase==="STARTING"?"warn":null)),
+      drow("Live relay",hasRelay?(relayConn?"Connected":"Disconnected"):"Local only",hasRelay?relayConn:null,"Carries the live score to viewers"),
+      drow("Cloud sync",(C&&C.enabled)?"Enabled":"Disabled",(C&&C.enabled)?true:null),
+      drow("Signed in",signedIn?((C.user.email||"yes").replace(/</g,"")):"No",signedIn?true:null),
+      drow("Current game",gameActive?(((OUR.short||"US")+" vs "+(OPP.short||"OPP")).replace(/</g,"")):"None",null),
+      drow("Screen",window.innerWidth+"×"+window.innerHeight+(isWide()?" · wide":" · phone"),null),
+      drow("Browser",(navigator.userAgent||"").slice(0,58),null)
+    ].join("");
+    window.__diagText=["All-Stars Live diagnostics",
+      "Version: "+(window.APP_VERSION||"—"),
+      "Platform: "+(IS_APP?"Native app":"Web"),
+      "Internet: "+(online?"Online":"Offline"),
+      "Camera: "+(IS_APP?(camLive?"Connected":"Not connected"):"App only"),
+      "Stream: "+phase+(yt?" ("+yt+")":""),
+      "Relay: "+(hasRelay?(relayConn?"Connected":"Disconnected"):"Local only"),
+      "Cloud: "+((C&&C.enabled)?"Enabled":"Disabled"),
+      "Signed in: "+(signedIn?(C.user.email||"yes"):"No"),
+      "Game: "+(gameActive?((OUR.short||"US")+" vs "+(OPP.short||"OPP")):"None"),
+      "Screen: "+window.innerWidth+"x"+window.innerHeight,
+      "UA: "+(navigator.userAgent||"")].join("\n");
+    const tip=`<div style="font-size:12px;color:${T.sageDim};background:${T.surface};border:1px dashed ${T.line};border-radius:11px;padding:13px 15px;line-height:1.5">${IC('alert',14)} <b style="color:${T.sage}">Camera won't connect?</b> Check the camera and this device are on the <b style="color:${T.sage}">same Wi-Fi</b>, the camera app is running, and the hotspot has internet. Most connection issues are on the camera side, not the app.</div>`;
+    return `<div style="display:flex;flex-direction:column;gap:12px">
+        <div class="frost-card" style="display:flex;align-items:center;gap:10px;background:${T.surface};border:1px solid ${T.line};border-radius:14px;padding:12px 14px">
+          <button data-act="opensettings" style="${ghost};padding:9px 11px">&lsaquo; Settings</button>
+          <div style="font-family:${MONO};font-size:23px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:${T.lime}">Diagnostics</div></div>
+        <div style="font-size:12px;color:${T.sage};margin:0 2px">Live status for field troubleshooting.</div>
+        <div style="display:flex;flex-direction:column;gap:8px">${rows}</div>
+        ${tip}
+        <div style="display:flex;gap:8px">
+          <button data-act="opendebug" style="${ghost};flex:1;display:flex;align-items:center;justify-content:center;gap:8px">${ICN.refresh} Refresh</button>
+          <button data-act="copydiag" style="${ghost};flex:1;display:flex;align-items:center;justify-content:center;gap:8px">${ICN.doc} Copy</button></div>
       </div>`;
   }
   if(mode==="newgame"){
@@ -2491,8 +2559,11 @@ function render(){
         </div></div>`;
     return;
   }
+  // A non-scorer can't sit in Scorer mode (it would show live scoring controls that don't sync).
+  // canScoreNow() is permissive during sync, so this never strands a real scorer in Viewer.
+  if(viewMode==="scorer" && !canScoreNow()) viewMode="viewer";
   renderToolbar();
-  const menu=(mode==="home"||mode==="teams"||mode==="team"||mode==="pickteam"||mode==="newgame"||mode==="lineup"||mode==="pickplayer"||mode==="pickpos"||mode==="editplayer"||mode==="summary"||mode==="settings"||mode==="directory"||mode==="teamstats");
+  const menu=(mode==="home"||mode==="teams"||mode==="team"||mode==="pickteam"||mode==="newgame"||mode==="lineup"||mode==="pickplayer"||mode==="pickpos"||mode==="editplayer"||mode==="summary"||mode==="settings"||mode==="directory"||mode==="teamstats"||mode==="debug");
   if(IS_APP&&window.AllStars.setInGame){ try{ AllStars.setInGame(!menu); }catch(e){} }   // hide native tabs during a game
   // Push the live score to the native compositor so it's burned into the broadcast.
   if(IS_APP&&!menu&&window.AllStars.setScore){ try{
@@ -2803,6 +2874,7 @@ document.getElementById("app").addEventListener("click",e=>{
   }
   if(act==="role"){
     if(viewerLocked) return;   // watch-link viewers can't switch to scorer
+    if(arg==="scorer" && !canScoreNow()){ flash("Only this team's scorers can score — ask the owner to add you"); return; }
     viewMode=arg;
     try{localStorage.setItem("al-view-mode",viewMode);}catch(e){}
     renderToolbar(); render();
@@ -2856,6 +2928,9 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="confirm-yes"){const r=confirmAct&&confirmAct.run;confirmAct=null;if(r)r();else render();}
   else if(act==="newgame"){mode="newgame";render();}
   else if(act==="gohome"){mode="home";render();}
+  else if(act==="opendebug"){mode="debug";render();}
+  else if(act==="opensettings"){mode="settings";render();}
+  else if(act==="copydiag"){ const u=window.__diagText||""; const done=()=>flash("Diagnostics copied"); if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(u).then(done).catch(done);}else{done();} }
   else if(act==="refresh"){ try{ if(window.cloudSyncTeams)cloudSyncTeams(); }catch(e){} flash("Refreshed"); render(); }
   else if(act==="apprefresh"){ flash("Refreshing…"); try{ if(navigator.serviceWorker&&navigator.serviceWorker.getRegistrations) navigator.serviceWorker.getRegistrations().then(function(rs){rs.forEach(function(r){try{r.update();}catch(e){}});}); }catch(e){} try{ if(window.cloudSyncTeams)cloudSyncTeams(); }catch(e){} setTimeout(function(){ try{ location.reload(); }catch(e){} }, 500); }
   else if(act==="settings"){mode="settings";render();}
@@ -2913,7 +2988,7 @@ function renderToolbar(){
   // Menu / non-game screens that must NOT show the in-game top bar (Scorer/Viewer toggle, Share,
   // LIVE dot). "directory" (Find a team) and "teamstats" (public team stats) were missing, so the
   // toolbar wrongly appeared on those browse pages.
-  const menuModes=["home","teams","team","pickteam","newgame","lineup","pickplayer","pickpos","editplayer","summary","settings","directory","teamstats"];
+  const menuModes=["home","teams","team","pickteam","newgame","lineup","pickplayer","pickpos","editplayer","summary","settings","directory","teamstats","debug"];
   const playMode2=!menuModes.includes(mode);
   // No top bar on menu screens (home/teams/etc.) — it duplicated the page title and
   // showed a misleading "LIVE" relay dot before any game. Reclaims that space.
@@ -2923,7 +2998,8 @@ function renderToolbar(){
   if(["locate","contact","result","runners","errpos","outpos","dppick"].includes(mode)){ tb.innerHTML=""; return; }
   // In a live game the title slot becomes the Scorer/Viewer role toggle (the matchup
   // already shows in the scorebug below — no need to repeat it here).
-  const roleSeg=(r,lbl)=>`<button data-act="role" data-arg="${r}" style="padding:8px 14px;border:none;font-family:${MONO};font-weight:800;font-size:13px;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;background:${viewMode===r?T.lime:"transparent"};color:${viewMode===r?T.field:T.sage}">${lbl}</button>`;
+  const scorerLocked=!canScoreNow();   // signed-in follower (not a scorer) → grey the Scorer tab
+  const roleSeg=(r,lbl)=>{const lock=(r==="scorer"&&scorerLocked);return `<button data-act="role" data-arg="${r}" title="${lock?'Scorers only — ask the owner for access':''}" style="padding:8px 14px;border:none;font-family:${MONO};font-weight:800;font-size:13px;letter-spacing:.5px;text-transform:uppercase;cursor:${lock?'not-allowed':'pointer'};background:${viewMode===r?T.lime:"transparent"};color:${viewMode===r?T.field:T.sage};${lock?'opacity:.4':''};display:inline-flex;align-items:center;gap:5px">${lbl}${lock?IC('key',12):''}</button>`;};
   const chip=(playMode2&&viewerLocked)
     ? `<div style="display:inline-flex;align-items:center;gap:8px"><span style="display:inline-flex;align-items:center;gap:5px;background:${T.surface};border:1px solid ${T.line};border-radius:999px;padding:5px 11px;font-family:${MONO};font-size:11px;font-weight:800;letter-spacing:1px;color:${T.lime}">${IC('eye',14)} WATCHING</span><span style="font-family:${MONO};font-weight:700;font-size:15px;color:${T.chalk}">${OUR.short||"US"} <span style="color:${T.sageDim};font-weight:600">vs</span> ${OPP.short||"OPP"}</span></div>`
     : playMode2
@@ -3066,6 +3142,7 @@ window.appBack=function(){
     if(mode==="team"){ mode="teams"; render(); return true; }
     if(mode==="teamstats"){ mode="directory"; render(); return true; }   // public team view → back to search
     if(mode==="directory"){ mode="teams"; render(); return true; }       // browse teams → back to Teams
+    if(mode==="debug"){ mode="settings"; render(); return true; }
     if(mode==="settings"){ mode="home"; render(); return true; }
     if(mode==="teams"){ mode="home"; render(); return true; }
     if(mode==="summary"){ mode="idle"; render(); return true; }
@@ -3256,7 +3333,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v98";
+var APP_VERSION="v99";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
