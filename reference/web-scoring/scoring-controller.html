@@ -2812,7 +2812,6 @@ document.getElementById("app").addEventListener("click",e=>{
   if(act==="schview"){ scheduleView=(arg==="calendar"?"calendar":"list"); try{localStorage.setItem("al-sched-view",scheduleView);}catch(e){} render(); return; }
   if(act==="calprev"||act==="calnext"){ if(!calYM){const d=new Date();calYM={y:d.getFullYear(),m:d.getMonth()};} let mm=calYM.m+(act==="calnext"?1:-1),yy=calYM.y; if(mm<0){mm=11;yy--;} else if(mm>11){mm=0;yy++;} calYM={y:yy,m:mm}; calSelDay=null; render(); return; }
   if(act==="calday"){ calSelDay=(calSelDay===arg?null:arg); render(); return; }
-  if(act==="invitewatch"){ openShare(); return; }
   if(act==="teamchat"){ openChat(openTeamId); return; }
   if(act==="closechat"){ closeChat(); return; }
   if(act==="sendmsg"){ sendChat(); return; }
@@ -2850,17 +2849,13 @@ document.getElementById("app").addEventListener("click",e=>{
   if(act==="addcoowner"){ const e=document.getElementById("coOwnerWho"); if(!e)return; const v=(e.value||"").trim().toLowerCase(); if(v.indexOf("@")<0){flash("Enter a valid email");return;} const t=teamById(openTeamId); if(t){ if(!Array.isArray(t.coOwners))t.coOwners=[]; if(t.coOwners.indexOf(v)<0)t.coOwners.push(v); } if(window.cloudAddCoOwner)window.cloudAddCoOwner(openTeamId,v); e.value=""; flash(v+" is now a co-owner"); render(); return; }
   if(act==="rmcoowner"){ const t=teamById(openTeamId); if(t&&Array.isArray(t.coOwners)){ t.coOwners=t.coOwners.filter(x=>x!==arg); } if(window.cloudRemoveCoOwner)window.cloudRemoveCoOwner(openTeamId,arg); render(); return; }
   if(act==="lineupback"){ mode=gameActive?"idle":"home"; render(); return; }
-  if(act==="openrules"){ const _t=teamById(openTeamId); const _u=_t&&_t.rulesUrl; if(_u){ if(IS_APP&&window.AllStars&&window.AllStars.openExternal)AllStars.openExternal(_u); else window.open(_u,"_blank","noopener"); } return; }
-  if(act==="openrulebook"){ if(window.openRulebook)window.openRulebook(); return; }
   if(act==="closerules"){ closeRules(); return; }
   if(act==="viewrulebook"){ openRulebookEntry(arg); return; }
   if(act==="setrulebook"){ const t=teamById(openTeamId); if(t){ t.rulebookId=arg; saveDB(); render(); } return; }
   if(act==="rmrulebook"){ const list=getCustomRulebooks().filter(r=>r.id!==arg); saveCustomRulebooks(list); const t=teamById(openTeamId); if(t&&t.rulebookId===arg){t.rulebookId="dyb";saveDB();} render(); return; }
   if(act==="addrulebook"){ const n=document.getElementById("rbName"), u=document.getElementById("rbUrl"); const name=(n&&n.value||"").trim(), url=(u&&u.value||"").trim(); if(!name||!url){flash("Enter a name and a link");return;} let href=url; if(!/^https?:\/\//i.test(href))href="https://"+href; const list=getCustomRulebooks(); list.push({id:"rb"+Date.now().toString(36),name:name,kind:"url",src:href,custom:true}); saveCustomRulebooks(list); flash("Rulebook added"); render(); return; }
   if(act==="viewgamerulebook"){ openRulebookEntry((G&&G.rulebookId)||(curTeam()&&curTeam().rulebookId)||"dyb"); return; }
-  if(act==="exportteam"){ if(window.exportTeam)window.exportTeam(openTeamId); return; }
   if(act==="importteam"){ if(window.importTeam)window.importTeam(); return; }
-  if(act==="exportgame"){ if(window.exportGame)window.exportGame(); return; }
   if(act==="gamecard"){ try{printGameCard();}catch(e){flash("Couldn't build the scorecard");} return; }
   if(act==="importgame"){ if(window.importGame)window.importGame(); return; }
   if(act==="signingoogle"){ if(window.cloudSignInGoogle)window.cloudSignInGoogle(); return; }
@@ -2904,7 +2899,6 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="back-result"){mode="result";render();}
   else if(act==="dest"){const[i,c]=arg.split(":");setDest(+i,+c);}
   else if(act==="confirm")commit(result,plan);
-  else if(act==="zones"){showZones=!showZones;render();}
   else if(act==="lineup"){mode="lineup";render();}
   else if(act==="lineupdone"){ gameActive=true;mode="idle";render();broadcast(); }   // timer starts on first pitch (see recordPitch)
   else if(act==="lutab"){lineupTab=arg;render();}
@@ -2914,7 +2908,6 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="resume"){mode="idle";render();}
   else if(act==="resumegame"){G.final=false;mode="idle";render();broadcast();}
   else if(act==="summary-done"){gameActive=false;mode="teams";render();broadcast();}
-  else if(act==="sideflip"){G.ourSide=G.ourSide==="home"?"away":"home";render();broadcast();}
   else if(act==="pickplayer"){editSlot=+arg;mode="pickplayer";render();}
   else if(act==="pickpos"){editSlot=+arg;mode="pickpos";render();}
   else if(act==="editplayer"){editSlot=+arg;mode="editplayer";render();}
@@ -2936,7 +2929,6 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="settings"){mode="settings";render();}
   else if(act==="opencamera"){ try{ if(window.AllStars&&window.AllStars.openVideo)AllStars.openVideo(); }catch(e){} }
   else if(act==="newgamestart"){newgameFrom="home";mode="newgame";render();}
-  else if(act==="homestart"){newgameFrom="home";selectTeam(arg);G=initGame();loadTeamLineup(teamById(curTeamId));hist=[];resetUI();mode="newgame";render();broadcast();}
   else if(act==="gototeams"){mode="teams";render();}
   else if(act==="opent"){openTeamId=arg;teamTab="hub";mode="team";render();}
   else if(act==="teamtab"){teamTab=arg;render();}
@@ -2971,7 +2963,6 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="newteampick"){const t=newTeam("");if(pickFor==="our"){selectTeam(t.id);}else{oppTeamId=t.id;OPP.name=t.name;OPP.short=t.short;OPP.color=t.color;OPP.logo=null;}mode="newgame";render();broadcast();}
   else if(act==="oppnoroster"){oppTeamId=null;OPP.name="Opponent";OPP.short="OPP";OPP.color="#E2574C";mode="newgame";render();broadcast();}
   else if(act==="ngback"){mode="newgame";render();}
-  else if(act==="quickgame"){curTeamId=null;ROSTER=genericRoster();OUR.name="Your Team";OUR.short="HOME";OUR.color="#2E6BE6";G=initGame();hist=[];resetUI();mode="newgame";render();broadcast();}
   else if(act==="ng-side"){G.ourSide=arg;render();broadcast();}
   else if(act==="ng-start")startNewGame();
   else if(act==="nglineupcard"){ const tt=curTeam()||{name:OUR.name,short:OUR.short,color:OUR.color,players:ROSTER,record:{w:0,l:0,t:0},games:[]}; const opp=(OPP.name&&OPP.name!=="Opponent")?OPP.name:""; let tm=""; if(G&&G.startedAt){ try{ tm=new Date(G.startedAt).toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"}); }catch(e){} } printLineupCard(tt,{opp:opp,time:tm}); }
@@ -3333,7 +3324,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v99";
+var APP_VERSION="v100";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
