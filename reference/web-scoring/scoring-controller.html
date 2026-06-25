@@ -2163,7 +2163,7 @@ function actionArea(){
           ${t.logo?`<img src="${t.logo}" alt="" style="width:44px;height:44px;flex:none;border-radius:9px;object-fit:contain;background:#fff;box-shadow:0 0 0 1px ${T.line}">`:""}
           <div style="flex:1;min-width:0;border-left:5px solid ${t.color};padding-left:10px">
             <div style="font-family:${MONO};font-size:22px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${(t.name||"Team").replace(/</g,"")}</div>
-            <div style="font-family:${MONO};font-size:18px;color:${T.sage};margin-top:4px"><span style="color:${t.color};font-weight:800">${rec}</span> &middot; ${t.players.length} players</div></div></div>
+            <div style="font-family:${MONO};font-size:20px;font-weight:800;color:${t.color};margin-top:4px">${rec}</div></div></div>
         <button data-act="teamchat" style="${bigBtn(T.lime,'')};font-size:17px">${ICN.chat} Team chat</button>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
           ${hb("roster",IC('users',26),"Roster &amp; details")}
@@ -2181,10 +2181,10 @@ function actionArea(){
   }
   if(mode==="pickteam"){
     const sortedTeams=DB.teams.slice().sort((a,b)=>((a.name||"").toLowerCase()<(b.name||"").toLowerCase()?-1:1));
-    const cards=sortedTeams.map(t=>`<button data-act="setteam" data-arg="${t.id}" data-tname="${(t.name||'').toLowerCase().replace(/"/g,'&quot;')}" style="display:flex;align-items:center;gap:12px;background:${T.surface};border:1px solid ${T.line};border-left:5px solid ${t.color};border-radius:10px;padding:12px 14px;text-align:left;width:100%">
+    const cards=sortedTeams.map(t=>{const R=teamRec(t),rec=R.w+"-"+R.l+(R.t?"-"+R.t:"");return `<button data-act="setteam" data-arg="${t.id}" data-tname="${(t.name||'').toLowerCase().replace(/"/g,'&quot;')}" style="display:flex;align-items:center;gap:12px;background:${T.surface};border:1px solid ${T.line};border-left:5px solid ${t.color};border-radius:10px;padding:12px 14px;text-align:left;width:100%">
         <div style="flex:1;min-width:0"><div style="font-family:${MONO};font-size:17px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.name}</div>
-          <div style="font-size:11px;color:${T.sage};margin-top:2px">${t.players.length} players</div></div>
-        <span style="color:${t.color};font-weight:800;font-size:12px">PICK &rsaquo;</span></button>`).join("")
+          <div style="font-family:${MONO};font-size:15px;font-weight:800;color:${t.color};margin-top:3px">${rec}</div></div>
+        <span style="color:${t.color};font-weight:800;font-size:12px">PICK &rsaquo;</span></button>`;}).join("")
       ||`<div style="color:${T.sage};font-size:13px;text-align:center;padding:16px 8px;border:1px dashed ${T.line};border-radius:10px">No saved teams yet — create one below.</div>`;
     // Type-to-filter the saved-team list (alphabetical, live). Recent opponents = quick re-picks.
     const filterInput = sortedTeams.length>3 ? `<input oninput="window._oppFilter(this.value)" placeholder="Type to filter teams…" autocomplete="off" style="background:${T.surface2};border:1px solid ${T.line};color:${T.ink};border-radius:8px;padding:10px 12px;font-size:14px;outline:none;width:100%;box-sizing:border-box">` : "";
@@ -2232,8 +2232,7 @@ function actionArea(){
     const recLine=`${rec.w}-${rec.l}${rec.t?"-"+rec.t:""}`;
     const head=`<div class="frost-card" style="background:${T.surface};border:1px solid ${T.line};border-left:6px solid ${vt.color||T.lime};border-radius:14px;padding:14px 16px">
         <div style="font-family:${MONO};font-size:24px;font-weight:800;color:${T.ink}">${(vt.name||'Team').replace(/</g,'&lt;')}</div>
-        <div style="display:flex;align-items:center;gap:10px;margin-top:6px;font-family:${MONO};font-size:17px;color:${T.sage}">
-          <span style="font-weight:800;color:${vt.color||T.lime}">${recLine}</span><span style="opacity:.45">&middot;</span><span>${players.length} players</span></div></div>`;
+        <div style="font-family:${MONO};font-size:20px;font-weight:800;color:${vt.color||T.lime};margin-top:6px">${recLine}</div></div>`;
     const roster=`<div style="background:${T.surface};border:1px solid ${T.line};border-radius:12px;padding:12px 14px">
         <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin-bottom:8px">Roster</div>
         ${players.length?`<div style="display:flex;flex-wrap:wrap;gap:6px">${players.map(p=>`<span style="background:${T.surface2};border:1px solid ${T.line};border-radius:8px;padding:6px 10px;font-family:${MONO};font-size:13px;font-weight:700;color:${T.chalk}">#${p.num||"–"} ${(p.name||'').replace(/</g,'&lt;')}</span>`).join("")}</div>`:`<div style="font-size:12px;color:${T.sageDim}">No roster shared.</div>`}</div>`;
@@ -2379,11 +2378,12 @@ function actionArea(){
         <div style="flex:1;min-width:0"><div style="${lbl};margin:0 0 4px">${who}</div><div style="font-family:${MONO};font-size:23px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${name}</div></div>
         <span style="color:${color};font-weight:800;font-size:14px;letter-spacing:.5px;flex:none">CHANGE &rsaquo;</span></button>`;
     // Opponent colour picker — so two same-ish team colours can be made distinct for the scoreboard.
-    const OPP_SWATCHES=["#E11D2E","#E08A12","#F0B43E","#2EC98A","#7C5CFF","#EC4899","#19A0E0","#FFFFFF"];
-    const oppColorRow=`<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:2px">
-        <span style="${lbl};width:100%;margin:0 0 2px">Opponent color — make it pop vs ${(OUR.short||OUR.name||"your team").replace(/</g,"&lt;")}</span>
-        ${OPP_SWATCHES.map(c=>`<button data-act="oppcolor" data-arg="${c}" style="width:32px;height:32px;border-radius:8px;background:${c};border:3px solid ${(OPP.color||"").toLowerCase()===c.toLowerCase()?T.ink:"transparent"};box-shadow:0 0 0 1px ${T.line}"></button>`).join("")}
-        <label style="display:inline-flex;align-items:center;gap:7px;background:${T.surface2};border:1px solid ${T.line};border-radius:8px;padding:6px 11px;cursor:pointer;font-size:12px;font-weight:700;color:${T.ink};position:relative"><span style="width:18px;height:18px;border-radius:5px;background:${OPP.color};box-shadow:0 0 0 1px ${T.line}"></span>More<input type="color" value="${OPP.color||"#E11D2E"}" onchange="window.setOppColor(this.value)" style="position:absolute;left:0;top:0;width:100%;height:100%;opacity:0;cursor:pointer"></label></div>`;
+    // Single "Opponent color" button → native colour picker (no swatch wall). Set it so a same-ish
+    // opponent colour can be made distinct from your team on the scoreboard.
+    const oppColorRow=`<label title="Pick the opponent's colour" style="display:inline-flex;align-items:center;gap:10px;align-self:flex-start;background:${T.surface2};border:1px solid ${T.line};border-radius:11px;padding:11px 16px;cursor:pointer;position:relative">
+        <span style="width:26px;height:26px;border-radius:7px;background:${OPP.color};box-shadow:0 0 0 1px ${T.line}"></span>
+        <span style="font-weight:800;color:${T.ink};font-size:14px">Opponent color</span>${ICN.palette}
+        <input type="color" value="${OPP.color||"#E11D2E"}" onchange="window.setOppColor(this.value)" style="position:absolute;left:0;top:0;width:100%;height:100%;opacity:0;cursor:pointer"></label>`;
     const header=`<div class="frost-card" style="display:flex;align-items:center;gap:10px;flex:none;background:${T.surface};border:1px solid ${T.line};border-radius:14px;padding:12px 14px">
           <button data-act="${setMode?"settingsdone":"gohome"}" style="${ghost};padding:9px 11px">&lsaquo; ${setMode?"Done":"Home"}</button>
           <div style="font-family:${MONO};font-size:23px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:${T.lime}">${setMode?"Game Settings":"New Game"}</div></div>`;
@@ -3561,7 +3561,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v112";
+var APP_VERSION="v113";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
