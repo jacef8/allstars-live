@@ -29,8 +29,8 @@
     /* GroundLink-style dark theme: charcoal base, navy + lime-green accents. */
     --field:#10141A; --ink:#F2F5FA; --surface:#212A38; --surface2:#324056; --line:#6A7EA6;
     --clay:#E0974F; --chalk:#F2F5FA; --grass:#1F5C3A; --grassLt:#2C7D4E;
-    --safe:#4ED070; --out:#FF6B52; --sage:#CFDAEC; --sageDim:#AEBBD4; --amber:#F0B43E;
-    --live:#FF3B5C; --navy:#1D3A66; --lime:#A3E635;
+    --safe:#2E6BE6; --out:#FF6B52; --sage:#CFDAEC; --sageDim:#AEBBD4; --amber:#F0B43E;
+    --live:#FF3B5C; --navy:#1D3A66; --lime:#E11D2E;
     --mono:"Saira Condensed",system-ui,-apple-system,sans-serif;
     --sans:"Barlow",system-ui,-apple-system,sans-serif;
     --ease:cubic-bezier(.16,1,.3,1); --ease-soft:cubic-bezier(.4,0,.2,1);
@@ -60,14 +60,14 @@
        getting a black, near-invisible icon on the dark surfaces. Buttons that need dark text
        (lime/green/amber, etc.) set their own color inline and override this. */
     transition:transform .12s var(--ease-soft), filter .15s ease, box-shadow .18s ease, background .15s ease;}
-  button:active{transform:scale(.94);filter:brightness(1.14) drop-shadow(0 0 7px rgba(163,230,53,.32));}
+  button:active{transform:scale(.94);filter:brightness(1.14) drop-shadow(0 0 7px rgba(225,29,46,.32));}
   button:disabled{opacity:.4;filter:none;cursor:default;}
   #wrap{position:fixed;inset:0;display:flex;justify-content:center;
     /* Only subtle, semi-transparent accent glows — NO opaque base — so the body's blue turf
        shows through. (The native app makes #wrap transparent too; see IS_APP below.) */
     background:
       radial-gradient(42% 38% at 8% 2%, rgba(29,58,102,.22), transparent 70%),
-      radial-gradient(60% 55% at 92% 104%, rgba(163,230,53,.06), transparent 70%);
+      radial-gradient(60% 55% at 92% 104%, rgba(225,29,46,.06), transparent 70%);
     padding:10px;overflow:hidden;}
   #app{width:100%;max-width:400px;height:100%;display:flex;flex-direction:column;gap:8px;color:var(--chalk);}
   .num{font-family:var(--mono);font-variant-numeric:tabular-nums;}
@@ -107,7 +107,7 @@
   #splash .sp-a{width:min(80vw,460px);height:auto;display:block;filter:drop-shadow(0 12px 34px rgba(0,0,0,.6));animation:spPop .7s var(--ease) both;}
   #splash .sp-logo{font-family:var(--mono);font-weight:800;font-size:clamp(30px,7vw,54px);line-height:.9;letter-spacing:2px;text-align:center;color:#fff;animation:spPop .7s var(--ease) .12s both;}
   #splash .sp-logo span{color:var(--lime);}
-  #splash .sp-bar{width:56px;height:4px;border-radius:2px;background:var(--lime);box-shadow:0 0 14px rgba(163,230,53,.6);animation:spPop .7s var(--ease) .1s both;}
+  #splash .sp-bar{width:56px;height:4px;border-radius:2px;background:var(--lime);box-shadow:0 0 14px rgba(225,29,46,.6);animation:spPop .7s var(--ease) .1s both;}
   #splash .sp-sub{font-size:12px;font-weight:700;letter-spacing:5px;color:var(--sage);animation:spPop .7s var(--ease) .18s both;}
   @keyframes splashOut{to{opacity:0;visibility:hidden;}}
   @keyframes spPop{0%{transform:translateY(12px);opacity:0;}60%{opacity:1;}100%{transform:translateY(0);opacity:1;}}
@@ -144,12 +144,12 @@
 <div id="qrmodal" style="display:none;position:fixed;inset:0;z-index:200;background:rgba(8,11,16,.84);align-items:center;justify-content:center;padding:20px">
   <div style="max-width:330px;width:100%;background:#212A38;border:1px solid #4A5870;border-radius:18px;padding:20px;text-align:center;box-shadow:0 24px 60px rgba(0,0,0,.6)">
     <div id="qrTitle" style="font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:20px;letter-spacing:.5px;color:#EAEDF2">SHARE THE GAME</div>
-    <div id="qrSub" style="font-size:12px;color:#B7C2D6;margin:3px 0 12px">Nearby? Have them <b style="color:#A3E635">scan</b>. Far away? Send the link.</div>
+    <div id="qrSub" style="font-size:12px;color:#B7C2D6;margin:3px 0 12px">Nearby? Have them <b style="color:#E11D2E">scan</b>. Far away? Send the link.</div>
     <div id="shareToggle"></div>
     <div id="qrbox" style="background:#fff;border-radius:12px;padding:12px;width:244px;height:244px;margin:0 auto;display:flex;align-items:center;justify-content:center;color:#677281;font-size:12px"></div>
     <div id="qrurl" style="font-size:11px;color:#B7C2D6;word-break:break-all;margin:12px 4px 14px"></div>
     <div style="display:flex;gap:8px">
-      <button data-act="shareemail" style="flex:1;display:flex;align-items:center;justify-content:center;gap:8px;background:#A3E635;border:none;color:#0B0E13;border-radius:10px;padding:13px;font-family:'Barlow',sans-serif;font-size:15px;font-weight:800;cursor:pointer">
+      <button data-act="shareemail" style="flex:1;display:flex;align-items:center;justify-content:center;gap:8px;background:#E11D2E;border:none;color:#fff;border-radius:10px;padding:13px;font-family:'Barlow',sans-serif;font-size:15px;font-weight:800;cursor:pointer">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#0B0E13" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M22 7l-10 6L2 7"/></svg>Email</button>
       <button data-act="sharetext" style="flex:1;display:flex;align-items:center;justify-content:center;gap:8px;background:#324056;border:1px solid #4A5870;color:#EAEDF2;border-radius:10px;padding:13px;font-family:'Barlow',sans-serif;font-size:15px;font-weight:800;cursor:pointer">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#EAEDF2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Text</button>
@@ -172,7 +172,7 @@
     <input id="streamInput" placeholder="https://youtube.com/watch?v=…  or  youtu.be/…" autocomplete="off" spellcheck="false" style="width:100%;box-sizing:border-box;background:#10141A;border:1px solid #6A7EA6;color:#EAEDF2;border-radius:10px;padding:12px;font-size:14px;font-family:system-ui;outline:none">
     <div id="streamHint" style="font-size:11px;color:#AEBBD4;min-height:15px;margin:7px 2px 0"></div>
     <div style="display:flex;gap:8px;margin-top:12px">
-      <button data-act="savestream" style="flex:1;background:#A3E635;border:none;color:#0B0E13;border-radius:10px;padding:13px;font-family:'Barlow',sans-serif;font-size:15px;font-weight:800;cursor:pointer">Use this stream</button>
+      <button data-act="savestream" style="flex:1;background:#E11D2E;border:none;color:#fff;border-radius:10px;padding:13px;font-family:'Barlow',sans-serif;font-size:15px;font-weight:800;cursor:pointer">Use this stream</button>
       <button data-act="closestream" style="background:#212A38;border:1px solid #4A5870;color:#B7C2D6;border-radius:10px;padding:13px 16px;font-family:'Barlow',sans-serif;font-size:14px;font-weight:700;cursor:pointer">Cancel</button>
     </div>
     <button data-act="clearstream" style="width:100%;margin-top:8px;background:transparent;border:none;color:#AEBBD4;font-size:12px;font-weight:600;cursor:pointer;padding:6px">Disconnect / clear stream</button>
@@ -205,7 +205,7 @@
     <div id="chatList" style="flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px 14px;display:flex;flex-direction:column;gap:8px"></div>
     <div style="display:flex;gap:8px;padding:11px 14px;border-top:1px solid #2A3650;flex:none">
       <input id="chatInput" placeholder="Message…" autocomplete="off" style="flex:1;min-width:0;background:#10141A;border:1px solid #2A3650;color:#EAEDF2;border-radius:10px;padding:12px;font-size:14px;font-family:system-ui;outline:none">
-      <button data-act="sendmsg" style="background:#A3E635;border:none;color:#0B0E13;border-radius:10px;padding:12px 16px;font-weight:800;font-size:14px;cursor:pointer">Send</button>
+      <button data-act="sendmsg" style="background:#E11D2E;border:none;color:#fff;border-radius:10px;padding:12px 16px;font-weight:800;font-size:14px;cursor:pointer">Send</button>
     </div>
   </div>
 </div>
@@ -221,9 +221,9 @@
    Field-as-input baseball scoring controller — interaction prototype
 ---------------------------------------------------------------------- */
 const T={field:"#10141A",ink:"#F2F5FA",surface:"#212A38",surface2:"#324056",line:"#6A7EA6",
-  clay:"#E0974F",chalk:"#F2F5FA",grass:"#1F5C3A",grassLt:"#2C7D4E",safe:"#4ED070",
+  clay:"#E0974F",chalk:"#F2F5FA",grass:"#1F5C3A",grassLt:"#2C7D4E",safe:"#2E6BE6",
   out:"#FF6B52",sage:"#CFDAEC",sageDim:"#AEBBD4",amber:"#F0B43E",live:"#FF3B5C",
-  navy:"#1D3A66",lime:"#A3E635"};
+  navy:"#1D3A66",lime:"#E11D2E"};
 const FIELDLINE="#F4F8FC";  // white chalk for the field graphic (stays light on the green diamond)
 const MONO="'Saira Condensed',system-ui,-apple-system,sans-serif";  // condensed display — scoreboard numbers & headers
 const SANS="'Barlow',system-ui,-apple-system,sans-serif";           // body / UI text
@@ -293,8 +293,8 @@ function brandCss(accent){ return '*{box-sizing:border-box;-webkit-print-color-a
   +'.card{max-width:920px;margin:0 auto;background:#fff;border:1px solid #d4d8e0;border-radius:16px;overflow:hidden;box-shadow:0 6px 24px rgba(11,14,19,.12)}'
   +'.brand{background:#0B0E13;color:#fff;padding:13px 22px;display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid '+accent+'}'
   +'.brand .wm{font-family:"Arial Black",Arial,sans-serif;font-weight:900;font-size:23px;letter-spacing:1.5px}'
-  +'.brand .wm i{color:#A3E635;font-style:normal}'
-  +'.brand .tag{font-size:12px;letter-spacing:3px;color:#A3E635;text-transform:uppercase;font-weight:800}'
+  +'.brand .wm i{color:#E11D2E;font-style:normal}'
+  +'.brand .tag{font-size:12px;letter-spacing:3px;color:#E11D2E;text-transform:uppercase;font-weight:800}'
   +'.inner{padding:18px 22px}'
   +'.hd{display:flex;align-items:center;gap:16px;border-bottom:3px solid '+accent+';padding-bottom:12px}'
   +'.hd img{width:62px;height:62px;object-fit:contain}'
@@ -304,7 +304,7 @@ function brandCss(accent){ return '*{box-sizing:border-box;-webkit-print-color-a
   +'.hd .meta .f{display:flex;gap:6px}.hd .meta .f span{color:#888;font-weight:700;width:64px;text-transform:uppercase;font-size:11px;letter-spacing:.5px;align-self:center}'
   +'.hd .meta .f b{flex:1;border-bottom:1px solid #bbb;font-weight:600}'
   +'.brandft{background:#0B0E13;color:#8290AC;font-size:11px;padding:9px 22px;display:flex;justify-content:space-between;align-items:center;letter-spacing:.3px}'
-  +'.brandft b{color:#A3E635;font-weight:800;letter-spacing:1px}'
+  +'.brandft b{color:#E11D2E;font-weight:800;letter-spacing:1px}'
   +'@media print{body{padding:0;background:#fff}.card{border:none;box-shadow:none;border-radius:0;max-width:none}@page{margin:11mm}}'; }
 function brandBar(tag){ return '<div class="brand"><div class="wm">ALL-STARS <i>LIVE</i></div><div class="tag">'+tag+'</div></div>'; }
 function brandFt(){ return '<div class="brandft"><span>Generated with <b>ALL-STARS LIVE</b></span><span>allstarslive</span></div>'; }
@@ -369,7 +369,7 @@ function openScorecard(M){
     return '<h3 style="border-color:'+m.color+'">'+esc(m.name)+' — Pitching</h3><table class="grid"><thead><tr><th class="nm">Pitcher</th><th>IP</th><th>P</th><th>H</th><th>R</th><th>BB</th><th>K</th></tr></thead><tbody>'+rows+'</tbody></table>'; };
   const teamHead=(m,win)=>'<div class="team">'+(m.logo?'<img src="'+m.logo+'">':'<div class="ph"></div>')+'<div class="ti"><div class="tn">'+esc(m.name)+'</div>'+(m.rec?'<div class="tc">'+esc(m.rec)+'</div>':'')+'</div><div class="ts" style="color:'+m.color+'">'+m.runs+'</div>'+(win?'<div class="wb">WIN</div>':'')+'</div>';
   const html='<!doctype html><html><head><meta charset="utf-8"><title>'+esc(A.short)+' vs '+esc(H.short)+' — Scorecard</title><style>'
-    +brandCss('#A3E635')
+    +brandCss('#E11D2E')
     +'.top{display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid #e0e3ea;padding-bottom:6px;margin-bottom:14px}'
     +'.top .ttl{font-size:13px;letter-spacing:2px;font-weight:800;color:#444}.top .dt{font-size:12px;color:#666}'
     +'.score{display:flex;align-items:stretch;gap:14px;margin-bottom:16px}'
@@ -377,7 +377,7 @@ function openScorecard(M){
     +'.team img{width:54px;height:54px;object-fit:contain}.team .ph{width:54px;height:54px;border-radius:8px;background:#eef0f4}'
     +'.team .ti{flex:1}.team .tn{font-size:18px;font-weight:800;line-height:1.1}.team .tc{font-size:12px;color:#666;margin-top:2px}'
     +'.team .ts{font-size:46px;font-weight:800;line-height:1}'
-    +'.team .wb{position:absolute;top:-9px;left:12px;background:#A3E635;color:#0B0E13;font-size:10px;font-weight:800;letter-spacing:1px;padding:2px 8px;border-radius:999px}'
+    +'.team .wb{position:absolute;top:-9px;left:12px;background:#E11D2E;color:#fff;font-size:10px;font-weight:800;letter-spacing:1px;padding:2px 8px;border-radius:999px}'
     +'.vs{display:flex;align-items:center;font-weight:800;color:#999;font-size:14px}'
     +'h3{font-size:13px;letter-spacing:.5px;text-transform:uppercase;margin:16px 0 6px;border-left:5px solid #0B0E13;padding-left:8px}'
     +'table{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:4px}'
@@ -1361,7 +1361,7 @@ function monitorPane(){
         <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="${T.sageDim}" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
         <div style="font-family:${MONO};font-weight:800;letter-spacing:2px;font-size:14px;color:${T.sage}">${(viewerLocked||viewMode==="viewer")?"WAITING FOR VIDEO":"CAMERA FEED"}</div>
         <div style="font-size:11px;color:${T.sageDim};max-width:260px;line-height:1.45">${(viewerLocked||viewMode==="viewer")?"The video will appear here once the game is live.":(IS_APP?"Start the stream to put the game on YouTube with the scorebug.":"Connect your YouTube Live stream to see it here with the scorebug.")}</div>
-        ${(viewerLocked||viewMode==="viewer")?"":`<button data-act="${IS_APP?'appgolive':'setstream'}" style="margin-top:4px;background:${T.lime};color:${T.field};border:none;border-radius:9px;padding:10px 16px;font-family:${SANS};font-weight:800;font-size:13px;display:inline-flex;align-items:center;gap:7px;cursor:pointer">
+        ${(viewerLocked||viewMode==="viewer")?"":`<button data-act="${IS_APP?'appgolive':'setstream'}" style="margin-top:4px;background:${T.lime};color:#fff;border:none;border-radius:9px;padding:10px 16px;font-family:${SANS};font-weight:800;font-size:13px;display:inline-flex;align-items:center;gap:7px;cursor:pointer">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="${T.field}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3l14 9-14 9V3z"/></svg>${IS_APP?(appLive()?"Going live…":"Start game stream"):"Connect your stream"}</button>`}</div>`;
   const monBtn="width:32px;height:32px;border-radius:8px;background:rgba(8,11,16,.6);border:1px solid rgba(255,255,255,.2);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer";
   const fsIcon=`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>`;
@@ -1499,7 +1499,7 @@ function feedPanel(){
       <span style="flex:1;min-width:0;color:${pit?T.sage:T.chalk};font-size:${pit?"14px":"17px"};font-weight:${pit?"600":"700"}">${e.head}${e.sub?` <span style="color:${T.sageDim};font-weight:600">— ${e.sub}</span>`:""}</span>
       <span style="font-family:${MONO};font-size:${pit?"13px":"15px"};color:${T.sage};white-space:nowrap">${TEAMS.away.short} ${e.away}-${e.home} ${TEAMS.home.short}</span>
     </div>`;}).join("");
-  const seg=(v,lbl)=>`<button data-act="feedview" data-arg="${v}" style="padding:5px 11px;border:none;font-family:${MONO};font-weight:800;font-size:11px;letter-spacing:.4px;cursor:pointer;background:${feedView===v?T.lime:"transparent"};color:${feedView===v?T.field:T.sage}">${lbl}</button>`;
+  const seg=(v,lbl)=>`<button data-act="feedview" data-arg="${v}" style="padding:5px 11px;border:none;font-family:${MONO};font-weight:800;font-size:11px;letter-spacing:.4px;cursor:pointer;background:${feedView===v?T.lime:"transparent"};color:${feedView===v?"#fff":T.sage}">${lbl}</button>`;
   return `<div style="flex:1;min-height:0;display:flex;flex-direction:column;background:${T.surface};border:1px solid ${T.line};border-radius:12px;overflow:hidden">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 13px;border-bottom:1px solid ${T.line};flex:none">
         <span style="font-family:${MONO};font-weight:800;font-size:15px;letter-spacing:1.4px;color:${T.lime}">GAME FEED</span>
@@ -1512,7 +1512,7 @@ function feedPanel(){
 // One GroundLink-style line-icon family: 2px stroke, currentColor, rounded caps. IC('name')
 // or IC('name',size) renders a sized SVG; ICN.name is a ready-to-drop 17px SVG string. Raw
 // <path…> strings still pass straight through, so existing IC('<path…>') calls keep working.
-const IC=(p,sz)=>`<svg viewBox="0 0 24 24" width="${sz||17}" height="${sz||17}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none;vertical-align:middle">${(PATHS&&PATHS[p])||p}</svg>`;
+const IC=(p,sz)=>`<svg viewBox="0 0 24 24" width="${sz||20}" height="${sz||20}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none;vertical-align:middle">${(PATHS&&PATHS[p])||p}</svg>`;
 const PATHS={
   // —— in-game (baseball) ——
   ball:`<circle cx="12" cy="12" r="8.5"/><path d="M5.5 6.5c2.4 1.8 2.4 9.2 0 11M18.5 6.5c-2.4 1.8-2.4 9.2 0 11"/>`,
@@ -1562,8 +1562,8 @@ const bigBtn=(bg,extra="",fg="#FFFFFF")=>`background:${bg};border:1px solid rgba
 const ghost=`background:${T.surface};border:1px solid ${T.line};color:${T.sage};border-radius:8px;padding:11px;font-family:${MONO};font-size:14px;font-weight:700;letter-spacing:.5px;text-transform:uppercase`;
 /* GameChanger-style pitch button: round icon badge + label beneath. accent=primary (lime). */
 function pitchBtn(act,label,icon,accent){
-  const bg=accent?T.lime:T.surface, bd=accent?T.lime:"#3F6CA8", txt=accent?T.field:T.ink;
-  const circ=accent?"rgba(0,0,0,.16)":T.surface2, ic=accent?T.field:T.lime;
+  const bg=accent?T.lime:T.surface, bd=accent?T.lime:"#3F6CA8", txt=accent?"#fff":T.ink;
+  const circ=accent?"rgba(0,0,0,.16)":T.surface2, ic=accent?"#fff":T.lime;
   return `<button data-act="${act}" style="background:${bg};border:2px solid ${bd};color:${txt};border-radius:12px;padding:8px 4px;display:flex;flex-direction:column;align-items:center;gap:5px;font-family:${SANS};font-size:12.5px;font-weight:800;line-height:1.05;text-align:center;letter-spacing:.2px">
     <span style="width:34px;height:34px;border-radius:50%;background:${circ};display:flex;align-items:center;justify-content:center;color:${ic}">${icon}</span>${label}</button>`;
 }
@@ -1671,15 +1671,15 @@ function actionArea(){
     // Home header = the transparent "A" logo floating over the turf (no banner box).
     // Falls back to the text wordmark until icons/logo-mark.png (transparent) is added.
     const hero = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:6px 0 2px;flex:none">
-          <img src="icons/logo-mark.png" alt=""
+          <img src="icons/logo-star.png" alt=""
             onerror="if(this.src.indexOf('icon-512')<0){this.src='icons/icon-512.png';this.style.borderRadius='20px';}else{this.style.display='none';}"
             style="height:clamp(130px,calc(var(--avh) * 26),260px);width:auto;display:block;filter:drop-shadow(0 8px 20px rgba(0,0,0,.55))">
           <div style="font-family:${MONO};font-size:clamp(26px,4.2vw,46px);font-weight:800;letter-spacing:1.5px;line-height:1;color:#fff">ALL-STARS <span style="color:${T.lime}">LIVE</span></div></div>`;
-    const resumeBtn = gameActive?`<button data-act="resume" style="${bigBtn(T.safe,"",T.field)};font-size:17px;padding:16px;display:flex;align-items:center;justify-content:center;gap:8px">${IC(PLAY)} Resume &middot; ${OUR.short} vs ${OPP.short}</button>`:"";
-    const newGameBtn = `<button data-act="newgamestart" style="${bigBtn(T.lime,"font-size:21px;padding:17px;box-shadow:0 8px 22px rgba(163,230,53,.22)",T.field)}">${IC(PLAY)} New Game</button>`;
+    const resumeBtn = gameActive?`<button data-act="resume" style="${bigBtn("#FFFFFF","border:1px solid rgba(0,0,0,.10)",T.field)};font-size:17px;padding:16px;display:flex;align-items:center;justify-content:center;gap:8px">${IC(PLAY)} Resume &middot; ${OUR.short} vs ${OPP.short}</button>`:"";
+    const newGameBtn = `<button data-act="newgamestart" style="${bigBtn(T.lime,"font-size:21px;padding:17px;border:2px solid rgba(255,255,255,.92);box-shadow:0 8px 22px rgba(225,29,46,.34)")}">${IC(PLAY)} New Game</button>`;
     const manageBtn = DB.teams.length
-      ? `<button data-act="gototeams" style="${ghost};padding:17px;font-size:17px;border:2px solid #3F6CA8;color:${T.ink};display:flex;align-items:center;justify-content:center;gap:9px">${IC('<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>')} Manage teams &amp; rosters</button>`
-      : `<button data-act="gototeams" style="${bigBtn(T.lime,"font-size:19px;padding:17px;box-shadow:0 8px 22px rgba(163,230,53,.22)",T.field)}">${IC('<path d="M12 5v14M5 12h14"/>')} Create Your First Team</button>`;
+      ? `<button data-act="gototeams" style="${ghost};padding:17px;font-size:17px;border:2px solid rgba(255,255,255,.55);color:${T.ink};display:flex;align-items:center;justify-content:center;gap:9px">${IC('<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>')} Manage teams &amp; rosters</button>`
+      : `<button data-act="gototeams" style="${bigBtn(T.lime,"font-size:19px;padding:17px;border:2px solid rgba(255,255,255,.92);box-shadow:0 8px 22px rgba(225,29,46,.34)")}">${IC('<path d="M12 5v14M5 12h14"/>')} Create Your First Team</button>`;
     // Share only makes sense once a game (and its stream link) exists.
     // "Share game link" only makes sense once a game is live (it shares the viewer/watch link).
     // No game in progress → no button (was confusing on a fresh home screen).
@@ -1704,7 +1704,7 @@ function actionArea(){
                <div style="display:flex;align-items:center;gap:8px;color:${T.sageDim};font-size:11px;font-weight:700;letter-spacing:1px"><span style="width:40px;height:1px;background:${T.line}"></span>OR<span style="width:40px;height:1px;background:${T.line}"></span></div>`}
                <div style="display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap">
                  <input id="authEmail" type="email" autocomplete="email" placeholder="you@email.com" style="flex:1;min-width:160px;max-width:240px;background:${T.surface2};border:1px solid ${T.line};color:${T.ink};border-radius:8px;padding:10px 12px;font-size:14px;outline:none">
-                 <button data-act="signin" style="background:${T.lime};color:${T.field};border:none;border-radius:8px;padding:10px 16px;font-weight:800;font-size:13px">Email link</button></div></div>`)
+                 <button data-act="signin" style="background:${T.lime};color:#fff;border:none;border-radius:8px;padding:10px 16px;font-weight:800;font-size:13px">Email link</button></div></div>`)
       : "";
     // Single Settings gear (top-right) — app/camera/account settings. Same on native + web.
     const gBtn=(act,glyph,title)=>`<button data-act="${act}" title="${title}" style="background:rgba(13,19,32,.72);border:1px solid ${T.line};color:${T.chalk};border-radius:11px;width:44px;height:44px;display:flex;align-items:center;justify-content:center;font-size:20px;cursor:pointer">${glyph}</button>`;
@@ -1719,7 +1719,7 @@ function actionArea(){
           <svg viewBox="0 0 24 24" width="42" height="42" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${svg}</svg>
           <span style="font-family:${MONO};font-weight:800;font-size:27px;letter-spacing:.6px">${label}</span>
           ${sub?`<span style="font-size:13px;font-weight:600;opacity:.85">${sub}</span>`:""}</button>`;
-      const newTile=tile('newgamestart','New Game',T.lime,T.field,'<path d="M8 5l11 7-11 7z" fill="currentColor" stroke="none"/>','Score + stream a game');
+      const newTile=tile('newgamestart','New Game',T.lime,'#fff','<path d="M8 5l11 7-11 7z" fill="currentColor" stroke="none"/>','Score + stream a game');
       const manageTile=tile('gototeams','Manage Teams',T.surface2,T.ink,'<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>','Rosters · records · stats');
       // Scroll a long team list in its own column. NOTE: use a JS-computed px max-height, NOT
       // `46vh` — in the Android WebView `vh` was resolving to 0px, collapsing this wrapper to
@@ -1816,7 +1816,7 @@ function actionArea(){
           <button data-act="schedrm" data-arg="${s.id}" style="background:none;border:1px solid ${T.line};color:${T.out};border-radius:7px;padding:7px 9px;font-weight:800">&times;</button></div>`;}).join("");
     const fLbl=`font-size:10px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:${T.sageDim};margin:0 2px 3px`;
     const fld=(lbl,inner)=>`<div style="flex:1;min-width:120px;display:flex;flex-direction:column">${lbl?`<div style="${fLbl}">${lbl}</div>`:""}${inner}</div>`;
-    const svBtn=(v,lbl)=>`<button data-act="schview" data-arg="${v}" style="flex:1;background:${scheduleView===v?T.lime:T.surface2};color:${scheduleView===v?T.field:T.sage};border:1px solid ${scheduleView===v?T.lime:T.line};border-radius:8px;padding:8px 0;font-weight:800;font-size:12px;letter-spacing:.4px">${lbl}</button>`;
+    const svBtn=(v,lbl)=>`<button data-act="schview" data-arg="${v}" style="flex:1;background:${scheduleView===v?T.lime:T.surface2};color:${scheduleView===v?"#fff":T.sage};border:1px solid ${scheduleView===v?T.lime:T.line};border-radius:8px;padding:8px 0;font-weight:800;font-size:12px;letter-spacing:.4px">${lbl}</button>`;
     const scheduleViewCard=`<div class="frost-card" style="background:${T.surface};border:1px solid ${T.line};border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:8px">
         <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime}">Upcoming — games &amp; practices</div>
         <div style="display:flex;gap:6px">${svBtn("list",IC('list',15)+" List")}${svBtn("calendar",IC('grid',15)+" Calendar")}</div>
@@ -1830,7 +1830,7 @@ function actionArea(){
         ${fld("Opponent (games only)",`<select id="schOppSel" onchange="var n=document.getElementById('schOppNew');if(n)n.style.display=this.value==='__new__'?'block':'none'" style="${cell}"><option value="">— pick a team —</option>${(DB.teams||[]).filter(x=>x.id!==t.id).map(x=>`<option value="${(x.name||'').replace(/"/g,'&quot;')}">${(x.name||'').replace(/</g,'')}</option>`).join("")}<option value="__new__">+ New opponent…</option></select><input id="schOppNew" placeholder="New opponent name" style="${cell};margin-top:6px;display:none">`)}
         ${fld("Location",`<input id="schLoc" placeholder="e.g. City Park — Field 2" style="${cell}">`)}
         ${fld("Notes (optional)",`<input id="schNotes" placeholder="e.g. arrive 45 min early, white jerseys" style="${cell}">`)}
-        <button data-act="schedadd" style="${bigBtn(T.lime,'',T.field)};margin-top:4px">+ Add to schedule</button></div>`;
+        <button data-act="schedadd" style="${bigBtn(T.lime,'')};margin-top:4px">+ Add to schedule</button></div>`;
     // Past games — the finished-game log, newest first, TAPPABLE to open the score + box score.
     const pastRows=(t.games||[]).slice(0,25).map(g=>{const rc=g.result==="W"?T.lime:(g.result==="L"?T.out:T.sage);
       const gdt=(()=>{try{return new Date((g.date||"")+"T00:00").toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"});}catch(e){return g.date||"";}})();
@@ -1881,7 +1881,7 @@ function actionArea(){
         <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin-bottom:4px">Scorers</div>
         <div style="font-size:12px;color:${T.sageDim};margin-bottom:4px">Can score games &amp; edit the team — but can't manage owners or delete the team.</div>
         ${(t.scorers&&t.scorers.length)?t.scorers.map(s=>`<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 0;border-top:1px solid ${T.line}"><span style="font-size:13px;color:${T.chalk};word-break:break-all">${s.replace(/</g,"")}</span>${canManage?`<button data-act="rmscorer" data-arg="${s}" style="background:none;border:1px solid ${T.line};color:${T.out};border-radius:7px;padding:5px 10px;font-weight:800;font-size:12px">Remove</button>`:""}</div>`).join(""):`<div style="font-size:12px;color:${T.sageDim};padding:4px 0">No authorized scorers yet.</div>`}
-        ${canManage?`<div style="display:flex;gap:8px;margin-top:10px"><input id="inviteWho" type="text" autocomplete="off" autocapitalize="off" placeholder="Email or phone number" style="${cell};flex:1;min-width:0">${(window.AllStars&&window.AllStars.pickContact)?`<button data-act="pickcontact" title="Pick from contacts" style="background:${T.surface2};color:${T.lime};border:1px solid ${T.line};border-radius:8px;padding:9px 13px;font-size:16px">${IC('user',18)}</button>`:""}<button data-act="inviteadd" style="background:${T.lime};color:${T.field};border:none;border-radius:8px;padding:9px 16px;font-weight:800;font-size:13px">Invite</button></div>
+        ${canManage?`<div style="display:flex;gap:8px;margin-top:10px"><input id="inviteWho" type="text" autocomplete="off" autocapitalize="off" placeholder="Email or phone number" style="${cell};flex:1;min-width:0">${(window.AllStars&&window.AllStars.pickContact)?`<button data-act="pickcontact" title="Pick from contacts" style="background:${T.surface2};color:${T.lime};border:1px solid ${T.line};border-radius:8px;padding:9px 13px;font-size:16px">${IC('user',18)}</button>`:""}<button data-act="inviteadd" style="background:${T.lime};color:#fff;border:none;border-radius:8px;padding:9px 16px;font-weight:800;font-size:13px">Invite</button></div>
           <div style="font-size:11px;color:${T.sageDim};margin-top:6px">Enter an <b style="color:${T.sage}">email</b> to authorize a scorer, or a <b style="color:${T.sage}">phone number</b> to text them a join link. Either way they sign in once and they're in.</div>`:`<div style="font-size:11px;color:${T.sageDim};margin-top:6px">Only the owner or a co-owner can add scorers.</div>`}</div>`;
     const scorersSection = !(C&&C.enabled) ? ""
       : !signedIn ? `<div style="${cardCss}">
@@ -1955,7 +1955,7 @@ function actionArea(){
         return `<div><div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin:0 2px 4px">${esc(sideName(side))} &mdash; batting</div>${card(`<table style="width:100%;border-collapse:collapse;font-family:${MONO};font-size:16px;text-align:center;color:${T.chalk}"><thead><tr style="color:${T.sageDim};font-size:12px"><th style="text-align:left;padding:4px 6px">Batter</th><th>AB</th><th>R</th><th>H</th><th>RBI</th><th>BB</th><th>K</th></tr></thead><tbody>${rows||`<tr><td colspan="7" style="padding:8px;color:${T.sageDim}">No at-bats</td></tr>`}</tbody></table>`)}</div>`;};
       const pitchTbl=(side)=>{const list=(g.pitch&&g.pitch[side])||[];if(!list.length)return "";const rows=list.map(x=>`<tr style="border-top:1px solid ${T.line}"><td style="text-align:left;padding:6px;font-weight:700;white-space:nowrap">${esc(x.name)}</td><td style="padding:9px 6px">${x.ip}</td><td>${x.pc}</td><td>${x.h}</td><td>${x.r}</td><td>${x.bb}</td><td>${x.k}</td></tr>`).join("");
         return `<div><div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin:0 2px 4px">${esc(sideName(side))} &mdash; pitching</div>${card(`<table style="width:100%;border-collapse:collapse;font-family:${MONO};font-size:16px;text-align:center;color:${T.chalk}"><thead><tr style="color:${T.sageDim};font-size:12px"><th style="text-align:left;padding:4px 6px">Pitcher</th><th>IP</th><th>P</th><th>H</th><th>R</th><th>BB</th><th>K</th></tr></thead><tbody>${rows}</tbody></table>`)}</div>`;};
-      const scoreBtn=`<button data-act="storedcard" data-arg="${g.id}" style="${bigBtn(T.lime,'',T.field)};display:flex;align-items:center;justify-content:center;gap:9px">&#128196; Game scorecard (PDF)</button>`;
+      const scoreBtn=`<button data-act="storedcard" data-arg="${g.id}" style="${bigBtn(T.lime,'')};display:flex;align-items:center;justify-content:center;gap:9px">&#128196; Game scorecard (PDF)</button>`;
       return secWrap(`${secHdr("Game")}${head}${lineTbl}${batTbl("away")}${batTbl("home")}${pitchTbl("away")}${pitchTbl("home")}${scoreBtn}${ytBtn}${delBtn}`);
     }
     if(teamTab==="stats") return secWrap(`${secHdr("Stats &amp; games")}${recEditor}${gamesBlock}${statTable}`);
@@ -1968,7 +1968,7 @@ function actionArea(){
       if(!signedIn) return secWrap(`${secHdr("Photos")}<div style="font-size:13px;color:${T.sage};padding:8px">Sign in on the Home screen to view &amp; add team photos.</div>`);
       if(!member) return secWrap(`${secHdr("Photos")}<div style="font-size:13px;color:${T.sage};padding:8px">Follow or join this team to see its photo gallery.</div>`);
       if(photoListTeam!==t.id){ photoListTeam=t.id; photoList=null; try{ if(window.cloudPrunePhotos)window.cloudPrunePhotos(t.id); }catch(e){} if(window.cloudGetPhotos)window.cloudGetPhotos(t.id).then(function(l){ if(photoListTeam===t.id){ photoList=l; if(teamTab==="photos")render(); } }); }
-      const addBtn=`<label style="${bigBtn(T.lime,'',T.field)};display:flex;align-items:center;justify-content:center;gap:9px;cursor:pointer">${ICN.camera} Add photos<input type="file" accept="image/*" multiple onchange="window.uploadTeamPhotos(this,'${t.id}')" style="display:none"></label>`;
+      const addBtn=`<label style="${bigBtn(T.lime,'')};display:flex;align-items:center;justify-content:center;gap:9px;cursor:pointer">${ICN.camera} Add photos<input type="file" accept="image/*" multiple onchange="window.uploadTeamPhotos(this,'${t.id}')" style="display:none"></label>`;
       const grid = photoList===null
         ? `<div style="font-size:13px;color:${T.sageDim};text-align:center;padding:20px">Loading photos…</div>`
         : (photoList.length
@@ -1997,7 +1997,7 @@ function actionArea(){
           <div style="flex:1;min-width:0;border-left:5px solid ${t.color};padding-left:10px">
             <div style="font-family:${MONO};font-size:22px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${(t.name||"Team").replace(/</g,"")}</div>
             <div style="font-family:${MONO};font-size:18px;color:${T.sage};margin-top:4px"><span style="color:${t.color};font-weight:800">${rec}</span> &middot; ${t.players.length} players</div></div></div>
-        <button data-act="teamchat" style="${bigBtn(T.lime,'',T.field)};font-size:17px">${ICN.chat} Team chat</button>
+        <button data-act="teamchat" style="${bigBtn(T.lime,'')};font-size:17px">${ICN.chat} Team chat</button>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
           ${hb("roster",IC('users',26),"Roster &amp; details")}
           ${hb("schedule",IC('calendar',26),"Schedule")}
@@ -2035,7 +2035,7 @@ function actionArea(){
         <span style="color:${r.color};font-weight:800;font-size:12px">PICK &rsaquo;</span></button>`;
     const searchBlock = (pickFor==="opp" && canSearch) ? `<div style="border-top:1px solid ${T.line};margin-top:4px;padding-top:10px">
         <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin-bottom:6px">Find a public team</div>
-        <div style="display:flex;gap:8px"><input id="finderQ" placeholder="Search team name" value="${(window._finderQ||'').replace(/"/g,'&quot;')}" style="${inpCss};flex:1;min-width:0"><button data-act="findteams" style="background:${T.lime};color:${T.field};border:none;border-radius:8px;padding:9px 16px;font-weight:800;font-size:13px">Search</button></div>
+        <div style="display:flex;gap:8px"><input id="finderQ" placeholder="Search team name" value="${(window._finderQ||'').replace(/"/g,'&quot;')}" style="${inpCss};flex:1;min-width:0"><button data-act="findteams" style="background:${T.lime};color:#fff;border:none;border-radius:8px;padding:9px 16px;font-weight:800;font-size:13px">Search</button></div>
         ${finderResults!==null?(finderResults.length?finderResults.map(resCard).join(""):`<div style="font-size:12px;color:${T.sageDim};margin-top:8px">No public teams match that name.</div>`):""}
       </div>` : "";
     return step(`Choose ${pickFor==="our"?"your team":"the opponent"}`,"Pick a saved team, a recent opponent, search the directory, or create one.",
@@ -2049,13 +2049,13 @@ function actionArea(){
     const dcard=(r)=>`<div style="display:flex;align-items:center;gap:10px;background:${T.surface};border:1px solid ${T.line};border-left:5px solid ${r.color};border-radius:10px;padding:10px 12px">
         <div style="flex:1;min-width:0"><div style="font-family:${MONO};font-size:16px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${(r.name||'').replace(/</g,'&lt;')}</div>
           <div style="font-size:11px;color:${T.sage};margin-top:2px">${r.players} players${r.statsPublic?` &middot; ${r.record.w}-${r.record.l}${r.record.t?'-'+r.record.t:''}`:''}</div></div>
-        <button data-act="viewteamstats" data-arg="${r.id}" style="background:${T.lime};color:${T.field};border:none;border-radius:8px;padding:8px 13px;font-weight:800;font-size:12px">View &rsaquo;</button></div>`;
+        <button data-act="viewteamstats" data-arg="${r.id}" style="background:${T.lime};color:#fff;border:none;border-radius:8px;padding:8px 13px;font-weight:800;font-size:12px">View &rsaquo;</button></div>`;
     const results = dirResults!==null
       ? (dirResults.length?dirResults.map(dcard).join(""):`<div style="font-size:12px;color:${T.sageDim};text-align:center;padding:12px">No public teams match that name.</div>`)
       : `<div style="font-size:12px;color:${T.sageDim};text-align:center;padding:12px;border:1px dashed ${T.line};border-radius:10px">Search to view any public team's roster &amp; season stats.</div>`;
     return step("Find a team","Browse teams that have opted to be public.",
       `<div style="display:flex;flex-direction:column;gap:8px">
-          <div style="display:flex;gap:8px"><input id="dirQ" placeholder="Search team name" value="${(window._dirQ||'').replace(/"/g,'&quot;')}" autocomplete="off" style="${inpCss};flex:1;min-width:0"><button data-act="dirsearch" style="background:${T.lime};color:${T.field};border:none;border-radius:8px;padding:9px 16px;font-weight:800;font-size:13px">Search</button></div>
+          <div style="display:flex;gap:8px"><input id="dirQ" placeholder="Search team name" value="${(window._dirQ||'').replace(/"/g,'&quot;')}" autocomplete="off" style="${inpCss};flex:1;min-width:0"><button data-act="dirsearch" style="background:${T.lime};color:#fff;border:none;border-radius:8px;padding:9px 16px;font-weight:800;font-size:13px">Search</button></div>
           ${results}</div>`,"gototeams");
   }
   if(mode==="teamstats"){
@@ -2083,7 +2083,7 @@ function actionArea(){
     const alreadyFav=DB.teams.some(x=>x.id===vt.id);
     const favBtn=alreadyFav
       ? `<button data-act="favpublicteam" style="${ghost};display:flex;align-items:center;justify-content:center;gap:9px;color:${T.amber}">${ICN.starFill} Following — tap to remove from my home</button>`
-      : `<button data-act="favpublicteam" style="${bigBtn(T.lime,'',T.field)};display:flex;align-items:center;justify-content:center;gap:9px">${ICN.star} Follow this team — add to my home</button>`;
+      : `<button data-act="favpublicteam" style="${bigBtn(T.lime,'')};display:flex;align-items:center;justify-content:center;gap:9px">${ICN.star} Follow this team — add to my home</button>`;
     return step("Team stats","",`<div style="display:flex;flex-direction:column;gap:12px">${head}${favBtn}<div style="font-size:11px;color:${T.sageDim};text-align:center;margin-top:-4px">Following just keeps this team on your home to watch — it does NOT make you a member.</div>${roster}${statBlock}</div>`,"opendirectory");
   }
   if(mode==="settings"){
@@ -2187,11 +2187,11 @@ function actionArea(){
           <select onchange="ngRulebook(this.value)" style="${selStyle}">${allRulebooks().map(r=>`<option value="${r.id}"${grb===r.id?" selected":""}>${(r.name||'').replace(/</g,'&lt;')}</option>`).join("")}</select>
           <button data-act="viewgamerulebook" style="width:100%;margin-top:8px;background:${T.surface2};color:${T.lime};border:1px solid ${T.line};border-radius:9px;padding:11px;font-family:${MONO};font-weight:800;font-size:14px;display:flex;align-items:center;justify-content:center;gap:8px">${ICN.doc} View rulebook</button></div>`;
     const ac=alertsCfg();
-    const aChip=(k,lbl)=>`<button data-act="alerttoggle" data-arg="${k}" style="background:${ac[k]?T.lime:T.surface2};border:1px solid ${ac[k]?T.lime:T.line};color:${ac[k]?T.field:T.sage};border-radius:999px;padding:7px 13px;font-family:${MONO};font-weight:800;font-size:12px">${lbl}</button>`;
+    const aChip=(k,lbl)=>`<button data-act="alerttoggle" data-arg="${k}" style="background:${ac[k]?T.lime:T.surface2};border:1px solid ${ac[k]?T.lime:T.line};color:${ac[k]?"#fff":T.sage};border-radius:999px;padding:7px 13px;font-family:${MONO};font-weight:800;font-size:12px">${lbl}</button>`;
     const alertsCard=`<div style="${rowCard};flex-wrap:wrap">
           <div style="flex:1;min-width:150px"><div style="font-weight:800;color:${T.ink};font-size:19px">Rule alerts</div>
             <div style="color:${T.sage};font-size:13px;margin-top:3px">Pop-up reminders during the game</div></div>
-          <button data-act="alerttoggle" data-arg="on" style="background:${ac.on?T.lime:T.surface2};border:1px solid ${ac.on?T.lime:T.line};color:${ac.on?T.field:T.sage};border-radius:999px;padding:10px 20px;font-family:${MONO};font-weight:800;font-size:15px;min-width:66px">${ac.on?"ON":"OFF"}</button>
+          <button data-act="alerttoggle" data-arg="on" style="background:${ac.on?T.lime:T.surface2};border:1px solid ${ac.on?T.lime:T.line};color:${ac.on?"#fff":T.sage};border-radius:999px;padding:10px 20px;font-family:${MONO};font-weight:800;font-size:15px;min-width:66px">${ac.on?"ON":"OFF"}</button>
           ${ac.on?`<div style="width:100%;display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">${aChip("runRule","Run rule")}${aChip("runCap","Run cap")}${aChip("pitch","Pitch limit")}${aChip("inning","Final inning")}</div>`:""}</div>`;
     const runCapCard=`<div style="${rowCard}">
           <div><div style="font-weight:800;color:${T.ink};font-size:19px">Run cap</div>
@@ -2209,14 +2209,14 @@ function actionArea(){
     const pitchTypeCard=`<div style="${rowCard}">
           <div><div style="font-weight:800;color:${T.ink};font-size:19px">Track pitch types</div>
             <div style="color:${T.sage};font-size:14px;margin-top:3px">Adds FB/CB/CH/SL/OTH per pitch while scoring</div></div>
-          <button data-act="advtoggle" style="background:${advPitch?T.lime:T.surface2};border:1px solid ${advPitch?T.lime:T.line};color:${advPitch?T.field:T.sage};border-radius:999px;padding:10px 20px;font-family:${MONO};font-weight:800;font-size:15px;min-width:66px">${advPitch?"ON":"OFF"}</button></div>`;
-    const startBtn=`<button data-act="ng-start" style="${bigBtn(T.lime,"width:100%;font-size:25px;padding:24px;box-shadow:0 8px 22px rgba(163,230,53,.22)",T.field)};flex:none;margin-top:2px">Start game &rarr;</button>`;
+          <button data-act="advtoggle" style="background:${advPitch?T.lime:T.surface2};border:1px solid ${advPitch?T.lime:T.line};color:${advPitch?"#fff":T.sage};border-radius:999px;padding:10px 20px;font-family:${MONO};font-weight:800;font-size:15px;min-width:66px">${advPitch?"ON":"OFF"}</button></div>`;
+    const startBtn=`<button data-act="ng-start" style="${bigBtn(T.lime,"width:100%;font-size:25px;padding:24px;box-shadow:0 8px 22px rgba(225,29,46,.22)",T.field)};flex:none;margin-top:2px">Start game &rarr;</button>`;
     // Print a lineup card pre-filled with the opponent + date/time from this game setup.
     const lineupCardBtn=`<button data-act="nglineupcard" style="${ghost};display:flex;align-items:center;justify-content:center;gap:9px;width:100%;flex:none">${ICN.doc} Print lineup card</button>`;
     // In settings mode (mid-game) we show ONLY the rule cards + Done — no team/side pickers,
     // and no "Start game" (that would reset the live game).
     const ruleCards=`${leagueCard}${rulebookCard}${runCapCard}${hittersCard}${pitchTypeCard}${alertsCard}${startCard}`;
-    const doneBtn=`<button data-act="settingsdone" style="${bigBtn(T.lime,"width:100%;font-size:22px;padding:20px",T.field)};flex:none;margin-top:2px">Done &#10003;</button>`;
+    const doneBtn=`<button data-act="settingsdone" style="${bigBtn(T.lime,"width:100%;font-size:22px;padding:20px")};flex:none;margin-top:2px">Done &#10003;</button>`;
     if(isWide()){
       if(setMode) return `<div style="min-height:100%;display:flex;flex-direction:column;gap:16px;justify-content:safe center">
             ${header}
@@ -2256,7 +2256,7 @@ function actionArea(){
         ${luToggle}
         <div style="flex:1 1 auto;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:6px">${orows}</div>
         <button data-act="oppadd" style="${ghost};flex-shrink:0">+ Add hitter</button>
-        <button data-act="lineupdone" style="${bigBtn(T.lime,"",T.field)}flex-shrink:0">Done</button>`;
+        <button data-act="lineupdone" style="${bigBtn(T.lime,"")}flex-shrink:0">Done</button>`;
     }
     const rows=G.lineup.order.map((ri,slot)=>{const p=ROSTER[ri],pos=posOfPlayer(ri)||"—",isP=pos==="P";
       return `<div data-row data-ri="${ri}" style="display:flex;align-items:center;gap:6px;background:${T.surface};border:1px solid ${T.line};border-radius:9px;padding:8px 8px">
@@ -2281,7 +2281,7 @@ function actionArea(){
         <button data-act="rembatter" style="${ghost};flex:1" ${n<=9?"disabled":""}>&minus; Remove last</button></div>
       <div style="flex-shrink:0"><div style="font-size:10px;color:${T.sageDim};letter-spacing:.6px;margin:0 2px 5px">BENCH</div>
         <div style="display:flex;flex-wrap:wrap;gap:5px">${bench||`<span style="font-size:12px;color:${T.sageDim}">No bench players</span>`}</div></div>
-      <button data-act="lineupdone" style="${bigBtn(T.lime,"",T.field)}flex-shrink:0">Done</button>`;
+      <button data-act="lineupdone" style="${bigBtn(T.lime,"")}flex-shrink:0">Done</button>`;
   }
   if(mode==="pickplayer"){
     const pitcherPick=editSlot===-1, cur=pitcherPick?G.lineup.pos.P:G.lineup.order[editSlot];
@@ -2341,7 +2341,7 @@ function actionArea(){
     const pp=pitchers.map(x=>`<tr style="border-top:1px solid ${T.line}"><td style="text-align:left;padding:5px 6px;font-weight:700;white-space:nowrap">${(x.name||'').replace(/</g,'')}</td><td style="padding:11px 6px">${x.ip}</td><td style="padding:11px 6px">${x.pc}</td><td style="padding:11px 6px">${x.h}</td><td style="padding:11px 6px">${x.r}</td><td style="padding:11px 6px">${x.bb}</td><td style="padding:11px 6px">${x.k}</td></tr>`).join("");
     const pitchBlock=pitchers.length?`<div><div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin:0 2px 4px">${selName} &mdash; pitching</div>
           <div style="overflow-x:auto;background:${T.surface};border:1px solid ${T.line};border-radius:10px;padding:4px 6px"><table style="width:100%;border-collapse:collapse;font-family:${MONO};font-size:17px;text-align:center;color:${T.chalk}"><thead><tr style="color:${T.sageDim};font-size:13px"><th style="text-align:left;padding:4px 6px">Pitcher</th><th title="Innings pitched">IP</th><th title="Pitches">P</th><th>H</th><th>R</th><th>BB</th><th>K</th></tr></thead><tbody>${pp}</tbody></table></div></div>`:"";
-    const stBtn=(v,lbl)=>`<button data-act="sumteam" data-arg="${v}" style="flex:1;background:${summaryTeam===v?T.lime:T.surface2};color:${summaryTeam===v?T.field:T.sage};border:1px solid ${summaryTeam===v?T.lime:T.line};border-radius:9px;padding:9px 0;font-family:${MONO};font-weight:800;font-size:13px;letter-spacing:.4px;text-transform:uppercase">${lbl}</button>`;
+    const stBtn=(v,lbl)=>`<button data-act="sumteam" data-arg="${v}" style="flex:1;background:${summaryTeam===v?T.lime:T.surface2};color:${summaryTeam===v?"#fff":T.sage};border:1px solid ${summaryTeam===v?T.lime:T.line};border-radius:9px;padding:9px 0;font-family:${MONO};font-weight:800;font-size:13px;letter-spacing:.4px;text-transform:uppercase">${lbl}</button>`;
     const teamToggle=`<div style="display:flex;gap:6px">${stBtn("us",OUR.short||"Us")}${stBtn("opp",(OPP.short||"Opp"))}</div>`;
     return `<div style="display:flex;flex-direction:column;gap:14px">
         <div style="text-align:center">
@@ -2725,7 +2725,7 @@ function render(){
         <div style="display:flex;flex-direction:column;align-items:flex-end;min-width:0">
           <span style="font-family:${MONO};font-size:10px;font-weight:800;letter-spacing:1.5px;color:${pitchClr}">&#9899; PITCHING</span>
           <span style="font-size:18px;color:${T.chalk};font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%">${currentPitcherName()} &middot; ${pitchTeam}</span></div></div>`;
-    const tab=(id,label)=>`<button data-act="pane" data-arg="${id}" style="flex:1;background:${phonePane===id?T.lime:T.surface};border:2px solid ${phonePane===id?T.lime:T.line};color:${phonePane===id?T.field:T.sage};border-radius:10px;padding:9px;font-family:${MONO};font-weight:800;font-size:14px;letter-spacing:.6px;text-transform:uppercase">${label}</button>`;
+    const tab=(id,label)=>`<button data-act="pane" data-arg="${id}" style="flex:1;background:${phonePane===id?T.lime:T.surface};border:2px solid ${phonePane===id?T.lime:T.line};color:${phonePane===id?"#fff":T.sage};border-radius:10px;padding:9px;font-family:${MONO};font-weight:800;font-size:14px;letter-spacing:.6px;text-transform:uppercase">${label}</button>`;
     const pane=phonePane==="video"
       ? `<div style="flex:1;min-height:0;display:flex;flex-direction:column;justify-content:center;gap:11px">${monitorPane()}</div>`
       : isView
@@ -2838,7 +2838,7 @@ document.getElementById("app").addEventListener("click",e=>{
     // Same share sheet as the game (QR + Email / Text / Copy) so the operator can send the
     // join link any way they like — consistent with "Share the game".
     const sub=isEmail
-      ? `<b style="color:#A3E635">${v.replace(/</g,"&lt;")}</b> is authorized. Send them the link to join.`
+      ? `<b style="color:#E11D2E">${v.replace(/</g,"&lt;")}</b> is authorized. Send them the link to join.`
       : `Scan it, or send the link — they sign in once and they're in.`;
     openShareLink({ url:url, title:"INVITE TO "+team.toUpperCase().replace(/</g,"&lt;"),
       sub:sub, subject:"Join "+team+" on All-Stars Live",
@@ -2942,7 +2942,7 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="deleteteam"){ const delId=openTeamId; const td=teamById(delId); if(!td)return; confirmAct={title:"Delete "+(td.name||"team")+"?",msg:"This removes the roster and all season stats and can't be undone.",yes:"Delete",danger:true,run:function(){ try{ if(window.cloudDeleteTeam)cloudDeleteTeam(delId); }catch(e){} DB.teams=DB.teams.filter(t=>t.id!==delId); if(curTeamId===delId)curTeamId=null; openTeamId=null; teamTab="hub"; saveDB(); mode="teams"; render(); }}; render(); }
   else if(act==="shareteam"){ const t=teamById(openTeamId); if(!t)return; const url=appBaseUrl()+"?follow="+encodeURIComponent(openTeamId); const nm=(t.name||"our team"); const nmE=nm.replace(/</g,"&lt;");
     openShareLink({ url:url, title:"SHARE "+nm.toUpperCase().replace(/</g,"&lt;"),
-      sub:`Parents &amp; fans can <b style="color:#A3E635">follow ${nmE}</b> — watch live &amp; chat (no scoring).`,
+      sub:`Parents &amp; fans can <b style="color:#E11D2E">follow ${nmE}</b> — watch live &amp; chat (no scoring).`,
       subject:"Follow "+nm+" on All-Stars Live",
       body:nm+" posts live games on All-Stars Live, a free youth-baseball scoreboard app. Follow the team to watch games live, see the schedule, and join the team chat:" }); }
   else if(act==="togglepublic"){ const t=teamById(openTeamId); if(t&&window.cloudIsOwner&&window.cloudIsOwner(t)){ t.public=!t.public; saveDB(); flash(t.public?"Team is now public":"Team is now private"); render(); } }
@@ -2990,7 +2990,7 @@ function renderToolbar(){
   // In a live game the title slot becomes the Scorer/Viewer role toggle (the matchup
   // already shows in the scorebug below — no need to repeat it here).
   const scorerLocked=!canScoreNow();   // signed-in follower (not a scorer) → grey the Scorer tab
-  const roleSeg=(r,lbl)=>{const lock=(r==="scorer"&&scorerLocked);return `<button data-act="role" data-arg="${r}" title="${lock?'Scorers only — ask the owner for access':''}" style="padding:8px 14px;border:none;font-family:${MONO};font-weight:800;font-size:13px;letter-spacing:.5px;text-transform:uppercase;cursor:${lock?'not-allowed':'pointer'};background:${viewMode===r?T.lime:"transparent"};color:${viewMode===r?T.field:T.sage};${lock?'opacity:.4':''};display:inline-flex;align-items:center;gap:5px">${lbl}${lock?IC('key',12):''}</button>`;};
+  const roleSeg=(r,lbl)=>{const lock=(r==="scorer"&&scorerLocked);return `<button data-act="role" data-arg="${r}" title="${lock?'Scorers only — ask the owner for access':''}" style="padding:8px 14px;border:none;font-family:${MONO};font-weight:800;font-size:13px;letter-spacing:.5px;text-transform:uppercase;cursor:${lock?'not-allowed':'pointer'};background:${viewMode===r?T.lime:"transparent"};color:${viewMode===r?"#fff":T.sage};${lock?'opacity:.4':''};display:inline-flex;align-items:center;gap:5px">${lbl}${lock?IC('key',12):''}</button>`;};
   const chip=(playMode2&&viewerLocked)
     ? `<div style="display:inline-flex;align-items:center;gap:8px"><span style="display:inline-flex;align-items:center;gap:5px;background:${T.surface};border:1px solid ${T.line};border-radius:999px;padding:5px 11px;font-family:${MONO};font-size:11px;font-weight:800;letter-spacing:1px;color:${T.lime}">${IC('eye',14)} WATCHING</span><span style="font-family:${MONO};font-weight:700;font-size:15px;color:${T.chalk}">${OUR.short||"US"} <span style="color:${T.sageDim};font-weight:600">vs</span> ${OPP.short||"OPP"}</span></div>`
     : playMode2
@@ -2999,10 +2999,10 @@ function renderToolbar(){
       ? `${OUR.short||"US"} <span style="color:${T.sageDim};font-weight:600">vs</span> ${OPP.short||"OPP"}`
       : `ALL-STARS <span style="color:${T.lime}">LIVE</span>`;
   const conn=LINK.connected(), hasRelay=LINK.hasRelay();
-  const dot = !hasRelay ? {c:T.sageDim,l:"LOCAL"} : conn ? {c:T.safe,l:"LIVE"} : {c:T.out,l:"OFFLINE"};
+  const dot = !hasRelay ? {c:T.sageDim,l:"LOCAL"} : conn ? {c:T.live,l:"LIVE"} : {c:T.out,l:"OFFLINE"};
   // Wide-only: slide the video monitor in/out for distraction-free scoring.
   const playMode=!menuModes.includes(mode);
-  const vidToggle=(isWide()&&playMode)?`<button data-act="togglevideo" title="${monitorOn?"Hide video":"Show video"}" style="display:flex;align-items:center;gap:7px;background:${monitorOn?T.surface2:T.lime};border:1px solid ${monitorOn?T.line:T.lime};color:${monitorOn?T.chalk:T.field};border-radius:10px;padding:9px 13px;font-size:14px;font-weight:800">
+  const vidToggle=(isWide()&&playMode)?`<button data-act="togglevideo" title="${monitorOn?"Hide video":"Show video"}" style="display:flex;align-items:center;gap:7px;background:${monitorOn?T.surface2:T.lime};border:1px solid ${monitorOn?T.line:T.lime};color:${monitorOn?T.chalk:"#fff"};border-radius:10px;padding:9px 13px;font-size:14px;font-weight:800">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>${monitorOn?"Hide video":"Show video"}</button>`:"";
   // Game controls moved UP into the top bar (wide + scorer + idle) so the bottom row is
   // freed for a bigger video + field. Phone keeps its own bottom footer.
@@ -3051,7 +3051,7 @@ function renderChatList(){
   box.innerHTML=chatMsgs.map(m=>{ const mine=m.authorUid===myUid; const canDel=mine||owner;
     const when=(()=>{try{return new Date(m.ts).toLocaleString(undefined,{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"});}catch(e){return "";}})();
     return `<div style="align-self:${mine?"flex-end":"flex-start"};max-width:84%;background:${mine?"#1E2C16":"#1A2233"};border:1px solid ${mine?"#3A5A1E":"#2A3650"};border-radius:12px;padding:8px 11px">
-        <div style="font-size:11px;color:${mine?"#A3E635":"#8FA0BD"};font-weight:800;margin-bottom:2px">${(m.authorName||"Someone").replace(/</g,"&lt;")}${canDel?` <button data-act="delmsg" data-arg="${m.id}" style="background:none;border:none;color:#E2574C;font-size:11px;font-weight:700;cursor:pointer;padding:0 0 0 6px">delete</button>`:""}</div>
+        <div style="font-size:11px;color:${mine?"#E11D2E":"#8FA0BD"};font-weight:800;margin-bottom:2px">${(m.authorName||"Someone").replace(/</g,"&lt;")}${canDel?` <button data-act="delmsg" data-arg="${m.id}" style="background:none;border:none;color:#E2574C;font-size:11px;font-weight:700;cursor:pointer;padding:0 0 0 6px">delete</button>`:""}</div>
         <div style="font-size:14px;color:#EAEDF2;line-height:1.4;white-space:pre-wrap;word-break:break-word">${(m.text||"").replace(/</g,"&lt;")}</div>
         <div style="font-size:10px;color:#5B6880;margin-top:3px">${when}</div></div>`;}).join("");
   box.scrollTop=box.scrollHeight;
@@ -3104,7 +3104,7 @@ window.rulesSearch=function(q){
   if(!q){ body.innerHTML=_rulesParas.map(p=>`<p style="margin:0 0 12px">${esc(p)}</p>`).join(""); if(cnt)cnt.textContent=_rulesParas.length+" sections"; body.scrollTop=0; return; }
   const ql=q.toLowerCase(); const re=new RegExp("("+q.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+")","ig");
   const hits=_rulesParas.filter(p=>p.toLowerCase().indexOf(ql)>=0);
-  body.innerHTML = hits.length ? hits.map(p=>`<p style="margin:0 0 12px">${esc(p).replace(re,'<mark style="background:#A3E635;color:#08111f">$1</mark>')}</p>`).join("") : `<div style="color:#8290AC;text-align:center;padding:24px">No rule text matches &ldquo;${esc(q)}&rdquo;.</div>`;
+  body.innerHTML = hits.length ? hits.map(p=>`<p style="margin:0 0 12px">${esc(p).replace(re,'<mark style="background:#E11D2E;color:#fff">$1</mark>')}</p>`).join("") : `<div style="color:#8290AC;text-align:center;padding:24px">No rule text matches &ldquo;${esc(q)}&rdquo;.</div>`;
   if(cnt)cnt.textContent=hits.length+" match"+(hits.length===1?"":"es"); body.scrollTop=0;
 };
 (function(){ const rm=document.getElementById("rulesmodal"); if(rm)rm.addEventListener("click",e=>{ if(e.target.id==="rulesmodal")closeRules(); }); })();
@@ -3178,12 +3178,12 @@ function openShare(){
   // Title + subtitle: game share by default, custom when sharing an invite/team link.
   const tEl=document.getElementById("qrTitle"), sEl=document.getElementById("qrSub");
   if(tEl) tEl.textContent = shareCtx ? (shareCtx.title||"SHARE LINK") : "SHARE THE GAME";
-  if(sEl) sEl.innerHTML = shareCtx ? (shareCtx.sub||'Nearby? Have them <b style="color:#A3E635">scan</b>. Far away? send the link.') : 'Nearby? Have them <b style="color:#A3E635">scan</b>. Far away? Send the link.';
+  if(sEl) sEl.innerHTML = shareCtx ? (shareCtx.sub||'Nearby? Have them <b style="color:#E11D2E">scan</b>. Far away? send the link.') : 'Nearby? Have them <b style="color:#E11D2E">scan</b>. Far away? Send the link.';
   const hasVid=!shareCtx&&!!streamYt();
   if(!hasVid) shareMode="feed";
   const tog=document.getElementById("shareToggle");
   if(tog){
-    const pill=(m,lbl)=>`<button data-act="sharemode" data-arg="${m}" style="padding:8px 16px;border:none;font-family:'Barlow',sans-serif;font-weight:800;font-size:13px;cursor:pointer;background:${shareMode===m?"#A3E635":"transparent"};color:${shareMode===m?"#0B0E13":"#B7C2D6"}">${lbl}</button>`;
+    const pill=(m,lbl)=>`<button data-act="sharemode" data-arg="${m}" style="padding:8px 16px;border:none;font-family:'Barlow',sans-serif;font-weight:800;font-size:13px;cursor:pointer;background:${shareMode===m?"#E11D2E":"transparent"};color:${shareMode===m?"#fff":"#B7C2D6"}">${lbl}</button>`;
     tog.innerHTML = hasVid
       ? `<div style="display:inline-flex;background:#10141A;border:1px solid #4A5870;border-radius:9px;overflow:hidden;margin-bottom:12px">${pill("feed","Game feed")}${pill("video","Feed + video")}</div>`
       : "";
@@ -3324,7 +3324,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v100";
+var APP_VERSION="v101";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
@@ -3344,7 +3344,7 @@ try{
     navigator.serviceWorker.addEventListener("controllerchange", function(){
       if(swRefreshing) return; swRefreshing=true;
       try{ var t=document.createElement("div"); t.textContent="Updating to the latest version…";
-        t.setAttribute("style","position:fixed;z-index:99999;left:50%;top:14px;transform:translateX(-50%);background:#A3E635;color:#0B0E13;font-family:system-ui,sans-serif;font-weight:800;font-size:13px;padding:8px 16px;border-radius:999px;box-shadow:0 6px 20px rgba(0,0,0,.5)");
+        t.setAttribute("style","position:fixed;z-index:99999;left:50%;top:14px;transform:translateX(-50%);background:#E11D2E;color:#fff;font-family:system-ui,sans-serif;font-weight:800;font-size:13px;padding:8px 16px;border-radius:999px;box-shadow:0 6px 20px rgba(0,0,0,.5)");
         document.body.appendChild(t); }catch(e){}
       setTimeout(function(){ location.reload(); }, 350);
     });
@@ -3380,7 +3380,7 @@ try{
     if(document.getElementById("pwa-install"))return;
     var b=document.createElement("button");
     b.id="pwa-install"; b.textContent="⬇  Install app";
-    b.setAttribute("style","position:fixed;z-index:9999;left:50%;bottom:14px;transform:translateX(-50%);background:#A3E635;color:#0B0E13;border:none;border-radius:999px;padding:10px 18px;font-family:'Barlow',system-ui,sans-serif;font-weight:800;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.5);cursor:pointer");
+    b.setAttribute("style","position:fixed;z-index:9999;left:50%;bottom:14px;transform:translateX(-50%);background:#E11D2E;color:#fff;border:none;border-radius:999px;padding:10px 18px;font-family:'Barlow',system-ui,sans-serif;font-weight:800;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.5);cursor:pointer");
     b.onclick=function(){ if(!deferred)return; deferred.prompt(); deferred.userChoice.finally(function(){ deferred=null; var x=document.getElementById("pwa-install"); if(x)x.remove(); }); };
     document.body.appendChild(b);
   }
