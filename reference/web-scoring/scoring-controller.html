@@ -135,6 +135,7 @@
 </head>
 <body>
 <div id="splash"><img class="sp-a" src="icons/logo-emblem.png" alt="" onerror="if(this.src.indexOf('logo-star')<0){this.src='icons/logo-star.png';}else if(this.src.indexOf('icon-512')<0){this.src='icons/icon-512.png';this.style.borderRadius='22px';}else{this.style.display='none';}"><div class="sp-logo">ALL-STARS <span>LIVE</span></div></div>
+<script>/* Native shows the OS splash (star) already — hide the web splash instantly so it never flashes the badge fallback. */try{if(window.AllStars&&window.AllStars.isApp){var _s=document.getElementById("splash");if(_s)_s.parentNode.removeChild(_s);}}catch(e){}</script>
 <div id="wrap"><div id="app">
   <div id="toolbar" style="flex-shrink:0"></div>
   <div id="content" style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px"></div>
@@ -3560,7 +3561,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v111";
+var APP_VERSION="v112";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
