@@ -733,6 +733,11 @@ window.ngRulebook=function(v){ G.rulebookId=v; render(); };
 let settingsMode=false;   // true = Game Setup opened mid-game (Done returns to play, never resets)
 let teamTab="hub";        // team page: "hub" (grid of sections) or a section: roster/schedule/stats/access/rules
 let viewGameId=null;      // when teamTab==="gameview": which finished game (t.games[].id) to show
+// Team photo gallery is gated OFF until a (free) photo store is chosen — Firebase Storage needs
+// the Blaze plan, which this project isn't on. Flip PHOTOS_ENABLED to true (after finishing the
+// chosen backend's setup) to re-show the Photos tile + tab; all the gallery code below stays
+// intact meanwhile, so re-enabling is a one-line change.
+const PHOTOS_ENABLED=false;
 let photoList=null, photoListTeam=null, photoZoom=null;   // team photo gallery (cloud subcollection)
 
 /* ===== rule-reminder popups (run cap / run rule / pitch limit / final inning) ===== */
@@ -1938,6 +1943,7 @@ function actionArea(){
     if(teamTab==="stats") return secWrap(`${secHdr("Stats &amp; games")}${recEditor}${gamesBlock}${statTable}`);
     if(teamTab==="access") return secWrap(`${secHdr("Team access")}${scorersSection}${discoverySection}`);
     if(teamTab==="rules"){ teamTab="roster"; return actionArea(); }   // rules folded into Roster & details
+    if(teamTab==="photos"&&!PHOTOS_ENABLED){ teamTab="hub"; return actionArea(); }   // gallery gated off
     if(teamTab==="photos"){
       const C=window.Cloud, signedIn=!!(C&&C.enabled&&C.user);
       const member=signedIn && (!(window.cloudIsMember) || window.cloudIsMember(t));
@@ -1978,7 +1984,7 @@ function actionArea(){
           ${hb("roster",IC('users',26),"Roster &amp; details")}
           ${hb("schedule",IC('calendar',26),"Schedule")}
           ${hb("stats",IC('chart',26),"Stats &amp; games")}
-          ${hb("photos",IC('camera',26),"Photos")}
+          ${PHOTOS_ENABLED?hb("photos",IC('camera',26),"Photos"):""}
           ${(!(C&&C.enabled)||(window.cloudIsScorer&&window.cloudIsScorer(t)))?hb("access",IC('key',26),"Scorers &amp; co-owners"):""}
           ${hbAct("shareteam",IC('share',26),"Share &amp; invite")}
         </div>
@@ -3242,7 +3248,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v96";
+var APP_VERSION="v97";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
