@@ -933,6 +933,7 @@ function applyRemote(raw){
     gameActive=true; _remoteLive=true;
     if(["home","teams","team","pickteam","newgame","lineup","pickplayer","pickpos","editplayer","summary","settings"].includes(mode)) mode="idle";
     render();
+    try{ triggerAnim(G.anim); }catch(e){}   // play the ball-flight + baserunning animation for the viewer
   }catch(e){}
 }
 let _seq=0,_event=null,_eventId=0,_pitch=null;
@@ -1083,6 +1084,8 @@ function setDest(i,c){const m=plan[i];if(!m||m.out)return;const floor=m.start===
 function commit(r,movers){
   snapshot();recordPitch("inplay");const outs=outsFromKind(r.kind);   // the pitch that was put in play
   if(G.ab&&tap)G.ab.loc={zone:tap.zone,pos:tap.pos};   // remember where it was hit
+  // one-shot animation payload (ball flight + runner paths) — rides the full-G broadcast to viewers
+  try{ const _ap=planPaths(movers); G.anim={ id:((G.anim&&G.anim.id)||0)+1, ts:Date.now(), hit:(tap?{x:tap.x,y:tap.y}:null), k:r.kind, paths:_ap.map(p=>({pts:p.pts,color:p.color,scored:!!p.scored,out:!!p.out})) }; }catch(e){}
   const k0=battingKey(),bn=batter().name;
   const runs=resolve(movers,outs);                 // capped runs that actually count
   const rbi=rbiEligible(r.kind)?runs:0;
@@ -1092,6 +1095,7 @@ function commit(r,movers){
   const capped=capReached(); if(capped)doFlip(); else flipIfNeeded();
   bcastEvent(r.kind, bn+(runs?` · ${runs} run${runs>1?"s":""}`:"")+(rbi?` · ${rbi} RBI`:""), k0);
   flash(r.note+(runs?` · ${runs} run${runs>1?"s":""}`:"")+(rbi?` · ${rbi} RBI`:"")+(capped?" · run cap":""));resetUI();render();broadcast();
+  try{ triggerAnim(G.anim); }catch(e){}
 }
 function planState(plan){
   const bases={1:null,2:null,3:null},scored=[];
@@ -1109,6 +1113,35 @@ function planPaths(movers){
     const pts=[];for(let k=m.start;k<=m.dest;k++)pts.push(off(BPATH[k]));
     return {out:false,scored:m.dest===4,color:m.color,pts};
   });
+}
+/* ---- one-shot play animation for the diamond: the ball flies to where it was hit and the
+   runners travel the bases. Built from tap (hit location) + planPaths (runner paths) at commit,
+   ridden to viewers on the full-G broadcast, played once (deduped by id, skipped if stale). ---- */
+let playAnim=null,_lastAnimId=0,_animTimer=null;
+function triggerAnim(a){
+  if(!a||!a.id||a.id===_lastAnimId) return;
+  if(a.ts&&(Date.now()-a.ts)>6000){ _lastAnimId=a.id; return; }   // reload / late join — don't replay an old play
+  _lastAnimId=a.id; playAnim=a;
+  if(_animTimer)clearTimeout(_animTimer);
+  try{render();}catch(e){}
+  _animTimer=setTimeout(function(){ playAnim=null; try{render();}catch(e){} },1800);
+}
+function playAnimSVG(){
+  const a=playAnim; if(!a) return "";
+  let s="";
+  if(a.hit){ const hx=+a.hit.x,hy=+a.hit.y,mx=(150+hx)/2,my=Math.max(2,Math.min(hy,150)-46);   // arc up toward the hit
+    s+=`<g opacity="0"><animate attributeName="opacity" values="0;1;1;0" keyTimes="0;.08;.78;1" dur="0.62s" begin="0s" fill="freeze"/>
+        <circle r="5.6" fill="#fff" stroke="#C0392B" stroke-width="1"/><path d="M-3.6 0 A4 4 0 0 1 3.6 0" fill="none" stroke="#C0392B" stroke-width="0.7"/>
+        <animateMotion path="M150,250 Q${mx.toFixed(1)},${my.toFixed(1)} ${hx.toFixed(1)},${hy.toFixed(1)}" dur="0.6s" begin="0s" fill="freeze"/></g>`;
+    s+=`<circle cx="${hx}" cy="${hy}" r="3" fill="none" stroke="${T.clay}" stroke-width="2.2" opacity="0"><animate attributeName="r" values="3;15" dur="0.5s" begin="0.5s" fill="freeze"/><animate attributeName="opacity" values=".95;0" dur="0.5s" begin="0.5s" fill="freeze"/></circle>`;
+  }
+  (a.paths||[]).forEach(p=>{ if(p.out||!p.pts||p.pts.length<2)return;
+    const d="M"+p.pts.map(pt=>(+pt[0]).toFixed(1)+","+(+pt[1]).toFixed(1)).join(" L ");
+    s+=`<circle r="6.2" fill="${p.color||"#fff"}" stroke="#0C1410" stroke-width="1.2" opacity="0">
+        <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;.12;.85;1" dur="0.95s" begin="0.22s" fill="freeze"/>
+        <animateMotion path="${d}" dur="0.95s" begin="0.22s" fill="freeze"/></circle>`;
+  });
+  return s;
 }
 /* zone overlay for testing — colours every cell by what zoneFromPoint returns */
 function pointInPoly(p,poly){
@@ -1158,7 +1191,7 @@ function diamondSVG(){
       <path d="${d}" fill="none" stroke="${p.color}" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="7 4" marker-end="url(#${MARKERID(p.color)})"/>`;}).join("");
   const marker=tap?`<g><circle cx="${tap.x}" cy="${tap.y}" r="9" fill="none" stroke="${FIELDLINE}" stroke-width="3"/><circle cx="${tap.x}" cy="${tap.y}" r="9" fill="none" stroke="${T.clay}" stroke-width="1.75"/>
       <circle cx="${tap.x}" cy="${tap.y}" r="3" fill="${T.clay}"/></g>`:"";
-  const ballFly="";
+  const ballFly=playAnimSVG();
   // Mower/lawn stripes: radiating wedges from home plate across the outfield fan,
   // alternating subtle light/dark like a groomed field (echoes the turf background).
   const lawnStripes=(()=>{
@@ -3465,7 +3498,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v104";
+var APP_VERSION="v105";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
