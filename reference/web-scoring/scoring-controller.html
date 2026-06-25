@@ -1745,9 +1745,9 @@ function actionArea(){
     // Home header = the transparent "A" logo floating over the turf (no banner box).
     // Falls back to the text wordmark until icons/logo-mark.png (transparent) is added.
     const hero = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:6px 0 2px;flex:none">
-          <img src="icons/logo-star.png" alt=""
-            onerror="if(this.src.indexOf('icon-512')<0){this.src='icons/icon-512.png';this.style.borderRadius='20px';}else{this.style.display='none';}"
-            style="height:clamp(130px,calc(var(--avh) * 26),260px);width:auto;display:block;filter:drop-shadow(0 8px 20px rgba(0,0,0,.55))">
+          <img src="icons/logo-emblem.png" alt=""
+            onerror="if(this.src.indexOf('logo-star')<0){this.src='icons/logo-star.png';}else if(this.src.indexOf('icon-512')<0){this.src='icons/icon-512.png';this.style.borderRadius='20px';}else{this.style.display='none';}"
+            style="height:clamp(150px,calc(var(--avh) * 30),300px);width:auto;display:block;filter:drop-shadow(0 8px 18px rgba(0,0,0,.6))">
           <div style="font-family:${MONO};font-size:clamp(26px,4.2vw,46px);font-weight:800;letter-spacing:1.5px;line-height:1;color:#fff">ALL-STARS <span style="color:${T.lime}">LIVE</span></div></div>`;
     const resumeBtn = gameActive?`<button data-act="resume" style="${bigBtn("#FFFFFF","border:1px solid rgba(0,0,0,.10)",T.field)};font-size:17px;padding:16px;display:flex;align-items:center;justify-content:center;gap:8px">${IC(PLAY)} Resume &middot; ${OUR.short} vs ${OPP.short}</button>`:"";
     const newGameBtn = `<button data-act="newgamestart" style="${bigBtn(T.lime,"font-size:21px;padding:17px;border:2px solid rgba(255,255,255,.92);box-shadow:0 8px 22px rgba(225,29,46,.34)")}">${IC(PLAY)} New Game</button>`;
@@ -3465,7 +3465,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v103";
+var APP_VERSION="v104";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
