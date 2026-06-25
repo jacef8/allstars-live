@@ -2539,8 +2539,8 @@ function render(){
   // scoring tools on one page. Phone (narrow) = too small for both, so PAGE between a
   // Video page and a Scoring page with a toggle (phonePane).
   const controls=footer;   // undo + (idle: home/lineup/endgame); empty during transient picker steps
-  const shareBtn=`<button data-act="share" style="${bigBtn(T.surface2,"border:2px solid "+T.line+";font-size:16px",T.chalk)}">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="${T.lime}" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="19" r="2.6"/><path d="M8.3 10.8 15.7 6.4M8.3 13.2l7.4 4.4"/></svg>Share with fans</button>`;
+  // (No separate "Share with fans" button here — the top toolbar's "Share" is always present
+  // in a live game, on every pane/width, so a second one in the video pane was a duplicate.)
   const fieldEl=`<div style="${fieldStyle};display:flex;align-items:center;justify-content:center;position:relative">${diamondSVG()}${toastEl}</div>`;
   const actionEl=pickerModal?"":`<div id="action-area" style="display:flex;flex-direction:column;gap:8px;${actionStyle}">${actionArea()}</div>`;
   // Wide (tablet): a single compact row under a BIGGER monitor — instead of a full-width
@@ -2646,7 +2646,7 @@ function render(){
           <span style="font-size:18px;color:${T.chalk};font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%">${currentPitcherName()} &middot; ${pitchTeam}</span></div></div>`;
     const tab=(id,label)=>`<button data-act="pane" data-arg="${id}" style="flex:1;background:${phonePane===id?T.lime:T.surface};border:2px solid ${phonePane===id?T.lime:T.line};color:${phonePane===id?T.field:T.sage};border-radius:10px;padding:9px;font-family:${MONO};font-weight:800;font-size:14px;letter-spacing:.6px;text-transform:uppercase">${label}</button>`;
     const pane=phonePane==="video"
-      ? `<div style="flex:1;min-height:0;display:flex;flex-direction:column;justify-content:center;gap:11px">${monitorPane()}${isView?"":shareBtn}</div>`
+      ? `<div style="flex:1;min-height:0;display:flex;flex-direction:column;justify-content:center;gap:11px">${monitorPane()}</div>`
       : isView
         ? `<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px">${statusBar()}${batterCard()}${fieldEl}${feedPanel()}</div>`
         : `<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px">${focusPlay?"":statusBar()}${batterCard()}${focusPlay?fieldEl:pcLine+'<div style="flex:1;min-height:0"></div>'}${actionEl}${controls}</div>`;
@@ -3229,7 +3229,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v93";
+var APP_VERSION="v94";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
