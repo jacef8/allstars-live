@@ -134,7 +134,7 @@
 </style>
 </head>
 <body>
-<div id="splash"><img class="sp-a" src="icons/logo-mark.png" alt="" onerror="if(this.src.indexOf('icon-512')<0){this.src='icons/icon-512.png';this.style.borderRadius='22px';}else{this.style.display='none';}"><div class="sp-logo">ALL-STARS <span>LIVE</span></div></div>
+<div id="splash"><img class="sp-a" src="icons/logo-emblem.png" alt="" onerror="if(this.src.indexOf('logo-star')<0){this.src='icons/logo-star.png';}else if(this.src.indexOf('icon-512')<0){this.src='icons/icon-512.png';this.style.borderRadius='22px';}else{this.style.display='none';}"><div class="sp-logo">ALL-STARS <span>LIVE</span></div></div>
 <div id="wrap"><div id="app">
   <div id="toolbar" style="flex-shrink:0"></div>
   <div id="content" style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px"></div>
@@ -1367,7 +1367,9 @@ function parseYouTubeId(s){
 const IS_APP = !!(window.AllStars && window.AllStars.isApp);
 // In the native app only: go transparent so the native camera-preview layer shows through
 // the monitor region. In a browser/PWA the dark #0B0E13 background (CSS) stays.
-if(IS_APP){ document.documentElement.style.background="transparent"; document.body.style.background="transparent"; var _w=document.getElementById("wrap"); if(_w)_w.style.background="transparent"; }
+if(IS_APP){ document.documentElement.style.background="transparent"; document.body.style.background="transparent"; var _w=document.getElementById("wrap"); if(_w)_w.style.background="transparent";
+  // Native already shows the OS splash (star) — drop the in-app web splash so launch isn't 3 splashes.
+  try{ var _sp=document.getElementById("splash"); if(_sp)_sp.remove(); }catch(e){} }
 window.__bcastPhase = "OFFLINE";
 window.__bcast = function(phase, videoId){
   window.__bcastPhase = phase || "OFFLINE";
@@ -3558,7 +3560,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v109";
+var APP_VERSION="v110";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
