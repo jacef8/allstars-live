@@ -254,7 +254,17 @@ let ROSTER=genericRoster();
 function pFull(p){ if(!p)return ""; const f=(p.first||"").trim(), l=(p.last||"").trim(); const n=(f+" "+l).trim(); return n||p.name||""; }
 function pBug(p){ if(!p)return ""; const f=(p.first||"").trim(), l=(p.last||"").trim(); if(l) return (f?f.charAt(0).toUpperCase()+". ":"")+l; return f||p.name||""; }
 function ensureName(p){ if(!p)return; if(p.first===undefined&&p.last===undefined){ const parts=(p.name||"").trim().split(/\s+/).filter(Boolean); if(parts.length>=2){ p.last=parts.pop(); p.first=parts.join(" "); } else { p.first=p.name||""; p.last=""; } } if(p.first===undefined)p.first=""; if(p.last===undefined)p.last=""; p.name=pFull(p); }
-function migrateTeam(t){ if(t&&t.players)t.players.forEach(ensureName); if(t&&!Array.isArray(t.schedule))t.schedule=[]; }
+function migrateTeam(t){ if(t&&t.players)t.players.forEach(ensureName); if(t&&!Array.isArray(t.schedule))t.schedule=[];
+  // Saved lineups: many named batting orders per team, stored by PLAYER ID (durable across
+  // roster edits/sorts). Convert any legacy single index-based t.lineup into the new array.
+  if(t&&!Array.isArray(t.lineups)){ t.lineups=[];
+    if(t.lineup&&t.lineup.order&&t.lineup.order.length&&t.players){
+      const order=t.lineup.order.map(i=>t.players[i]&&t.players[i].id).filter(Boolean);
+      const pos={}; Object.keys(t.lineup.pos||{}).forEach(P=>{const i=t.lineup.pos[P]; if(t.players[i])pos[P]=t.players[i].id;});
+      if(order.length){ const lu={id:nextId("lu"),name:"Starting lineup",order:order,pos:pos}; t.lineups.push(lu); t.activeLineupId=lu.id; }
+    }
+  }
+}
 
 /* ====================== persistent team DB (browser localStorage) ======================
    Teams, rosters, and FULL-BOX season stats (batting / pitching / fielding) persist
@@ -282,8 +292,24 @@ function teamRemovePlayer(t,pid){if(t.players.length<=9)return;t.players=t.playe
 /* Make a saved team the active "our" team for a game. */
 function selectTeam(id){const t=teamById(id);if(!t)return;curTeamId=id;ROSTER=t.players;
   OUR.name=t.name;OUR.short=t.short||t.name.slice(0,3).toUpperCase();OUR.color=t.color||OUR.color;OUR.logo=t.logo||null;}
-/* Load a team's saved batting order/positions into G.lineup (used when a game starts). */
-function loadTeamLineup(t){ if(t&&t.lineup&&t.lineup.order&&t.lineup.order.length){ G.lineup={order:t.lineup.order.slice(), pos:Object.assign({},t.lineup.pos||{})}; } }
+/* ===== saved lineups (multiple named batting orders per team, stored by player id) ===== */
+function teamLineups(t){ if(!t)return []; if(!Array.isArray(t.lineups))t.lineups=[]; return t.lineups; }
+function lineupById(t,id){ return teamLineups(t).find(l=>l.id===id)||null; }
+function activeLineup(t){ const L=teamLineups(t); if(!L.length)return null; return lineupById(t,t.activeLineupId)||L[0]; }
+/* Convert a saved (player-id) lineup into the roster-index form G.lineup uses, dropping any
+   ids no longer on the roster. Returns null if nothing usable remains. */
+function lineupToIdx(t,lu){ if(!t||!lu||!t.players)return null; const ids=t.players.map(p=>p.id);
+  const order=(lu.order||[]).map(id=>ids.indexOf(id)).filter(i=>i>=0);
+  const pos={}; Object.keys(lu.pos||{}).forEach(P=>{ const i=ids.indexOf(lu.pos[P]); if(i>=0)pos[P]=i; });
+  return order.length?{order:order,pos:pos}:null; }
+/* Create a fresh lineup from the current roster: everyone bats (cap 12), first 9 take the field. */
+function makeLineup(t,name){ const L=teamLineups(t);
+  const order=t.players.slice(0,Math.min(12,Math.max(9,t.players.length))).map(p=>p.id);
+  const pos={}; POSLIST.forEach((P,i)=>{ if(t.players[i])pos[P]=t.players[i].id; });
+  const lu={id:nextId("lu"),name:name||("Lineup "+(L.length+1)),order:order,pos:pos};
+  L.push(lu); if(!t.activeLineupId)t.activeLineupId=lu.id; saveDB(); return lu; }
+/* Load the team's active saved lineup into G.lineup (used when a game starts). Needs 9+ batters. */
+function loadTeamLineup(t){ const idx=lineupToIdx(t,activeLineup(t)); if(idx&&idx.order.length>=9){ G.lineup={order:idx.order.slice(), pos:Object.assign({},idx.pos)}; } }
 /* ===== export / import (JSON files) — backup & move teams/games between devices ===== */
 function downloadJSON(filename,obj){ try{ const blob=new Blob([JSON.stringify(obj,null,2)],{type:"application/json"}); const url=URL.createObjectURL(blob); const a=document.createElement("a"); a.href=url; a.download=filename; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>{try{URL.revokeObjectURL(url);}catch(e){}},1500); }catch(e){ try{alert("Export failed: "+e.message);}catch(x){} } }
 function pickJSON(onObj){ const inp=document.createElement("input"); inp.type="file"; inp.accept=".json,application/json"; inp.onchange=function(){ const f=inp.files&&inp.files[0]; if(!f)return; const r=new FileReader(); r.onload=function(){ try{ onObj(JSON.parse(r.result)); }catch(e){ try{alert("Couldn't read that file: "+e.message);}catch(x){} } }; r.readAsText(f); }; inp.click(); }
@@ -320,10 +346,17 @@ function printLineupCard(t,ctx){
   const players=(t.players||[]).slice();
   const total=Math.max(players.length, players.length>9?players.length:9);   // 9 slots min, or full roster (continuous)
   // Standard lineup-card grid: Order | No. | Player | Position | Sub.
+  const pn=p=>p?(p.name||((p.first||"")+" "+(p.last||"")).trim()):"";
   let rows="";
-  for(let i=0;i<total;i++){ const p=players[i];
-    const pname=p?(p.name||((p.first||"")+" "+(p.last||"")).trim()):"";
-    rows+=`<tr><td class="ord">${i+1}</td><td class="num">${p?esc(p.num):""}</td><td class="nm">${esc(pname)}</td><td class="pos"></td><td class="sub"></td></tr>`; }
+  const lu=ctx.lineup;   // {order:[idx],pos:{POS:idx}} — print a specific saved lineup with positions filled
+  if(lu&&lu.order&&lu.order.length){
+    const posOf=ri=>{ const P=Object.keys(lu.pos||{}).find(k=>lu.pos[k]===ri); return P||""; };
+    lu.order.forEach((ri,i)=>{ const p=players[ri];
+      rows+=`<tr><td class="ord">${i+1}</td><td class="num">${p?esc(p.num):""}</td><td class="nm">${esc(pn(p))}</td><td class="pos">${esc(posOf(ri))}</td><td class="sub"></td></tr>`; });
+  } else {
+    for(let i=0;i<total;i++){ const p=players[i];
+      rows+=`<tr><td class="ord">${i+1}</td><td class="num">${p?esc(p.num):""}</td><td class="nm">${esc(pn(p))}</td><td class="pos"></td><td class="sub"></td></tr>`; }
+  }
   // Bench / extra players (named, beyond slot count) for the substitutes box.
   let subs=""; for(let i=0;i<6;i++)subs+=`<tr><td class="num"></td><td class="nm"></td><td class="pos"></td></tr>`;
   // Pitcher log (blank to fill in).
@@ -436,6 +469,15 @@ function rollupSeason(){const t=curTeam();if(!t)return;
 window.teamPNum=function(id,v){const t=teamById(openTeamId);if(!t)return;const p=t.players.find(p=>p.id===id);if(p){p.num=v;saveDB();}};
 window.teamPFirst=function(id,v){const t=teamById(openTeamId);if(!t)return;const p=t.players.find(p=>p.id===id);if(p){p.first=v;ensureName(p);saveDB();}};
 window.teamPLast=function(id,v){const t=teamById(openTeamId);if(!t)return;const p=t.players.find(p=>p.id===id);if(p){p.last=v;ensureName(p);saveDB();}};
+window.luName=function(v){const t=teamById(openTeamId);const lu=t&&lineupById(t,editLineupId);if(lu){lu.name=(v||"").trim()||"Lineup";saveDB();}};
+window.applySavedLineup=function(id){ if(!id)return; const t=curTeam(); const lu=t&&lineupById(t,id); const idx=lu&&lineupToIdx(t,lu);
+  if(idx&&idx.order.length>=9){ G.lineup={order:idx.order.slice(),pos:Object.assign({},idx.pos)}; t.activeLineupId=id; saveDB(); render(); try{broadcast();}catch(e){} }
+  else { try{alert("That lineup needs 9+ active players to load.");}catch(e){} render(); } };
+window.luSetPos=function(id,pos){const t=teamById(openTeamId);const lu=t&&lineupById(t,editLineupId);if(!lu)return; if(!lu.pos)lu.pos={};
+  // clear this player's old position, free the chosen position from whoever held it, then assign
+  Object.keys(lu.pos).forEach(P=>{if(lu.pos[P]===id)delete lu.pos[P];});
+  if(pos){ delete lu.pos[pos]; lu.pos[pos]=id; }
+  saveDB(); render(); };
 window.edTeamName=function(v){const t=teamById(openTeamId);if(!t)return;t.name=(v||"").trim()||"New Team";saveDB();};
 window.edTeamAbbr=function(v){const t=teamById(openTeamId);if(!t)return;t.short=(v||"").toUpperCase().slice(0,6)||"TM";saveDB();};
 window.edTeamRulesUrl=function(v){const t=teamById(openTeamId);if(!t)return;t.rulesUrl=(v||"").trim()||undefined;saveDB();};
@@ -739,8 +781,9 @@ window.setTeamRulebook=function(v){ const t=teamById(openTeamId); if(t){ t.ruleb
 window.ngLeague=function(v){ const L=leagueById(v); G.league=L.id; G.innings=L.innings; G.runCap=L.runCap; G.mercy=L.mercy?{r15:L.mercy.r15,r10:L.mercy.r10}:null; G.pitchMax=L.pitch||0; render(); };
 window.ngRulebook=function(v){ G.rulebookId=v; render(); };
 let settingsMode=false;   // true = Game Setup opened mid-game (Done returns to play, never resets)
-let teamTab="hub";        // team page: "hub" (grid of sections) or a section: roster/schedule/stats/access/rules
+let teamTab="hub";        // team page: "hub" (grid of sections) or a section: roster/schedule/stats/manage/lineupedit
 let viewGameId=null;      // when teamTab==="gameview": which finished game (t.games[].id) to show
+let editLineupId=null;    // when teamTab==="lineupedit": which saved lineup (t.lineups[].id) is open
 // Team photo gallery is gated OFF until a (free) photo store is chosen — Firebase Storage needs
 // the Blaze plan, which this project isn't on. Flip PHOTOS_ENABLED to true (after finishing the
 // chosen backend's setup) to re-show the Photos tile + tab; all the gallery code below stays
@@ -2073,11 +2116,80 @@ function actionArea(){
     const secWrap=(inner)=>`<div style="width:100%;max-width:880px;margin:0 auto;display:flex;flex-direction:column;gap:12px">${inner}</div>`;
     if(teamTab==="roster"){
       const canMng=!(C&&C.enabled)||(window.cloudIsScorer&&window.cloudIsScorer(t));
+      const esc=s=>(s==null?"":String(s)).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+      // ---- saved lineups card ----
+      const LUs=teamLineups(t), actId=t.activeLineupId||(LUs[0]&&LUs[0].id);
+      const sBtn=(act,id,label,col)=>`<button data-act="${act}" data-arg="${id}" style="flex:1;background:${T.surface};border:1px solid ${T.line};color:${col||T.sage};border-radius:7px;padding:7px 4px;font-size:11px;font-weight:700;letter-spacing:.3px">${label}</button>`;
+      const luRow=lu=>{ const idx=lineupToIdx(t,lu),cnt=idx?idx.order.length:0,isDef=lu.id===actId;
+        return `<div style="background:${T.surface2};border:1px solid ${isDef?T.lime:T.line};border-radius:11px;padding:10px 11px;display:flex;flex-direction:column;gap:8px">
+          <button data-act="luedit" data-arg="${lu.id}" style="text-align:left;background:transparent;border:none;color:${T.ink};display:flex;align-items:center;gap:8px;padding:0">
+            <span style="flex:1;min-width:0"><span style="font-family:${MONO};font-weight:800;font-size:15px">${esc(lu.name)}</span>
+              <span style="display:block;font-size:11px;color:${T.sage};margin-top:1px">${cnt} batter${cnt===1?"":"s"}${cnt<9?` &middot; needs 9+`:""} &middot; tap to edit</span></span>
+            ${isDef?`<span style="font-size:10px;font-weight:800;color:${T.lime};letter-spacing:.5px">&#9733; DEFAULT</span>`:`<span style="font-size:17px;color:${T.line}">&rsaquo;</span>`}
+          </button>
+          <div style="display:flex;gap:6px">
+            ${isDef?`<div style="flex:1;display:flex;align-items:center;justify-content:center;font-size:11px;color:${T.sageDim}">Loads at game start</div>`:sBtn("ludefault",lu.id,"Make default",T.chalk)}
+            ${sBtn("luprintcard",lu.id,"Print",T.sage)}
+            ${sBtn("ludup",lu.id,"Duplicate",T.sage)}
+            ${sBtn("ludel",lu.id,"Delete",T.out)}
+          </div></div>`; };
+      const lineupsCard=`<div class="frost-card" style="background:${T.surface};border:1px solid ${T.line};border-radius:14px;padding:12px 13px;display:flex;flex-direction:column;gap:9px">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+            <div><div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime}">Lineups</div>
+              <div style="font-size:11px;color:${T.sageDim};margin-top:2px">Batting orders you can load instantly at game start</div></div>
+            <button data-act="lunew" style="background:${T.lime};border:none;color:#fff;border-radius:9px;padding:9px 13px;font-weight:800;font-size:13px;white-space:nowrap">+ New</button></div>
+          ${LUs.length?LUs.map(luRow).join(""):`<div style="font-size:12px;color:${T.sageDim};text-align:center;padding:10px 6px;border:1px dashed ${T.line};border-radius:10px">No saved lineups yet. Build one batting order &amp; field assignment and reuse it every game.</div>`}
+        </div>`;
       return secWrap(`${secHdr("Roster &amp; lineup")}
           <div class="frost-card" style="background:${T.surface};border:1px solid ${T.line};border-radius:12px;padding:11px 12px 4px">
             <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin:0 2px 8px">Roster — tap to edit #/name &middot; &rsaquo; for player stats</div>${roster}</div>
           <button data-act="addteamp" style="${ghost}">+ Add player</button>
+          <div style="display:flex;gap:8px">
+            <button data-act="pasteplayers" style="${ghost};flex:2;font-size:13px">&#8593; Paste roster</button>
+            <button data-act="sortnum" style="${ghost};flex:1;font-size:13px">Sort #</button>
+            <button data-act="sortname" style="${ghost};flex:1;font-size:13px">Sort A&ndash;Z</button>
+          </div>
+          ${lineupsCard}
           ${canMng?`<button data-act="teamtab" data-arg="manage" style="display:flex;align-items:center;justify-content:center;gap:10px;width:100%;background:${T.surface2};border:1px solid ${T.line};color:${T.ink};border-radius:12px;padding:15px;font-family:${MONO};font-weight:800;font-size:16px;letter-spacing:.5px;margin-top:6px">${IC('gear',20)} Team management</button>`:""}`);
+    }
+    if(teamTab==="lineupedit"){
+      const lu=lineupById(t,editLineupId);
+      if(!lu){ teamTab="roster"; return actionArea(); }
+      const esc=s=>(s==null?"":String(s)).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+      lu.order=(lu.order||[]).filter(id=>t.players.some(p=>p.id===id));   // drop any released players
+      const n=lu.order.length;
+      const back=`<div class="frost-card" style="display:flex;align-items:center;gap:12px;background:${T.surface};border:1px solid ${T.line};border-radius:14px;padding:12px 14px">
+          <button data-act="teamtab" data-arg="roster" title="Back" style="${ghost};padding:9px 13px;flex:none;font-size:15px">&lsaquo; Back</button>
+          <div style="flex:1;min-width:0;font-family:${MONO};font-size:20px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:${T.lime};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Edit lineup</div></div>`;
+      const nameCard=`<div class="frost-card" style="background:${T.surface};border:1px solid ${T.line};border-radius:12px;padding:11px 12px">
+          <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin:0 2px 6px">Lineup name</div>
+          <input value="${esc(lu.name)}" oninput="window.luName(this.value)" placeholder="e.g. Vs lefties" style="${cell};width:100%;font-family:${MONO};font-weight:800;font-size:16px">
+          <div style="font-size:11px;color:${T.sageDim};margin-top:6px">${n} batting${n>9?" (continuous)":""} &middot; positions fill the field; spots without one bat as EH.${n<9?` <span style="color:${T.out}">Add ${9-n} more to use this in a game.</span>`:""}</div></div>`;
+      const posOpts=cur=>["",...POSLIST].map(P=>`<option value="${P}"${P===cur?" selected":""}>${P||"EH"}</option>`).join("");
+      const rows=lu.order.map((id,i)=>{ const p=t.players.find(x=>x.id===id)||{num:"",name:"?"};
+        const cur=Object.keys(lu.pos||{}).find(k=>lu.pos[k]===id)||"";
+        return `<div style="display:flex;align-items:center;gap:6px;background:${T.surface};border:1px solid ${T.line};border-radius:9px;padding:7px 8px">
+          <span style="font-family:${MONO};font-size:16px;font-weight:800;color:${T.lime};width:18px;text-align:center">${i+1}</span>
+          <span style="flex:1;min-width:0;display:flex;align-items:center;gap:7px;overflow:hidden"><span style="font-family:${MONO};color:${t.color};min-width:32px">#${esc(p.num)}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700">${esc(p.name)}</span></span>
+          <select onchange="window.luSetPos('${id}',this.value)" style="background:${T.surface2};border:1px solid ${T.line};color:${T.chalk};border-radius:7px;padding:7px 6px;font-family:${MONO};font-weight:800;font-size:14px">${posOpts(cur)}</select>
+          <button data-act="lumoveup" data-arg="${i}" ${i===0?"disabled":""} style="background:${T.surface2};border:1px solid ${T.line};color:${i===0?T.sageDim:T.chalk};border-radius:7px;padding:7px 9px;font-size:13px">&#9650;</button>
+          <button data-act="lumovedn" data-arg="${i}" ${i===n-1?"disabled":""} style="background:${T.surface2};border:1px solid ${T.line};color:${i===n-1?T.sageDim:T.chalk};border-radius:7px;padding:7px 9px;font-size:13px">&#9660;</button>
+          <button data-act="luremove" data-arg="${id}" ${n<=9?"disabled":""} title="Move to bench" style="background:none;border:1px solid ${T.line};color:${n<=9?T.sageDim:T.out};border-radius:7px;padding:7px 9px;font-weight:800">&times;</button></div>`; }).join("");
+      const benchIds=t.players.filter(p=>lu.order.indexOf(p.id)<0);
+      const bench=benchIds.length?benchIds.map(p=>`<button data-act="luadd" data-arg="${p.id}" ${n>=12?"disabled":""} style="display:inline-flex;align-items:center;gap:6px;background:${T.surface};border:1px solid ${T.line};color:${n>=12?T.sageDim:T.chalk};border-radius:8px;padding:7px 11px;font-size:13px;font-weight:700"><span style="font-family:${MONO};color:${t.color}">#${esc(p.num)}</span>${esc(p.name)} <span style="color:${T.lime};font-weight:800">+</span></button>`).join(" "):`<span style="font-size:12px;color:${T.sageDim}">Everyone is in the order</span>`;
+      return secWrap(`${back}${nameCard}
+          <div class="frost-card" style="background:${T.surface};border:1px solid ${T.line};border-radius:12px;padding:11px 12px;display:flex;flex-direction:column;gap:6px">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin:0 2px 2px">
+              <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime}">Batting order &amp; field</div>
+              <button data-act="luauto" style="background:${T.surface2};border:1px solid ${T.line};color:${T.sage};border-radius:7px;padding:6px 10px;font-size:11px;font-weight:700">Auto-fill positions</button></div>
+            ${rows}</div>
+          <div class="frost-card" style="background:${T.surface};border:1px solid ${T.line};border-radius:12px;padding:11px 12px">
+            <div style="font-size:10px;color:${T.sageDim};letter-spacing:.6px;margin:0 2px 7px">BENCH &middot; ${n>=12?"max 12 batters":"tap to add to the order"}</div>
+            <div style="display:flex;flex-wrap:wrap;gap:6px">${bench}</div></div>
+          <div style="display:flex;gap:8px">
+            <button data-act="luprintcard" data-arg="${lu.id}" style="${ghost};flex:1;display:flex;align-items:center;justify-content:center;gap:8px">${ICN.doc} Print card</button>
+            <button data-act="ludefault" data-arg="${lu.id}" style="${ghost};flex:1">${lu.id===(t.activeLineupId||(teamLineups(t)[0]&&teamLineups(t)[0].id))?"&#9733; Default":"Make default"}</button></div>
+          <button data-act="teamtab" data-arg="roster" style="${bigBtn(T.lime,"")}">Done</button>`);
     }
     if(teamTab==="manage"){
       const canMng=!(C&&C.enabled)||(window.cloudIsScorer&&window.cloudIsScorer(t));
@@ -2498,6 +2610,10 @@ function actionArea(){
         <button data-act="rembatter" style="${ghost};flex:1" ${n<=9?"disabled":""}>&minus; Remove last</button></div>
       <div style="flex-shrink:0"><div style="font-size:10px;color:${T.sageDim};letter-spacing:.6px;margin:0 2px 5px">BENCH</div>
         <div style="display:flex;flex-wrap:wrap;gap:5px">${bench||`<span style="font-size:12px;color:${T.sageDim}">No bench players</span>`}</div></div>
+      ${(function(){ const ct=curTeam(); if(!ct)return ""; const sl=teamLineups(ct);
+        return `<div style="flex-shrink:0;display:flex;gap:8px;align-items:center">
+          ${sl.length?`<select onchange="window.applySavedLineup(this.value)" style="${ghost};flex:1;text-transform:none;padding:11px;color:${T.chalk}"><option value="">&#8595; Load saved lineup&hellip;</option>${sl.map(l=>`<option value="${l.id}">${(l.name||"").replace(/</g,"&lt;")}</option>`).join("")}</select>`:`<span style="flex:1;font-size:11px;color:${T.sageDim};padding:0 4px">No saved lineups yet for ${ct.short||ct.name}</span>`}
+          <button data-act="savecurlineup" style="${ghost};flex:none;padding:11px 14px">Save as&hellip;</button></div>`; })()}
       <button data-act="lineupdone" style="${bigBtn(T.lime,"")}flex-shrink:0">Done</button>`;
   }
   if(mode==="pickplayer"){
@@ -3166,7 +3282,7 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="favteam"){const t=teamById(arg);if(t){t.fav=!t.fav;saveDB();}render();}
   else if(act==="teamcolor"){const t=teamById(openTeamId);if(t){t.color=arg;saveDB();}render();}
   else if(act==="rmlogo"){const t=teamById(openTeamId);if(t){delete t.logo;saveDB();render();}}
-  else if(act==="lineupcard"){const t=teamById(openTeamId);if(t)printLineupCard(t);}
+  else if(act==="lineupcard"){const t=teamById(openTeamId);if(t){const lu=activeLineup(t);printLineupCard(t,lu?{lineup:lineupToIdx(t,lu)}:undefined);}}
   else if(act==="newteam"){const t=newTeam("");openTeamId=t.id;teamTab="hub";mode="team";render();}
   else if(act==="teamsback"){mode="teams";render();}
   else if(act==="deleteteam"){ const delId=openTeamId; const td=teamById(delId); if(!td)return; confirmAct={title:"Delete "+(td.name||"team")+"?",msg:"This removes the roster and all season stats and can't be undone.",yes:"Delete",danger:true,run:function(){ try{ if(window.cloudDeleteTeam)cloudDeleteTeam(delId); }catch(e){} DB.teams=DB.teams.filter(t=>t.id!==delId); if(curTeamId===delId)curTeamId=null; openTeamId=null; teamTab="hub"; saveDB(); mode="teams"; render(); }}; render(); }
@@ -3179,6 +3295,23 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="togglestatspublic"){ const t=teamById(openTeamId); if(t&&window.cloudIsOwner&&window.cloudIsOwner(t)){ t.statsPublic=!t.statsPublic; saveDB(); render(); } }
   else if(act==="addteamp"){const t=teamById(openTeamId);if(t)teamAddPlayer(t);render();}
   else if(act==="rmteamp"){const t=teamById(openTeamId);if(t)teamRemovePlayer(t,arg);render();}
+  // ---- saved lineups ----
+  else if(act==="lunew"){ const t=teamById(openTeamId); if(t){ const lu=makeLineup(t); editLineupId=lu.id; teamTab="lineupedit"; render(); } }
+  else if(act==="luedit"){ const t=teamById(openTeamId); if(t&&lineupById(t,arg)){ editLineupId=arg; teamTab="lineupedit"; render(); } }
+  else if(act==="ludefault"){ const t=teamById(openTeamId); if(t){ t.activeLineupId=arg; saveDB(); render(); } }
+  else if(act==="ludup"){ const t=teamById(openTeamId); const lu=t&&lineupById(t,arg); if(lu){ const c={id:nextId("lu"),name:lu.name+" (copy)",order:(lu.order||[]).slice(),pos:Object.assign({},lu.pos||{})}; teamLineups(t).push(c); saveDB(); render(); } }
+  else if(act==="ludel"){ const t=teamById(openTeamId); const lu=t&&lineupById(t,arg); if(lu){ let ok=true; try{ok=confirm('Delete lineup "'+lu.name+'"?');}catch(e){} if(ok){ t.lineups=teamLineups(t).filter(l=>l.id!==arg); if(t.activeLineupId===arg)t.activeLineupId=(t.lineups[0]&&t.lineups[0].id)||null; saveDB(); render(); } } }
+  else if(act==="luprintcard"){ const t=teamById(openTeamId); const lu=t&&lineupById(t,arg); if(t&&lu){ printLineupCard(t,{lineup:lineupToIdx(t,lu)}); } }
+  else if(act==="lumoveup"){ const t=teamById(openTeamId); const lu=t&&lineupById(t,editLineupId); const i=+arg; if(lu&&i>0){ const o=lu.order; const x=o[i];o[i]=o[i-1];o[i-1]=x; saveDB(); render(); } }
+  else if(act==="lumovedn"){ const t=teamById(openTeamId); const lu=t&&lineupById(t,editLineupId); const i=+arg; if(lu&&i<lu.order.length-1){ const o=lu.order; const x=o[i];o[i]=o[i+1];o[i+1]=x; saveDB(); render(); } }
+  else if(act==="luremove"){ const t=teamById(openTeamId); const lu=t&&lineupById(t,editLineupId); if(lu&&lu.order.length>9){ lu.order=lu.order.filter(id=>id!==arg); Object.keys(lu.pos||{}).forEach(P=>{if(lu.pos[P]===arg)delete lu.pos[P];}); saveDB(); render(); } }
+  else if(act==="luadd"){ const t=teamById(openTeamId); const lu=t&&lineupById(t,editLineupId); if(lu&&lu.order.length<12&&lu.order.indexOf(arg)<0){ lu.order.push(arg); saveDB(); render(); } }
+  else if(act==="luauto"){ const t=teamById(openTeamId); const lu=t&&lineupById(t,editLineupId); if(lu){ lu.pos={}; let f=0; lu.order.forEach(id=>{ if(f<POSLIST.length){lu.pos[POSLIST[f]]=id;f++;} }); saveDB(); render(); } }
+  else if(act==="savecurlineup"){ const t=curTeam(); if(t){ let nm=""; try{nm=prompt("Name this lineup:","Lineup "+(teamLineups(t).length+1));}catch(e){} if(nm!=null){ const ids=t.players.map(p=>p.id); const order=G.lineup.order.map(ri=>ids[ri]).filter(Boolean); const pos={}; Object.keys(G.lineup.pos||{}).forEach(P=>{const ri=G.lineup.pos[P]; if(ids[ri]!=null)pos[P]=ids[ri];}); const lu={id:nextId("lu"),name:(nm||"").trim()||("Lineup "+(teamLineups(t).length+1)),order:order,pos:pos}; teamLineups(t).push(lu); t.activeLineupId=lu.id; saveDB(); try{flash("Lineup saved");}catch(e){} render(); } } }
+  // ---- roster tools ----
+  else if(act==="sortnum"){ const t=teamById(openTeamId); if(t){ t.players.sort((a,b)=>(parseInt(a.num,10)||999)-(parseInt(b.num,10)||999)); saveDB(); render(); } }
+  else if(act==="sortname"){ const t=teamById(openTeamId); if(t){ t.players.sort((a,b)=>((a.last||a.name||"")+a.first).localeCompare((b.last||b.name||"")+b.first)); saveDB(); render(); } }
+  else if(act==="pasteplayers"){ const t=teamById(openTeamId); if(t){ let txt=""; try{txt=prompt("Paste players — one per line. Each line: number then name, e.g.\n12 John Smith\n7 Maria Diaz");}catch(e){} if(txt){ let added=0; txt.split(/\r?\n/).forEach(line=>{ line=line.trim(); if(!line)return; if(t.players.length>=20)return; const m=line.match(/^(\d{1,3})\s+(.*)$/); let num="",nm=line; if(m){num=m[1];nm=m[2].trim();} const parts=nm.split(/\s+/).filter(Boolean); const first=parts.length>1?parts.slice(0,-1).join(" "):(parts[0]||""); const last=parts.length>1?parts[parts.length-1]:""; const p={id:nextId("p"),num:num,first:first,last:last,name:""}; ensureName(p); t.players.push(p); added++; }); if(added){saveDB();render();} else {try{alert("No players found — check the format.");}catch(e){}} } } }
   else if(act==="startteam"){newgameFrom="team";selectTeam(openTeamId);G=initGame();loadTeamLineup(teamById(curTeamId));hist=[];resetUI();mode="newgame";render();broadcast();}
   else if(act==="pickour"){pickFor="our";mode="pickteam";render();}
   else if(act==="pickopp"){pickFor="opp";finderResults=null;window._finderQ="";mode="pickteam";render();}
@@ -3364,6 +3497,7 @@ window.appBack=function(){
     if(mode==="newgame"&&settingsMode){ settingsMode=false; mode="idle"; render(); return true; }
     if(mode==="newgame"){ if(newgameFrom==="team"&&openTeamId){mode="team";}else{mode=gameActive?"idle":"home";} render(); return true; }
     if(mode==="lineup"){ mode=gameActive?"idle":"home"; render(); return true; }
+    if(mode==="team"&&teamTab==="lineupedit"){ teamTab="roster"; render(); return true; }
     if(mode==="team"&&teamTab&&teamTab!=="hub"){ teamTab="hub"; render(); return true; }
     if(mode==="team"){ mode="teams"; render(); return true; }
     if(mode==="teamstats"){ mode="directory"; render(); return true; }   // public team view → back to search
@@ -3561,7 +3695,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v116";
+var APP_VERSION="v117";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
