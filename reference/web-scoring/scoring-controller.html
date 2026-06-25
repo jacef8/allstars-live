@@ -439,6 +439,7 @@ window.edTeamName=function(v){const t=teamById(openTeamId);if(!t)return;t.name=(
 window.edTeamAbbr=function(v){const t=teamById(openTeamId);if(!t)return;t.short=(v||"").toUpperCase().slice(0,6)||"TM";saveDB();};
 window.edTeamRulesUrl=function(v){const t=teamById(openTeamId);if(!t)return;t.rulesUrl=(v||"").trim()||undefined;saveDB();};
 window.edTeamColor=function(v){const t=teamById(openTeamId);if(!t||!v)return;t.color=v;saveDB();render();};
+window.setOppColor=function(v){ if(!v)return; OPP.color=v; try{render();}catch(e){} try{broadcast();}catch(e){} };
 // Upload one or more team photos: downscale each to <=1280px JPEG, push to the cloud gallery.
 window.uploadTeamPhotos=function(input,teamId){ try{ const files=input&&input.files; if(!files||!files.length)return; if(!window.cloudAddPhoto){flash("Sign in to add photos");return;}
   flash("Uploading "+files.length+" photo"+(files.length>1?"s":"")+"…"); let done=0; const total=files.length;
@@ -681,6 +682,8 @@ function endGame(){snapshot();G.final=true;
   resetUI();mode="summary";render();broadcast();}
 /* The team's W-L-T record, computed from its finished-game log so the two are always consistent. */
 function teamRec(t){const g=(t&&t.games)||[];let w=0,l=0,ti=0;for(const x of g){if(x.result==="W")w++;else if(x.result==="L")l++;else if(x.result==="T")ti++;}return {w:w,l:l,t:ti};}
+// Pick readable text (dark or white) for a swatch/badge filled with `hex`.
+function idealText(hex){try{hex=(hex||"").replace("#","");if(hex.length===3)hex=hex.split("").map(c=>c+c).join("");const r=parseInt(hex.slice(0,2),16),g=parseInt(hex.slice(2,4),16),b=parseInt(hex.slice(4,6),16);return (0.299*r+0.587*g+0.114*b)>150?"#10141A":"#fff";}catch(e){return "#fff";}}
 /* New Game: reset scores/innings/in-play state but keep the chosen rules, side, and lineup. */
 function startNewGame(){
   const keep={runCap:G.runCap,oppBatters:G.oppBatters,ourSide:G.ourSide,innings:G.innings,lineup:JSON.parse(JSON.stringify(G.lineup)),
@@ -938,6 +941,7 @@ let summaryTeam="us";    // end-game box score: which team's batting/pitching to
 let monitorOn=(()=>{try{ const p=new URLSearchParams(location.search); if(p.get("feed")==="1") return false; if(p.get("yt")) return true; return localStorage.getItem("al-monitor-on")!=="0";}catch(e){return true;}})();  // wide: video shown/hidden; shared ?feed=1 opens feed-only
 let viewMode=(()=>{try{ const p=new URLSearchParams(location.search); if(p.get("view")==="viewer") return "viewer"; return localStorage.getItem("al-view-mode")||"scorer";}catch(e){return "scorer";}})();  // "scorer" | "viewer"; shared links (?view=viewer) open as viewer
 let viewerRight=(()=>{try{return localStorage.getItem("al-viewer-right")||"field";}catch(e){return "field";}})();  // viewer + video on: which of field/feed is the big one
+let viewerPhone=(()=>{try{return localStorage.getItem("al-viewer-phone")||"both";}catch(e){return "both";}})();  // phone viewer: "both" | "field" (only) | "feed" (only)
 // Opened via a watch/share link → this person is ONLY a viewer (no scoring). Lock them to viewer
 // mode and hide the Scorer/Viewer toggle (and reuse that space for the matchup they're watching).
 let viewerLocked=(()=>{try{ const p=new URLSearchParams(location.search); return p.get("view")==="viewer"||p.get("feed")==="1"||!!p.get("watch"); }catch(e){return false;}})();
@@ -1709,6 +1713,7 @@ function actionArea(){
     // Favorite-team cards: quick "Start" + manage, with record at a glance.
     const favs=DB.teams.filter(t=>t.fav), list=favs.length?favs:DB.teams;
     const card=t=>{const R=teamRec(t);const rec=`${R.w}-${R.l}${R.t?"-"+R.t:""}`;const games=R.w+R.l+R.t;
+      const sub=(()=>{const n=new Date(),today=n.getFullYear()+"-"+String(n.getMonth()+1).padStart(2,"0")+"-"+String(n.getDate()).padStart(2,"0");const up=(t.schedule||[]).filter(s=>s.date&&s.date>=today).sort((a,b)=>((a.date+(a.time||""))<(b.date+(b.time||""))?-1:1))[0];if(up){try{return "Next · "+new Date(up.date+"T00:00").toLocaleDateString(undefined,{month:"short",day:"numeric"});}catch(e){return "Next game set";}}return games?(games+" game"+(games===1?"":"s")):"New season";})();
       const unread=teamHasUnread(t);
       return `<div data-act="opent" data-arg="${t.id}" style="position:relative;background:${T.surface};border:2px solid ${t.color};border-left:7px solid ${t.color};border-radius:14px;padding:14px;box-shadow:0 0 0 1px rgba(0,0,0,.35), 0 8px 20px rgba(0,0,0,.4);cursor:pointer">
           ${unread?`<span title="New chat messages" style="position:absolute;top:11px;left:11px;display:flex;align-items:center;gap:5px;background:${T.amber};color:${T.field};border-radius:999px;padding:3px 9px;font-family:${MONO};font-weight:800;font-size:11px;letter-spacing:.4px">${IC('chat',12)} NEW</span>`:""}
@@ -1716,8 +1721,8 @@ function actionArea(){
           <div style="display:flex;align-items:center;gap:10px;padding-right:30px">
             ${t.logo?`<img src="${t.logo}" alt="" style="width:36px;height:36px;flex:none;border-radius:8px;object-fit:contain;background:#fff;box-shadow:0 0 0 1px ${T.line}">`:""}
             <div style="font-family:${MONO};font-size:23px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0">${t.name}</div></div>
-          <div style="display:flex;align-items:center;gap:10px;margin-top:7px;font-family:${MONO};font-size:18px;color:${T.sage}">
-            <span style="font-weight:800;color:${t.color}">${rec}</span><span style="opacity:.45">·</span><span>${t.players.length} players</span></div>
+          <div style="display:flex;align-items:baseline;gap:9px;margin-top:7px">
+            <span style="font-family:${MONO};font-size:28px;font-weight:800;color:${t.color};line-height:1">${rec}</span><span style="font-size:13px;color:${T.sage}">${sub}</span></div>
           <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:14px;background:${t.color};color:#fff;border-radius:9px;padding:13px;font-family:${MONO};font-weight:800;font-size:16px;letter-spacing:.8px;pointer-events:none">${IC(GEAR)} ${t.external?"VIEW TEAM":"MANAGE TEAM"}</div></div>`;};
     // Collapsible section headers (drawers) for Home — tap to open/close the list beneath.
     const drawerHdr=(act,label,open)=>`<button data-act="${act}" style="display:flex;align-items:center;justify-content:space-between;width:100%;background:rgba(13,19,32,.55);border:1px solid ${T.line};border-radius:11px;padding:11px 14px;cursor:pointer;margin-top:2px">
@@ -1820,13 +1825,14 @@ function actionArea(){
   }
   if(mode==="teams"){
     const sorted=DB.teams.slice().sort((a,b)=>(b.fav?1:0)-(a.fav?1:0));
-    const cards=sorted.map(t=>{const R=teamRec(t);const rec=`${R.w}-${R.l}${R.t?"-"+R.t:""}`;
+    const cards=sorted.map(t=>{const R=teamRec(t);const rec=`${R.w}-${R.l}${R.t?"-"+R.t:""}`;const games=R.w+R.l+R.t;
+      const sub=(()=>{const n=new Date(),today=n.getFullYear()+"-"+String(n.getMonth()+1).padStart(2,"0")+"-"+String(n.getDate()).padStart(2,"0");const up=(t.schedule||[]).filter(s=>s.date&&s.date>=today).sort((a,b)=>((a.date+(a.time||""))<(b.date+(b.time||""))?-1:1))[0];if(up){try{return "Next · "+new Date(up.date+"T00:00").toLocaleDateString(undefined,{month:"short",day:"numeric"});}catch(e){return "Next game set";}}return games?(games+" game"+(games===1?"":"s")):"New season";})();
       return `<div style="display:flex;align-items:center;gap:8px;background:${T.surface};border:2px solid ${t.color};border-left:7px solid ${t.color};border-radius:12px;padding:11px 13px;box-shadow:0 6px 16px rgba(0,0,0,.35)">
         ${(window.cloudIsScorer&&window.cloudIsScorer(t))?"":`<button data-act="favteam" data-arg="${t.id}" title="Follow this team" style="background:none;border:none;color:${t.fav?T.amber:T.sageDim};font-size:25px;line-height:1;padding:2px 4px;cursor:pointer">${t.fav?IC('starFill',23):IC('star',23)}</button>`}
         <button data-act="opent" data-arg="${t.id}" style="flex:1;min-width:0;display:flex;align-items:center;gap:10px;text-align:left;background:none;border:none;padding:6px 2px;cursor:pointer">
           <div style="flex:1;min-width:0">
             <div style="font-family:${MONO};font-size:22px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.name}</div>
-            <div style="font-family:${MONO};font-size:14px;color:${T.sage};margin-top:3px"><span style="color:${t.color};font-weight:800">${rec}</span> &middot; ${t.players.length} players</div></div>
+            <div style="display:flex;align-items:baseline;gap:9px;margin-top:5px"><span style="font-family:${MONO};font-size:26px;font-weight:800;color:${t.color};line-height:1">${rec}</span><span style="font-size:13px;color:${T.sage}">${sub}</span></div></div>
           <span style="color:${t.color};font-weight:800;font-size:15px;letter-spacing:.5px;white-space:nowrap">MANAGE &rsaquo;</span></button></div>`;}).join("")
       ||`<div style="color:${T.sage};font-size:15px;text-align:center;padding:24px 8px;border:1px dashed ${T.line};border-radius:12px">No teams yet — create one to start tracking rosters &amp; season stats.</div>`;
     return `<div style="display:flex;flex-direction:column;gap:14px">
@@ -1994,8 +2000,8 @@ function actionArea(){
             ${t.logo?`<button data-act="rmlogo" style="background:none;border:1px solid ${T.line};color:${T.out};border-radius:8px;padding:8px 12px;font-weight:700;font-size:12px">Remove</button>`:""}
             <div style="font-size:11px;color:${T.sageDim};width:100%;line-height:1.4">Shows on team cards, the lineup card &amp; (soon) the scoreboard. A square PNG with a transparent background looks best.</div></div>`;
       return secWrap(`${secHdr("Roster &amp; details")}${detailsBlock}
-          <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin:2px 2px -2px">Roster — tap to edit #/name</div>
-          <div class="frost-card" style="background:${T.surface};border:1px solid ${T.line};border-radius:12px;padding:4px 12px">${roster}</div>
+          <div class="frost-card" style="background:${T.surface};border:1px solid ${T.line};border-radius:12px;padding:11px 12px 4px">
+            <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin:0 2px 8px">Roster — tap to edit #/name &middot; &rsaquo; for player stats</div>${roster}</div>
           <button data-act="addteamp" style="${ghost}">+ Add player</button>
           ${rulebookSection}`);
     }
@@ -2277,9 +2283,16 @@ function actionArea(){
     const inpSm=`width:98px;flex:none;background:${T.surface2};border:1px solid ${T.line};color:${T.ink};border-radius:10px;padding:14px 10px;font-family:${MONO};font-size:27px;font-weight:800;text-align:center;outline:none`;
     const rowCard=`display:flex;align-items:center;justify-content:space-between;gap:12px;background:${T.surface};border:1px solid ${T.line};border-radius:12px;padding:18px 20px;box-shadow:0 2px 6px rgba(15,30,60,.07)`;
     const sideBtn=(s,lbl2)=>{const on=G.ourSide===s;return `<button data-act="ng-side" data-arg="${s}" style="flex:1;padding:18px;border-radius:11px;font-family:${MONO};font-weight:800;font-size:19px;text-transform:uppercase;letter-spacing:.5px;border:2px solid ${on?OUR.color:T.line};background:${on?OUR.color:T.surface};color:${on?"#FFFFFF":T.ink}">${lbl2}</button>`;};
-    const teamRow=(who,name,color,act)=>`<button data-act="${act}" class="frost-card" style="display:flex;align-items:center;justify-content:space-between;background:rgba(13,19,32,.82);border:1px solid ${color}66;border-left:7px solid ${color};border-radius:12px;padding:18px 20px;width:100%;text-align:left">
-        <div><div style="${lbl};margin:0 0 4px">${who}</div><div style="font-family:${MONO};font-size:25px;font-weight:800;color:${T.ink}">${name}</div></div>
-        <span style="color:${color};font-weight:800;font-size:15px;letter-spacing:.5px">CHANGE &rsaquo;</span></button>`;
+    const teamRow=(who,name,short,color,act)=>`<button data-act="${act}" class="frost-card" style="display:flex;align-items:center;gap:14px;background:rgba(13,19,32,.82);border:2px solid ${color};border-left:11px solid ${color};border-radius:12px;padding:14px 16px;width:100%;text-align:left">
+        <span style="width:54px;height:54px;flex:none;border-radius:12px;background:${color};color:${idealText(color)};display:flex;align-items:center;justify-content:center;font-family:${MONO};font-weight:800;font-size:18px;letter-spacing:.5px;box-shadow:0 0 0 1px rgba(255,255,255,.2)">${((short||name||"?").slice(0,4)).toUpperCase()}</span>
+        <div style="flex:1;min-width:0"><div style="${lbl};margin:0 0 4px">${who}</div><div style="font-family:${MONO};font-size:23px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${name}</div></div>
+        <span style="color:${color};font-weight:800;font-size:14px;letter-spacing:.5px;flex:none">CHANGE &rsaquo;</span></button>`;
+    // Opponent colour picker — so two same-ish team colours can be made distinct for the scoreboard.
+    const OPP_SWATCHES=["#E11D2E","#E08A12","#F0B43E","#2EC98A","#7C5CFF","#EC4899","#19A0E0","#FFFFFF"];
+    const oppColorRow=`<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:2px">
+        <span style="${lbl};width:100%;margin:0 0 2px">Opponent color — make it pop vs ${(OUR.short||OUR.name||"your team").replace(/</g,"&lt;")}</span>
+        ${OPP_SWATCHES.map(c=>`<button data-act="oppcolor" data-arg="${c}" style="width:32px;height:32px;border-radius:8px;background:${c};border:3px solid ${(OPP.color||"").toLowerCase()===c.toLowerCase()?T.ink:"transparent"};box-shadow:0 0 0 1px ${T.line}"></button>`).join("")}
+        <label style="display:inline-flex;align-items:center;gap:7px;background:${T.surface2};border:1px solid ${T.line};border-radius:8px;padding:6px 11px;cursor:pointer;font-size:12px;font-weight:700;color:${T.ink};position:relative"><span style="width:18px;height:18px;border-radius:5px;background:${OPP.color};box-shadow:0 0 0 1px ${T.line}"></span>More<input type="color" value="${OPP.color||"#E11D2E"}" onchange="window.setOppColor(this.value)" style="position:absolute;left:0;top:0;width:100%;height:100%;opacity:0;cursor:pointer"></label></div>`;
     const header=`<div class="frost-card" style="display:flex;align-items:center;gap:10px;flex:none;background:${T.surface};border:1px solid ${T.line};border-radius:14px;padding:12px 14px">
           <button data-act="${setMode?"settingsdone":"gohome"}" style="${ghost};padding:9px 11px">&lsaquo; ${setMode?"Done":"Home"}</button>
           <div style="font-family:${MONO};font-size:23px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:${T.lime}">${setMode?"Game Settings":"New Game"}</div></div>`;
@@ -2339,7 +2352,7 @@ function actionArea(){
       return `<div style="min-height:100%;display:flex;flex-direction:column;gap:14px;justify-content:safe center">
           ${header}
           <div style="width:100%;max-width:1180px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start">
-            <div style="display:flex;flex-direction:column;gap:14px">${teamRow("Your team",OUR.name,OUR.color,"pickour")}${teamRow("Opponent",OPP.name,OPP.color,"pickopp")}${sideSel}${runCapCard}${hittersCard}</div>
+            <div style="display:flex;flex-direction:column;gap:14px">${teamRow("Your team",OUR.name,OUR.short,OUR.color,"pickour")}${teamRow("Opponent",OPP.name,OPP.short,OPP.color,"pickopp")}${oppColorRow}${sideSel}${runCapCard}${hittersCard}</div>
             <div style="display:flex;flex-direction:column;gap:14px">${leagueCard}${alertsCard}${pitchTypeCard}${startCard}</div>
           </div>
           <div style="width:100%;max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:10px">${startBtn}${lineupCardBtn}</div>
@@ -2348,8 +2361,9 @@ function actionArea(){
     if(setMode) return `<div style="display:flex;flex-direction:column;gap:14px">${header}${ruleCards}${lineupCardBtn}${doneBtn}</div>`;
     return `<div style="display:flex;flex-direction:column;gap:14px">
         ${header}
-        ${teamRow("Your team",OUR.name,OUR.color,"pickour")}
-        ${teamRow("Opponent",OPP.name,OPP.color,"pickopp")}
+        ${teamRow("Your team",OUR.name,OUR.short,OUR.color,"pickour")}
+        ${teamRow("Opponent",OPP.name,OPP.short,OPP.color,"pickopp")}
+        ${oppColorRow}
         ${sideSel}${ruleCards}${startBtn}${lineupCardBtn}
       </div>`;
   }
@@ -2841,7 +2855,8 @@ function render(){
     const pane=phonePane==="video"
       ? `<div style="flex:1;min-height:0;display:flex;flex-direction:column;justify-content:center;gap:11px">${monitorPane()}</div>`
       : isView
-        ? `<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px">${statusBar()}${batterCard()}${fieldEl}${feedPanel()}</div>`
+        ? (function(){var vp=viewerPhone;var vseg=(id,l)=>`<button data-act="viewerphone" data-arg="${id}" style="flex:1;background:${vp===id?T.lime:T.surface2};color:${vp===id?"#fff":T.sage};border:1px solid ${vp===id?T.lime:T.line};border-radius:9px;padding:8px;font-family:${MONO};font-weight:800;font-size:12.5px;letter-spacing:.4px;text-transform:uppercase">${l}</button>`;
+          return `<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px">${statusBar()}${batterCard()}<div style="display:flex;gap:8px;flex:none">${vseg("both","Both")}${vseg("field","Field")}${vseg("feed","Feed")}</div>${vp==="feed"?"":fieldEl}${vp==="field"?"":feedPanel()}</div>`;})()
         : `<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px">${focusPlay?"":statusBar()}${batterCard()}${focusPlay?fieldEl:pcLine+'<div style="flex:1;min-height:0"></div>'}${actionEl}${controls}</div>`;
     body=`<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:9px">
         ${focusPlay?"":`<div style="display:flex;gap:8px;flex:none">${tab("score",isView?ICN.inplay+" Field":ICN.dot+" Scoring")}${tab("video",ICN.play+" Video")}</div>`}
@@ -2942,19 +2957,22 @@ document.getElementById("app").addEventListener("click",e=>{
   if(act==="rewatchgame"){ const u="https://www.youtube.com/watch?v="+encodeURIComponent(arg); if(IS_APP&&window.AllStars&&window.AllStars.openExternal)AllStars.openExternal(u); else window.open(u,"_blank","noopener"); return; }
   if(act==="delgame"){ const t=teamById(openTeamId); if(!t)return; if(window.Cloud&&window.Cloud.enabled&&window.Cloud.user&&window.cloudCanManage&&!window.cloudCanManage(t)){flash("Only the owner can delete a game");return;} confirmAct={title:"Delete this game?",msg:"This permanently removes the game and its stats from the team's record.",yes:"Delete game",danger:true,run:function(){ t.games=(t.games||[]).filter(x=>x.id!==arg); t.record=teamRec(t); saveDB(); teamTab="schedule"; viewGameId=null; render(); }}; render(); return; }
   if(act==="swapviewer"){ viewerRight=viewerRight==="field"?"feed":"field"; try{localStorage.setItem("al-viewer-right",viewerRight);}catch(e){} render(); return; }
+  if(act==="viewerphone"){ viewerPhone=(arg==="field"||arg==="feed")?arg:"both"; try{localStorage.setItem("al-viewer-phone",viewerPhone);}catch(e){} render(); return; }
   if(act==="inviteadd"){ const e=document.getElementById("inviteWho"); if(!e)return; const v=(e.value||"").trim(); if(!v){flash("Enter an email or phone number");return;}
     const url=appBaseUrl()+"?invite="+encodeURIComponent(openTeamId); const t=teamById(openTeamId);
     const team=(t&&t.name)?t.name:"our team"; const isEmail=v.indexOf("@")>=0;
     if(isEmail && window.cloudAddScorer) window.cloudAddScorer(openTeamId,v);   // authorize this email as a scorer now
+    // Actually SEND it: open the user's email (to this address) or texts (to this number),
+    // pre-filled with the join link — no extra copy step.
+    const body="You're invited to join "+team+" on All-Stars Live (a free youth-baseball scoreboard). Open this link and sign in once to score games or follow the team: "+url;
+    if(isEmail){
+      location.href="mailto:"+encodeURIComponent(v)+"?subject="+encodeURIComponent("Join "+team+" on All-Stars Live")+"&body="+encodeURIComponent(body);
+      flash(v+" authorized — opening your email");
+    } else {
+      location.href="sms:"+encodeURIComponent(v.replace(/[^\d+]/g,""))+"?body="+encodeURIComponent(body);
+      flash("Opening a text to "+v);
+    }
     e.value="";
-    // Same share sheet as the game (QR + Email / Text / Copy) so the operator can send the
-    // join link any way they like — consistent with "Share the game".
-    const sub=isEmail
-      ? `<b style="color:#E11D2E">${v.replace(/</g,"&lt;")}</b> is authorized. Send them the link to join.`
-      : `Scan it, or send the link — they sign in once and they're in.`;
-    openShareLink({ url:url, title:"INVITE TO "+team.toUpperCase().replace(/</g,"&lt;"),
-      sub:sub, subject:"Join "+team+" on All-Stars Live",
-      body:"You're invited to join "+team+" on All-Stars Live, a free youth-baseball scoreboard app. Open the link and sign in once to help score games or follow the team:" });
     return; }
   if(act==="rmscorer"){ if(window.cloudRemoveScorer)window.cloudRemoveScorer(openTeamId,arg); return; }
   if(act==="pickcontact"){ try{ if(window.AllStars&&window.AllStars.pickContact)window.AllStars.pickContact(); }catch(e){} return; }
@@ -3072,6 +3090,7 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="startteam"){newgameFrom="team";selectTeam(openTeamId);G=initGame();loadTeamLineup(teamById(curTeamId));hist=[];resetUI();mode="newgame";render();broadcast();}
   else if(act==="pickour"){pickFor="our";mode="pickteam";render();}
   else if(act==="pickopp"){pickFor="opp";finderResults=null;window._finderQ="";mode="pickteam";render();}
+  else if(act==="oppcolor"){ OPP.color=arg; render(); broadcast(); }
   else if(act==="findteams"){ const e=document.getElementById("finderQ"); const q=e?(e.value||"").trim():""; window._finderQ=q; if(!window.cloudSearchTeams){flash("Search needs sign-in");return;} flash("Searching…"); window.cloudSearchTeams(q).then(function(res){ finderResults=res||[]; render(); }); }
   else if(act==="opendirectory"){ if(!(window.Cloud&&window.Cloud.enabled&&window.Cloud.user)){flash("Sign in to browse teams");return;} mode="directory"; render(); }
   else if(act==="dirsearch"){ const e=document.getElementById("dirQ"); const q=e?(e.value||"").trim():""; window._dirQ=q; if(!window.cloudSearchTeams){flash("Search needs sign-in");return;} flash("Searching…"); window.cloudSearchTeams(q).then(function(res){ dirResults=res||[]; render(); }); }
@@ -3446,7 +3465,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v102";
+var APP_VERSION="v103";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
