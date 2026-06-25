@@ -2762,7 +2762,7 @@ document.getElementById("app").addEventListener("click",e=>{
       : `Scan it, or send the link — they sign in once and they're in.`;
     openShareLink({ url:url, title:"INVITE TO "+team.toUpperCase().replace(/</g,"&lt;"),
       sub:sub, subject:"Join "+team+" on All-Stars Live",
-      body:"Join "+team+" on All-Stars Live to score/follow the team — sign in once and you're in:" });
+      body:"You're invited to join "+team+" on All-Stars Live, a free youth-baseball scoreboard app. Open the link and sign in once to help score games or follow the team:" });
     return; }
   if(act==="rmscorer"){ if(window.cloudRemoveScorer)window.cloudRemoveScorer(openTeamId,arg); return; }
   if(act==="pickcontact"){ try{ if(window.AllStars&&window.AllStars.pickContact)window.AllStars.pickContact(); }catch(e){} return; }
@@ -2867,7 +2867,7 @@ document.getElementById("app").addEventListener("click",e=>{
     openShareLink({ url:url, title:"SHARE "+nm.toUpperCase().replace(/</g,"&lt;"),
       sub:`Parents &amp; fans can <b style="color:#A3E635">follow ${nmE}</b> — watch live &amp; chat (no scoring).`,
       subject:"Follow "+nm+" on All-Stars Live",
-      body:"Follow "+nm+" on All-Stars Live — watch games live and join the team chat:" }); }
+      body:nm+" posts live games on All-Stars Live, a free youth-baseball scoreboard app. Follow the team to watch games live, see the schedule, and join the team chat:" }); }
   else if(act==="togglepublic"){ const t=teamById(openTeamId); if(t&&window.cloudIsOwner&&window.cloudIsOwner(t)){ t.public=!t.public; saveDB(); flash(t.public?"Team is now public":"Team is now private"); render(); } }
   else if(act==="togglestatspublic"){ const t=teamById(openTeamId); if(t&&window.cloudIsOwner&&window.cloudIsOwner(t)){ t.statsPublic=!t.statsPublic; saveDB(); render(); } }
   else if(act==="addteamp"){const t=teamById(openTeamId);if(t)teamAddPlayer(t);render();}
@@ -3067,8 +3067,15 @@ window.appBack=function(){
 // The live viewer link — the app itself, opened in VIEWER mode (+ the video id if streaming).
 // Always available (works before/without YouTube), so nearby folks can just scan to follow.
 function appBaseUrl(){
-  if(location.protocol==="http:"||location.protocol==="https:") return location.origin+location.pathname;
-  return "https://web-production-77d34.up.railway.app/scoring-controller.html";   // native app (file://) → public URL
+  // Links we hand to parents/fans have to look trustworthy, not like spam. Always share the
+  // branded public domain — never the random Railway dev host (web-production-…up.railway.app)
+  // or a raw "scoring-controller.html" path, both of which look sketchy and make people
+  // hesitate to tap. allstars-live.web.app serves the same app + same backend, so the viewer
+  // still gets the live game. (localhost preview keeps its own URL so testing still works.)
+  if((location.protocol==="http:"||location.protocol==="https:")
+     && (location.hostname==="localhost"||location.hostname==="127.0.0.1"))
+    return location.origin+location.pathname;
+  return "https://allstars-live.web.app/";
 }
 let shareMode="feed";   // "feed" = scorebug + play-by-play only (no video); "video" = include the stream
 function shareUrl(){
@@ -3117,13 +3124,19 @@ document.getElementById("qrmodal").addEventListener("click",e=>{
   if(a.dataset.act==="closeshare") closeShare();
   else if(a.dataset.act==="shareemail"){
     const u=curShareUrl(); if(!u)return;
-    const subj=shareCtx?(shareCtx.subject||"All-Stars Live"):"Watch All-Stars Live";
-    const body=shareCtx?((shareCtx.body||"")+"\n"+u):("Follow the game live:\n"+u);
+    const mt=(OUR.name||"Our team")+" vs "+(OPP.name||"Opponent");
+    const subj=shareCtx?(shareCtx.subject||"All-Stars Live"):("Watch "+mt+" — live");
+    const body=shareCtx
+      ? ((shareCtx.body||"")+"\n\n"+u+"\n\nAll-Stars Live is a free youth-baseball scoreboard app.")
+      : (mt+" is being scored live on All-Stars Live, a free youth-baseball scoreboard. Tap the link to follow the live score and play-by-play (and the video stream, if one is running):\n\n"+u);
     location.href="mailto:?subject="+encodeURIComponent(subj)+"&body="+encodeURIComponent(body);
   }
   else if(a.dataset.act==="sharetext"){
     const u=curShareUrl(); if(!u)return;
-    const body=shareCtx?((shareCtx.body?shareCtx.body+" ":"")+u):("Watch All-Stars Live: "+u);
+    const mt=(OUR.name||"Our team")+" vs "+(OPP.name||"Opponent");
+    const body=shareCtx
+      ? ((shareCtx.body?shareCtx.body+"\n":"")+u)
+      : ("Watch "+mt+" live on All-Stars Live (free youth-baseball scoreboard):\n"+u);
     location.href="sms:?body="+encodeURIComponent(body);
   }
   else if(a.dataset.act==="sharemode"){ shareMode=a.dataset.arg; openShare(); return; }
@@ -3229,7 +3242,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v94";
+var APP_VERSION="v95";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
