@@ -1041,9 +1041,9 @@ function pitch(type){
   snapshot();const k0=battingKey(),b0=batter(),bn=b0.name,bnum=b0.num;_pitch=type;recordPitch(type);
   const pt=(advPitch&&pitchType)?" "+pitchType:"";   // pitch type tag (if advanced tracking on)
   if(type==="ball"){G.balls++;feedPitch("Ball"+pt,"#"+bnum+" · "+G.balls+"-"+G.strikes);if(G.balls>=4){applyPlanInline("walk");flash("Walk");bcastEvent("walk","Ball four · "+bn,k0);}}
-  else if(type==="strike"){G.strikes++;feedPitch("Strike"+pt,"#"+bnum+" · "+G.balls+"-"+G.strikes);if(G.strikes>=3){G.outs++;creditBatter("strikeout",0);nextBatter();flipIfNeeded();flash("Strikeout");bcastEvent("strikeout",bn,k0);}}
+  else if(type==="strike"){G.strikes++;feedPitch("Strike"+pt,"#"+bnum+" · "+G.balls+"-"+G.strikes);if(G.strikes>=3){G.outs++;creditBatter("strikeout",0);nextBatter();flipIfNeeded();flash("Strikeout");bcastEvent("strikeout",bn,k0);G.anim={id:((G.anim&&G.anim.id)||0)+1,ts:Date.now(),sfx:"whiff"};}}
   else if(type==="foul"){if(G.strikes<2)G.strikes++;feedPitch("Foul"+pt,"#"+bnum+" · "+G.balls+"-"+G.strikes);}
-  render();broadcast();
+  render();broadcast();try{triggerAnim(G.anim);}catch(e){}
 }
 function manual(kind,label){snapshot();const k0=battingKey(),bn=batter().name;if(kind==="hbp")recordPitch("hbp");applyPlanInline(kind);bcastEvent(kind,bn,k0);flash(label);render();broadcast();}
 function startInPlay(){mode="locate";tap=null;render();}
@@ -1085,7 +1085,7 @@ function commit(r,movers){
   snapshot();recordPitch("inplay");const outs=outsFromKind(r.kind);   // the pitch that was put in play
   if(G.ab&&tap)G.ab.loc={zone:tap.zone,pos:tap.pos};   // remember where it was hit
   // one-shot animation payload (ball flight + runner paths) — rides the full-G broadcast to viewers
-  try{ const _ap=planPaths(movers); G.anim={ id:((G.anim&&G.anim.id)||0)+1, ts:Date.now(), hit:(tap?{x:tap.x,y:tap.y}:null), k:r.kind, paths:_ap.map(p=>({pts:p.pts,color:p.color,scored:!!p.scored,out:!!p.out})) }; }catch(e){}
+  try{ const _ap=planPaths(movers); G.anim={ id:((G.anim&&G.anim.id)||0)+1, ts:Date.now(), hit:(tap?{x:tap.x,y:tap.y}:null), k:r.kind, outKind:(outsFromKind(r.kind)>0), paths:_ap.map(p=>({pts:p.pts,color:p.color,scored:!!p.scored,out:!!p.out})) }; }catch(e){}
   const k0=battingKey(),bn=batter().name;
   const runs=resolve(movers,outs);                 // capped runs that actually count
   const rbi=rbiEligible(r.kind)?runs:0;
@@ -1136,7 +1136,18 @@ const Snd=(function(){
     const g=c.createGain(); g.gain.setValueAtTime(0.0001,t); g.gain.linearRampToValueAtTime(0.16,t+0.4); g.gain.exponentialRampToValueAtTime(0.0008,t+0.95);
     s.connect(bp); bp.connect(g); g.connect(c.destination); s.start(t); s.stop(t+0.95);
   }
-  return {unlock:unlock,isOn:isOn,setOn:setOn,crack:crack,cheer:cheer};
+  function whiff(){ if(!on)return; const c=ac(); if(!c)return; const t=c.currentTime;   // swing & miss
+    const s=noise(c,0.22,1.4), lp=c.createBiquadFilter(); lp.type="lowpass"; lp.Q.value=0.7;
+    lp.frequency.setValueAtTime(3600,t); lp.frequency.exponentialRampToValueAtTime(480,t+0.2);
+    const g=c.createGain(); g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(0.22,t+0.02); g.gain.exponentialRampToValueAtTime(0.0006,t+0.22);
+    s.connect(lp); lp.connect(g); g.connect(c.destination); s.start(t); s.stop(t+0.23);
+  }
+  function out(){ if(!on)return; const c=ac(); if(!c)return; const t=c.currentTime;   // low "out" thunk + tick
+    const o=c.createOscillator(); o.type="sine"; o.frequency.setValueAtTime(190,t); o.frequency.exponentialRampToValueAtTime(90,t+0.1);
+    const g=c.createGain(); env(g,t,0.4,0.13); o.connect(g); g.connect(c.destination); o.start(t); o.stop(t+0.14);
+    const s=noise(c,0.05,3), hp=c.createBiquadFilter(); hp.type="highpass"; hp.frequency.value=1200; const ng=c.createGain(); env(ng,t,0.16,0.05); s.connect(hp); hp.connect(ng); ng.connect(c.destination); s.start(t); s.stop(t+0.06);
+  }
+  return {unlock:unlock,isOn:isOn,setOn:setOn,crack:crack,cheer:cheer,whiff:whiff,out:out};
 })();
 try{ document.addEventListener("pointerdown",function(){Snd.unlock();},{once:true,passive:true}); }catch(e){}
 
@@ -1148,7 +1159,12 @@ function triggerAnim(a){
   if(!a||!a.id||a.id===_lastAnimId) return;
   if(a.ts&&(Date.now()-a.ts)>6000){ _lastAnimId=a.id; return; }   // reload / late join — don't replay an old play
   _lastAnimId=a.id; playAnim=a;
-  try{ if(a.hit)Snd.crack(); if((a.paths||[]).some(p=>p.scored))setTimeout(function(){Snd.cheer();},650); }catch(e){}
+  try{
+    if(a.sfx==="whiff")Snd.whiff();
+    if(a.hit)Snd.crack();
+    if(a.outKind||(a.paths||[]).some(p=>p.out))setTimeout(function(){Snd.out();},a.hit?420:0);
+    if((a.paths||[]).some(p=>p.scored))setTimeout(function(){Snd.cheer();},650);
+  }catch(e){}
   if(_animTimer)clearTimeout(_animTimer);
   try{render();}catch(e){}
   _animTimer=setTimeout(function(){ playAnim=null; try{render();}catch(e){} },1800);
@@ -3530,7 +3546,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v106";
+var APP_VERSION="v107";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
