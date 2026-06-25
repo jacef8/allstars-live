@@ -2072,8 +2072,17 @@ function actionArea(){
     // #app (up to ~1680px) otherwise leaves a big dead zone in the middle of tables/forms.
     const secWrap=(inner)=>`<div style="width:100%;max-width:880px;margin:0 auto;display:flex;flex-direction:column;gap:12px">${inner}</div>`;
     if(teamTab==="roster"){
-      // Team details grouped into one tidy card — name → abbr → colour (single button) → logo,
-      // each a consistent label-left / control-right row.
+      const canMng=!(C&&C.enabled)||(window.cloudIsScorer&&window.cloudIsScorer(t));
+      return secWrap(`${secHdr("Roster &amp; lineup")}
+          <div class="frost-card" style="background:${T.surface};border:1px solid ${T.line};border-radius:12px;padding:11px 12px 4px">
+            <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin:0 2px 8px">Roster — tap to edit #/name &middot; &rsaquo; for player stats</div>${roster}</div>
+          <button data-act="addteamp" style="${ghost}">+ Add player</button>
+          ${canMng?`<button data-act="teamtab" data-arg="manage" style="display:flex;align-items:center;justify-content:center;gap:10px;width:100%;background:${T.surface2};border:1px solid ${T.line};color:${T.ink};border-radius:12px;padding:15px;font-family:${MONO};font-weight:800;font-size:16px;letter-spacing:.5px;margin-top:6px">${IC('gear',20)} Team management</button>`:""}`);
+    }
+    if(teamTab==="manage"){
+      const canMng=!(C&&C.enabled)||(window.cloudIsScorer&&window.cloudIsScorer(t));
+      if(!canMng) return secWrap(`${secHdr("Team management")}<div style="font-size:13px;color:${T.sage};padding:8px">Only the team's owner or a scorer can manage these settings.</div>`);
+      // Everything that configures the team — identity, rules, access — in one window.
       const dLbl=`font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:${T.lime};flex:none;width:120px;padding-top:8px`;
       const dRow=(label,inner,first)=>`<div style="display:flex;gap:12px;flex-wrap:wrap;padding:11px 2px;${first?"":`border-top:1px solid ${T.line}`}"><div style="${dLbl}">${label}</div><div style="flex:1;min-width:180px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">${inner}</div></div>`;
       const logoCtl=`<div style="width:50px;height:50px;flex:none;border-radius:11px;border:1px solid ${T.line};background:${t.logo?"#fff":T.surface2}${t.logo?`;background-image:url('${t.logo}');background-size:contain;background-repeat:no-repeat;background-position:center`:""};display:flex;align-items:center;justify-content:center;color:${T.sageDim}">${t.logo?"":IC('flag',22)}</div>
@@ -2085,11 +2094,7 @@ function actionArea(){
           ${dRow("Logo",logoCtl)}
           <div style="font-size:11px;color:${T.sageDim};line-height:1.4;padding:8px 2px 0">The logo shows on team cards, the lineup card &amp; (soon) the scoreboard. A square PNG with a transparent background looks best.</div>
         </div>`;
-      return secWrap(`${secHdr("Roster &amp; details")}${detailsBlock}
-          <div class="frost-card" style="background:${T.surface};border:1px solid ${T.line};border-radius:12px;padding:11px 12px 4px">
-            <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin:0 2px 8px">Roster — tap to edit #/name &middot; &rsaquo; for player stats</div>${roster}</div>
-          <button data-act="addteamp" style="${ghost}">+ Add player</button>
-          ${rulebookSection}`);
+      return secWrap(`${secHdr("Team management")}${detailsBlock}${rulebookSection}${scorersSection}${discoverySection}`);
     }
     if(teamTab==="schedule") return secWrap(`${secHdr("Schedule")}${scheduleSection}`);
     if(teamTab==="gameview"){
@@ -2121,8 +2126,8 @@ function actionArea(){
       return secWrap(`${secHdr("Game")}${head}${lineTbl}${batTbl("away")}${batTbl("home")}${pitchTbl("away")}${pitchTbl("home")}${scoreBtn}${ytBtn}${delBtn}`);
     }
     if(teamTab==="stats") return secWrap(`${secHdr("Stats &amp; games")}${recEditor}${gamesBlock}${statTable}`);
-    if(teamTab==="access") return secWrap(`${secHdr("Team access")}${scorersSection}${discoverySection}`);
-    if(teamTab==="rules"){ teamTab="roster"; return actionArea(); }   // rules folded into Roster & details
+    if(teamTab==="access"){ teamTab="manage"; return actionArea(); }   // access folded into Team management
+    if(teamTab==="rules"){ teamTab="manage"; return actionArea(); }     // rules folded into Team management
     if(teamTab==="photos"&&!PHOTOS_ENABLED){ teamTab="hub"; return actionArea(); }   // gallery gated off
     if(teamTab==="photos"){
       const C=window.Cloud, signedIn=!!(C&&C.enabled&&C.user);
@@ -2161,11 +2166,11 @@ function actionArea(){
             <div style="font-family:${MONO};font-size:20px;font-weight:800;color:${t.color};margin-top:4px">${rec}</div></div></div>
         <button data-act="teamchat" style="${bigBtn(T.lime,'')};font-size:17px">${ICN.chat} Team chat</button>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-          ${hb("roster",IC('users',26),"Roster &amp; details")}
+          ${hb("roster",IC('users',26),"Roster &amp; lineup")}
           ${hb("schedule",IC('calendar',26),"Schedule")}
           ${hb("stats",IC('chart',26),"Stats &amp; games")}
           ${PHOTOS_ENABLED?hb("photos",IC('camera',26),"Photos"):""}
-          ${(!(C&&C.enabled)||(window.cloudIsScorer&&window.cloudIsScorer(t)))?hb("access",IC('key',26),"Scorers &amp; co-owners"):""}
+          ${(!(C&&C.enabled)||(window.cloudIsScorer&&window.cloudIsScorer(t)))?hb("manage",IC('gear',26),"Team management"):""}
           ${hbAct("shareteam",IC('share',26),"Share &amp; invite")}
         </div>
         <button data-act="startteam" style="${bigBtn(t.color)}">${IC('<path d="M8 5l11 7-11 7z" fill="currentColor" stroke="none"/>')} Start game with ${t.short}</button>
@@ -3556,7 +3561,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v115";
+var APP_VERSION="v116";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
