@@ -553,7 +553,7 @@ function buildResults(pos,contact,bases){
       R.push(h("single","Single","1B"),h("double","Double","2B"),h("lineout",`Lineout to ${pos}`,`L${n}`),
              h("triple","Triple","3B"),h("hr","Home run","HR"));
     }else{ R.push(h("single","Single","1B"),h("double","Double","2B")); }
-    R.push(h("error",`Reached on error (${pos})`,`E${n}`)); return R;
+    R.push(h("error",`Reached on error (${pos})`,`E${n}`)); if(advEvents)R.push(h("ci","Catcher's interference","CI")); return R;
   }
   if(contact==="Grounder"){
     R.push(h("out1",`Out at first (${n}-3)`,pos==="1B"?"3U":`${n}-3`));
@@ -565,6 +565,7 @@ function buildResults(pos,contact,bases){
   }else{
     R.push(h("popout",`Popout to ${pos}`,`P${n}`),h("single","Bunt single","1B"),h("error",`Reached on error (${pos})`,`E${n}`));
   }
+  if(advEvents)R.push(h("ci","Catcher's interference","CI"));
   return R;
 }
 
@@ -1013,7 +1014,7 @@ function baseRunModal(){
         </div></div>`;}).join("");
   const gbtn=(act,lbl)=>`<button data-act="${act}" style="flex:1 1 auto;background:${T.surface2};border:1px solid ${T.line};color:${T.chalk};border-radius:9px;padding:11px 8px;font-family:${SANS};font-size:14px;font-weight:800;white-space:nowrap">${lbl}</button>`;
   return `<div data-act="brclose" style="position:fixed;left:0;right:0;top:0;height:calc(var(--avh) * 100);z-index:120;background:rgba(8,11,16,.78);display:flex;align-items:center;justify-content:center;padding:16px">
-      <div onclick="event.stopPropagation()" style="width:100%;max-width:460px;max-height:calc(var(--avh) * 90);overflow-y:auto;-webkit-overflow-scrolling:touch;background:${T.surface};border:2px solid ${T.lime};border-radius:18px;padding:16px;display:flex;flex-direction:column;gap:12px;box-shadow:0 18px 54px rgba(0,0,0,.6)">
+      <div data-act="noop" style="width:100%;max-width:460px;max-height:calc(var(--avh) * 90);overflow-y:auto;-webkit-overflow-scrolling:touch;background:${T.surface};border:2px solid ${T.lime};border-radius:18px;padding:16px;display:flex;flex-direction:column;gap:12px;box-shadow:0 18px 54px rgba(0,0,0,.6)">
         <div style="display:flex;align-items:center;gap:10px"><div style="flex:1;font-family:${MONO};font-size:18px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:${T.lime}">Base running</div>
           <button data-act="brclose" style="${ghost};padding:8px 14px;flex:none">Close</button></div>
         <div style="font-size:12px;color:${T.sage};margin-top:-4px">No ball in play — the batter stays up with the same count.</div>
@@ -3000,7 +3001,6 @@ function actionArea(){
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
         <button data-act="walk" style="${flatBtn}"><span style="color:${T.sage}">${ICN.walk}</span>Walk</button>
         <button data-act="hbp" style="${flatBtn}"><span style="color:${T.sage}">${ICN.hbp}</span>HBP</button></div>
-      ${advEvents?`<button data-act="ci" style="${flatBtn}"><span style="color:${T.sage}">&#9758;</span>Catcher's interference <span style="color:${T.sage};font-weight:600;font-size:11px;text-transform:none;letter-spacing:0">batter to 1st</span></button>`:""}
       ${[1,2,3].some(b=>G.bases&&G.bases[b])?`<button data-act="brsheet" style="${flatBtn};border-left:4px solid ${T.safe}"><span style="color:${T.safe};font-size:16px;line-height:1">&#9826;</span>Base running <span style="color:${T.sage};font-weight:600;font-size:11px;text-transform:none;letter-spacing:0">steal · WP/PB · balk</span></button>`:""}
       <button data-act="endinning" style="${flatBtn};border-left:4px solid ${T.amber}"><span style="color:${T.amber}">${ICN.inning}</span>End Inning <span style="color:${T.sage};font-weight:600;font-size:11px;text-transform:none;letter-spacing:0">${halfLabel} · ${G.outs} out${G.outs===1?"":"s"}</span></button>`;
   }
@@ -3634,7 +3634,6 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="inplay")startInPlay();
   else if(act==="walk")manual("walk","Walk");
   else if(act==="hbp")manual("hbp","Hit by pitch");
-  else if(act==="ci")manual("ci","Catcher's interference");
   else if(act==="cancel"){resetUI();render();}
   else if(act==="contact")chooseContact(arg);
   else if(act==="result")chooseResult(curResults[+arg]);
@@ -4142,7 +4141,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v142";
+var APP_VERSION="v143";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
