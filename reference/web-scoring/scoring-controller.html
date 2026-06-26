@@ -335,6 +335,27 @@ function brandCss(accent){ return '*{box-sizing:border-box;-webkit-print-color-a
   +'@media print{body{padding:0;background:#fff}.card{border:none;box-shadow:none;border-radius:0;max-width:none}@page{margin:11mm}}'; }
 function brandBar(tag){ return '<div class="brand"><div class="wm">ALL-STARS <i>LIVE</i></div><div class="tag">'+tag+'</div></div>'; }
 function brandFt(){ return '<div class="brandft"><span>Generated with <b>ALL-STARS LIVE</b></span><span>allstarslive</span></div>'; }
+/* Show a generated print document (lineup card / scorecard) IN-APP via a full-screen iframe
+ * overlay with a Back button — so on the tablet it doesn't open an orphan window with no way
+ * back (hitting back used to exit the whole app). A Print/Save-PDF button triggers the print. */
+function showPrintable(html){
+  try{
+    const doc=html.replace(/<script>[\s\S]*?window\.print\(\)[\s\S]*?<\/script>/gi,"");   // drop auto-print; use the button
+    const old=document.getElementById("docOverlay"); if(old)old.remove();
+    const ov=document.createElement("div");
+    ov.id="docOverlay";
+    ov.style.cssText="position:fixed;inset:0;z-index:300;background:#0b0f15;display:flex;flex-direction:column";
+    const bar=document.createElement("div");
+    bar.style.cssText="flex:none;display:flex;align-items:center;gap:10px;padding:10px 14px;background:#141a22;border-bottom:1px solid #2a3650";
+    bar.innerHTML='<button id="docClose" style="background:#222b36;border:1px solid #3a4658;color:#fff;border-radius:9px;padding:9px 16px;font-family:system-ui;font-weight:800;font-size:14px;cursor:pointer">&lsaquo; Back</button><div style="flex:1"></div><button id="docPrint" style="background:#E11D2E;border:none;color:#fff;border-radius:9px;padding:9px 16px;font-family:system-ui;font-weight:800;font-size:14px;cursor:pointer">Print / Save PDF</button>';
+    const frame=document.createElement("iframe");
+    frame.style.cssText="flex:1;width:100%;border:0;background:#fff";
+    frame.setAttribute("srcdoc",doc);
+    ov.appendChild(bar); ov.appendChild(frame); document.body.appendChild(ov);
+    document.getElementById("docClose").onclick=function(){ ov.remove(); };
+    document.getElementById("docPrint").onclick=function(){ try{ frame.contentWindow.focus(); frame.contentWindow.print(); }catch(e){} };
+  }catch(e){ try{ const w=window.open("","_blank"); if(w){ w.document.open(); w.document.write(html); w.document.close(); } }catch(x){} }
+}
 /* Printable "lineup card" — opens a clean print view (Save as PDF) with the team logo, color,
  * record and a standard batting-order grid + substitutes + pitcher log. */
 function printLineupCard(t,ctx){
@@ -382,9 +403,7 @@ function printLineupCard(t,ctx){
     +'</div>'+brandFt()+'</div>'
     +'<scr'+'ipt>window.onload=function(){setTimeout(function(){try{window.print();}catch(e){}},300);};</scr'+'ipt>'
     +'</body></html>';
-  const w=window.open("","_blank");
-  if(!w){ flash("Allow pop-ups to open the lineup card"); return; }
-  w.document.open(); w.document.write(html); w.document.close();
+  showPrintable(html);
 }
 window.importTeam=function(){ pickJSON(function(o){ const t=(o&&o.team&&o.team.players)?o.team:(o&&o.players?o:null); if(!t||!t.players){try{alert("That's not a team file.");}catch(e){} return;} t.id=nextId("t"); delete t.ownerUid; delete t.ownerEmail; delete t.scorers; (t.players||[]).forEach(ensureName); if(!t.record)t.record={w:0,l:0,t:0}; if(!t.season)t.season={}; DB.teams.push(t); saveDB(); openTeamId=t.id; mode="team"; render(); }); };
 window.exportGame=function(){ downloadJSON("game-"+((OUR.short||"home"))+"-vs-"+((OPP.short||"opp"))+".allstars-game.json",{kind:"allstars-game",v:1,G,OUR,OPP,curTeamId,oppTeamId}); };
@@ -428,9 +447,7 @@ function openScorecard(M){
     +'</div>'+brandFt()+'</div>'
     +'<scr'+'ipt>window.onload=function(){setTimeout(function(){try{window.print();}catch(e){}},350);};</scr'+'ipt>'
     +'</body></html>';
-  const w=window.open("","_blank");
-  if(!w){ flash("Allow pop-ups to open the scorecard"); return; }
-  w.document.open(); w.document.write(html); w.document.close();
+  showPrintable(html);
 }
 function printGameCard(){
   if(!G||!G.line){ flash("No game to print"); return; }
@@ -1768,7 +1785,10 @@ function getRecentOpps(){ try{ return JSON.parse(localStorage.getItem("al-recent
 function getSeenChat(){ try{ return JSON.parse(localStorage.getItem("al-chat-seen")||"{}"); }catch(e){ return {}; } }
 function markSeenChat(id){ if(!id)return; try{ const s=getSeenChat(); s[id]=Date.now(); localStorage.setItem("al-chat-seen",JSON.stringify(s)); }catch(e){} }
 function teamHasUnread(t){ try{ if(!t||!t.lastMsgAt)return false; return (getSeenChat()[t.id]||0) < (t.lastMsgAt-4000); }catch(e){ return false; } }  // 4s grace: never badge your own just-sent message (same-device clock skew)
-function recordRecentOpp(o){ if(!o||!o.name||o.name==="Opponent")return; try{ let r=getRecentOpps().filter(x=>x.name!==o.name); r.unshift({name:o.name,short:o.short||"",color:o.color||"#E2574C"}); localStorage.setItem("al-recent-opps",JSON.stringify(r.slice(0,8))); }catch(e){} }
+function recordRecentOpp(o){ if(!o||!o.name||o.name==="Opponent")return; try{ let r=getRecentOpps().filter(x=>x.name!==o.name); r.unshift({name:o.name,short:o.short||"",color:o.color||"#E2574C"}); localStorage.setItem("al-recent-opps",JSON.stringify(r.slice(0,12))); }catch(e){} }
+/* Reusable list of places you've scheduled at (for the schedule form's location autocomplete). */
+function getRecentLocs(){ try{ return JSON.parse(localStorage.getItem("al-recent-locs")||"[]"); }catch(e){ return []; } }
+function recordRecentLoc(loc){ loc=(loc||"").trim(); if(!loc)return; try{ let r=getRecentLocs().filter(x=>x.toLowerCase()!==loc.toLowerCase()); r.unshift(loc); localStorage.setItem("al-recent-locs",JSON.stringify(r.slice(0,15))); }catch(e){} }
 /* Live client-side filter for the opponent picker (no re-render → keeps the input focused). */
 window._oppFilter=function(v){ v=(v||"").trim().toLowerCase(); try{ document.querySelectorAll('[data-tname]').forEach(function(el){ el.style.display=(!v||(el.getAttribute('data-tname')||'').indexOf(v)>=0)?"":"none"; }); }catch(e){} };
 /* Schedule month-calendar view (toggle with the list). calYM = {y,m} of the shown month. */
@@ -2090,15 +2110,17 @@ function actionArea(){
     const editing = schedEditId ? (t.schedule||[]).find(s=>s.id===schedEditId) : null;
     const eq=v=>(v||"").replace(/"/g,"&quot;");
     const eOpp = editing?(editing.opp||""):"";
-    const oppNewSel = !!(editing && eOpp && !(DB.teams||[]).some(x=>x.id!==t.id && x.name===eOpp));
+    const dbOpps=(DB.teams||[]).filter(x=>x.id!==t.id);
+    const recentOpps=getRecentOpps().filter(o=>o.name && !dbOpps.some(x=>x.name===o.name));   // saved-for-reuse opponent names
+    const oppNewSel = !!(editing && eOpp && !dbOpps.some(x=>x.name===eOpp) && !recentOpps.some(o=>o.name===eOpp));
     const scheduleEditCard=`<div class="frost-card" style="background:${T.surface};border:1px solid ${editing?T.lime:T.line};border-radius:14px;padding:16px 18px;display:flex;flex-direction:column;gap:11px">
         <div style="font-size:14px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime}">${editing?"Edit game or practice":"Add a game or practice"}</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           ${fld("Type",`<select id="schType" style="${cellL}"><option value="game"${editing&&editing.type!=="practice"?" selected":""}>Game</option><option value="practice"${editing&&editing.type==="practice"?" selected":""}>Practice</option></select>`)}
           ${fld("Date",`<input id="schDate" type="date" value="${editing?eq(editing.date):(calSelDay||'')}" style="${cellL}">`)}
           ${fld("Time",timeSelects("schTime",editing?(editing.time||""):""))}</div>
-        ${fld("Opponent (games only)",`<select id="schOppSel" onchange="var n=document.getElementById('schOppNew');if(n)n.style.display=this.value==='__new__'?'block':'none'" style="${cellL}"><option value=""${!editing||!eOpp?" selected":""}>— pick a team —</option>${(DB.teams||[]).filter(x=>x.id!==t.id).map(x=>`<option value="${eq(x.name)}"${eOpp&&eOpp===x.name?" selected":""}>${(x.name||'').replace(/</g,'')}</option>`).join("")}<option value="__new__"${oppNewSel?" selected":""}>+ New opponent…</option></select><input id="schOppNew" placeholder="New opponent name" value="${oppNewSel?eq(eOpp):""}" style="${cellL};margin-top:6px;display:${oppNewSel?"block":"none"}">`)}
-        ${fld("Location",`<input id="schLoc" placeholder="e.g. City Park — Field 2" value="${editing?eq(editing.loc):""}" style="${cellL}">`)}
+        ${fld("Opponent (games only)",`<select id="schOppSel" onchange="var n=document.getElementById('schOppNew');if(n)n.style.display=this.value==='__new__'?'block':'none'" style="${cellL}"><option value=""${!editing||!eOpp?" selected":""}>— pick an opponent —</option>${dbOpps.length?`<optgroup label="Your teams">${dbOpps.map(x=>`<option value="${eq(x.name)}"${eOpp&&eOpp===x.name?" selected":""}>${(x.name||'').replace(/</g,'')}</option>`).join("")}</optgroup>`:""}${recentOpps.length?`<optgroup label="Recent opponents">${recentOpps.map(o=>`<option value="${eq(o.name)}"${eOpp&&eOpp===o.name?" selected":""}>${(o.name||'').replace(/</g,'')}</option>`).join("")}</optgroup>`:""}<option value="__new__"${oppNewSel?" selected":""}>+ New opponent…</option></select><input id="schOppNew" placeholder="New opponent name" value="${oppNewSel?eq(eOpp):""}" style="${cellL};margin-top:6px;display:${oppNewSel?"block":"none"}">`)}
+        ${fld("Location",`<input id="schLoc" list="schLocList" placeholder="e.g. City Park — Field 2" value="${editing?eq(editing.loc):""}" style="${cellL}"><datalist id="schLocList">${getRecentLocs().map(l=>`<option value="${eq(l)}"></option>`).join("")}</datalist>`)}
         ${fld("Notes (optional)",`<input id="schNotes" placeholder="e.g. arrive 45 min early, white jerseys" value="${editing?eq(editing.notes):""}" style="${cellL}">`)}
         <div style="display:flex;gap:8px;margin-top:4px">${editing?`<button data-act="schedcancel" style="${ghost};flex:none;padding:14px 18px">Cancel</button>`:""}<button data-act="schedadd" style="${bigBtn(T.lime,'')};flex:1">${editing?"Save changes":"+ Add to schedule"}</button></div></div>`;
     // Past games — the finished-game log, newest first, TAPPABLE to open the score + box score.
@@ -2326,9 +2348,9 @@ function actionArea(){
     }
     // ----- HUB: team header + grid of sections + primary actions -----
     const rec=(()=>{const R=teamRec(t);return `${R.w}-${R.l}${R.t?"-"+R.t:""}`;})();
-    const hb=(arg,icon,label)=>`<button data-act="teamtab" data-arg="${arg}" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;background:${T.surface};border:1px solid ${T.line};border-radius:14px;padding:14px 10px;min-height:84px;cursor:pointer"><span style="font-size:25px;color:${T.lime}">${icon}</span><span style="font-weight:800;color:${T.ink};font-size:15px;text-align:center;line-height:1.2">${label}</span></button>`;
+    const hb=(arg,icon,label)=>`<button data-act="teamtab" data-arg="${arg}" style="display:flex;flex-direction:row;align-items:center;justify-content:center;gap:10px;background:${T.surface};border:1px solid ${T.line};border-radius:13px;padding:13px 10px;min-height:0;cursor:pointer"><span style="font-size:22px;color:${T.lime};display:flex">${icon}</span><span style="font-weight:800;color:${T.ink};font-size:15px;text-align:center;line-height:1.15">${label}</span></button>`;
     // Hub tile that fires a non-tab action (Share) — same look as hb() but its own data-act.
-    const hbAct=(act,icon,label)=>`<button data-act="${act}" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;background:${T.surface};border:1px solid ${T.line};border-radius:14px;padding:14px 10px;min-height:84px;cursor:pointer"><span style="font-size:25px;color:${T.lime}">${icon}</span><span style="font-weight:800;color:${T.ink};font-size:15px;text-align:center;line-height:1.2">${label}</span></button>`;
+    const hbAct=(act,icon,label)=>`<button data-act="${act}" style="display:flex;flex-direction:row;align-items:center;justify-content:center;gap:10px;background:${T.surface};border:1px solid ${T.line};border-radius:13px;padding:13px 10px;min-height:0;cursor:pointer"><span style="font-size:22px;color:${T.lime};display:flex">${icon}</span><span style="font-weight:800;color:${T.ink};font-size:15px;text-align:center;line-height:1.15">${label}</span></button>`;
     return secWrap(`
         <div class="frost-card" style="display:flex;align-items:center;gap:10px;background:${T.surface};border:1px solid ${T.line};border-radius:14px;padding:12px 14px">
           <button data-act="teamsback" style="${ghost};padding:9px 11px">&lsaquo; Teams</button>
@@ -2562,7 +2584,8 @@ function actionArea(){
     const header=`<div class="frost-card" style="display:flex;align-items:center;gap:10px;flex:none;background:${T.surface};border:1px solid ${T.line};border-radius:14px;padding:12px 14px">
           <button data-act="${setMode?"settingsdone":"gohome"}" style="${ghost};padding:9px 11px;flex:none">&lsaquo; ${setMode?"Done":"Home"}</button>
           <div style="flex:1;min-width:0;font-family:${MONO};font-size:23px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:${T.lime};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${setMode?"Game Settings":"New Game"}</div>${startTop}</div>`;
-    const sideSel=`<div><div style="${lbl}">Is ${OUR.name} home or away?</div>
+    const sideSel=`<div class="frost-card" style="background:${T.surface};border:1px solid ${T.line};border-radius:12px;padding:16px 20px;display:flex;flex-direction:column;gap:11px;box-shadow:0 2px 6px rgba(15,30,60,.07)">
+          <div style="font-weight:800;color:${T.ink};font-size:19px">Is ${OUR.name} home or away?</div>
           <div style="display:flex;gap:8px">${sideBtn("home","Home")}${sideBtn("away","Away")}</div></div>`;
     const selStyle=`background:${T.surface2};border:1px solid ${T.line};color:${T.ink};border-radius:10px;padding:13px 12px;font-family:${MONO};font-size:16px;font-weight:800;outline:none;max-width:190px`;
     const curL=leagueById(G.league);
@@ -2616,9 +2639,9 @@ function actionArea(){
       // without scrolling. Left = who's playing + the two number settings; right = league/rules.
       return `<div style="min-height:100%;display:flex;flex-direction:column;gap:14px;justify-content:safe center">
           ${header}
-          <div style="width:100%;max-width:1180px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start">
-            <div style="display:flex;flex-direction:column;gap:14px">${teamRow("Your team",OUR.name,OUR.short,OUR.color,"pickour")}${teamRow("Opponent",OPP.name,OPP.short,OPP.color,"pickopp")}${oppColorRow}${sideSel}${runCapCard}${hittersCard}</div>
-            <div style="display:flex;flex-direction:column;gap:14px">${leagueCard}${alertsCard}${pitchTypeCard}${startCard}</div>
+          <div style="width:100%;max-width:1180px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start">
+            <div style="display:flex;flex-direction:column;gap:12px">${teamRow("Your team",OUR.name,OUR.short,OUR.color,"pickour")}${teamRow("Opponent",OPP.name,OPP.short,OPP.color,"pickopp")}${sideSel}<div style="display:flex;gap:12px"><div style="flex:1;min-width:0">${runCapCard}</div><div style="flex:1;min-width:0">${hittersCard}</div></div></div>
+            <div style="display:flex;flex-direction:column;gap:12px">${leagueCard}${alertsCard}${pitchTypeCard}${startCard}</div>
           </div>
           <div style="width:100%;max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:10px">${lineupCardBtn}</div>
         </div>`;
@@ -2628,7 +2651,6 @@ function actionArea(){
         ${header}
         ${teamRow("Your team",OUR.name,OUR.short,OUR.color,"pickour")}
         ${teamRow("Opponent",OPP.name,OPP.short,OPP.color,"pickopp")}
-        ${oppColorRow}
         ${sideSel}${ruleCards}${lineupCardBtn}
       </div>`;
   }
@@ -3312,6 +3334,7 @@ document.getElementById("app").addEventListener("click",e=>{
   if(act==="schedcancel"){ schedEditId=null; render(); return; }
   if(act==="schedadd"){ const t=teamById(openTeamId); if(!t)return; const g=id=>{const e=document.getElementById(id);return e?(e.value||""):"";}; const date=g("schDate"); if(!date){flash("Pick a date");return;} const _sel=g("schOppSel"); const opp=(_sel==="__new__"?g("schOppNew"):_sel).trim(); if(!Array.isArray(t.schedule))t.schedule=[];
     const fields={type:g("schType")||"game",date:date,time:g("schTime"),opp:opp,loc:g("schLoc").trim(),notes:g("schNotes").trim()};
+    if(opp)recordRecentOpp({name:opp}); if(fields.loc)recordRecentLoc(fields.loc);   // remember for next time
     if(schedEditId){ const ex=t.schedule.find(s=>s.id===schedEditId); if(ex)Object.assign(ex,fields); schedEditId=null; saveDB(); try{ if(window.cloudSaveTeam)window.cloudSaveTeam(t); }catch(e){} flash("Schedule updated"); render(); return; }
     const ev=Object.assign({id:"s"+Date.now().toString(36)},fields);
     t.schedule.push(ev); saveDB();
@@ -3710,6 +3733,7 @@ window.rulesSearch=function(q){
 window.appBack=function(){
   try{
     // An open overlay/modal swallows Back first — dismiss it instead of leaving the app.
+    const dov=document.getElementById("docOverlay"); if(dov){ dov.remove(); return true; }   // lineup card / scorecard viewer
     if(photoZoom){ photoZoom=null; render(); return true; }
     const rmod=document.getElementById("rulesmodal"); if(rmod&&rmod.style.display==="flex"){ closeRules(); return true; }
     const cm=document.getElementById("chatmodal"); if(cm&&cm.style.display==="flex"){ closeChat(); return true; }
@@ -3927,7 +3951,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v132";
+var APP_VERSION="v133";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
