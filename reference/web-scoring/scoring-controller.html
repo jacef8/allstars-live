@@ -1445,6 +1445,53 @@ function batterStrip(){
   </button>`;
 }
 
+/* ───────── Free-layout windows (BETA prototype) ─────────
+   A draggable + resizable floating "window" that survives the full re-render render() does on
+   every pitch: geometry lives in FLOAT (persisted), and setupFloatWins() re-applies it + re-binds
+   pointer drag/resize after each render. Prototype floats ONE panel (the AT BAT card) on the wide
+   (tablet) scorer view; once proven we extend the same wrapper to the field, feed, score, etc. */
+let floatOn=(()=>{ try{ return localStorage.getItem("al-float-on")==="1"; }catch(e){ return false; } })();
+let FLOAT=(()=>{ try{ return JSON.parse(localStorage.getItem("al-float")||"{}")||{}; }catch(e){ return {}; } })();
+function saveFloat(){ try{ localStorage.setItem("al-float",JSON.stringify(FLOAT)); localStorage.setItem("al-float-on",floatOn?"1":"0"); }catch(e){} }
+function floatGeo(id,def){ const g=FLOAT[id]||{}; return {x:g.x!=null?g.x:def.x, y:g.y!=null?g.y:def.y, w:g.w!=null?g.w:def.w, h:g.h!=null?g.h:def.h}; }
+function floatWindow(id,title,inner,def){
+  const g=floatGeo(id,def);
+  return `<div data-floatwin="${id}" style="position:absolute;left:${g.x}px;top:${g.y}px;width:${g.w}px;height:${g.h}px;z-index:40;pointer-events:auto;display:flex;flex-direction:column;background:rgba(13,19,32,.97);border:1px solid ${T.lime};border-radius:12px;box-shadow:0 14px 44px rgba(0,0,0,.6);overflow:hidden">
+    <div data-floatdrag="${id}" style="flex:none;display:flex;align-items:center;gap:8px;padding:6px 10px;background:${T.surface2};border-bottom:1px solid ${T.line};cursor:move;touch-action:none;user-select:none">
+      <span style="font-size:14px;color:${T.sageDim};line-height:1">&#9783;</span>
+      <span style="flex:1;font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:${T.lime};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${title}</span>
+      <span style="font-size:9px;font-weight:700;letter-spacing:.5px;color:${T.sageDim}">drag</span></div>
+    <div style="flex:1;min-height:0;overflow:auto;padding:8px;display:flex;flex-direction:column">${inner}</div>
+    <div data-floatresize="${id}" title="Drag to resize" style="position:absolute;right:0;bottom:0;width:24px;height:24px;cursor:nwse-resize;touch-action:none;background:linear-gradient(135deg,transparent 45%,${T.lime}99 45%,${T.lime}99 60%,transparent 60%,transparent 72%,${T.lime}99 72%,${T.lime}99 86%,transparent 86%)"></div>
+  </div>`;
+}
+/* Re-apply saved geometry and (re)bind pointer drag/resize after each render. */
+function setupFloatWins(){
+  if(!floatOn) return;
+  const layer=document.getElementById("float-layer"); if(!layer) return;
+  const clampInto=(win)=>{ const w=win.offsetWidth,h=win.offsetHeight;
+    let x=parseFloat(win.style.left)||0, y=parseFloat(win.style.top)||0;
+    x=Math.max(0,Math.min(x,Math.max(0,window.innerWidth-Math.min(w,80))));
+    y=Math.max(0,Math.min(y,Math.max(0,window.innerHeight-44)));
+    win.style.left=x+"px"; win.style.top=y+"px"; };
+  layer.querySelectorAll("[data-floatwin]").forEach(win=>{
+    const id=win.getAttribute("data-floatwin"); clampInto(win);
+    const handle=win.querySelector("[data-floatdrag]"), rez=win.querySelector("[data-floatresize]");
+    let act=null,sx=0,sy=0,ox=0,oy=0,ow=0,oh=0;
+    const move=(e)=>{ if(!act) return; const dx=e.clientX-sx, dy=e.clientY-sy;
+      if(act==="drag"){ win.style.left=(ox+dx)+"px"; win.style.top=(oy+dy)+"px"; }
+      else { win.style.width=Math.max(230,ow+dx)+"px"; win.style.height=Math.max(96,oh+dy)+"px"; }
+      e.preventDefault(); };
+    const up=()=>{ if(!act) return; clampInto(win);
+      FLOAT[id]={x:parseFloat(win.style.left)||0,y:parseFloat(win.style.top)||0,w:win.offsetWidth,h:win.offsetHeight};
+      saveFloat(); act=null; window.removeEventListener("pointermove",move); window.removeEventListener("pointerup",up); };
+    const down=(e,a)=>{ act=a; sx=e.clientX; sy=e.clientY; ox=parseFloat(win.style.left)||0; oy=parseFloat(win.style.top)||0; ow=win.offsetWidth; oh=win.offsetHeight;
+      window.addEventListener("pointermove",move); window.addEventListener("pointerup",up); e.preventDefault(); e.stopPropagation(); };
+    if(handle) handle.addEventListener("pointerdown",e=>down(e,"drag"));
+    if(rez) rez.addEventListener("pointerdown",e=>down(e,"resize"));
+  });
+}
+
 /* Which YouTube stream the monitor shows: ?yt= wins, else the device-saved one. */
 function streamYt(){ try{ return new URLSearchParams(location.search).get("yt") || localStorage.getItem("al-stream-yt") || ""; }catch(e){ return new URLSearchParams(location.search).get("yt")||""; } }
 /* Accept a full YouTube link (watch?v=, youtu.be/, /live/, /embed/) or a bare id. */
@@ -3252,7 +3299,7 @@ function render(){
           ${monitorPane()}
         </div>
         <div style="flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;gap:8px">
-          ${focusPlay?"":scoreBar()}${fieldEl}${focusPlay?"":batterCard()}${actionEl}
+          ${focusPlay?"":scoreBar()}${fieldEl}${(focusPlay||floatOn)?"":batterCard()}${actionEl}
         </div>
       </div>`;
   } else if(wide){
@@ -3263,7 +3310,7 @@ function render(){
           ${focusPlay?"":scoreBar()}<div style="flex:1;min-height:0;display:flex;align-items:center;justify-content:center;position:relative">${diamondSVG()}${toastEl}</div>
         </div>
         <div style="flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;gap:8px">
-          ${focusPlay?"":batterCard()}${actionEl}${feedPanel()}
+          ${(focusPlay||floatOn)?"":batterCard()}${actionEl}${feedPanel()}
         </div>
       </div>`;
   } else if(pickerModal){
@@ -3301,12 +3348,19 @@ function render(){
         ${pane}
       </div>`;
   }
+  // Free-layout (BETA): a "⊞ Windows" toggle on the wide scorer view, and — when on — a fixed
+  // overlay holding the draggable/resizable AT BAT window (prototype panel).
+  const floatable = wide && viewMode!=="viewer";   // prototype: scorer, tablet/PC only
+  const floatToggleBtn = floatable ? `<button data-act="togglefloat" title="Free layout — drag &amp; resize windows (beta)" style="position:fixed;right:16px;bottom:16px;z-index:46;background:${floatOn?T.lime:T.surface2};border:1px solid ${floatOn?T.lime:T.line};color:${floatOn?"#fff":T.chalk};border-radius:10px;padding:9px 13px;font-family:${SANS};font-size:13px;font-weight:800;box-shadow:0 4px 16px rgba(0,0,0,.45)">&#8862; Windows${floatOn?" &#10003;":""}</button>` : "";
+  const floatLayer = (floatable && floatOn) ? `<div id="float-layer" style="position:fixed;inset:0;z-index:35;pointer-events:none">${floatWindow("batter","At Bat",batterCard(),{x:24,y:96,w:360,h:168})}</div>` : "";
   document.getElementById("content").innerHTML=`
     ${body}${confirmOverlay()}${alertOverlay()}
     ${reviewBatter?batterReviewModal():""}
     ${reviewInn?inningLogModal():""}
     ${(pickerModal&&wide)?`<div style="${sheetWrap}">
-        <div id="action-area" style="${sheetCard};overflow-y:auto;-webkit-overflow-scrolling:touch;background:${T.surface};padding:16px;display:flex;flex-direction:column;gap:8px">${actionArea()}</div></div>`:""}`;
+        <div id="action-area" style="${sheetCard};overflow-y:auto;-webkit-overflow-scrolling:touch;background:${T.surface};padding:16px;display:flex;flex-direction:column;gap:8px">${actionArea()}</div></div>`:""}
+    ${floatLayer}${floatToggleBtn}`;
+  try{ setupFloatWins(); }catch(e){}
   animateStatusBar();
   try{ startClock(); }catch(e){}
   if(mode!==_lastMode){ const a=document.getElementById("action-area"); if(a)a.classList.add("screen-in"); _lastMode=mode; }
@@ -3399,6 +3453,7 @@ document.getElementById("app").addEventListener("click",e=>{
   if(act==="sendmsg"){ sendChat(); return; }
   if(act==="delmsg"){ if(window.cloudDeleteMessage&&chatTeamId)window.cloudDeleteMessage(chatTeamId,arg); return; }
   if(act==="ingamesettings"){ settingsMode=true; mode="newgame"; render(); return; }
+  if(act==="togglefloat"){ floatOn=!floatOn; saveFloat(); render(); return; }
   if(act==="settingsdone"){ settingsMode=false; mode="idle"; render(); broadcast(); return; }
   if(act==="ptype"){ pitchType=(pitchType===arg?null:arg); render(); return; }
   if(act==="pane"){ phonePane=arg; render(); return; }
@@ -3987,7 +4042,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v136";
+var APP_VERSION="v137";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
