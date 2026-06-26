@@ -1900,13 +1900,13 @@ function actionArea(){
             onerror="if(this.src.indexOf('logo-star')<0){this.src='icons/logo-star.png';}else if(this.src.indexOf('icon-512')<0){this.src='icons/icon-512.png';this.style.borderRadius='20px';}else{this.style.display='none';}"
             style="height:clamp(150px,calc(var(--avh) * 30),300px);width:auto;display:block;filter:drop-shadow(0 8px 18px rgba(0,0,0,.6))">
           <div style="font-family:${MONO};font-size:clamp(26px,4.2vw,46px);font-weight:800;letter-spacing:1.5px;line-height:1;color:#fff">ALL-STARS <span style="color:${T.lime}">LIVE</span></div></div>`;
-    // Compact hero for the WIDE (tablet) home, where the screen can't scroll — a smaller logo so a
-    // full row of team cards always fits without scrolling. Phones keep the big hero above (they scroll).
-    const heroWide = `<div style="display:flex;align-items:center;justify-content:center;gap:13px;padding:2px 0;flex:none">
+    // Hero for the WIDE (tablet) home — same stacked look as the phone, just a touch smaller so a
+    // full row of team cards fits without scrolling (the wide home can't page-scroll).
+    const heroWide = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:4px 0 2px;flex:none">
           <img src="icons/logo-emblem.png" alt=""
-            onerror="if(this.src.indexOf('logo-star')<0){this.src='icons/logo-star.png';}else if(this.src.indexOf('icon-512')<0){this.src='icons/icon-512.png';this.style.borderRadius='14px';}else{this.style.display='none';}"
-            style="height:clamp(56px,calc(var(--avh) * 12),104px);width:auto;display:block;filter:drop-shadow(0 6px 14px rgba(0,0,0,.55))">
-          <div style="font-family:${MONO};font-size:clamp(24px,3.2vw,38px);font-weight:800;letter-spacing:1.4px;line-height:1;color:#fff">ALL-STARS <span style="color:${T.lime}">LIVE</span></div></div>`;
+            onerror="if(this.src.indexOf('logo-star')<0){this.src='icons/logo-star.png';}else if(this.src.indexOf('icon-512')<0){this.src='icons/icon-512.png';this.style.borderRadius='18px';}else{this.style.display='none';}"
+            style="height:clamp(112px,calc(var(--avh) * 20),156px);width:auto;display:block;filter:drop-shadow(0 8px 18px rgba(0,0,0,.6))">
+          <div style="font-family:${MONO};font-size:clamp(26px,3.6vw,42px);font-weight:800;letter-spacing:1.5px;line-height:1;color:#fff">ALL-STARS <span style="color:${T.lime}">LIVE</span></div></div>`;
     const resumeBtn = gameActive?`<button data-act="resume" style="${bigBtn("#FFFFFF","border:1px solid rgba(0,0,0,.10)",T.field)};font-size:17px;padding:16px;display:flex;align-items:center;justify-content:center;gap:8px">${IC(PLAY)} Resume &middot; ${OUR.short} vs ${OPP.short}</button>`:"";
     const newGameBtn = `<button data-act="newgamestart" style="${bigBtn(T.lime,"font-size:21px;padding:17px;border:2px solid rgba(255,255,255,.92);box-shadow:0 8px 22px rgba(225,29,46,.34)")}">${IC(PLAY)} New Game</button>`;
     const manageBtn = DB.teams.length
@@ -2057,38 +2057,39 @@ function actionArea(){
     const fmtSched=(s)=>{ try{ const dt=new Date((s.date||"")+"T"+(s.time||"00:00")); if(isNaN(dt))return s.date||""; let o=dt.toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"}); if(s.time)o+=" · "+dt.toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"}); return o; }catch(e){ return s.date||""; } };
     const sched=(t.schedule||[]).slice().sort((a,b)=>(((a.date||"")+(a.time||""))<((b.date||"")+(b.time||""))?-1:1));
     const schedRows=sched.map(s=>{const isG=s.type!=="practice";
-      return `<div style="display:flex;align-items:center;gap:8px;background:${T.surface2};border:1px solid ${T.line};border-left:5px solid ${isG?OUR.color:T.sage};border-radius:9px;padding:9px 11px">
+      return `<div style="display:flex;align-items:center;gap:10px;background:${T.surface2};border:1px solid ${T.line};border-left:6px solid ${isG?OUR.color:T.sage};border-radius:11px;padding:13px 15px">
           <div style="flex:1;min-width:0">
-            <div style="font-weight:800;color:${T.ink};font-size:18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${isG?ICN.inplay+" "+(s.opp?("vs "+(s.opp||"").replace(/</g,"")):"Game"):ICN.ball+" Practice"}</div>
-            <div style="font-size:15px;color:${T.sage};margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${fmtSched(s)}${s.loc?` &middot; <span data-act="openmap" data-arg="${encodeURIComponent(s.loc)}" title="Open in Maps — get directions" style="color:${T.lime};cursor:pointer;text-decoration:underline;text-underline-offset:2px">${IC('<path d="M12 21s-6-5.7-6-10a6 6 0 1 1 12 0c0 4.3-6 10-6 10z"/><circle cx="12" cy="11" r="2.1"/>',13)} ${(s.loc||"").replace(/</g,"&lt;")}</span>`:""}${s.notes?(" &middot; "+(s.notes||"").replace(/</g,"&lt;")):""}</div></div>
-          <button data-act="schedrm" data-arg="${s.id}" style="background:none;border:1px solid ${T.line};color:${T.out};border-radius:7px;padding:7px 9px;font-weight:800;flex:none">&times;</button></div>`;}).join("");
-    const fLbl=`font-size:10px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:${T.sageDim};margin:0 2px 3px`;
-    const fld=(lbl,inner)=>`<div style="flex:1;min-width:120px;display:flex;flex-direction:column">${lbl?`<div style="${fLbl}">${lbl}</div>`:""}${inner}</div>`;
+            <div style="font-weight:800;color:${T.ink};font-size:21px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${isG?ICN.inplay+" "+(s.opp?("vs "+(s.opp||"").replace(/</g,"")):"Game"):ICN.ball+" Practice"}</div>
+            <div style="font-size:17px;color:${T.sage};margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${fmtSched(s)}${s.loc?` &middot; <span data-act="openmap" data-arg="${encodeURIComponent(s.loc)}" title="Open in Maps — get directions" style="color:${T.lime};cursor:pointer;text-decoration:underline;text-underline-offset:2px">${IC('<path d="M12 21s-6-5.7-6-10a6 6 0 1 1 12 0c0 4.3-6 10-6 10z"/><circle cx="12" cy="11" r="2.1"/>',15)} ${(s.loc||"").replace(/</g,"&lt;")}</span>`:""}${s.notes?(" &middot; "+(s.notes||"").replace(/</g,"&lt;")):""}</div></div>
+          <button data-act="schedrm" data-arg="${s.id}" style="background:none;border:1px solid ${T.line};color:${T.out};border-radius:8px;padding:9px 12px;font-weight:800;font-size:18px;flex:none">&times;</button></div>`;}).join("");
+    const fLbl=`font-size:12px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:${T.sageDim};margin:0 2px 5px`;
+    const cellL=cell+";font-size:17px;padding:12px 12px";   // larger inputs for the schedule form
+    const fld=(lbl,inner)=>`<div style="flex:1;min-width:150px;display:flex;flex-direction:column">${lbl?`<div style="${fLbl}">${lbl}</div>`:""}${inner}</div>`;
     const svBtn=(v,lbl)=>`<button data-act="schview" data-arg="${v}" style="flex:1;background:${scheduleView===v?T.lime:T.surface2};color:${scheduleView===v?"#fff":T.sage};border:1px solid ${scheduleView===v?T.lime:T.line};border-radius:8px;padding:8px 0;font-weight:800;font-size:12px;letter-spacing:.4px">${lbl}</button>`;
-    const scheduleViewCard=`<div class="frost-card" style="background:${T.surface};border:1px solid ${T.line};border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:8px">
-        <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime}">Upcoming — games &amp; practices</div>
+    const scheduleViewCard=`<div class="frost-card" style="background:${T.surface};border:1px solid ${T.line};border-radius:14px;padding:16px 18px;display:flex;flex-direction:column;gap:11px">
+        <div style="font-size:14px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime}">Upcoming — games &amp; practices</div>
         <div style="display:flex;gap:6px">${svBtn("list",IC('list',15)+" List")}${svBtn("calendar",IC('grid',15)+" Calendar")}</div>
         ${scheduleView==="calendar" ? calendarHtml(t) : (schedRows||`<div style="font-size:12px;color:${T.sageDim}">Nothing scheduled yet.</div>`)}</div>`;
-    const scheduleEditCard=`<div class="frost-card" style="background:${T.surface};border:1px solid ${T.line};border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:8px">
-        <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime}">Add a game or practice</div>
+    const scheduleEditCard=`<div class="frost-card" style="background:${T.surface};border:1px solid ${T.line};border-radius:14px;padding:16px 18px;display:flex;flex-direction:column;gap:11px">
+        <div style="font-size:14px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime}">Add a game or practice</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
-          ${fld("Type",`<select id="schType" style="${cell}"><option value="game">Game</option><option value="practice">Practice</option></select>`)}
-          ${fld("Date",`<input id="schDate" type="date" value="${calSelDay||''}" style="${cell}">`)}
+          ${fld("Type",`<select id="schType" style="${cellL}"><option value="game">Game</option><option value="practice">Practice</option></select>`)}
+          ${fld("Date",`<input id="schDate" type="date" value="${calSelDay||''}" style="${cellL}">`)}
           ${fld("Time",timeSelects("schTime",""))}</div>
-        ${fld("Opponent (games only)",`<select id="schOppSel" onchange="var n=document.getElementById('schOppNew');if(n)n.style.display=this.value==='__new__'?'block':'none'" style="${cell}"><option value="">— pick a team —</option>${(DB.teams||[]).filter(x=>x.id!==t.id).map(x=>`<option value="${(x.name||'').replace(/"/g,'&quot;')}">${(x.name||'').replace(/</g,'')}</option>`).join("")}<option value="__new__">+ New opponent…</option></select><input id="schOppNew" placeholder="New opponent name" style="${cell};margin-top:6px;display:none">`)}
-        ${fld("Location",`<input id="schLoc" placeholder="e.g. City Park — Field 2" style="${cell}">`)}
-        ${fld("Notes (optional)",`<input id="schNotes" placeholder="e.g. arrive 45 min early, white jerseys" style="${cell}">`)}
+        ${fld("Opponent (games only)",`<select id="schOppSel" onchange="var n=document.getElementById('schOppNew');if(n)n.style.display=this.value==='__new__'?'block':'none'" style="${cellL}"><option value="">— pick a team —</option>${(DB.teams||[]).filter(x=>x.id!==t.id).map(x=>`<option value="${(x.name||'').replace(/"/g,'&quot;')}">${(x.name||'').replace(/</g,'')}</option>`).join("")}<option value="__new__">+ New opponent…</option></select><input id="schOppNew" placeholder="New opponent name" style="${cellL};margin-top:6px;display:none">`)}
+        ${fld("Location",`<input id="schLoc" placeholder="e.g. City Park — Field 2" style="${cellL}">`)}
+        ${fld("Notes (optional)",`<input id="schNotes" placeholder="e.g. arrive 45 min early, white jerseys" style="${cellL}">`)}
         <button data-act="schedadd" style="${bigBtn(T.lime,'')};margin-top:4px">+ Add to schedule</button></div>`;
     // Past games — the finished-game log, newest first, TAPPABLE to open the score + box score.
     const pastRows=(t.games||[]).slice(0,25).map(g=>{const rc=g.result==="W"?T.lime:(g.result==="L"?T.out:T.sage);
       const gdt=(()=>{try{return new Date((g.date||"")+"T00:00").toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"});}catch(e){return g.date||"";}})();
-      return `<button data-act="opengame" data-arg="${g.id}" style="display:flex;align-items:center;gap:11px;width:100%;text-align:left;background:${T.surface2};border:1px solid ${T.line};border-left:5px solid ${rc};border-radius:9px;padding:9px 11px;cursor:pointer">
-          <span style="width:26px;height:26px;flex:none;display:flex;align-items:center;justify-content:center;border-radius:7px;background:${rc};color:${T.field};font-family:${MONO};font-weight:800;font-size:13px">${g.result||""}</span>
-          <div style="flex:1;min-width:0"><div style="font-weight:800;color:${T.ink};font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">vs ${(g.opp||"Opponent").replace(/</g,"&lt;")}</div><div style="font-size:12px;color:${T.sage};margin-top:1px">${gdt}</div></div>
-          <span style="font-family:${MONO};font-weight:800;font-size:18px;color:${T.chalk}">${g.us}&ndash;${g.them}</span>
-          <span style="color:${T.lime};font-weight:800;font-size:16px">&rsaquo;</span></button>`;}).join("");
-    const pastGamesCard=`<div class="frost-card" style="background:${T.surface};border:1px solid ${T.line};border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:7px">
-        <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime}">Past games &mdash; tap to see the score &amp; stats</div>
+      return `<button data-act="opengame" data-arg="${g.id}" style="display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:${T.surface2};border:1px solid ${T.line};border-left:6px solid ${rc};border-radius:11px;padding:12px 14px;cursor:pointer">
+          <span style="width:32px;height:32px;flex:none;display:flex;align-items:center;justify-content:center;border-radius:8px;background:${rc};color:${T.field};font-family:${MONO};font-weight:800;font-size:15px">${g.result||""}</span>
+          <div style="flex:1;min-width:0"><div style="font-weight:800;color:${T.ink};font-size:18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">vs ${(g.opp||"Opponent").replace(/</g,"&lt;")}</div><div style="font-size:14px;color:${T.sage};margin-top:2px">${gdt}</div></div>
+          <span style="font-family:${MONO};font-weight:800;font-size:22px;color:${T.chalk}">${g.us}&ndash;${g.them}</span>
+          <span style="color:${T.lime};font-weight:800;font-size:18px">&rsaquo;</span></button>`;}).join("");
+    const pastGamesCard=`<div class="frost-card" style="background:${T.surface};border:1px solid ${T.line};border-radius:14px;padding:16px 18px;display:flex;flex-direction:column;gap:9px">
+        <div style="font-size:14px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime}">Past games &mdash; tap to see the score &amp; stats</div>
         ${pastRows||`<div style="font-size:12px;color:${T.sageDim}">No finished games yet — each game lands here once you end it.</div>`}</div>`;
     const scheduleSection=scheduleViewCard+pastGamesCard+scheduleEditCard;
     // Rulebook repository — pick the team's league (radio), view any rulebook, add your own.
@@ -2246,7 +2247,7 @@ function actionArea(){
         </div>`;
       return secWrap(`${secHdr("Team management")}${detailsBlock}${rulebookSection}${scorersSection}${discoverySection}`);
     }
-    if(teamTab==="schedule") return secWrap(`${secHdr("Schedule")}${scheduleSection}`);
+    if(teamTab==="schedule") return `<div style="width:100%;max-width:1080px;margin:0 auto;display:flex;flex-direction:column;gap:14px">${secHdr("Schedule")}${scheduleSection}</div>`;
     if(teamTab==="gameview"){
       const g=(t.games||[]).find(x=>x.id===viewGameId);
       const esc=s=>(s==null?"":String(s)).replace(/</g,"&lt;");
@@ -2314,7 +2315,8 @@ function actionArea(){
           <div style="flex:1;min-width:0;border-left:5px solid ${t.color};padding-left:10px">
             <div style="font-family:${MONO};font-size:22px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${(t.name||"Team").replace(/</g,"")}</div>
             <div style="font-family:${MONO};font-size:20px;font-weight:800;color:${t.color};margin-top:4px">${rec}</div></div></div>
-        <button data-act="teamchat" style="${bigBtn(T.lime,'')};font-size:17px">${ICN.chat} Team chat</button>
+        <button data-act="teamchat" style="${bigBtn(T.lime,'')};font-size:17px;position:relative">${ICN.chat} Team chat${teamHasUnread(t)?`<span style="background:${T.amber};color:${T.field};border-radius:999px;padding:2px 10px;font-family:${MONO};font-weight:800;font-size:12px;letter-spacing:.5px;margin-left:9px">&#9679; NEW</span>`:""}</button>
+        ${teamHasUnread(t)?`<div style="font-size:12px;color:${T.sage};text-align:center;margin-top:-4px">That &ldquo;NEW&rdquo; on the home screen is unread team chat &mdash; new games &amp; messages post here.</div>`:""}
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
           ${hb("roster",IC('users',26),"Roster &amp; lineup")}
           ${hb("schedule",IC('calendar',26),"Schedule")}
@@ -3794,7 +3796,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v126";
+var APP_VERSION="v127";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
