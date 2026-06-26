@@ -3879,7 +3879,7 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="nglineupcard"){ const tt=curTeam()||{name:OUR.name,short:OUR.short,color:OUR.color,players:ROSTER,record:{w:0,l:0,t:0},games:[]}; const opp=(OPP.name&&OPP.name!=="Opponent")?OPP.name:""; let tm=""; if(G&&G.startedAt){ try{ tm=new Date(G.startedAt).toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"}); }catch(e){} } printLineupCard(tt,{opp:opp,time:tm}); }
   else if(act==="addbatter"){addBatter();render();}
   else if(act==="rembatter"){removeBatter();render();}
-  else if(act==="share")openShare();
+  else if(act==="share"){ shareCtx=null; openShare(); }   // game share (reset any stale invite/link context)
   else if(act==="undo")undo();
 });
 
@@ -4113,8 +4113,15 @@ function shareUrl(){
   // "waiting for <team>" lobby instead of a blank/Home screen.
   const t=teamById(openTeamId)||curTeam();
   const teamQ=t?("&team="+encodeURIComponent(t.id)+"&tn="+encodeURIComponent(t.short||t.name||"")):"";
-  if(shareMode==="video"){ const yt=streamYt(); if(yt) return base+"?view=viewer&yt="+encodeURIComponent(yt)+teamQ; }
-  return base+"?view=viewer&feed=1"+teamQ;   // feed-only viewer
+  // CRITICAL: carry the live CLOUD GAME id (?watch=) so a fan on any network subscribes to the cloud
+  // game and sees the live feed — not just the scorer's local relay. (Without this the shared viewer
+  // sat on the "no game in progress" lobby even though the game was live.) Make sure the id exists for
+  // a signed-in scorer so the link is valid even if they share before the first pitch.
+  try{ if(gameActive && !G.cloudId && window.Cloud && window.Cloud.user && curTeamId){ const ct=teamById(curTeamId);
+      if(ct && window.cloudIsScorer && window.cloudIsScorer(ct)){ G.cloudId=curTeamId+"-"+Date.now().toString(36); try{ broadcast(); }catch(e){} } } }catch(e){}
+  const watchQ=(gameActive && G && G.cloudId)?("&watch="+encodeURIComponent(G.cloudId)):"";
+  if(shareMode==="video"){ const yt=streamYt(); if(yt) return base+"?view=viewer&yt="+encodeURIComponent(yt)+watchQ+teamQ; }
+  return base+"?view=viewer&feed=1"+watchQ+teamQ;   // feed-only viewer
 }
 // Generic link-share sheet (invite scorers / share team to follow): same QR + Email/Text/Copy
 // UI as the game share, just a different URL + message. Pass null to restore the game share.
@@ -4272,7 +4279,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v151";
+var APP_VERSION="v152";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
