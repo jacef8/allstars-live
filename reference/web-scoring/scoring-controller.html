@@ -538,7 +538,10 @@ function zoneFromPoint(x,y){
   const dx=x-150,dy=250-y,dist=Math.hypot(dx,dy),ang=Math.atan2(dx,dy)*180/Math.PI;
   if(dist<24)return{pos:"C",zone:"to the catcher"};
   if(dist<66&&Math.abs(ang)<18)return{pos:"P",zone:"to the pitcher"};
-  const infield=(Math.abs(x-150)+Math.abs(y-186))<=86;
+  // Infield catch-zone: a diamond around the infield. Sized generously (well past the base
+  // paths) so a ball placed just BEHIND an infielder — e.g. in the 5.5/6 hole behind the SS —
+  // still credits the infielder, not the outfielder standing further out.
+  const infield=(Math.abs(x-150)+Math.abs(y-186))<=104;
   if(!infield){ // outfield — the zones that matter
     if(ang<-32)return{pos:"LF",zone:"down the left-field line"};
     if(ang<-16)return{pos:"LF",zone:"to left field"};
@@ -1081,6 +1084,9 @@ function baseRunModal(){
    nudge is a single Undo step. */
 function correctModal(){
   const sBtn=`background:${T.surface};border:1px solid ${T.line};color:${T.chalk};border-radius:10px;width:46px;height:46px;font-size:24px;font-weight:800;line-height:1;flex:none`;
+  // Pitch-count row targets whoever is on the mound right now (the fielding team's pitcher).
+  const _corrPName=fielding()?(fielderName("P")||"Current pitcher"):((OPP.short||"OPP")+" pitcher");
+  const _corrPC=currentPitchCount();
   const step=(field,label,val,sub)=>`<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;background:${T.surface2};border:1px solid ${T.line};border-radius:12px;padding:10px 12px">
       <div style="min-width:0"><div style="font-weight:700;color:${T.ink};font-size:15px">${label}</div>${sub?`<div style="font-size:11px;color:${T.sageDim}">${sub}</div>`:""}</div>
       <div style="display:flex;align-items:center;gap:12px;flex:none">
@@ -1105,6 +1111,8 @@ function correctModal(){
         <div style="font-size:10px;font-weight:800;letter-spacing:1px;color:${T.sageDim};margin:6px 2px 0">INNING</div>
         ${step("inning","Inning",G.inning)}
         ${halfRow}
+        <div style="font-size:10px;font-weight:800;letter-spacing:1px;color:${T.sageDim};margin:6px 2px 0">PITCH COUNT</div>
+        ${step("pitch","Pitch count",_corrPC,_corrPName)}
       </div></div>`;
 }
 /* Long-press any [data-longpress] element (re-bound after each render). Currently the scoreboard
@@ -3722,6 +3730,7 @@ document.getElementById("app").addEventListener("click",e=>{
     else if(f==="inning") G.inning=Math.max(1,G.inning+d);
     else if(f==="half") G.half=(G.half==="T"?"B":"T");
     else if(f==="away"||f==="home"){ G[f]=Math.max(0,(G[f]||0)+d); if(!G.line)G.line={away:[],home:[]}; if(!G.line[f])G.line[f]=[]; G.line[f][G.inning]=Math.max(0,(G.line[f][G.inning]||0)+d); }
+    else if(f==="pitch"){ if(!G.pitches)G.pitches={}; const k=currentPitcherKey(); G.pitches[k]=Math.max(0,(G.pitches[k]||0)+d); G.halfPitches=Math.max(0,(G.halfPitches||0)+d); }
     render(); broadcast(); return; }
   if(act==="brsteal"){ brSteal(+arg); return; }
   if(act==="bradv"){ brAdvance(+arg); return; }
@@ -4403,7 +4412,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v162";
+var APP_VERSION="v163";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
