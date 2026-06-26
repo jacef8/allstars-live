@@ -2728,6 +2728,7 @@ function actionArea(){
       </div>`;
   }
   if(mode==="lineup"){
+    const narrow=!isWide();   // phone → give each player two rows (name on top, position below) so nothing is cramped
     const tabBtn=(id,lbl,col)=>`<button data-act="lutab" data-arg="${id}" style="flex:1;min-width:0;padding:10px;border-radius:9px;font-family:${MONO};font-weight:800;font-size:14px;text-transform:uppercase;letter-spacing:.3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border:1px solid ${lineupTab===id?col:T.line};background:${lineupTab===id?col:T.surface};color:${lineupTab===id?"#fff":T.ink}">${lbl}</button>`;
     const luToggle=`<div style="display:flex;gap:8px;flex-shrink:0">${tabBtn("us",OUR.name,OUR.color)}${tabBtn("opp",OPP.name,OPP.color)}</div>`;
     if(lineupTab==="opp"){
@@ -2735,6 +2736,15 @@ function actionArea(){
       if(!G.oppLineup.some(e=>e&&e.pos))oppDefaultPositions();
       const L=oppList(), bench=oppBenchList(), n=L.length, pit=oppPitcher();
       const orows=L.map((e,i)=>{ const pos=(e.pos)||"—",isP=pos==="P"; const nm=((e.name||"").trim())||"Hitter";
+        if(narrow) return `<div data-opprow data-i="${i}" style="display:flex;align-items:center;gap:9px;background:${T.surface};border:1px solid ${T.line};border-radius:10px;padding:10px 9px">
+          <span data-oppdrag style="cursor:grab;color:${T.sageDim};display:flex;align-items:center;padding:6px 2px;touch-action:none">${IC('<path d="M4 7h16M4 12h16M4 17h16"/>')}</span>
+          <span style="font-family:${MONO};font-size:18px;font-weight:800;color:${T.lime};width:20px;text-align:center;flex:none">${i+1}</span>
+          <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:7px">
+            <button data-act="oppedit" data-arg="${i}" style="text-align:left;background:transparent;border:none;color:${T.chalk};font-size:20px;font-weight:700;display:flex;align-items:center;gap:9px;padding:0;min-width:0"><span style="font-family:${MONO};color:${OPP.color};flex:none">#${(e.num||"").toString().replace(/</g,"")}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${nm.replace(/</g,"&lt;")}</span></button>
+            <div style="display:flex;align-items:center;gap:9px">
+              <button data-act="opppickpos" data-arg="${i}" style="background:${isP?OPP.color:T.surface2};border:1px solid ${isP?OPP.color:T.line};color:${isP?"#FFFFFF":T.chalk};border-radius:7px;padding:7px 14px;font-family:${MONO};font-size:16px;font-weight:800;min-width:54px;flex:none">${pos}</button>
+              <span style="font-size:12px;color:${T.sageDim}">${isP?"Pitcher":(pos==="—"?"Tap to set position":"Fielding "+pos)}</span>
+            </div></div></div>`;
         return `<div data-opprow data-i="${i}" style="display:flex;align-items:center;gap:6px;background:${T.surface};border:1px solid ${T.line};border-radius:9px;padding:8px 8px">
           <span data-oppdrag style="cursor:grab;color:${T.sageDim};display:flex;align-items:center;padding:4px 2px;touch-action:none">${IC('<path d="M4 7h16M4 12h16M4 17h16"/>')}</span>
           <span style="font-family:${MONO};font-size:17px;font-weight:800;color:${T.lime};width:18px;text-align:center">${i+1}</span>
@@ -2758,6 +2768,15 @@ function actionArea(){
         <button data-act="lineupdone" style="${bigBtn(T.lime,"")}flex-shrink:0">Done</button>`;
     }
     const rows=G.lineup.order.map((ri,slot)=>{const p=ROSTER[ri],pos=posOfPlayer(ri)||"—",isP=pos==="P";
+      if(narrow) return `<div data-row data-ri="${ri}" style="display:flex;align-items:center;gap:9px;background:${T.surface};border:1px solid ${T.line};border-radius:10px;padding:10px 9px">
+        <span data-drag style="cursor:grab;color:${T.sageDim};display:flex;align-items:center;padding:6px 2px;touch-action:none">${IC('<path d="M4 7h16M4 12h16M4 17h16"/>')}</span>
+        <span style="font-family:${MONO};font-size:18px;font-weight:800;color:${T.lime};width:20px;text-align:center;flex:none">${slot+1}</span>
+        <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:7px">
+          <button data-act="editplayer" data-arg="${slot}" style="text-align:left;background:transparent;border:none;color:${T.chalk};font-size:20px;font-weight:700;display:flex;align-items:center;gap:9px;padding:0;min-width:0"><span style="font-family:${MONO};color:${OUR.color};flex:none">#${p.num}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.name}</span></button>
+          <div style="display:flex;align-items:center;gap:9px">
+            <button data-act="pickpos" data-arg="${slot}" style="background:${isP?OUR.color:T.surface2};border:1px solid ${isP?OUR.color:T.line};color:${isP?"#FFFFFF":T.chalk};border-radius:7px;padding:7px 14px;font-family:${MONO};font-size:16px;font-weight:800;min-width:54px;flex:none">${pos}</button>
+            <span style="font-size:12px;color:${T.sageDim}">${isP?"Pitcher":(pos==="—"?"Tap to set position":"Fielding "+pos)}</span>
+          </div></div></div>`;
       return `<div data-row data-ri="${ri}" style="display:flex;align-items:center;gap:6px;background:${T.surface};border:1px solid ${T.line};border-radius:9px;padding:8px 8px">
         <span data-drag style="cursor:grab;color:${T.sageDim};display:flex;align-items:center;padding:4px 2px;touch-action:none">${IC('<path d="M4 7h16M4 12h16M4 17h16"/>')}</span>
         <span style="font-family:${MONO};font-size:17px;font-weight:800;color:${T.lime};width:18px;text-align:center">${slot+1}</span>
@@ -4042,7 +4061,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v137";
+var APP_VERSION="v138";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
