@@ -3211,9 +3211,8 @@ function actionArea(){
         ${pitchBtn("ball","Ball",ICN.ball)}${pitchBtn("strike","Strike",ICN.strike)}${pitchBtn("foul","Foul",ICN.foul)}${pitchBtn("inplay","In Play",ICN.inplay,true)}</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
         <button data-act="hbp" style="${flatBtn}"><span style="color:${T.sage}">${ICN.hbp}</span>HBP</button>
-        <button data-act="correctopen" style="${flatBtn};border-left:4px solid ${T.lime}"><span style="color:${T.lime};font-size:16px">&#9998;</span>Fix count/score</button></div>
-      ${[1,2,3].some(b=>G.bases&&G.bases[b])?`<button data-act="brsheet" style="${flatBtn};border-left:4px solid ${T.safe}"><span style="color:${T.safe};font-size:16px;line-height:1">&#9826;</span>Base running <span style="color:${T.sage};font-weight:600;font-size:11px;text-transform:none;letter-spacing:0">steal · WP/PB · balk</span></button>`:""}
-      <button data-act="endinning" style="${flatBtn};border-left:4px solid ${T.amber}"><span style="color:${T.amber}">${ICN.inning}</span>End Inning <span style="color:${T.sage};font-weight:600;font-size:11px;text-transform:none;letter-spacing:0">${halfLabel} · ${G.outs} out${G.outs===1?"":"s"}</span></button>`;
+        <button data-act="endinning" style="${flatBtn};flex-direction:column;gap:2px;border-left:4px solid ${T.amber}"><span style="display:flex;align-items:center;gap:6px"><span style="color:${T.amber}">${ICN.inning}</span>End Inning</span><span style="color:${T.sage};font-weight:600;font-size:11px;text-transform:none;letter-spacing:0">${halfLabel} · ${G.outs} out${G.outs===1?"":"s"}</span></button></div>
+      ${[1,2,3].some(b=>G.bases&&G.bases[b])?`<button data-act="brsheet" style="${flatBtn};border-left:4px solid ${T.safe}"><span style="color:${T.safe};font-size:16px;line-height:1">&#9826;</span>Base running <span style="color:${T.sage};font-weight:600;font-size:11px;text-transform:none;letter-spacing:0">steal · WP/PB · balk</span></button>`:""}`;
   }
   if(mode==="locate"){
     // Outcomes where the ball was NOT put in play (no field location needed) — shown up front so
@@ -4047,7 +4046,7 @@ function renderToolbar(){
   // Undo gets a labeled, accent-bordered button at the far RIGHT (easiest to see/reach while
   // scoring); the rest stay compact icons to its left.
   const gc=(isWide()&&mode==="idle"&&viewMode==="scorer")
-    ? `<div style="display:flex;gap:6px;flex:none;align-items:center">${tbIcon("lineup","Lineup",IC('users',18))}${tbIcon("inninglog","Inning log",IC('doc',18))}${tbIcon("ingamesettings","Game settings",IC('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>',16))}${tbIcon("home","Home",IC('home',18))}${tbIcon("endgame","End game",IC('<rect x="6" y="6" width="12" height="12" rx="1.5"/>',18),`color:${T.out};border-color:${T.out}`)}<button data-act="undo" title="Undo last action" style="display:flex;align-items:center;gap:7px;background:${T.surface2};border:1.5px solid ${T.lime};color:${T.chalk};border-radius:9px;height:38px;padding:0 16px;font-family:${SANS};font-size:14px;font-weight:800;flex:none">${IC('undo',18)} Undo</button></div>`
+    ? `<div style="display:flex;gap:6px;flex:none;align-items:center;flex-wrap:wrap;justify-content:flex-end;margin-left:auto">${tbIcon("lineup","Lineup",IC('users',18))}${tbIcon("inninglog","Inning log",IC('doc',18))}${tbIcon("ingamesettings","Settings",IC('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>',16))}${tbIcon("home","Home",IC('home',18))}${tbIcon("endgame","End game",IC('<rect x="6" y="6" width="12" height="12" rx="1.5"/>',18),`color:${T.out};border-color:${T.out}`)}<button data-act="undo" title="Undo last action" style="display:flex;align-items:center;gap:7px;background:${T.surface2};border:1.5px solid ${T.lime};color:${T.chalk};border-radius:9px;height:38px;padding:0 16px;font-family:${SANS};font-size:14px;font-weight:800;flex:none">${IC('undo',18)} Undo</button></div>`
     : "";
   // Viewer (video on): the field/feed swap lives in the top bar, labeled with what you switch TO.
   const vsw=(isWide()&&viewMode==="viewer"&&monitorOn)
@@ -4074,7 +4073,7 @@ function renderToolbar(){
   const floatTb = (viewMode!=="viewer") ? `<button data-act="togglefloat" title="Free-layout windows (beta) — pop the AT BAT card out as a draggable window" style="flex:none;display:flex;align-items:center;justify-content:center;background:${floatOn?T.lime:T.surface2};border:1px solid ${floatOn?T.lime:T.line};color:${floatOn?"#fff":T.sageDim};border-radius:10px;width:42px;height:38px;font-size:17px;line-height:1">&#8862;</button>` : "";
   // LEFT = broadcast/meta (Scorer-Viewer, video, share, sound, LIVE). RIGHT = game info + controls
   // (batter box + Lineup/Log/Home/End/Undo) sitting over the scoring buttons.
-  tb.innerHTML=`<div style="display:flex;align-items:center;gap:8px;padding:4px 2px 2px;flex-wrap:nowrap">
+  tb.innerHTML=`<div style="display:flex;align-items:center;gap:8px;padding:4px 2px 2px;flex-wrap:wrap;row-gap:6px">
     <div style="flex:none;min-width:0;font-family:${MONO};font-weight:700;font-size:16px;letter-spacing:.5px;color:${T.chalk};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${chip}</div>
     ${vidToggle}
     ${shareBtnTop}
@@ -4404,7 +4403,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v161";
+var APP_VERSION="v162";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
