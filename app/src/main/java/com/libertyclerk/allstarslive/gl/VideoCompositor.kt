@@ -205,9 +205,9 @@ class VideoCompositor {
         // outgoing stream stays smooth even when these camera frames arrive unevenly.
     }
 
-    /** Draw the clean program frame (last camera frame + overlay) to the encoder. Called
-     *  per real frame from [drawFrame] AND by the keep-alive [heartbeat] during a camera
-     *  stall — both re-use whatever [oesTexId]/[texMatrix] currently hold. */
+    /** Draw the clean program frame (latest camera frame + overlay) to the encoder. Called on the
+     *  steady [encoderTick] (~30fps) using whatever [oesTexId]/[texMatrix] currently hold, so the
+     *  output frame rate is constant even when camera frames arrive unevenly. */
     private fun renderEncoder() {
         val enc = encoderSurface ?: return
         egl.makeCurrent(enc)
@@ -238,7 +238,7 @@ class VideoCompositor {
 
     fun release() {
         val latch = CountDownLatch(1)
-        handler.removeCallbacks(heartbeat)
+        handler.removeCallbacks(encoderTick)
         handler.post {
             runCatching { surfaceTexture.release() }
             runCatching { inputSurface.release() }
