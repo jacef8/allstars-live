@@ -148,6 +148,14 @@ private class ScorerBridge(private val appContext: Context) {
     @JavascriptInterface
     fun stopStreamNow() { main.post { if (Broadcast.isActive) Broadcast.stop() } }
 
+    /** Mute/unmute the broadcast audio (sends silence to YouTube while muted). The web owns the
+     *  preference and calls this on toggle and when going live. */
+    @JavascriptInterface
+    fun setBroadcastMuted(muted: Boolean) { main.post { Broadcast.setMuted(muted) } }
+
+    @JavascriptInterface
+    fun isBroadcastMuted(): Boolean = Broadcast.muted
+
     /** The web tells us when a game/console is on screen (vs the menus). */
     @JavascriptInterface
     fun setInGame(inGame: Boolean) {

@@ -1214,6 +1214,7 @@ let phonePane="score";   // phone-only paging: "score" | "video" (large screens 
 let summaryTeam="us";    // end-game box score: which team's batting/pitching to show ("us" | "opp")
 let monitorOn=(()=>{try{ const p=new URLSearchParams(location.search); if(p.get("feed")==="1") return false; if(p.get("yt")) return true; return localStorage.getItem("al-monitor-on")!=="0";}catch(e){return true;}})();  // wide: video shown/hidden; shared ?feed=1 opens feed-only
 let viewMode=(()=>{try{ const p=new URLSearchParams(location.search); if(p.get("view")==="viewer") return "viewer"; return localStorage.getItem("al-view-mode")||"scorer";}catch(e){return "scorer";}})();  // "scorer" | "viewer"; shared links (?view=viewer) open as viewer
+let bcastMuted=(()=>{try{ return localStorage.getItem("al-bcast-mute")==="1"; }catch(e){ return false; }})();   // broadcast-audio mute (the YouTube audio is the tablet mic)
 let viewerRight=(()=>{try{return localStorage.getItem("al-viewer-right")||"field";}catch(e){return "field";}})();  // viewer + video on: which of field/feed is the big one
 let viewerPhone=(()=>{try{return localStorage.getItem("al-viewer-phone")||"both";}catch(e){return "both";}})();  // phone viewer: "both" | "field" (only) | "feed" (only)
 // Opened via a watch/share link → this person is ONLY a viewer (no scoring). Lock them to viewer
@@ -1818,7 +1819,10 @@ function monitorPane(){
   const ytIcon=`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M9 7h8v8"/></svg>`;
   const gearIcon=`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/></svg>`;
   const endBtn=`<button data-act="appstop" title="End broadcast" style="height:32px;border-radius:8px;background:#FF3B5C;border:1px solid #FF3B5C;color:#fff;display:flex;align-items:center;justify-content:center;padding:0 12px;font-family:${SANS};font-weight:800;font-size:12px;cursor:pointer">End</button>`;
+  const muteBtn=`<button data-act="mutebcast" title="${bcastMuted?'Broadcast audio is OFF — tap to unmute':'Mute the broadcast audio'}" style="${monBtn};${bcastMuted?'background:#FF3B5C;border-color:#FF3B5C':''}">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4z"/>${bcastMuted?'<path d="M22 9l-6 6M16 9l6 6"/>':'<path d="M15.5 8.5a5 5 0 0 1 0 7"/>'}</svg></button>`;
   const ctrls=`<div style="position:absolute;top:9px;right:10px;display:flex;gap:6px;z-index:3">
+      ${IS_APP&&appLive()?muteBtn:""}
       ${IS_APP&&appLive()?endBtn:""}
       ${setGear}
       ${yt?`<button data-act="ytopen" title="Open in YouTube" style="${monBtn}">${ytIcon}</button>`:""}
@@ -3813,8 +3817,9 @@ document.getElementById("app").addEventListener("click",e=>{
   if(act==="fullscreen"){ const m=document.getElementById("monitor"); const r=m&&(m.requestFullscreen||m.webkitRequestFullscreen); if(r)r.call(m); return; }
   if(act==="ytopen"){ const ytv=streamYt(); if(ytv){ const u="https://www.youtube.com/watch?v="+encodeURIComponent(ytv); if(IS_APP&&window.AllStars.openExternal)AllStars.openExternal(u); else window.open(u,"_blank","noopener"); } return; }
   if(act==="bcasterr"){ const m=window.__bcastStatus||"Stream error"; try{ flash(m); }catch(e){} try{ alert("Stream error\n\n"+m); }catch(e){} return; }
-  if(act==="appgolive"){ try{ window.AllStars.requestGoLive(); }catch(e){} return; }
+  if(act==="appgolive"){ try{ if(window.AllStars&&window.AllStars.setBroadcastMuted)window.AllStars.setBroadcastMuted(bcastMuted); }catch(e){} try{ window.AllStars.requestGoLive(); }catch(e){} return; }
   if(act==="appstop"){ try{ window.AllStars.stopStream(); }catch(e){} return; }
+  if(act==="mutebcast"){ bcastMuted=!bcastMuted; try{ localStorage.setItem("al-bcast-mute",bcastMuted?"1":"0"); }catch(e){} try{ if(window.AllStars&&window.AllStars.setBroadcastMuted)window.AllStars.setBroadcastMuted(bcastMuted); }catch(e){} flash(bcastMuted?"Broadcast audio muted":"Broadcast audio on"); render(); return; }
   if(act==="setstream"){ openStream(); return; }
   if(act==="videosetup"){ if(IS_APP&&window.AllStars&&window.AllStars.openVideo){ try{AllStars.openVideo();}catch(e){} } else { openStream(); } return; }
   if(act==="savestream"){ saveStream(); return; }
@@ -4359,7 +4364,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v154";
+var APP_VERSION="v155";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;

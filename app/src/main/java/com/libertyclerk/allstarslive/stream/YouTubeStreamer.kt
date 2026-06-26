@@ -42,6 +42,10 @@ class YouTubeStreamer(
     // audio thread's start while video was wall-clock from the first frame → they drifted apart.)
     val avBaseNs: Long = System.nanoTime()
 
+    // When true, broadcast SILENCE instead of the mic (YouTube still needs an audio track, so we
+    // keep sending silent AAC). Toggled live via Broadcast.setMuted.
+    @Volatile var muted = false
+
     private val client: RtmpClient = RtmpClient(object : ConnectChecker {
         override fun onConnectionStarted(url: String) = onStatus("Connecting…")
         override fun onConnectionSuccess() {
@@ -175,11 +179,11 @@ class YouTubeStreamer(
                 while (streaming) {
                     // Wall-clock PTS from the SHARED a/v base → stays in lock-step with the video.
                     val ptsUs = (System.nanoTime() - avBaseNs) / 1000
-                    if (mic != null) {
+                    if (mic != null && !muted) {
                         val n = mic.read(pcm, 0, chunkBytes)
                         if (n <= 0) { Thread.sleep(5); continue }
                         feedAudio(pcm, n, ptsUs)
-                    } else {
+                    } else {                          // muted, or no mic → silent AAC (keeps the track alive)
                         java.util.Arrays.fill(pcm, 0)
                         feedAudio(pcm, chunkBytes, ptsUs)
                         Thread.sleep(20)               // pace silence ~real-time

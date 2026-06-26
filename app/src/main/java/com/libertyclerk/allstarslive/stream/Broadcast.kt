@@ -48,6 +48,12 @@ object Broadcast {
     fun requestStop() { if (isActive) _showStopConfirm.value = true }
     fun dismissStop() { _showStopConfirm.value = false }
 
+    // Broadcast-audio mute (sends silence to YouTube). Sticky across broadcasts in this session; the
+    // web persists the preference and re-applies it. Takes effect live on the running stream.
+    @Volatile var muted = false
+        private set
+    fun setMuted(b: Boolean) { muted = b; streamer?.muted = b }
+
     private const val PROG_W = 1280
     private const val PROG_H = 720
     private val main = Handler(Looper.getMainLooper())
@@ -171,6 +177,7 @@ object Broadcast {
                 }
             }
         })
+        s.muted = muted                                                                    // carry the mute preference into this broadcast
         comp.setEncoderSurface(s.inputSurface, PROG_W, PROG_H, s.avBaseNs) { s.drain() }   // shared a/v clock → lip-sync
         s.start("rtmp://a.rtmp.youtube.com/live2/${live.streamKey}")
         streamer = s
