@@ -1400,6 +1400,7 @@ function batterCard(){
   const ord=ordinal(battingSlot()+1);
   const big=b.ours?b.num:b.num;
   const nameLine=b.ours?pBug(b):((b.name||"").trim()||("#"+(b.num||"?")));   // batter name, never the team name
+  const abp=(G.ab&&G.ab.pitches)?G.ab.pitches.length:0;   // pitches to THIS batter this at-bat (resets each AB)
   const sub=b.ours
     ? `${TEAMS[k].short}${b.pos?` · ${b.pos}`:""} &middot; ${ord} in order`
     : `${TEAMS[k].short||"OPP"} &middot; ${ord} batter`;   // include the team so it's unmistakable
@@ -1409,6 +1410,12 @@ function batterCard(){
       <div style="display:inline-flex;align-items:center;gap:6px;background:${c};color:#fff;border-radius:999px;padding:2px 9px;font-family:${MONO};font-size:10px;font-weight:800;letter-spacing:1px;margin-bottom:4px">&#9678; AT BAT</div>
       <div style="font-family:${MONO};font-size:23px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;line-height:1;color:${T.chalk};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${nameLine}</div>
       <div style="font-size:11px;color:${T.sage};font-weight:500;margin-top:3px">${sub}</div></div>
+    <div style="text-align:center;line-height:1;flex:none;border-left:1px solid ${T.line};border-right:1px solid ${T.line};padding:0 13px">
+      <div style="font-family:${MONO};font-size:24px;font-weight:800;color:${T.chalk}">${G.balls}-${G.strikes}</div>
+      <div style="font-size:9px;font-weight:800;letter-spacing:1.2px;color:${T.sageDim};margin-top:2px">COUNT</div>
+      <div style="font-family:${MONO};font-size:18px;font-weight:800;color:${c};margin-top:7px">${abp}</div>
+      <div style="font-size:9px;font-weight:800;letter-spacing:1.2px;color:${T.sageDim};margin-top:1px">${abp===1?"PITCH":"PITCHES"}</div>
+    </div>
     <div style="text-align:right;line-height:1.1;min-width:58px">
       <div style="font-family:${MONO};font-size:10px;font-weight:800;letter-spacing:1.5px;color:${c}">TODAY</div>
       <div style="font-family:${MONO};font-size:22px;font-weight:800;color:${T.chalk};line-height:1.05">${lp.line}</div>
@@ -1426,11 +1433,15 @@ function batterStrip(){
   // back to their jersey number so it still identifies someone.
   const nm=b.ours?pBug(b):(b.name||"").trim();
   const nameLine=nm||(b.num?("#"+b.num):"—");
+  const abp=(G.ab&&G.ab.pitches)?G.ab.pitches.length:0;   // pitches to this batter this at-bat
   return `<button data-act="reviewbatter" data-arg="${batterKeyOf(b)}" class="frost-card" style="flex:1 1 auto;width:100%;display:flex;align-items:center;gap:14px;background:rgba(13,19,32,.72);border:1px solid ${c}66;border-left:6px solid ${c};border-radius:10px;padding:8px 16px;cursor:pointer;max-width:100%;min-width:0">
     <span title="Lineup spot" style="font-family:${MONO};font-size:30px;font-weight:800;color:${c};line-height:1;flex:none">${ord}</span>
     <div style="flex:1;min-width:0;text-align:left;display:flex;flex-direction:column;gap:3px">
       <div style="font-size:10px;letter-spacing:1.5px;font-weight:800;color:${T.sageDim};line-height:1">BATTING ${ordinal(ord)}</div>
       <div style="font-family:${MONO};font-size:21px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;line-height:1;color:${T.chalk};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${nameLine}</div></div>
+    <div style="flex:none;text-align:right;line-height:1.15">
+      <div style="font-family:${MONO};font-size:19px;font-weight:800;color:${T.chalk}">${G.balls}-${G.strikes}</div>
+      <div style="font-size:9px;font-weight:800;letter-spacing:1px;color:${T.sageDim}">${abp} ${abp===1?"PITCH":"PITCHES"}</div></div>
   </button>`;
 }
 
@@ -2096,14 +2107,23 @@ function actionArea(){
     // Schedule — games & practices stored on the team (syncs to the cloud with the team).
     const fmtSched=(s)=>{ try{ const dt=new Date((s.date||"")+"T"+(s.time||"00:00")); if(isNaN(dt))return s.date||""; let o=dt.toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"}); if(s.time)o+=" · "+dt.toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"}); return o; }catch(e){ return s.date||""; } };
     const sched=(t.schedule||[]).slice().sort((a,b)=>(((a.date||"")+(a.time||""))<((b.date||"")+(b.time||""))?-1:1));
-    const schedRows=sched.map(s=>{const isG=s.type!=="practice";
-      return `<div style="display:flex;align-items:center;gap:10px;background:${T.surface2};border:1px solid ${T.line};border-left:6px solid ${isG?OUR.color:T.sage};border-radius:11px;padding:13px 15px">
+    // Split upcoming vs already-passed. An entry counts as "passed" only once its date+time is well
+    // behind us (6h grace, so a game stays in Upcoming while it's actually being played); entries with
+    // no time use end-of-day. Passed items drop into a dimmed "Earlier" group instead of cluttering Upcoming.
+    const _now=Date.now(), _grace=6*3600*1000;
+    const schedWhen=(s)=>{ try{ const dt=new Date((s.date||"")+"T"+(s.time||"23:59")); return isNaN(dt.getTime())?0:dt.getTime(); }catch(e){ return 0; } };
+    const schedRow=(s,past)=>{const isG=s.type!=="practice";
+      return `<div style="display:flex;align-items:center;gap:10px;background:${T.surface2};border:1px solid ${T.line};border-left:6px solid ${isG?OUR.color:T.sage};border-radius:11px;padding:13px 15px${past?";opacity:.6":""}">
           <div style="flex:1;min-width:0">
             <div style="font-weight:800;color:${T.ink};font-size:21px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${isG?ICN.inplay+" "+(s.opp?("vs "+(s.opp||"").replace(/</g,"")):"Game"):ICN.ball+" Practice"}</div>
             <div style="font-size:17px;color:${T.sage};margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${fmtSched(s)}${s.loc?` &middot; <span data-act="openmap" data-arg="${encodeURIComponent(s.loc)}" title="Open in Maps — get directions" style="color:${T.lime};cursor:pointer;text-decoration:underline;text-underline-offset:2px">${IC('<path d="M12 21s-6-5.7-6-10a6 6 0 1 1 12 0c0 4.3-6 10-6 10z"/><circle cx="12" cy="11" r="2.1"/>',15)} ${(s.loc||"").replace(/</g,"&lt;")}</span>`:""}${s.notes?(" &middot; "+(s.notes||"").replace(/</g,"&lt;")):""}</div></div>
           ${isG?`<button data-act="schedstart" data-arg="${s.id}" title="Start this game now" style="background:${T.lime};border:1px solid ${T.lime};color:#fff;border-radius:8px;padding:9px 15px;font-weight:800;font-size:13px;letter-spacing:.4px;flex:none;display:inline-flex;align-items:center;gap:6px;box-shadow:0 3px 10px rgba(225,29,46,.28)">&#9654; Start</button>`:""}
           <button data-act="schededit" data-arg="${s.id}" title="Edit" style="background:${schedEditId===s.id?T.lime:"none"};border:1px solid ${schedEditId===s.id?T.lime:T.line};color:${schedEditId===s.id?"#fff":T.lime};border-radius:8px;padding:9px 12px;font-weight:800;font-size:13px;flex:none">Edit</button>
-          <button data-act="schedrm" data-arg="${s.id}" style="background:none;border:1px solid ${T.line};color:${T.out};border-radius:8px;padding:9px 12px;font-weight:800;font-size:18px;flex:none">&times;</button></div>`;}).join("");
+          <button data-act="schedrm" data-arg="${s.id}" style="background:none;border:1px solid ${T.line};color:${T.out};border-radius:8px;padding:9px 12px;font-weight:800;font-size:18px;flex:none">&times;</button></div>`;};
+    const schedUpcoming=sched.filter(s=>schedWhen(s)+_grace>=_now);
+    const schedEarlier=sched.filter(s=>schedWhen(s)+_grace<_now).reverse();   // most-recent first
+    const _earlierDiv=`<div style="display:flex;align-items:center;gap:10px;margin:8px 2px 2px"><div style="flex:1;height:1px;background:${T.line}"></div><div style="font-size:10px;font-weight:800;letter-spacing:1.2px;color:${T.sageDim}">EARLIER &middot; TAP &times; TO CLEAR</div><div style="flex:1;height:1px;background:${T.line}"></div></div>`;
+    const schedRows=`${schedUpcoming.map(s=>schedRow(s,false)).join("")||(schedEarlier.length?"":`<div style="font-size:12px;color:${T.sageDim}">Nothing scheduled yet.</div>`)}${schedEarlier.length?_earlierDiv+schedEarlier.map(s=>schedRow(s,true)).join(""):""}`;
     const fLbl=`font-size:12px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:${T.sageDim};margin:0 2px 5px`;
     const cellL=cell+";font-size:17px;padding:12px 12px";   // larger inputs for the schedule form
     const fld=(lbl,inner)=>`<div style="flex:1;min-width:150px;display:flex;flex-direction:column">${lbl?`<div style="${fLbl}">${lbl}</div>`:""}${inner}</div>`;
@@ -3967,7 +3987,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v135";
+var APP_VERSION="v136";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
