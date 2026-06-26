@@ -53,8 +53,57 @@ object Broadcast {
     private val main = Handler(Looper.getMainLooper())
     @Volatile private var streamer: YouTubeStreamer? = null
 
+    // ---- local recording (fallback when streaming isn't possible) ----
+    data class RecordState(
+        val recording: Boolean = false,
+        val startedAt: Long = 0L,
+        val savedLocation: String = "",
+        val error: String = "",
+    )
+    private val _recState = MutableStateFlow(RecordState())
+    val recState: StateFlow<RecordState> = _recState
+    @Volatile private var recorder: LocalRecorder? = null
+    val isRecording: Boolean get() = recorder != null
+
     /** True once a broadcast is starting or live (so both screens show the LIVE state). */
     val isActive: Boolean get() = _state.value.phase.let { it == Phase.LIVE || it == Phase.STARTING }
+
+    /**
+     * Record the composited program frame (camera + scorebug + mic) to a local MP4 — the
+     * offline fallback. Record-only: it shares the one encoder surface with streaming, so we
+     * never run both. Stops cleanly via [stopRecording].
+     */
+    fun startRecording(context: Context) {
+        if (recorder != null) return
+        if (isActive) { _recState.value = RecordState(error = "Stop the YouTube broadcast first"); return }
+        RtmpHub.ensureStarted(context)
+        val comp = RtmpHub.videoCompositor
+        if (comp == null) { _recState.value = RecordState(error = "Camera link not ready — try again"); return }
+        if (!RtmpHub.hasVideo) { _recState.value = RecordState(error = "No camera yet — connect the camera, then record"); return }
+        val rec = try {
+            LocalRecorder(context, PROG_W, PROG_H, onStatus = {})
+        } catch (e: Exception) {
+            Log.e(TAG, "recorder init failed", e)
+            _recState.value = RecordState(error = "Couldn't start recording: ${e.message}")
+            return
+        }
+        recorder = rec
+        comp.setEncoderSurface(rec.inputSurface, PROG_W, PROG_H) { rec.drain() }
+        rec.start()
+        _recState.value = RecordState(recording = true, startedAt = System.currentTimeMillis())
+        Log.i(TAG, "local recording started")
+    }
+
+    /** Stop recording and finalize the MP4 (detach first, then stop on the GL thread). */
+    fun stopRecording() {
+        val rec = recorder ?: return
+        recorder = null
+        val where = rec.savedLocation
+        val comp = RtmpHub.videoCompositor
+        if (comp != null) comp.detachEncoder { rec.stop() } else rec.stop()
+        _recState.value = RecordState(recording = false, savedLocation = where)
+        Log.i(TAG, "local recording stopped → $where")
+    }
 
     /**
      * Create a YouTube broadcast and push the live camera (+scorebug) to it. Safe to
@@ -62,6 +111,7 @@ object Broadcast {
      */
     fun goLive(context: Context, title: String, privacy: String) {
         if (isActive) return
+        if (recorder != null) stopRecording()   // recording shares the encoder surface — going live supersedes it
         // Ensure the camera pipeline is running even if the operator went straight to the
         // Game tab and never opened Video — otherwise there'd be no compositor to stream.
         // Mode-aware: device-camera (all-in-one) vs an external camera pushing RTMP to us.
@@ -78,6 +128,16 @@ object Broadcast {
             return
         }
         _state.value = State(phase = Phase.STARTING, title = title, privacy = privacy, status = "Setting up your YouTube broadcast…")
+        // Watchdog: if creation hasn't moved past "Setting up…" within 30s (no internet, YouTube
+        // unreachable, or the auth token never returns) surface a clear error instead of hanging.
+        main.postDelayed({
+            if (_state.value.phase == Phase.STARTING && _state.value.status.startsWith("Setting up")) {
+                _state.value = _state.value.copy(
+                    phase = Phase.ERROR,
+                    status = "Couldn't reach YouTube — check this device has internet and that YouTube is connected, then try Go Live again.",
+                )
+            }
+        }, 30_000L)
         YouTubeAuth.client(context).authorize(YouTubeAuth.request())
             .addOnSuccessListener { result ->
                 val token = result.accessToken

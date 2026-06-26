@@ -1358,7 +1358,7 @@ function batterCard(){
   const lp=batterLineParts();
   const ord=ordinal(battingSlot()+1);
   const big=b.ours?b.num:b.num;
-  const nameLine=b.ours?pBug(b):TEAMS[k].name.toUpperCase();
+  const nameLine=b.ours?pBug(b):((b.name||"").trim()||("#"+(b.num||"?")));   // batter name, never the team name
   const sub=b.ours
     ? `${TEAMS[k].short}${b.pos?` · ${b.pos}`:""} &middot; ${ord} in order`
     : `${TEAMS[k].short||"OPP"} &middot; ${ord} batter`;   // include the team so it's unmistakable
@@ -1385,11 +1385,11 @@ function batterStrip(){
   // back to their jersey number so it still identifies someone.
   const nm=b.ours?pBug(b):(b.name||"").trim();
   const nameLine=nm||(b.num?("#"+b.num):"—");
-  return `<button data-act="reviewbatter" data-arg="${batterKeyOf(b)}" class="frost-card" style="display:flex;align-items:center;gap:11px;background:rgba(13,19,32,.72);border:1px solid ${c}66;border-left:5px solid ${c};border-radius:10px;padding:7px 12px;cursor:pointer;max-width:100%;min-width:0">
-    <span title="Lineup spot" style="font-family:${MONO};font-size:24px;font-weight:800;color:${c};line-height:1;flex:none">${ord}</span>
-    <div style="min-width:0;text-align:left;display:flex;flex-direction:column;gap:3px">
-      <div style="font-size:9px;letter-spacing:1.3px;font-weight:800;color:${T.sageDim};line-height:1">BATTING ${ordinal(ord)}</div>
-      <div style="font-family:${MONO};font-size:16px;font-weight:700;letter-spacing:.3px;text-transform:uppercase;line-height:1;color:${T.chalk};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${nameLine}</div></div>
+  return `<button data-act="reviewbatter" data-arg="${batterKeyOf(b)}" class="frost-card" style="flex:1 1 auto;width:100%;display:flex;align-items:center;gap:14px;background:rgba(13,19,32,.72);border:1px solid ${c}66;border-left:6px solid ${c};border-radius:10px;padding:8px 16px;cursor:pointer;max-width:100%;min-width:0">
+    <span title="Lineup spot" style="font-family:${MONO};font-size:30px;font-weight:800;color:${c};line-height:1;flex:none">${ord}</span>
+    <div style="flex:1;min-width:0;text-align:left;display:flex;flex-direction:column;gap:3px">
+      <div style="font-size:10px;letter-spacing:1.5px;font-weight:800;color:${T.sageDim};line-height:1">BATTING ${ordinal(ord)}</div>
+      <div style="font-family:${MONO};font-size:21px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;line-height:1;color:${T.chalk};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${nameLine}</div></div>
   </button>`;
 }
 
@@ -1416,10 +1416,17 @@ if(IS_APP){ document.documentElement.style.background="transparent"; document.bo
   // Native already shows the OS splash (star) — drop the in-app web splash so launch isn't 3 splashes.
   try{ var _sp=document.getElementById("splash"); if(_sp)_sp.remove(); }catch(e){} }
 window.__bcastPhase = "OFFLINE";
-window.__bcast = function(phase, videoId){
+window.__bcastStatus = "";
+window.__bcast = function(phase, videoId, status){
+  const prev=window.__bcastPhase;
   window.__bcastPhase = phase || "OFFLINE";
+  window.__bcastStatus = status || "";
   if(videoId){ try{ localStorage.setItem("al-stream-yt", videoId); }catch(e){} }
   else if(window.__bcastPhase==="OFFLINE"){ try{ localStorage.removeItem("al-stream-yt"); }catch(e){} }  // ended → reset the monitor
+  // Surface a YouTube/stream failure right on the scorer page (so you don't have to open
+  // Camera setup to find out what went wrong). Flash it once, and a persistent pill stays
+  // in the top bar (see renderToolbar) until it clears.
+  if(window.__bcastPhase==="ERROR" && status && prev!=="ERROR"){ try{ flash(status); }catch(e){} }
   try{ render(); }catch(e){}
 };
 function appLive(){ return window.__bcastPhase==="LIVE" || window.__bcastPhase==="STARTING"; }
@@ -3081,7 +3088,7 @@ function render(){
           ${focusPlay?"":scoreBar()}<div style="flex:1;min-height:0;display:flex;align-items:center;justify-content:center;position:relative">${diamondSVG()}${toastEl}</div>
         </div>
         <div style="flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;gap:8px">
-          ${actionEl}${feedPanel()}
+          ${focusPlay?"":batterCard()}${actionEl}${feedPanel()}
         </div>
       </div>`;
   } else if(pickerModal){
@@ -3264,6 +3271,7 @@ document.getElementById("app").addEventListener("click",e=>{
   }
   if(act==="fullscreen"){ const m=document.getElementById("monitor"); const r=m&&(m.requestFullscreen||m.webkitRequestFullscreen); if(r)r.call(m); return; }
   if(act==="ytopen"){ const ytv=streamYt(); if(ytv){ const u="https://www.youtube.com/watch?v="+encodeURIComponent(ytv); if(IS_APP&&window.AllStars.openExternal)AllStars.openExternal(u); else window.open(u,"_blank","noopener"); } return; }
+  if(act==="bcasterr"){ const m=window.__bcastStatus||"Stream error"; try{ flash(m); }catch(e){} try{ alert("Stream error\n\n"+m); }catch(e){} return; }
   if(act==="appgolive"){ try{ window.AllStars.requestGoLive(); }catch(e){} return; }
   if(act==="appstop"){ try{ window.AllStars.stopStream(); }catch(e){} return; }
   if(act==="setstream"){ openStream(); return; }
@@ -3419,8 +3427,10 @@ function renderToolbar(){
   // its own bottom footer. The scoreboard above the field is just the score now.
   const tbBtn=(act,label,extra)=>`<button data-act="${act}" style="background:${T.surface2};border:1px solid ${T.line};color:${T.chalk};border-radius:9px;padding:8px 12px;font-family:${SANS};font-size:13px;font-weight:700;white-space:nowrap;${extra||""}">${label}</button>`;
   const tbIcon=(act,title,icon,extra)=>`<button data-act="${act}" title="${title}" aria-label="${title}" style="background:${T.surface2};border:1px solid ${T.line};color:${T.chalk};border-radius:9px;width:40px;height:38px;flex:none;display:inline-flex;align-items:center;justify-content:center;${extra||""}">${icon}</button>`;
+  // Undo gets a labeled, accent-bordered button at the far RIGHT (easiest to see/reach while
+  // scoring); the rest stay compact icons to its left.
   const gc=(isWide()&&mode==="idle"&&viewMode==="scorer")
-    ? `<div style="display:flex;gap:6px;flex:none">${tbIcon("undo","Undo",IC('undo',18))}${tbIcon("lineup","Lineup",IC('users',18))}${tbIcon("inninglog","Inning log",IC('doc',18))}${tbIcon("home","Home",IC('home',18))}${tbIcon("endgame","End game",IC('<rect x="6" y="6" width="12" height="12" rx="1.5"/>',18),`color:${T.out};border-color:${T.out}`)}</div>`
+    ? `<div style="display:flex;gap:6px;flex:none;align-items:center">${tbIcon("lineup","Lineup",IC('users',18))}${tbIcon("inninglog","Inning log",IC('doc',18))}${tbIcon("home","Home",IC('home',18))}${tbIcon("endgame","End game",IC('<rect x="6" y="6" width="12" height="12" rx="1.5"/>',18),`color:${T.out};border-color:${T.out}`)}<button data-act="undo" title="Undo last action" style="display:flex;align-items:center;gap:7px;background:${T.surface2};border:1.5px solid ${T.lime};color:${T.chalk};border-radius:9px;height:38px;padding:0 16px;font-family:${SANS};font-size:14px;font-weight:800;flex:none">${IC('undo',18)} Undo</button></div>`
     : "";
   // Viewer (video on): the field/feed swap lives in the top bar, labeled with what you switch TO.
   const vsw=(isWide()&&viewMode==="viewer"&&monitorOn)
@@ -3431,22 +3441,32 @@ function renderToolbar(){
   const liveDot=`<div title="${dot.l}" style="flex:none;display:flex;align-items:center;gap:5px;background:${T.surface};border:1px solid ${T.line};border-radius:999px;padding:5px 9px">
       <span class="${conn?'livedot':''}" style="width:8px;height:8px;border-radius:50%;background:${dot.c};${conn?`box-shadow:0 0 7px ${dot.c}`:""}"></span>
       <span style="font-family:${MONO};font-size:10px;font-weight:700;letter-spacing:1px;color:${dot.c}">${dot.l}</span></div>`;
+  // YouTube/stream error — persistent pill right in the top bar so the operator sees it without
+  // opening Camera setup. Tap re-shows the full message; it clears when the broadcast recovers.
+  const bErr=(IS_APP&&(window.__bcastPhase==="ERROR")&&window.__bcastStatus)
+    ? `<button data-act="bcasterr" title="${(window.__bcastStatus||"").replace(/"/g,"&quot;")}" style="flex:none;display:flex;align-items:center;gap:6px;background:rgba(255,59,92,.15);border:1px solid ${T.live};color:${T.live};border-radius:999px;padding:6px 11px;font-family:${SANS};font-weight:800;font-size:12px;max-width:300px;min-width:0">&#9888;<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${window.__bcastStatus}</span></button>`
+    : "";
   const sOn=Snd.isOn();
   const soundBtn=`<button data-act="soundtoggle" title="${sOn?"Mute sounds":"Unmute sounds"}" style="flex:none;display:flex;align-items:center;justify-content:center;background:${T.surface2};border:1px solid ${T.line};color:${sOn?T.lime:T.sageDim};border-radius:10px;width:42px;height:38px">
       <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4z"/>${sOn?'<path d="M15.5 8.5a5 5 0 0 1 0 7M18.8 6a9 9 0 0 1 0 12"/>':'<path d="M22 9l-6 6M16 9l6 6"/>'}</svg></button>`;
   // Current-batter box back in the top bar (wide scorer, live). It's flex:1 so it fills the middle
-  // and pushes the broadcast buttons (video / share / sound / LIVE) to the right; otherwise a spacer.
+  // The stretched batter box fills the middle and pushes the game controls to the far right
+  // (directly over the scoring buttons). Broadcast/meta stays on the left; otherwise a spacer.
   const batterTop=(isWide()&&viewMode==="scorer"&&!menuModes.includes(mode))
-    ? `<div style="flex:1;min-width:0;display:flex;justify-content:flex-start;padding:0 4px">${batterStrip()}</div>`
+    ? `<div style="flex:1;min-width:0;display:flex;padding:0 2px">${batterStrip()}</div>`
     : `<div style="flex:1"></div>`;
+  // LEFT = broadcast/meta (Scorer-Viewer, video, share, sound, LIVE). RIGHT = game info + controls
+  // (batter box + Lineup/Log/Home/End/Undo) sitting over the scoring buttons.
   tb.innerHTML=`<div style="display:flex;align-items:center;gap:8px;padding:4px 2px 2px;flex-wrap:nowrap">
     <div style="flex:none;min-width:0;font-family:${MONO};font-weight:700;font-size:16px;letter-spacing:.5px;color:${T.chalk};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${chip}</div>
-    ${gc}${vsw}
-    ${batterTop}
     ${vidToggle}
     ${shareBtnTop}
     ${soundBtn}
     ${liveDot}
+    ${bErr}
+    ${vsw}
+    ${batterTop}
+    ${gc}
   </div>`;
 }
 window.onLinkChange=renderToolbar;   // relay open/close → repaint the dot
@@ -3744,7 +3764,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v123";
+var APP_VERSION="v124";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;

@@ -3,6 +3,7 @@ package com.libertyclerk.allstarslive.ingest
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.RectF
 import android.graphics.Typeface
 import android.os.Handler
@@ -261,59 +262,96 @@ fun buildScorebugOverlay(
 ): Bitmap {
     val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)   // transparent
     val c = Canvas(bmp)
-    val pad = w * 0.025f
-    val boxW = w * 0.44f
-    val boxH = h * 0.18f
+    val pad = w * 0.022f
+    val boxW = w * 0.47f
+    val boxH = h * 0.205f
     val x = pad
     val y = h - boxH - pad
-    val rad = boxH * 0.12f
+    val rad = boxH * 0.14f
     val rowH = boxH / 2f
-    val divX = x + boxW * 0.66f
-    val p = Paint(Paint.ANTI_ALIAS_FLAG).apply { typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD) }
+    val accentW = boxW * 0.013f                 // brand-red accent down the left edge
+    val countW = boxW * 0.27f                    // right-hand count panel
+    val divX = x + boxW - countW
+    val sans = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
+    val mono = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
+    val red = 0xFFE11D2E.toInt()
+    val p = Paint(Paint.ANTI_ALIAS_FLAG)
 
-    // background + lime keyline
-    p.color = 0xF00E1626.toInt()
+    // ---- panel: soft shadow, deep-navy body, hairline, red left accent ----
+    p.color = 0x60000000
+    c.drawRoundRect(RectF(x + 2f, y + 5f, x + boxW + 2f, y + boxH + 5f), rad, rad, p)
+    p.color = 0xF20B1322.toInt()
     c.drawRoundRect(RectF(x, y, x + boxW, y + boxH), rad, rad, p)
-    p.style = Paint.Style.STROKE
-    p.strokeWidth = h * 0.004f
-    p.color = 0xFFA3E635.toInt()
+    // red accent clipped to the rounded left edge
+    c.save(); c.clipRect(x, y, x + accentW * 2.6f, y + boxH)
+    p.color = red; c.drawRoundRect(RectF(x, y, x + boxW, y + boxH), rad, rad, p); c.restore()
+    p.style = Paint.Style.STROKE; p.strokeWidth = h * 0.0022f; p.color = 0x33FFFFFF
     c.drawRoundRect(RectF(x, y, x + boxW, y + boxH), rad, rad, p)
     p.style = Paint.Style.FILL
 
     val logoPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
     fun row(ry: Float, abbr: String, score: Int, active: Boolean, chip: Int, logo: Bitmap?) {
-        p.color = chip
-        c.drawRect(x + boxW * 0.04f, ry + rowH * 0.24f, x + boxW * 0.06f, ry + rowH * 0.76f, p)
-        var textX = x + boxW * 0.10f
-        // Team logo (if provided) just right of the color chip; the abbreviation shifts over.
-        if (logo != null) {
-            val sz = rowH * 0.62f
-            val lx = x + boxW * 0.09f
-            val ly = ry + (rowH - sz) / 2f
-            c.drawBitmap(logo, null, RectF(lx, ly, lx + sz, ly + sz), logoPaint)
-            textX = lx + sz + boxW * 0.035f
+        val cy = ry + rowH / 2f
+        if (active) {                            // batting team: faint highlight + red tick
+            p.color = 0x18FFFFFF
+            c.drawRect(x + accentW * 2.6f, ry, divX, ry + rowH, p)
+            p.color = red
+            c.drawRect(x + accentW * 2.6f, ry + rowH * 0.16f, x + accentW * 4.0f, ry + rowH * 0.84f, p)
         }
-        p.color = if (active) 0xFFFFFFFF.toInt() else 0xFF8C97A8.toInt()
+        var textX = x + boxW * 0.085f
+        if (logo != null) {                      // prominent logo on a white rounded tile
+            val sz = rowH * 0.74f
+            val lx = x + boxW * 0.05f
+            val ly = cy - sz / 2f
+            p.color = 0xFFFFFFFF.toInt()
+            c.drawRoundRect(RectF(lx - sz * 0.10f, ly - sz * 0.10f, lx + sz * 1.10f, ly + sz * 1.10f), sz * 0.22f, sz * 0.22f, p)
+            c.drawBitmap(logo, null, RectF(lx, ly, lx + sz, ly + sz), logoPaint)
+            textX = lx + sz + boxW * 0.05f
+        } else {                                 // no logo: slim team-color chip
+            val chW = boxW * 0.016f
+            p.color = chip
+            c.drawRoundRect(RectF(x + boxW * 0.05f, cy - rowH * 0.30f, x + boxW * 0.05f + chW, cy + rowH * 0.30f), chW * 0.5f, chW * 0.5f, p)
+            textX = x + boxW * 0.05f + chW + boxW * 0.035f
+        }
+        p.typeface = sans
+        p.color = if (active) 0xFFFFFFFF.toInt() else 0xFF8A97AD.toInt()
         p.textAlign = Paint.Align.LEFT
-        p.textSize = rowH * 0.46f
-        c.drawText(abbr, textX, ry + rowH * 0.66f, p)
+        p.textSize = rowH * 0.40f
+        c.drawText(abbr.uppercase().take(5), textX, cy + rowH * 0.14f, p)
+        p.typeface = mono
+        p.color = if (active) 0xFFFFFFFF.toInt() else 0xFFAEB8C8.toInt()
         p.textAlign = Paint.Align.RIGHT
-        p.textSize = rowH * 0.62f
-        c.drawText(score.toString(), divX - boxW * 0.03f, ry + rowH * 0.70f, p)
+        p.textSize = rowH * 0.64f
+        c.drawText(score.toString(), divX - boxW * 0.045f, cy + rowH * 0.23f, p)
     }
     row(y, away, awayScore, topHalf, 0xFF2E6BE6.toInt(), awayLogo)
-    row(y + rowH, home, homeScore, !topHalf, 0xFFE2574C.toInt(), homeLogo)
+    p.color = 0x22FFFFFF                          // thin divider between the two rows
+    c.drawRect(x + accentW * 2.6f, y + rowH - h * 0.0011f, divX, y + rowH + h * 0.0011f, p)
+    row(y + rowH, home, homeScore, !topHalf, red, homeLogo)
 
-    // divider + inning/count on the right
-    p.color = 0xFF1E2A44.toInt()
-    c.drawRect(divX, y + boxH * 0.12f, divX + h * 0.002f, y + boxH * 0.88f, p)
-    val rcx = (divX + x + boxW) / 2f
-    p.textAlign = Paint.Align.CENTER
-    p.color = 0xFFE0E3E8.toInt()
-    p.textSize = boxH * 0.22f
-    c.drawText((if (topHalf) "T" else "B") + inning, rcx, y + boxH * 0.36f, p)
-    p.color = 0xFFA3E635.toInt()
-    p.textSize = boxH * 0.18f
-    c.drawText("B$balls S$strikes O$outs", rcx, y + boxH * 0.76f, p)
+    // ---- count panel (right) ----
+    p.color = 0x33FFFFFF
+    c.drawRect(divX, y + boxH * 0.12f, divX + h * 0.0016f, y + boxH * 0.88f, p)
+    val rcx = divX + countW / 2f
+    // inning: a small up/down triangle + the number
+    val tri = boxH * 0.085f
+    val triY = y + boxH * 0.27f
+    val path = Path()
+    if (topHalf) { path.moveTo(rcx - countW * 0.30f, triY + tri); path.lineTo(rcx - countW * 0.30f + tri, triY + tri); path.lineTo(rcx - countW * 0.30f + tri / 2f, triY) }
+    else { path.moveTo(rcx - countW * 0.30f, triY); path.lineTo(rcx - countW * 0.30f + tri, triY); path.lineTo(rcx - countW * 0.30f + tri / 2f, triY + tri) }
+    path.close()
+    p.color = 0xFFF0B43E.toInt(); c.drawPath(path, p)
+    p.typeface = mono; p.textAlign = Paint.Align.LEFT; p.color = 0xFFFFFFFF.toInt(); p.textSize = boxH * 0.27f
+    c.drawText(inning.toString(), rcx - countW * 0.30f + tri + countW * 0.06f, y + boxH * 0.37f, p)
+    // count: balls-strikes
+    p.textAlign = Paint.Align.CENTER; p.color = 0xFFFFFFFF.toInt(); p.textSize = boxH * 0.23f
+    c.drawText("$balls-$strikes", rcx, y + boxH * 0.66f, p)
+    // outs: two dots (filled red for each out)
+    val dotR = boxH * 0.045f
+    val dotY = y + boxH * 0.80f
+    for (i in 0..1) {
+        p.color = if (i < outs) red else 0x44FFFFFF
+        c.drawCircle(rcx - dotR * 1.6f + i * dotR * 3.2f, dotY, dotR, p)
+    }
     return bmp
 }

@@ -67,33 +67,42 @@ object YouTubeLive {
         return items.getJSONObject(0).optJSONObject("status")?.optString("lifeCycleStatus") ?: ""
     }
 
-    private fun get(token: String, path: String): JSONObject {
-        val conn = (URL("https://www.googleapis.com/youtube/v3/$path").openConnection() as HttpURLConnection).apply {
-            requestMethod = "GET"
-            setRequestProperty("Authorization", "Bearer $token")
-            connectTimeout = 15000; readTimeout = 20000
-        }
-        val code = conn.responseCode
-        val resp = (if (code in 200..299) conn.inputStream else conn.errorStream)
-            ?.bufferedReader()?.use { it.readText() } ?: ""
-        if (code !in 200..299) throw RuntimeException("YouTube GET ${path.substringBefore('?')} → $code: ${resp.take(180)}")
-        return if (resp.isBlank()) JSONObject() else JSONObject(resp)
-    }
+    private fun get(token: String, path: String): JSONObject = request("GET", token, path, null)
 
-    private fun api(token: String, path: String, body: JSONObject?): JSONObject {
-        val conn = (URL("https://www.googleapis.com/youtube/v3/$path").openConnection() as HttpURLConnection).apply {
-            requestMethod = "POST"
-            setRequestProperty("Authorization", "Bearer $token")
-            setRequestProperty("Content-Type", "application/json")
-            connectTimeout = 15000; readTimeout = 20000
-            doOutput = true
-            outputStream.use { it.write((body?.toString() ?: "").toByteArray()) }
+    private fun api(token: String, path: String, body: JSONObject?): JSONObject = request("POST", token, path, body)
+
+    /**
+     * One YouTube Data API call, with retry on transient network failures. Flaky field Wi-Fi (and
+     * Android's habit of reusing a dead keep-alive socket) throws IOExceptions like "unexpected end
+     * of stream" — those are retried on a fresh connection. Real HTTP errors (403/401/etc.) are NOT
+     * retried; they surface immediately so the operator gets the actual reason.
+     */
+    private fun request(method: String, token: String, path: String, body: JSONObject?): JSONObject {
+        var lastErr: java.io.IOException? = null
+        repeat(3) { attempt ->
+            try {
+                val conn = (URL("https://www.googleapis.com/youtube/v3/$path").openConnection() as HttpURLConnection).apply {
+                    requestMethod = method
+                    setRequestProperty("Authorization", "Bearer $token")
+                    setRequestProperty("Connection", "close")   // don't reuse a stale pooled socket
+                    connectTimeout = 15000; readTimeout = 20000
+                    if (method == "POST") {
+                        setRequestProperty("Content-Type", "application/json")
+                        doOutput = true
+                        outputStream.use { it.write((body?.toString() ?: "").toByteArray()) }
+                    }
+                }
+                val code = conn.responseCode
+                val resp = (if (code in 200..299) conn.inputStream else conn.errorStream)
+                    ?.bufferedReader()?.use { it.readText() } ?: ""
+                if (code !in 200..299) throw RuntimeException("YouTube ${path.substringBefore('?')} → $code: ${resp.take(220)}")
+                return if (resp.isBlank()) JSONObject() else JSONObject(resp)
+            } catch (e: java.io.IOException) {
+                lastErr = e
+                try { Thread.sleep(600L * (attempt + 1)) } catch (_: InterruptedException) {}
+            }
         }
-        val code = conn.responseCode
-        val resp = (if (code in 200..299) conn.inputStream else conn.errorStream)
-            ?.bufferedReader()?.use { it.readText() } ?: ""
-        if (code !in 200..299) throw RuntimeException("YouTube ${path.substringBefore('?')} → $code: ${resp.take(220)}")
-        return if (resp.isBlank()) JSONObject() else JSONObject(resp)
+        throw RuntimeException("Network error reaching YouTube (${lastErr?.message}). Check the connection and try again.", lastErr)
     }
 
     private fun isoSoon(): String {

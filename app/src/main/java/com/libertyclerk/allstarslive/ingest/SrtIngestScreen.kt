@@ -1,5 +1,7 @@
 package com.libertyclerk.allstarslive.ingest
 
+import android.content.Intent
+import android.net.Uri
 import android.view.Surface
 import android.view.SurfaceHolder
 import android.view.SurfaceView
@@ -21,6 +23,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -36,10 +39,12 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -75,6 +80,14 @@ fun SrtIngestScreen(onUseTestPattern: () -> Unit = {}) {
     val stats by source.stats.collectAsStateWithLifecycle()
     // Shared YouTube broadcast state — same source of truth as the Game page.
     val bcast by Broadcast.state.collectAsStateWithLifecycle()
+    // Local recording state (offline fallback).
+    val rec by Broadcast.recState.collectAsStateWithLifecycle()
+    LaunchedEffect(rec.savedLocation) {
+        if (rec.savedLocation.isNotEmpty()) Toast.makeText(ctx, "Recording saved to ${rec.savedLocation}", Toast.LENGTH_LONG).show()
+    }
+    LaunchedEffect(rec.error) {
+        if (rec.error.isNotEmpty()) Toast.makeText(ctx, rec.error, Toast.LENGTH_LONG).show()
+    }
 
     var surface by remember { mutableStateOf<Surface?>(null) }
     var showSetup by remember { mutableStateOf(false) }
@@ -172,7 +185,8 @@ fun SrtIngestScreen(onUseTestPattern: () -> Unit = {}) {
         )
 
         if (playing) {
-            LiveChip(Modifier.align(Alignment.TopStart).padding(14.dp))
+            // Top-RIGHT so it doesn't sit under the "‹ Done" exit button (top-left, from MainActivity).
+            LiveChip(Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(14.dp))
         } else if (ytChannel != null) {
             // Camera not live yet, but YouTube is set up → show the "waiting for camera" status.
             // (When YouTube isn't connected we show the first-run prompt below INSTEAD, so the two
@@ -188,6 +202,10 @@ fun SrtIngestScreen(onUseTestPattern: () -> Unit = {}) {
             cameraReady = playing,
             onGoLive = { Broadcast.requestDialog() },
             onEnd = { Broadcast.requestStop() },
+            recording = rec.recording,
+            recStartedAt = rec.startedAt,
+            onRecord = { Broadcast.startRecording(ctx) },
+            onStopRecord = { Broadcast.stopRecording() },
             modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 18.dp),
         )
 
@@ -314,6 +332,10 @@ private fun GoLiveBar(
     cameraReady: Boolean,
     onGoLive: () -> Unit,
     onEnd: () -> Unit,
+    recording: Boolean,
+    recStartedAt: Long,
+    onRecord: () -> Unit,
+    onStopRecord: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val active = phase == Broadcast.Phase.LIVE || phase == Broadcast.Phase.STARTING
@@ -340,13 +362,40 @@ private fun GoLiveBar(
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF3B5C), contentColor = Color.White),
                 ) { Text("End broadcast", fontSize = 14.sp) }
             }
+        } else if (recording) {
+            // Recording locally (offline fallback): a REC pill with an elapsed timer + Stop.
+            var now by remember { mutableStateOf(System.currentTimeMillis()) }
+            LaunchedEffect(recStartedAt) { while (true) { now = System.currentTimeMillis(); delay(500) } }
+            val secs = ((now - recStartedAt) / 1000L).coerceAtLeast(0)
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    Modifier.background(Color(0xCC11161F), RoundedCornerShape(999.dp)).padding(horizontal = 12.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(7.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(Modifier.size(9.dp).background(Color(0xFFE11D2E), RoundedCornerShape(999.dp)))
+                    Text("REC  %d:%02d".format(secs / 60, secs % 60), color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                }
+                Button(
+                    onClick = onStopRecord,
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE11D2E), contentColor = Color.White),
+                ) { Text("Stop recording", fontSize = 14.sp) }
+            }
         } else if (cameraReady) {
-            Button(
-                onClick = onGoLive,
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF3B5C), contentColor = Color.White),
-            ) { Text("● Go Live", fontSize = 16.sp, fontWeight = FontWeight.Bold) }
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                Button(
+                    onClick = onGoLive,
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF3B5C), contentColor = Color.White),
+                ) { Text("● Go Live", fontSize = 16.sp, fontWeight = FontWeight.Bold) }
+                Button(
+                    onClick = onRecord,
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF222B36), contentColor = Color.White),
+                ) { Text("● Record", fontSize = 15.sp, fontWeight = FontWeight.Bold) }
+            }
         }
-        if (status.isNotEmpty()) {
+        if (recording) {
+            Text("Recording to this tablet — no internet needed. Upload later.", color = Color(0xFFB7C0CC), fontSize = 12.sp)
+        } else if (status.isNotEmpty()) {
             Text(status, color = if (phase == Broadcast.Phase.ERROR) Color(0xFFFF6B6B) else Color(0xFFB7C0CC), fontSize = 12.sp)
         }
     }
@@ -518,6 +567,31 @@ private fun CameraSetupSheet(
                     }
                 }
                 Text("Stream key: anything (e.g. live).", color = Color(0xFF6B7585), fontSize = 12.sp)
+
+                // ----- Mevo: one tap to jump into the Mevo Multicam app (paste the address, Go Live) -----
+                if (!isPhone && profile.id == "mevo") {
+                    Button(
+                        onClick = {
+                            val launch = ctx.packageManager.getLaunchIntentForPackage("com.mevo.multicam")
+                            try {
+                                if (launch != null) {
+                                    ctx.startActivity(launch)
+                                } else {
+                                    // Not installed → send them to the store listing.
+                                    ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=com.mevo.multicam")))
+                                }
+                            } catch (e: Exception) {
+                                try {
+                                    ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=com.mevo.multicam")))
+                                } catch (_: Exception) {
+                                    Toast.makeText(ctx, "Couldn't open the Mevo app", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E6BE6)),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text("Open the Mevo app", fontWeight = FontWeight.Bold, color = Color.White) }
+                }
 
                 // ----- Phone-as-camera: scan this in Larix Broadcaster to auto-configure -----
                 if (isPhone && url.isNotEmpty()) {

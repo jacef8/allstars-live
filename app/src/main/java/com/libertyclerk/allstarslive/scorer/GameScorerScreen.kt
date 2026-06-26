@@ -192,9 +192,10 @@ private class ScorerBridge(private val appContext: Context) {
 fun GameScorerScreen(webView: WebView) {
     // Mirror the shared broadcast state into the web monitor (Start vs End, video id).
     val bcast by Broadcast.state.collectAsStateWithLifecycle()
-    LaunchedEffect(bcast.phase, bcast.videoId) {
+    LaunchedEffect(bcast.phase, bcast.videoId, bcast.status) {
         val vid = bcast.videoId ?: ""
-        webView.evaluateJavascript("window.__bcast && window.__bcast('${bcast.phase.name}','$vid')", null)
+        val st = org.json.JSONObject.quote(bcast.status)   // safe-escape the message for JS
+        webView.evaluateJavascript("window.__bcast && window.__bcast('${bcast.phase.name}','$vid',$st)", null)
     }
     // Tell the web whether the camera is delivering frames (drives the monitor's
     // "● camera live" vs "waiting for camera" status — the operator's connection check).
