@@ -2101,6 +2101,7 @@ function actionArea(){
           <div style="flex:1;min-width:0">
             <div style="font-weight:800;color:${T.ink};font-size:21px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${isG?ICN.inplay+" "+(s.opp?("vs "+(s.opp||"").replace(/</g,"")):"Game"):ICN.ball+" Practice"}</div>
             <div style="font-size:17px;color:${T.sage};margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${fmtSched(s)}${s.loc?` &middot; <span data-act="openmap" data-arg="${encodeURIComponent(s.loc)}" title="Open in Maps — get directions" style="color:${T.lime};cursor:pointer;text-decoration:underline;text-underline-offset:2px">${IC('<path d="M12 21s-6-5.7-6-10a6 6 0 1 1 12 0c0 4.3-6 10-6 10z"/><circle cx="12" cy="11" r="2.1"/>',15)} ${(s.loc||"").replace(/</g,"&lt;")}</span>`:""}${s.notes?(" &middot; "+(s.notes||"").replace(/</g,"&lt;")):""}</div></div>
+          ${isG?`<button data-act="schedstart" data-arg="${s.id}" title="Start this game now" style="background:${T.lime};border:1px solid ${T.lime};color:#fff;border-radius:8px;padding:9px 15px;font-weight:800;font-size:13px;letter-spacing:.4px;flex:none;display:inline-flex;align-items:center;gap:6px;box-shadow:0 3px 10px rgba(225,29,46,.28)">&#9654; Start</button>`:""}
           <button data-act="schededit" data-arg="${s.id}" title="Edit" style="background:${schedEditId===s.id?T.lime:"none"};border:1px solid ${schedEditId===s.id?T.lime:T.line};color:${schedEditId===s.id?"#fff":T.lime};border-radius:8px;padding:9px 12px;font-weight:800;font-size:13px;flex:none">Edit</button>
           <button data-act="schedrm" data-arg="${s.id}" style="background:none;border:1px solid ${T.line};color:${T.out};border-radius:8px;padding:9px 12px;font-weight:800;font-size:18px;flex:none">&times;</button></div>`;}).join("");
     const fLbl=`font-size:12px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:${T.sageDim};margin:0 2px 5px`;
@@ -2318,9 +2319,9 @@ function actionArea(){
       const lineTbl=card(`<table style="width:100%;border-collapse:collapse;font-family:${MONO};font-size:16px;text-align:center;color:${T.chalk}"><thead><tr style="color:${T.sageDim};font-size:12px">${lh}</tr></thead><tbody>${lr("away")}${lr("home")}</tbody></table>`);
       const sideName=(side)=> side==="away"?(g.ourSide==="away"?t.name:g.opp):(g.ourSide==="home"?t.name:g.opp);
       const batTbl=(side)=>{const rows=((g.bat&&g.bat[side])||[]).map(b=>`<tr style="border-top:1px solid ${T.line}"><td style="text-align:left;padding:6px;font-weight:700;white-space:nowrap">#${esc(b.num)} ${esc(b.name)}</td><td style="padding:9px 6px">${b.ab}</td><td>${b.r}</td><td>${b.h}</td><td>${b.rbi}</td><td>${b.bb}</td><td>${b.k}</td></tr>`).join("");
-        return `<div><div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin:0 2px 4px">${esc(sideName(side))} &mdash; batting</div>${card(`<table style="width:100%;border-collapse:collapse;font-family:${MONO};font-size:16px;text-align:center;color:${T.chalk}"><thead><tr style="color:${T.sageDim};font-size:12px"><th style="text-align:left;padding:4px 6px">Batter</th><th>AB</th><th>R</th><th>H</th><th>RBI</th><th>BB</th><th>K</th></tr></thead><tbody>${rows||`<tr><td colspan="7" style="padding:8px;color:${T.sageDim}">No at-bats</td></tr>`}</tbody></table>`)}</div>`;};
+        return card(`<div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin:0 0 8px">${esc(sideName(side))} &mdash; batting</div><table style="width:100%;border-collapse:collapse;font-family:${MONO};font-size:16px;text-align:center;color:${T.chalk}"><thead><tr style="color:${T.sageDim};font-size:12px"><th style="text-align:left;padding:4px 6px">Batter</th><th>AB</th><th>R</th><th>H</th><th>RBI</th><th>BB</th><th>K</th></tr></thead><tbody>${rows||`<tr><td colspan="7" style="padding:8px;color:${T.sageDim}">No at-bats</td></tr>`}</tbody></table>`);};
       const pitchTbl=(side)=>{const list=(g.pitch&&g.pitch[side])||[];if(!list.length)return "";const rows=list.map(x=>`<tr style="border-top:1px solid ${T.line}"><td style="text-align:left;padding:6px;font-weight:700;white-space:nowrap">${esc(x.name)}</td><td style="padding:9px 6px">${x.ip}</td><td>${x.pc}</td><td>${x.h}</td><td>${x.r}</td><td>${x.bb}</td><td>${x.k}</td></tr>`).join("");
-        return `<div><div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin:0 2px 4px">${esc(sideName(side))} &mdash; pitching</div>${card(`<table style="width:100%;border-collapse:collapse;font-family:${MONO};font-size:16px;text-align:center;color:${T.chalk}"><thead><tr style="color:${T.sageDim};font-size:12px"><th style="text-align:left;padding:4px 6px">Pitcher</th><th>IP</th><th>P</th><th>H</th><th>R</th><th>BB</th><th>K</th></tr></thead><tbody>${rows}</tbody></table>`)}</div>`;};
+        return card(`<div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin:0 0 8px">${esc(sideName(side))} &mdash; pitching</div><table style="width:100%;border-collapse:collapse;font-family:${MONO};font-size:16px;text-align:center;color:${T.chalk}"><thead><tr style="color:${T.sageDim};font-size:12px"><th style="text-align:left;padding:4px 6px">Pitcher</th><th>IP</th><th>P</th><th>H</th><th>R</th><th>BB</th><th>K</th></tr></thead><tbody>${rows}</tbody></table>`);};
       const scoreBtn=`<button data-act="storedcard" data-arg="${g.id}" style="${bigBtn(T.lime,'')};display:flex;align-items:center;justify-content:center;gap:9px">&#128196; Game scorecard (PDF)</button>`;
       return secWrap(`${secHdr("Game")}${head}${lineTbl}${batTbl("away")}${batTbl("home")}${pitchTbl("away")}${pitchTbl("home")}${scoreBtn}${ytBtn}${delBtn}`);
     }
@@ -2814,8 +2815,7 @@ function actionArea(){
     }
     pitchers=pitchers.filter(x=>x.outs>0||x.pc>0).sort((a,b)=>b.outs-a.outs);
     const pp=pitchers.map(x=>`<tr style="border-top:1px solid ${T.line}"><td style="text-align:left;padding:5px 6px;font-weight:700;white-space:nowrap">${(x.name||'').replace(/</g,'')}</td><td style="padding:11px 6px">${x.ip}</td><td style="padding:11px 6px">${x.pc}</td><td style="padding:11px 6px">${x.h}</td><td style="padding:11px 6px">${x.r}</td><td style="padding:11px 6px">${x.bb}</td><td style="padding:11px 6px">${x.k}</td></tr>`).join("");
-    const pitchBlock=pitchers.length?`<div><div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin:0 2px 4px">${selName} &mdash; pitching</div>
-          <div style="overflow-x:auto;background:${T.surface};border:1px solid ${T.line};border-radius:10px;padding:4px 6px"><table style="width:100%;border-collapse:collapse;font-family:${MONO};font-size:17px;text-align:center;color:${T.chalk}"><thead><tr style="color:${T.sageDim};font-size:13px"><th style="text-align:left;padding:4px 6px">Pitcher</th><th title="Innings pitched">IP</th><th title="Pitches">P</th><th>H</th><th>R</th><th>BB</th><th>K</th></tr></thead><tbody>${pp}</tbody></table></div></div>`:"";
+    const pitchBlock=pitchers.length?`<div style="overflow-x:auto;background:${T.surface};border:1px solid ${T.line};border-radius:10px;padding:8px 8px 4px"><div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin:0 0 8px">${selName} &mdash; pitching</div><table style="width:100%;border-collapse:collapse;font-family:${MONO};font-size:17px;text-align:center;color:${T.chalk}"><thead><tr style="color:${T.sageDim};font-size:13px"><th style="text-align:left;padding:4px 6px">Pitcher</th><th title="Innings pitched">IP</th><th title="Pitches">P</th><th>H</th><th>R</th><th>BB</th><th>K</th></tr></thead><tbody>${pp}</tbody></table></div>`:"";
     const stBtn=(v,lbl)=>`<button data-act="sumteam" data-arg="${v}" style="flex:1;background:${summaryTeam===v?T.lime:T.surface2};color:${summaryTeam===v?"#fff":T.sage};border:1px solid ${summaryTeam===v?T.lime:T.line};border-radius:9px;padding:9px 0;font-family:${MONO};font-weight:800;font-size:13px;letter-spacing:.4px;text-transform:uppercase">${lbl}</button>`;
     const teamToggle=`<div style="display:flex;gap:6px">${stBtn("us",OUR.short||"Us")}${stBtn("opp",(OPP.short||"Opp"))}</div>`;
     return `<div style="display:flex;flex-direction:column;gap:14px">
@@ -2828,8 +2828,7 @@ function actionArea(){
           </div></div>
         <div style="overflow-x:auto;background:${T.surface};border:1px solid ${T.line};border-radius:10px;padding:6px"><table style="width:100%;border-collapse:collapse;font-family:${MONO};font-size:17px;text-align:center;color:${T.chalk}"><thead><tr style="color:${T.sageDim};font-size:13px">${lineHead}</tr></thead><tbody>${lineRow("away")}${lineRow("home")}</tbody></table></div>
         ${teamToggle}
-        <div><div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin:0 2px 4px">${selName} &mdash; batting</div>
-          <div style="overflow-x:auto;background:${T.surface};border:1px solid ${T.line};border-radius:10px;padding:4px 6px"><table style="width:100%;border-collapse:collapse;font-family:${MONO};font-size:17px;text-align:center;color:${T.chalk}"><thead><tr style="color:${T.sageDim};font-size:13px"><th style="text-align:left;padding:4px 6px">Batter</th><th>AB</th><th>R</th><th>H</th><th>RBI</th><th>BB</th><th>K</th></tr></thead><tbody>${bb||`<tr><td colspan="7" style="padding:8px;color:${T.sageDim}">No at-bats recorded</td></tr>`}</tbody></table></div></div>
+        <div style="overflow-x:auto;background:${T.surface};border:1px solid ${T.line};border-radius:10px;padding:8px 8px 4px"><div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin:0 0 8px">${selName} &mdash; batting</div><table style="width:100%;border-collapse:collapse;font-family:${MONO};font-size:17px;text-align:center;color:${T.chalk}"><thead><tr style="color:${T.sageDim};font-size:13px"><th style="text-align:left;padding:4px 6px">Batter</th><th>AB</th><th>R</th><th>H</th><th>RBI</th><th>BB</th><th>K</th></tr></thead><tbody>${bb||`<tr><td colspan="7" style="padding:8px;color:${T.sageDim}">No at-bats recorded</td></tr>`}</tbody></table></div>
         ${pitchBlock}
         <button data-act="gamecard" style="${ghost};display:flex;align-items:center;justify-content:center;gap:9px">${ICN.doc} Scorecard (PDF)</button>
         <div style="display:flex;gap:10px">
@@ -3112,7 +3111,11 @@ function render(){
     const scroll=mode!=="lineup";
     // Preserve scroll position across a same-mode re-render (e.g. flipping a toggle), so the
     // page doesn't jump back to the top. A genuine page change (mode changed) starts at top.
-    const prevScroll=(scroll&&mode===_lastMode)?(()=>{const c=document.querySelector("#content > div");return c?c.scrollTop:0;})():0;
+    // Sub-page identity within a mode (team sub-tab + which game is open). Switching sub-tab — e.g.
+    // tapping a game in the stats list to open its summary — is a real page change, so it should
+    // start at the TOP, not inherit the list's scroll position.
+    const subTab=mode==="team"?(teamTab+":"+(typeof viewGameId!=="undefined"?(viewGameId||""):"")):"";
+    const prevScroll=(scroll&&mode===_lastMode&&subTab===_lastSubTab)?(()=>{const c=document.querySelector("#content > div");return c?c.scrollTop:0;})():0;
     // Preserve the lineup list's scroll across a reorder re-render so it doesn't snap to the top.
     const prevLineup=(mode==="lineup")?(()=>{const l=document.getElementById("lineup-list");return l?l.scrollTop:0;})():0;
     // page-zoom (scroll pages only) scales the UI up on big monitors; lineup is excluded so
@@ -3123,7 +3126,7 @@ function render(){
     const stepModes=["pickplayer","pickpos","editplayer","opppickpos","opppickpitch","oppeditplayer"];
     const cls=`${(mode!==_lastMode&&!stepModes.includes(mode))?"screen-in ":""}${(scroll&&!building)?"page-zoom":""}`;
     document.getElementById("content").innerHTML=`<div class="${cls}" style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px;${scroll?"overflow-y:auto;-webkit-overflow-scrolling:touch":""}">${actionArea()}</div>${confirmOverlay()}`;
-    _lastMode=mode;
+    _lastMode=mode; _lastSubTab=subTab;
     if(prevScroll){ const c=document.querySelector("#content > div"); if(c)c.scrollTop=prevScroll; }
     if(prevLineup){ const l=document.getElementById("lineup-list"); if(l)l.scrollTop=prevLineup; }
     if(mode==="lineup")setupLineupDrag();
@@ -3291,7 +3294,7 @@ function render(){
 }
 
 /* ---- diff the last-shown scoreboard vs current and fire one-shot animations ---- */
-let _disp=null,_lastMode=null;
+let _disp=null,_lastMode=null,_lastSubTab=null;
 function animateStatusBar(){
   if(!document.getElementById("sb-balls")) return;   // status bar not on screen; keep _disp as the baseline
   const cur={away:G.away,home:G.home,balls:G.balls,strikes:G.strikes,outs:G.outs,
@@ -3336,6 +3339,13 @@ document.getElementById("app").addEventListener("click",e=>{
   if(act==="alerttoggle"){ const c=alertsCfg(); c[arg]=!c[arg]; render(); return; }
   if(act==="alertdismiss"||act==="alertbackdrop"){ activeAlert=null; render(); return; }
   if(act==="alertsilence"){ if(activeAlert)dismissedAlerts.add(activeAlert.key); activeAlert=null; render(); return; }
+  if(act==="schedstart"){ const t=teamById(openTeamId); if(!t)return; const s=(t.schedule||[]).find(x=>x.id===arg);
+    newgameFrom="team"; selectTeam(t.id); G=initGame(); loadTeamLineup(teamById(curTeamId)); hist=[]; resetUI();
+    if(s&&s.opp){ const m=(DB.teams||[]).find(x=>x.id!==t.id && (x.name||"").toLowerCase()===(s.opp||"").toLowerCase());
+      if(m){ oppTeamId=m.id; OPP.name=m.name; OPP.short=m.short; OPP.color=m.color; OPP.logo=m.logo||null; }
+      else { oppTeamId=null; OPP.name=s.opp; OPP.short=(s.opp||"OPP").slice(0,3).toUpperCase(); OPP.color="#E2574C"; OPP.logo=null; }
+      try{ recordRecentOpp(OPP); }catch(e){} }
+    mode="newgame"; render(); broadcast(); return; }
   if(act==="schededit"){ schedEditId=arg; render(); return; }
   if(act==="schedcancel"){ schedEditId=null; render(); return; }
   if(act==="schedadd"){ const t=teamById(openTeamId); if(!t)return; const g=id=>{const e=document.getElementById(id);return e?(e.value||""):"";}; const date=g("schDate"); if(!date){flash("Pick a date");return;} const _sel=g("schOppSel"); const opp=(_sel==="__new__"?g("schOppNew"):_sel).trim(); if(!Array.isArray(t.schedule))t.schedule=[];
@@ -3957,7 +3967,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v134";
+var APP_VERSION="v135";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
