@@ -994,6 +994,27 @@ function brPickoff(base){ const d=brName(base)+" picked off"; brApply({[base]:{o
 function brAdvanceAll(label){ const ov={}; [3,2,1].forEach(b=>{ if(G.bases[b])ov[b]={dest:b+1}; }); brApply(ov,0,label,label); }
 function brOnError(base){ const d=brName(base)+" advances on error"; brApply({[base]:{dest:Math.min(4,base+1)}},0,"Advances on error",d,()=>{ const fs=battingKey()==="away"?"home":"away"; if(G.errors)G.errors[fs]=(G.errors[fs]||0)+1; }); }
 function brOut(base){ const d=brName(base)+" out"; brApply({[base]:{out:true}},1,"Runner out",d); }
+// Wild pitch / passed ball that IS a pitch: record one ball/strike (count + pitch count), then advance
+// all runners. Ball four still walks; strike three still strikes out (and may end the half-inning).
+let brPitchPick=null;   // null | "Wild pitch" | "Passed ball" — sheet is asking ball-or-strike
+function brWPApply(type){   // type: "ball" | "strike"
+  const label=brPitchPick||"Wild pitch"; brPitchPick=null;
+  snapshot();
+  recordPitch(type); try{ Snd.pip(type); }catch(e){}
+  const advance=()=>{ const ov={}; [3,2,1].forEach(b=>{ if(G.bases[b])ov[b]={dest:b+1}; }); resolve(brMovers(ov),0); };
+  if(type==="ball"){
+    G.balls++;
+    if(G.balls>=4){ feedPitch(label,"ball four · walk"); applyPlanInline("walk"); }   // walk handles the forced advance
+    else { feedPitch(label,"ball · runners advance"); advance(); }
+  } else {
+    G.strikes++;
+    if(G.strikes>=3){ G.outs++; creditBatter("strikeout",0); nextBatter();
+      if(G.outs>=3){ feedPitch(label,"strike three · inning over"); doFlip(); }
+      else { feedPitch(label,"strike three · runners advance"); advance(); } }
+    else { feedPitch(label,"strike · runners advance"); advance(); }
+  }
+  brSheet=false; render(); broadcast();
+}
 /* The base-running sheet (opened by the "Runners" button when anyone's on base). */
 function baseRunModal(){
   const occ=[3,2,1].filter(b=>G.bases&&G.bases[b]);
@@ -1016,10 +1037,18 @@ function baseRunModal(){
       <div data-act="noop" style="width:100%;max-width:460px;max-height:calc(var(--avh) * 90);overflow-y:auto;-webkit-overflow-scrolling:touch;background:${T.surface};border:2px solid ${T.lime};border-radius:18px;padding:16px;display:flex;flex-direction:column;gap:12px;box-shadow:0 18px 54px rgba(0,0,0,.6)">
         <div style="display:flex;align-items:center;gap:10px"><div style="flex:1;font-family:${MONO};font-size:18px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:${T.lime}">Base running</div>
           <button data-act="brclose" style="${ghost};padding:8px 14px;flex:none">Close</button></div>
+        ${brPitchPick?`
+        <div style="font-size:15px;color:${T.chalk};font-weight:700;margin:2px">${brPitchPick} — was the pitch a ball or a strike?</div>
+        <div style="font-size:12px;color:${T.sage};margin:-6px 2px 2px">It counts as a pitch and updates the count, then the runners advance.</div>
+        <div style="display:flex;gap:8px">
+          <button data-act="brwpkind" data-arg="ball" style="flex:1;background:${T.surface2};border:1px solid ${T.line};color:${T.chalk};border-radius:10px;padding:14px;font-family:${SANS};font-size:16px;font-weight:800">Ball</button>
+          <button data-act="brwpkind" data-arg="strike" style="flex:1;background:${T.surface2};border:1px solid ${T.line};color:${T.chalk};border-radius:10px;padding:14px;font-family:${SANS};font-size:16px;font-weight:800">Strike</button></div>
+        <button data-act="brwpback" style="${ghost};width:100%">&lsaquo; Back</button>
+        `:`
         <div style="font-size:12px;color:${T.sage};margin-top:-4px">No ball in play — the batter stays up with the same count.</div>
         <div><div style="font-size:10px;font-weight:800;letter-spacing:1px;color:${T.sageDim};margin:0 2px 6px">ALL RUNNERS ADVANCE</div>
           <div style="display:flex;gap:6px">${gbtn("brwp","Wild pitch")}${gbtn("brpb","Passed ball")}${gbtn("brbalk","Balk")}</div></div>
-        <div style="display:flex;flex-direction:column;gap:8px">${runnerRows||`<div style="font-size:13px;color:${T.sageDim};text-align:center;padding:14px">No runners on base.</div>`}</div>
+        <div style="display:flex;flex-direction:column;gap:8px">${runnerRows||`<div style="font-size:13px;color:${T.sageDim};text-align:center;padding:14px">No runners on base.</div>`}</div>`}
       </div></div>`;
 }
 
@@ -3017,9 +3046,7 @@ function actionArea(){
     return `${ptypeRow}
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
         ${pitchBtn("ball","Ball",ICN.ball)}${pitchBtn("strike","Strike",ICN.strike)}${pitchBtn("foul","Foul",ICN.foul)}${pitchBtn("inplay","In Play",ICN.inplay,true)}</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        <button data-act="walk" style="${flatBtn}"><span style="color:${T.sage}">${ICN.walk}</span>Walk</button>
-        <button data-act="hbp" style="${flatBtn}"><span style="color:${T.sage}">${ICN.hbp}</span>HBP</button></div>
+      <button data-act="hbp" style="${flatBtn}"><span style="color:${T.sage}">${ICN.hbp}</span>HBP <span style="color:${T.sageDim};font-weight:600;font-size:11px;text-transform:none;letter-spacing:0">walks happen on ball 4</span></button>
       ${[1,2,3].some(b=>G.bases&&G.bases[b])?`<button data-act="brsheet" style="${flatBtn};border-left:4px solid ${T.safe}"><span style="color:${T.safe};font-size:16px;line-height:1">&#9826;</span>Base running <span style="color:${T.sage};font-weight:600;font-size:11px;text-transform:none;letter-spacing:0">steal · WP/PB · balk</span></button>`:""}
       <button data-act="endinning" style="${flatBtn};border-left:4px solid ${T.amber}"><span style="color:${T.amber}">${ICN.inning}</span>End Inning <span style="color:${T.sage};font-weight:600;font-size:11px;text-transform:none;letter-spacing:0">${halfLabel} · ${G.outs} out${G.outs===1?"":"s"}</span></button>`;
   }
@@ -3517,16 +3544,18 @@ document.getElementById("app").addEventListener("click",e=>{
   const act=el.dataset.act,arg=el.dataset.arg;
   if(act==="noop")return;                                    // swallow taps inside a modal card
   if(act==="reviewbatter"){ reviewBatter=arg; render(); return; }
-  if(act==="brsheet"){ brSheet=true; render(); return; }
-  if(act==="brclose"){ brSheet=false; render(); return; }
+  if(act==="brsheet"){ brSheet=true; brPitchPick=null; render(); return; }
+  if(act==="brclose"){ brSheet=false; brPitchPick=null; render(); return; }
   if(act==="brsteal"){ brSteal(+arg); return; }
   if(act==="bradv"){ brAdvance(+arg); return; }
   if(act==="brscore"){ brScore(+arg); return; }
   if(act==="brcaught"){ brCaught(+arg); return; }
   if(act==="brpick"){ brPickoff(+arg); return; }
-  if(act==="brwp"){ brAdvanceAll("Wild pitch"); return; }
-  if(act==="brpb"){ brAdvanceAll("Passed ball"); return; }
-  if(act==="brbalk"){ brAdvanceAll("Balk"); return; }
+  if(act==="brwp"){ brPitchPick="Wild pitch"; render(); return; }
+  if(act==="brpb"){ brPitchPick="Passed ball"; render(); return; }
+  if(act==="brwpkind"){ brWPApply(arg==="strike"?"strike":"ball"); return; }
+  if(act==="brwpback"){ brPitchPick=null; render(); return; }
+  if(act==="brbalk"){ brAdvanceAll("Balk"); return; }   // a balk is not a pitch — no count change
   if(act==="bronerror"){ brOnError(+arg); return; }
   if(act==="brout"){ brOut(+arg); return; }
   if(act==="closereview"){ reviewBatter=null; render(); return; }
@@ -4170,7 +4199,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v148";
+var APP_VERSION="v149";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
