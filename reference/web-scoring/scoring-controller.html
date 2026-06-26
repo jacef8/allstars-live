@@ -420,8 +420,8 @@ function openScorecard(M){
   const A=M.A, H=M.H, maxI=M.maxI;
   let lhead='<th class="tm"></th>'; for(let i=1;i<=maxI;i++)lhead+='<th>'+i+'</th>'; lhead+='<th class="rhe">R</th><th class="rhe">H</th><th class="rhe">E</th>';
   const lrow=(side,m)=>{ let c='<td class="tm">'+esc(m.short)+'</td>'; for(let i=1;i<=maxI;i++)c+='<td>'+(M.line(side,i)||0)+'</td>'; const t=M.totals(side)||{r:0,h:0,e:0}; c+='<td class="rhe b">'+t.r+'</td><td class="rhe">'+t.h+'</td><td class="rhe">'+t.e+'</td>'; return '<tr>'+c+'</tr>'; };
-  const batTable=(side,m)=>{ const rows=(M.bat(side)||[]).map(b=>'<tr><td class="nm">#'+esc(b.num)+' '+esc(b.name)+'</td><td>'+b.ab+'</td><td>'+b.r+'</td><td>'+b.h+'</td><td>'+b.rbi+'</td><td>'+b.bb+'</td><td>'+b.k+'</td></tr>').join('');
-    return '<h3 style="border-color:'+m.color+'">'+esc(m.name)+' — Batting</h3><table class="grid"><thead><tr><th class="nm">Batter</th><th>AB</th><th>R</th><th>H</th><th>RBI</th><th>BB</th><th>K</th></tr></thead><tbody>'+(rows||'<tr><td colspan="7">No at-bats recorded</td></tr>')+'</tbody></table>'; };
+  const batTable=(side,m)=>{ const rows=(M.bat(side)||[]).map(b=>'<tr><td class="nm">#'+esc(b.num)+' '+esc(b.name)+'</td><td>'+b.ab+'</td><td>'+b.r+'</td><td>'+b.h+'</td><td>'+b.rbi+'</td><td>'+b.bb+'</td><td>'+b.k+'</td><td>'+(b.sb||0)+'</td><td>'+(b.cs||0)+'</td></tr>').join('');
+    return '<h3 style="border-color:'+m.color+'">'+esc(m.name)+' — Batting</h3><table class="grid"><thead><tr><th class="nm">Batter</th><th>AB</th><th>R</th><th>H</th><th>RBI</th><th>BB</th><th>K</th><th>SB</th><th>CS</th></tr></thead><tbody>'+(rows||'<tr><td colspan="9">No at-bats recorded</td></tr>')+'</tbody></table>'; };
   const pitchTable=(side,m)=>{ const list=M.pitch(side)||[]; if(!list.length)return ''; const rows=list.map(x=>'<tr><td class="nm">'+esc(x.name)+'</td><td>'+x.ip+'</td><td>'+x.pc+'</td><td>'+x.h+'</td><td>'+x.r+'</td><td>'+x.bb+'</td><td>'+x.k+'</td></tr>').join('');
     return '<h3 style="border-color:'+m.color+'">'+esc(m.name)+' — Pitching</h3><table class="grid"><thead><tr><th class="nm">Pitcher</th><th>IP</th><th>P</th><th>H</th><th>R</th><th>BB</th><th>K</th></tr></thead><tbody>'+rows+'</tbody></table>'; };
   const teamHead=(m,win)=>'<div class="team">'+(m.logo?'<img src="'+m.logo+'">':'<div class="ph"></div>')+'<div class="ti"><div class="tn">'+esc(m.name)+'</div>'+(m.rec?'<div class="tc">'+esc(m.rec)+'</div>':'')+'</div><div class="ts" style="color:'+m.color+'">'+m.runs+'</div>'+(win?'<div class="wb">WIN</div>':'')+'</div>';
@@ -659,7 +659,7 @@ const initGame=()=>({inning:1,half:"T",away:0,home:0,outs:0,balls:0,strikes:0,
   startedAt:null,  // wall-clock ms when the game ACTUALLY started (auto-set at first pitch / game start; editable in Game Setup) — drives the game timer
   lineup:{ order:[0,1,2,3,4,5,6,7,8],   // batting order: 9-12 entries (slots 10+ = extra hitters)
            pos:{P:0,C:1,"1B":2,"2B":3,"3B":4,SS:5,LF:6,CF:7,RF:8} }});
-let G=initGame(),hist=[],mode="home",tap=null,contact=null,result=null,plan=null,toast=null,toastTimer=null,curResults=[],showAll=false,showZones=false,editSlot=null,confirmAct=null,gameActive=false,lineupTab="us",newgameFrom="home";
+let G=initGame(),hist=[],mode="home",tap=null,contact=null,result=null,plan=null,toast=null,toastTimer=null,curResults=[],showAll=false,showZones=false,editSlot=null,confirmAct=null,gameActive=false,lineupTab="us",newgameFrom="home",brSheet=false;
 // Resume the last in-progress game (saved by saveGame) across reloads/app updates, so the
 // lineup/score is never lost. Stays on the home screen → shows "Resume". Re-links ROSTER
 // to the saved team so the lineup's player indices resolve correctly.
@@ -874,7 +874,7 @@ function alertOverlay(){
 
 /* ===== per-batter box-score stats (both teams) ===== */
 const batterKeyOf=b=>b.ours?("o"+b.ri):("p"+b.spot);
-function statFor(key){ if(!G.stats[key]) G.stats[key]={ab:0,r:0,h:0,rbi:0,bb:0,k:0,lob:0,num:"",name:"",team:"opp",slot:99}; return G.stats[key]; }
+function statFor(key){ if(!G.stats[key]) G.stats[key]={ab:0,r:0,h:0,rbi:0,bb:0,k:0,lob:0,sb:0,cs:0,num:"",name:"",team:"opp",slot:99}; return G.stats[key]; }
 const HIT_KINDS=["single","double","triple","hr"];
 const LOB_OUTS=["strikeout","out1","flyout","lineout","popout","dp","sacfly","sacbunt"];
 /* Credit the current batter for a completed plate appearance. Call AFTER resolve()
@@ -963,6 +963,60 @@ function applyPlanInline(kind){
   const runs=resolve(buildPlan(kind,G.bases,batterLabel(),batter().name,null,batterKeyOf(batter())),0);
   creditBatter(kind, rbiEligible(kind)?runs:0);
   nextBatter(); if(capReached())doFlip(); else flipIfNeeded();
+}
+
+/* ===== Base running — events with NO ball in play (steal, WP/PB, balk, pickoff, caught stealing).
+   Reuses resolve(): the BATTER stays at the plate with the same count; only the runners move,
+   score, or are put out. SB/CS credit goes to the runner's own stat key. snapshot() first so each
+   base-running event is a single Undo step. ===== */
+function ordBase(n){ return n>=4?"home":(n+"B"); }
+function brRunner(base){ return G.bases&&G.bases[base]; }
+function brName(base){ const r=brRunner(base); return (r&&(r.name||r.label))||"Runner"; }
+function brMovers(overrides){   // overrides: {base:{dest}} or {base:{out:true}}; absent base => hold
+  const m=[]; [1,2,3].forEach(base=>{ const r=G.bases[base]; if(!r)return; const o=overrides[base]||{};
+    m.push({label:r.label,name:r.name,color:r.color,key:r.key,start:base,dest:o.out?base:(o.dest||base),out:!!o.out}); });
+  return m;
+}
+function brApply(overrides,outs,label,detail,statFn){
+  snapshot();
+  if(statFn){ try{ statFn(); }catch(e){} }
+  resolve(brMovers(overrides), outs||0);
+  try{ feedPitch(label, detail||""); }catch(e){}
+  brSheet=false;
+  flipIfNeeded();   // a CS/pickoff that makes the 3rd out flips the half-inning + clears the bases
+  render(); broadcast();
+}
+function brSteal(base){ const k=brRunner(base)&&brRunner(base).key; const d=brName(base)+" steals "+ordBase(base+1); brApply({[base]:{dest:base+1}},0,"Stolen base",d,()=>{ if(k)statFor(k).sb++; }); }
+function brAdvance(base){ const d=brName(base)+" to "+ordBase(base+1); brApply({[base]:{dest:Math.min(4,base+1)}},0,"Runner advances",d); }
+function brScore(base){ const d=brName(base)+" scores"; brApply({[base]:{dest:4}},0,"Run scores",d); }
+function brCaught(base){ const k=brRunner(base)&&brRunner(base).key; const d=brName(base)+" caught stealing"; brApply({[base]:{out:true}},1,"Caught stealing",d,()=>{ if(k)statFor(k).cs++; }); }
+function brPickoff(base){ const d=brName(base)+" picked off"; brApply({[base]:{out:true}},1,"Picked off",d); }
+function brAdvanceAll(label){ const ov={}; [3,2,1].forEach(b=>{ if(G.bases[b])ov[b]={dest:b+1}; }); brApply(ov,0,label,label); }
+/* The base-running sheet (opened by the "Runners" button when anyone's on base). */
+function baseRunModal(){
+  const occ=[3,2,1].filter(b=>G.bases&&G.bases[b]);
+  const chip=(act,base,lbl,bg,fg,bd)=>`<button data-act="${act}" data-arg="${base}" style="flex:1 1 auto;min-width:0;background:${bg};border:1px solid ${bd||bg};color:${fg};border-radius:8px;padding:9px 6px;font-family:${SANS};font-size:13px;font-weight:800;white-space:nowrap">${lbl}</button>`;
+  const runnerRows=occ.map(b=>{ const r=G.bases[b];
+    return `<div style="background:${T.surface2};border:1px solid ${T.line};border-radius:11px;padding:10px 11px;display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;align-items:center;gap:9px"><span style="font-family:${MONO};font-size:15px;font-weight:800;color:${r.color||T.clay}">${b}B</span>
+          <span style="font-size:16px;font-weight:700;color:${T.chalk};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${((r.name||r.label||"Runner")+"").replace(/</g,"&lt;")}</span></div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">
+          ${chip("brsteal",b,"&#9650; Steal",T.safe,"#fff")}
+          ${chip("bradv",b,"Adv +1",T.surface,T.chalk,T.line)}
+          ${chip("brscore",b,"Score",T.lime,"#fff")}
+          ${chip("brcaught",b,"Caught",T.surface,T.out,T.out)}
+          ${chip("brpick",b,"Pickoff",T.surface,T.out,T.out)}
+        </div></div>`;}).join("");
+  const gbtn=(act,lbl)=>`<button data-act="${act}" style="flex:1 1 auto;background:${T.surface2};border:1px solid ${T.line};color:${T.chalk};border-radius:9px;padding:11px 8px;font-family:${SANS};font-size:14px;font-weight:800;white-space:nowrap">${lbl}</button>`;
+  return `<div data-act="brclose" style="position:fixed;inset:0;z-index:60;background:rgba(8,11,16,.62);display:flex;align-items:center;justify-content:center;padding:16px">
+      <div onclick="event.stopPropagation()" style="width:100%;max-width:440px;max-height:88vh;overflow-y:auto;background:${T.surface};border:2px solid ${T.lime};border-radius:18px;padding:16px;display:flex;flex-direction:column;gap:12px;box-shadow:0 18px 54px rgba(0,0,0,.6)">
+        <div style="display:flex;align-items:center;gap:10px"><div style="flex:1;font-family:${MONO};font-size:18px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:${T.lime}">Base running</div>
+          <button data-act="brclose" style="${ghost};padding:8px 14px;flex:none">Close</button></div>
+        <div style="font-size:12px;color:${T.sage};margin-top:-4px">No ball in play — the batter stays up with the same count.</div>
+        <div><div style="font-size:10px;font-weight:800;letter-spacing:1px;color:${T.sageDim};margin:0 2px 6px">ALL RUNNERS ADVANCE</div>
+          <div style="display:flex;gap:6px">${gbtn("brwp","Wild pitch")}${gbtn("brpb","Passed ball")}${gbtn("brbalk","Balk")}</div></div>
+        <div style="display:flex;flex-direction:column;gap:8px">${runnerRows||`<div style="font-size:13px;color:${T.sageDim};text-align:center;padding:14px">No runners on base.</div>`}</div>
+      </div></div>`;
 }
 
 /* ===== broadcast link — the controller is the single source of truth =====
@@ -1083,7 +1137,7 @@ function bcastEvent(kind,sub,team){
 function buildBox(){
   const our=[],opp=[];
   Object.keys(G.stats).forEach(key=>{const s=G.stats[key];
-    (s.team==="our"?our:opp).push({num:s.num,name:s.name,ab:s.ab,r:s.r,h:s.h,rbi:s.rbi,bb:s.bb,k:s.k,lob:s.lob,slot:s.slot});});
+    (s.team==="our"?our:opp).push({num:s.num,name:s.name,ab:s.ab,r:s.r,h:s.h,rbi:s.rbi,bb:s.bb,k:s.k,lob:s.lob,sb:s.sb||0,cs:s.cs||0,slot:s.slot});});
   const bySlot=(a,b)=>a.slot-b.slot; our.sort(bySlot); opp.sort(bySlot);
   const away=G.ourSide==="away"?our:opp, home=G.ourSide==="home"?our:opp;
   const sum=(a,f)=>a.reduce((t,x)=>t+(x[f]||0),0);
@@ -2385,8 +2439,8 @@ function actionArea(){
       const lr=(side)=>{const sh=side==="away"?g.awayShort:g.homeShort;const arr=(g.line&&g.line[side])||[];const tot=(g.totals&&g.totals[side])||{r:0,h:0,e:0};let c=`<td style="text-align:left;padding:6px;font-weight:800;${vL}">${esc(sh)}</td>`;for(let i=0;i<maxI;i++)c+=`<td style="padding:9px 6px;${vL}">${arr[i]||0}</td>`;c+=`<td style="padding:9px 6px;font-weight:800;color:${T.ink};${totL}">${tot.r}</td><td style="padding:9px 6px">${tot.h}</td><td style="padding:9px 6px">${tot.e}</td>`;return `<tr style="border-top:1px solid ${T.line}">${c}</tr>`;};
       const lineTbl=card(`<table style="width:100%;border-collapse:collapse;font-family:${MONO};font-size:16px;text-align:center;color:${T.chalk}"><thead><tr style="color:${T.sageDim};font-size:12px">${lh}</tr></thead><tbody>${lr("away")}${lr("home")}</tbody></table>`);
       const sideName=(side)=> side==="away"?(g.ourSide==="away"?t.name:g.opp):(g.ourSide==="home"?t.name:g.opp);
-      const batTbl=(side)=>{const rows=((g.bat&&g.bat[side])||[]).map(b=>`<tr style="border-top:1px solid ${T.line}"><td style="text-align:left;padding:6px;font-weight:700;white-space:nowrap">#${esc(b.num)} ${esc(b.name)}</td><td style="padding:9px 6px">${b.ab}</td><td>${b.r}</td><td>${b.h}</td><td>${b.rbi}</td><td>${b.bb}</td><td>${b.k}</td></tr>`).join("");
-        return card(`<div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin:0 0 8px">${esc(sideName(side))} &mdash; batting</div><table style="width:100%;border-collapse:collapse;font-family:${MONO};font-size:16px;text-align:center;color:${T.chalk}"><thead><tr style="color:${T.sageDim};font-size:12px"><th style="text-align:left;padding:4px 6px">Batter</th><th>AB</th><th>R</th><th>H</th><th>RBI</th><th>BB</th><th>K</th></tr></thead><tbody>${rows||`<tr><td colspan="7" style="padding:8px;color:${T.sageDim}">No at-bats</td></tr>`}</tbody></table>`);};
+      const batTbl=(side)=>{const rows=((g.bat&&g.bat[side])||[]).map(b=>`<tr style="border-top:1px solid ${T.line}"><td style="text-align:left;padding:6px;font-weight:700;white-space:nowrap">#${esc(b.num)} ${esc(b.name)}</td><td style="padding:9px 6px">${b.ab}</td><td>${b.r}</td><td>${b.h}</td><td>${b.rbi}</td><td>${b.bb}</td><td>${b.k}</td><td>${b.sb||0}</td><td>${b.cs||0}</td></tr>`).join("");
+        return card(`<div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin:0 0 8px">${esc(sideName(side))} &mdash; batting</div><table style="width:100%;border-collapse:collapse;font-family:${MONO};font-size:16px;text-align:center;color:${T.chalk}"><thead><tr style="color:${T.sageDim};font-size:12px"><th style="text-align:left;padding:4px 6px">Batter</th><th>AB</th><th>R</th><th>H</th><th>RBI</th><th>BB</th><th>K</th><th title="Stolen bases">SB</th><th title="Caught stealing">CS</th></tr></thead><tbody>${rows||`<tr><td colspan="9" style="padding:8px;color:${T.sageDim}">No at-bats</td></tr>`}</tbody></table>`);};
       const pitchTbl=(side)=>{const list=(g.pitch&&g.pitch[side])||[];if(!list.length)return "";const rows=list.map(x=>`<tr style="border-top:1px solid ${T.line}"><td style="text-align:left;padding:6px;font-weight:700;white-space:nowrap">${esc(x.name)}</td><td style="padding:9px 6px">${x.ip}</td><td>${x.pc}</td><td>${x.h}</td><td>${x.r}</td><td>${x.bb}</td><td>${x.k}</td></tr>`).join("");
         return card(`<div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin:0 0 8px">${esc(sideName(side))} &mdash; pitching</div><table style="width:100%;border-collapse:collapse;font-family:${MONO};font-size:16px;text-align:center;color:${T.chalk}"><thead><tr style="color:${T.sageDim};font-size:12px"><th style="text-align:left;padding:4px 6px">Pitcher</th><th>IP</th><th>P</th><th>H</th><th>R</th><th>BB</th><th>K</th></tr></thead><tbody>${rows}</tbody></table>`);};
       const scoreBtn=`<button data-act="storedcard" data-arg="${g.id}" style="${bigBtn(T.lime,'')};display:flex;align-items:center;justify-content:center;gap:9px">&#128196; Game scorecard (PDF)</button>`;
@@ -2889,7 +2943,7 @@ function actionArea(){
     const oppSide=G.ourSide==="home"?"away":"home";
     const selSide=summaryTeam==="us"?G.ourSide:oppSide;
     const selName=summaryTeam==="us"?OUR.name:(OPP.name||"Opponent");
-    const bb=(box[selSide]||[]).map(b=>`<tr style="border-top:1px solid ${T.line}"><td style="text-align:left;padding:5px 6px;font-weight:700;white-space:nowrap">#${b.num} ${b.name}</td><td style="padding:11px 6px">${b.ab}</td><td style="padding:11px 6px">${b.r}</td><td style="padding:11px 6px">${b.h}</td><td style="padding:11px 6px">${b.rbi}</td><td style="padding:11px 6px">${b.bb}</td><td style="padding:11px 6px">${b.k}</td></tr>`).join("");
+    const bb=(box[selSide]||[]).map(b=>`<tr style="border-top:1px solid ${T.line}"><td style="text-align:left;padding:5px 6px;font-weight:700;white-space:nowrap">#${b.num} ${b.name}</td><td style="padding:11px 6px">${b.ab}</td><td style="padding:11px 6px">${b.r}</td><td style="padding:11px 6px">${b.h}</td><td style="padding:11px 6px">${b.rbi}</td><td style="padding:11px 6px">${b.bb}</td><td style="padding:11px 6px">${b.k}</td><td style="padding:11px 6px">${b.sb||0}</td><td style="padding:11px 6px">${b.cs||0}</td></tr>`).join("");
     // Pitching for the chosen team. OUR pitchers are keyed "o"+rosterIdx (note: /^o\d/, NOT k[0]==="o",
     // so the opponent's pitcher key "oppP" no longer leaks into our table). The opponent uses "oppP".
     let pitchers;
@@ -2914,7 +2968,7 @@ function actionArea(){
           </div></div>
         <div style="overflow-x:auto;background:${T.surface};border:1px solid ${T.line};border-radius:10px;padding:6px"><table style="width:100%;border-collapse:collapse;font-family:${MONO};font-size:17px;text-align:center;color:${T.chalk}"><thead><tr style="color:${T.sageDim};font-size:13px">${lineHead}</tr></thead><tbody>${lineRow("away")}${lineRow("home")}</tbody></table></div>
         ${teamToggle}
-        <div style="overflow-x:auto;background:${T.surface};border:1px solid ${T.line};border-radius:10px;padding:8px 8px 4px"><div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin:0 0 8px">${selName} &mdash; batting</div><table style="width:100%;border-collapse:collapse;font-family:${MONO};font-size:17px;text-align:center;color:${T.chalk}"><thead><tr style="color:${T.sageDim};font-size:13px"><th style="text-align:left;padding:4px 6px">Batter</th><th>AB</th><th>R</th><th>H</th><th>RBI</th><th>BB</th><th>K</th></tr></thead><tbody>${bb||`<tr><td colspan="7" style="padding:8px;color:${T.sageDim}">No at-bats recorded</td></tr>`}</tbody></table></div>
+        <div style="overflow-x:auto;background:${T.surface};border:1px solid ${T.line};border-radius:10px;padding:8px 8px 4px"><div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin:0 0 8px">${selName} &mdash; batting</div><table style="width:100%;border-collapse:collapse;font-family:${MONO};font-size:17px;text-align:center;color:${T.chalk}"><thead><tr style="color:${T.sageDim};font-size:13px"><th style="text-align:left;padding:4px 6px">Batter</th><th>AB</th><th>R</th><th>H</th><th>RBI</th><th>BB</th><th>K</th><th title="Stolen bases">SB</th><th title="Caught stealing">CS</th></tr></thead><tbody>${bb||`<tr><td colspan="9" style="padding:8px;color:${T.sageDim}">No at-bats recorded</td></tr>`}</tbody></table></div>
         ${pitchBlock}
         <button data-act="gamecard" style="${ghost};display:flex;align-items:center;justify-content:center;gap:9px">${ICN.doc} Scorecard (PDF)</button>
         <div style="display:flex;gap:10px">
@@ -2936,6 +2990,7 @@ function actionArea(){
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
         <button data-act="walk" style="${flatBtn}"><span style="color:${T.sage}">${ICN.walk}</span>Walk</button>
         <button data-act="hbp" style="${flatBtn}"><span style="color:${T.sage}">${ICN.hbp}</span>HBP</button></div>
+      ${[1,2,3].some(b=>G.bases&&G.bases[b])?`<button data-act="brsheet" style="${flatBtn};border-left:4px solid ${T.safe}"><span style="color:${T.safe};font-size:16px;line-height:1">&#9826;</span>Base running <span style="color:${T.sage};font-weight:600;font-size:11px;text-transform:none;letter-spacing:0">steal · WP/PB · balk</span></button>`:""}
       <button data-act="endinning" style="${flatBtn};border-left:4px solid ${T.amber}"><span style="color:${T.amber}">${ICN.inning}</span>End Inning <span style="color:${T.sage};font-weight:600;font-size:11px;text-transform:none;letter-spacing:0">${halfLabel} · ${G.outs} out${G.outs===1?"":"s"}</span></button>`;
   }
   if(mode==="locate"){
@@ -3376,6 +3431,7 @@ function render(){
     ${body}${confirmOverlay()}${alertOverlay()}
     ${reviewBatter?batterReviewModal():""}
     ${reviewInn?inningLogModal():""}
+    ${brSheet?baseRunModal():""}
     ${(pickerModal&&wide)?`<div style="${sheetWrap}">
         <div id="action-area" style="${sheetCard};overflow-y:auto;-webkit-overflow-scrolling:touch;background:${T.surface};padding:16px;display:flex;flex-direction:column;gap:8px">${actionArea()}</div></div>`:""}
     ${floatLayer}${floatToggleBtn}`;
@@ -3425,6 +3481,16 @@ document.getElementById("app").addEventListener("click",e=>{
   const act=el.dataset.act,arg=el.dataset.arg;
   if(act==="noop")return;                                    // swallow taps inside a modal card
   if(act==="reviewbatter"){ reviewBatter=arg; render(); return; }
+  if(act==="brsheet"){ brSheet=true; render(); return; }
+  if(act==="brclose"){ brSheet=false; render(); return; }
+  if(act==="brsteal"){ brSteal(+arg); return; }
+  if(act==="bradv"){ brAdvance(+arg); return; }
+  if(act==="brscore"){ brScore(+arg); return; }
+  if(act==="brcaught"){ brCaught(+arg); return; }
+  if(act==="brpick"){ brPickoff(+arg); return; }
+  if(act==="brwp"){ brAdvanceAll("Wild pitch"); return; }
+  if(act==="brpb"){ brAdvanceAll("Passed ball"); return; }
+  if(act==="brbalk"){ brAdvanceAll("Balk"); return; }
   if(act==="closereview"){ reviewBatter=null; render(); return; }
   if(act==="inninglog"){ reviewInn=true; render(); return; }
   if(act==="closeinnlog"){ reviewInn=false; render(); return; }
@@ -4061,7 +4127,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v138";
+var APP_VERSION="v139";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
