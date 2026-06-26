@@ -1772,7 +1772,7 @@ function recordRecentOpp(o){ if(!o||!o.name||o.name==="Opponent")return; try{ le
 /* Live client-side filter for the opponent picker (no re-render → keeps the input focused). */
 window._oppFilter=function(v){ v=(v||"").trim().toLowerCase(); try{ document.querySelectorAll('[data-tname]').forEach(function(el){ el.style.display=(!v||(el.getAttribute('data-tname')||'').indexOf(v)>=0)?"":"none"; }); }catch(e){} };
 /* Schedule month-calendar view (toggle with the list). calYM = {y,m} of the shown month. */
-let calYM=null, calSelDay=null, scheduleView=(()=>{try{return localStorage.getItem("al-sched-view")||"list";}catch(e){return "list";}})();
+let calYM=null, calSelDay=null, schedEditId=null, scheduleView=(()=>{try{return localStorage.getItem("al-sched-view")||"list";}catch(e){return "list";}})();
 /* Public-team directory browser + read-only stats viewer (any team that opted public). */
 let dirResults=null, viewTeam=null;
 
@@ -2077,6 +2077,7 @@ function actionArea(){
           <div style="flex:1;min-width:0">
             <div style="font-weight:800;color:${T.ink};font-size:21px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${isG?ICN.inplay+" "+(s.opp?("vs "+(s.opp||"").replace(/</g,"")):"Game"):ICN.ball+" Practice"}</div>
             <div style="font-size:17px;color:${T.sage};margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${fmtSched(s)}${s.loc?` &middot; <span data-act="openmap" data-arg="${encodeURIComponent(s.loc)}" title="Open in Maps — get directions" style="color:${T.lime};cursor:pointer;text-decoration:underline;text-underline-offset:2px">${IC('<path d="M12 21s-6-5.7-6-10a6 6 0 1 1 12 0c0 4.3-6 10-6 10z"/><circle cx="12" cy="11" r="2.1"/>',15)} ${(s.loc||"").replace(/</g,"&lt;")}</span>`:""}${s.notes?(" &middot; "+(s.notes||"").replace(/</g,"&lt;")):""}</div></div>
+          <button data-act="schededit" data-arg="${s.id}" title="Edit" style="background:${schedEditId===s.id?T.lime:"none"};border:1px solid ${schedEditId===s.id?T.lime:T.line};color:${schedEditId===s.id?"#fff":T.lime};border-radius:8px;padding:9px 12px;font-weight:800;font-size:13px;flex:none">Edit</button>
           <button data-act="schedrm" data-arg="${s.id}" style="background:none;border:1px solid ${T.line};color:${T.out};border-radius:8px;padding:9px 12px;font-weight:800;font-size:18px;flex:none">&times;</button></div>`;}).join("");
     const fLbl=`font-size:12px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:${T.sageDim};margin:0 2px 5px`;
     const cellL=cell+";font-size:17px;padding:12px 12px";   // larger inputs for the schedule form
@@ -2086,16 +2087,20 @@ function actionArea(){
         <div style="font-size:14px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime}">Upcoming — games &amp; practices</div>
         <div style="display:flex;gap:6px">${svBtn("list",IC('list',15)+" List")}${svBtn("calendar",IC('grid',15)+" Calendar")}</div>
         ${scheduleView==="calendar" ? calendarHtml(t) : (schedRows||`<div style="font-size:12px;color:${T.sageDim}">Nothing scheduled yet.</div>`)}</div>`;
-    const scheduleEditCard=`<div class="frost-card" style="background:${T.surface};border:1px solid ${T.line};border-radius:14px;padding:16px 18px;display:flex;flex-direction:column;gap:11px">
-        <div style="font-size:14px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime}">Add a game or practice</div>
+    const editing = schedEditId ? (t.schedule||[]).find(s=>s.id===schedEditId) : null;
+    const eq=v=>(v||"").replace(/"/g,"&quot;");
+    const eOpp = editing?(editing.opp||""):"";
+    const oppNewSel = !!(editing && eOpp && !(DB.teams||[]).some(x=>x.id!==t.id && x.name===eOpp));
+    const scheduleEditCard=`<div class="frost-card" style="background:${T.surface};border:1px solid ${editing?T.lime:T.line};border-radius:14px;padding:16px 18px;display:flex;flex-direction:column;gap:11px">
+        <div style="font-size:14px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime}">${editing?"Edit game or practice":"Add a game or practice"}</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
-          ${fld("Type",`<select id="schType" style="${cellL}"><option value="game">Game</option><option value="practice">Practice</option></select>`)}
-          ${fld("Date",`<input id="schDate" type="date" value="${calSelDay||''}" style="${cellL}">`)}
-          ${fld("Time",timeSelects("schTime",""))}</div>
-        ${fld("Opponent (games only)",`<select id="schOppSel" onchange="var n=document.getElementById('schOppNew');if(n)n.style.display=this.value==='__new__'?'block':'none'" style="${cellL}"><option value="">— pick a team —</option>${(DB.teams||[]).filter(x=>x.id!==t.id).map(x=>`<option value="${(x.name||'').replace(/"/g,'&quot;')}">${(x.name||'').replace(/</g,'')}</option>`).join("")}<option value="__new__">+ New opponent…</option></select><input id="schOppNew" placeholder="New opponent name" style="${cellL};margin-top:6px;display:none">`)}
-        ${fld("Location",`<input id="schLoc" placeholder="e.g. City Park — Field 2" style="${cellL}">`)}
-        ${fld("Notes (optional)",`<input id="schNotes" placeholder="e.g. arrive 45 min early, white jerseys" style="${cellL}">`)}
-        <button data-act="schedadd" style="${bigBtn(T.lime,'')};margin-top:4px">+ Add to schedule</button></div>`;
+          ${fld("Type",`<select id="schType" style="${cellL}"><option value="game"${editing&&editing.type!=="practice"?" selected":""}>Game</option><option value="practice"${editing&&editing.type==="practice"?" selected":""}>Practice</option></select>`)}
+          ${fld("Date",`<input id="schDate" type="date" value="${editing?eq(editing.date):(calSelDay||'')}" style="${cellL}">`)}
+          ${fld("Time",timeSelects("schTime",editing?(editing.time||""):""))}</div>
+        ${fld("Opponent (games only)",`<select id="schOppSel" onchange="var n=document.getElementById('schOppNew');if(n)n.style.display=this.value==='__new__'?'block':'none'" style="${cellL}"><option value=""${!editing||!eOpp?" selected":""}>— pick a team —</option>${(DB.teams||[]).filter(x=>x.id!==t.id).map(x=>`<option value="${eq(x.name)}"${eOpp&&eOpp===x.name?" selected":""}>${(x.name||'').replace(/</g,'')}</option>`).join("")}<option value="__new__"${oppNewSel?" selected":""}>+ New opponent…</option></select><input id="schOppNew" placeholder="New opponent name" value="${oppNewSel?eq(eOpp):""}" style="${cellL};margin-top:6px;display:${oppNewSel?"block":"none"}">`)}
+        ${fld("Location",`<input id="schLoc" placeholder="e.g. City Park — Field 2" value="${editing?eq(editing.loc):""}" style="${cellL}">`)}
+        ${fld("Notes (optional)",`<input id="schNotes" placeholder="e.g. arrive 45 min early, white jerseys" value="${editing?eq(editing.notes):""}" style="${cellL}">`)}
+        <div style="display:flex;gap:8px;margin-top:4px">${editing?`<button data-act="schedcancel" style="${ghost};flex:none;padding:14px 18px">Cancel</button>`:""}<button data-act="schedadd" style="${bigBtn(T.lime,'')};flex:1">${editing?"Save changes":"+ Add to schedule"}</button></div></div>`;
     // Past games — the finished-game log, newest first, TAPPABLE to open the score + box score.
     const pastRows=(t.games||[]).slice(0,25).map(g=>{const rc=g.result==="W"?T.lime:(g.result==="L"?T.out:T.sage);
       const gdt=(()=>{try{return new Date((g.date||"")+"T00:00").toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"});}catch(e){return g.date||"";}})();
@@ -2332,7 +2337,6 @@ function actionArea(){
             <div style="font-family:${MONO};font-size:22px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${(t.name||"Team").replace(/</g,"")}</div>
             <div style="font-family:${MONO};font-size:20px;font-weight:800;color:${t.color};margin-top:4px">${rec}</div></div></div>
         <button data-act="teamchat" style="${bigBtn(T.lime,'')};font-size:17px;position:relative">${ICN.chat} Team chat${teamHasUnread(t)?`<span style="background:${T.amber};color:${T.field};border-radius:999px;padding:2px 10px;font-family:${MONO};font-weight:800;font-size:12px;letter-spacing:.5px;margin-left:9px">&#9679; NEW</span>`:""}</button>
-        ${teamHasUnread(t)?`<div style="font-size:12px;color:${T.sage};text-align:center;margin-top:-4px">That &ldquo;NEW&rdquo; on the home screen is unread team chat &mdash; new games &amp; messages post here.</div>`:""}
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
           ${hb("roster",IC('users',26),"Roster &amp; lineup")}
           ${hb("schedule",IC('calendar',26),"Schedule")}
@@ -2700,10 +2704,14 @@ function actionArea(){
   }
   if(mode==="pickpos"){
     const ri=G.lineup.order[editSlot],cur=posOfPlayer(ri);
-    const cells=POSLIST.map(p=>{const who=playerAtPos(p),sel=p===cur;
-      return `<button data-act="setpos" data-arg="${p}" style="display:flex;flex-direction:column;gap:4px;align-items:center;background:${sel?OUR.color:T.surface};border:1px solid ${sel?OUR.color:T.line};color:${sel?"#08111f":T.chalk};border-radius:9px;padding:16px 6px;font-family:${MONO};font-weight:800;font-size:23px">${p}<span style="font-size:13px;font-weight:600;color:${sel?"#08111f":T.sage};max-width:96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${who?who.name:"—"}</span></button>`;}).join("");
-    return step(`${ROSTER[ri].name} — position`,"Tap a spot. It swaps with whoever's there now.",
-      `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">${cells}</div>`,"backlineup");
+    const cell=p=>{const who=playerAtPos(p),sel=p===cur;
+      return `<button data-act="setpos" data-arg="${p}" style="display:flex;flex-direction:column;gap:4px;align-items:center;background:${sel?OUR.color:T.surface};border:1px solid ${sel?OUR.color:T.line};color:${sel?"#08111f":T.chalk};border-radius:9px;padding:16px 6px;font-family:${MONO};font-weight:800;font-size:23px">${p}<span style="font-size:13px;font-weight:600;color:${sel?"#08111f":T.sage};max-width:96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${who?who.name:"—"}</span></button>`;};
+    const takenByOther=p=>{const h=G.lineup.pos[p];return h!=null&&h!==ri;};
+    const open=POSLIST.filter(p=>!takenByOther(p)), used=POSLIST.filter(takenByOther);
+    const grid=arr=>`<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">${arr.map(cell).join("")}</div>`;
+    const div=used.length?`<div style="display:flex;align-items:center;gap:10px;margin:6px 2px"><div style="flex:1;height:1px;background:${T.line}"></div><span style="font-size:10px;font-weight:800;letter-spacing:1px;color:${T.sageDim};white-space:nowrap">TAKEN &middot; TAP TO SWAP</span><div style="flex:1;height:1px;background:${T.line}"></div></div>`:"";
+    return step(`${ROSTER[ri].name} — position`,"Open spots first; tap a taken spot to swap.",
+      `${grid(open)}${div}${used.length?grid(used):""}`,"backlineup");
   }
   if(mode==="editplayer"){
     const ri=G.lineup.order[editSlot],p=ROSTER[ri]||{num:"",first:"",last:""};
@@ -2723,10 +2731,14 @@ function actionArea(){
   }
   if(mode==="opppickpos"){
     const e=oppList()[editSlot]||{}, cur=e.pos||null;
-    const cells=POSLIST.map(p=>{const oi=oppAtPos(p),who=oi>=0?oppList()[oi]:null,sel=p===cur;const wn=who?(((who.name||"").trim())||("#"+(who.num||""))):"—";
-      return `<button data-act="oppsetpos" data-arg="${p}" style="display:flex;flex-direction:column;gap:4px;align-items:center;background:${sel?OPP.color:T.surface};border:1px solid ${sel?OPP.color:T.line};color:${sel?"#08111f":T.chalk};border-radius:9px;padding:16px 6px;font-family:${MONO};font-weight:800;font-size:23px">${p}<span style="font-size:13px;font-weight:600;color:${sel?"#08111f":T.sage};max-width:96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${wn.replace(/</g,"&lt;")}</span></button>`;}).join("");
-    return step(`${(((e.name||"").trim())||("#"+(e.num||"")))} — position`,"Tap a spot. It swaps with whoever's there.",
-      `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">${cells}</div>`,"backlineup");
+    const cell=p=>{const oi=oppAtPos(p),who=oi>=0?oppList()[oi]:null,sel=p===cur;const wn=who?(((who.name||"").trim())||("#"+(who.num||""))):"—";
+      return `<button data-act="oppsetpos" data-arg="${p}" style="display:flex;flex-direction:column;gap:4px;align-items:center;background:${sel?OPP.color:T.surface};border:1px solid ${sel?OPP.color:T.line};color:${sel?"#08111f":T.chalk};border-radius:9px;padding:16px 6px;font-family:${MONO};font-weight:800;font-size:23px">${p}<span style="font-size:13px;font-weight:600;color:${sel?"#08111f":T.sage};max-width:96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${wn.replace(/</g,"&lt;")}</span></button>`;};
+    const takenByOther=p=>{const oi=oppAtPos(p);return oi>=0&&oi!==editSlot;};
+    const open=POSLIST.filter(p=>!takenByOther(p)), used=POSLIST.filter(takenByOther);
+    const grid=arr=>`<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">${arr.map(cell).join("")}</div>`;
+    const div=used.length?`<div style="display:flex;align-items:center;gap:10px;margin:6px 2px"><div style="flex:1;height:1px;background:${T.line}"></div><span style="font-size:10px;font-weight:800;letter-spacing:1px;color:${T.sageDim};white-space:nowrap">TAKEN &middot; TAP TO SWAP</span><div style="flex:1;height:1px;background:${T.line}"></div></div>`:"";
+    return step(`${(((e.name||"").trim())||("#"+(e.num||"")))} — position`,"Open spots first; tap a taken spot to swap.",
+      `${grid(open)}${div}${used.length?grid(used):""}`,"backlineup");
   }
   if(mode==="opppickpitch"){
     const L=oppList(),curP=oppAtPos("P");
@@ -3078,7 +3090,10 @@ function render(){
     // page-zoom (scroll pages only) scales the UI up on big monitors; lineup is excluded so
     // its drag coordinates stay accurate.
     const building=(mode==="team"&&teamTab==="lineupedit");   // exclude page-zoom so drag coords stay accurate
-    const cls=`${mode!==_lastMode?"screen-in ":""}${(scroll&&!building)?"page-zoom":""}`;
+    // Picker sub-steps (position / player / pitcher / edit) appear instantly — the slide/fade
+    // transition reads as a jarring "flash" when you're just popping a quick chooser open.
+    const stepModes=["pickplayer","pickpos","editplayer","opppickpos","opppickpitch","oppeditplayer"];
+    const cls=`${(mode!==_lastMode&&!stepModes.includes(mode))?"screen-in ":""}${(scroll&&!building)?"page-zoom":""}`;
     document.getElementById("content").innerHTML=`<div class="${cls}" style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px;${scroll?"overflow-y:auto;-webkit-overflow-scrolling:touch":""}">${actionArea()}</div>${confirmOverlay()}`;
     _lastMode=mode;
     if(prevScroll){ const c=document.querySelector("#content > div"); if(c)c.scrollTop=prevScroll; }
@@ -3293,8 +3308,12 @@ document.getElementById("app").addEventListener("click",e=>{
   if(act==="alerttoggle"){ const c=alertsCfg(); c[arg]=!c[arg]; render(); return; }
   if(act==="alertdismiss"||act==="alertbackdrop"){ activeAlert=null; render(); return; }
   if(act==="alertsilence"){ if(activeAlert)dismissedAlerts.add(activeAlert.key); activeAlert=null; render(); return; }
+  if(act==="schededit"){ schedEditId=arg; render(); return; }
+  if(act==="schedcancel"){ schedEditId=null; render(); return; }
   if(act==="schedadd"){ const t=teamById(openTeamId); if(!t)return; const g=id=>{const e=document.getElementById(id);return e?(e.value||""):"";}; const date=g("schDate"); if(!date){flash("Pick a date");return;} const _sel=g("schOppSel"); const opp=(_sel==="__new__"?g("schOppNew"):_sel).trim(); if(!Array.isArray(t.schedule))t.schedule=[];
-    const ev={id:"s"+Date.now().toString(36),type:g("schType")||"game",date:date,time:g("schTime"),opp:opp,loc:g("schLoc").trim(),notes:g("schNotes").trim()};
+    const fields={type:g("schType")||"game",date:date,time:g("schTime"),opp:opp,loc:g("schLoc").trim(),notes:g("schNotes").trim()};
+    if(schedEditId){ const ex=t.schedule.find(s=>s.id===schedEditId); if(ex)Object.assign(ex,fields); schedEditId=null; saveDB(); try{ if(window.cloudSaveTeam)window.cloudSaveTeam(t); }catch(e){} flash("Schedule updated"); render(); return; }
+    const ev=Object.assign({id:"s"+Date.now().toString(36)},fields);
     t.schedule.push(ev); saveDB();
     // Push the team (with the new game) to the cloud IMMEDIATELY — before the chat message below.
     // Otherwise the chat message bumps the team's updatedAt, an inbound snapshot (still holding the
@@ -3312,7 +3331,7 @@ document.getElementById("app").addEventListener("click",e=>{
     flash(posted?"Added — posted to team chat":"Added to schedule");
     render(); return; }
   if(act==="openmap"){ try{ openMapLoc(decodeURIComponent(arg||"")); }catch(e){} return; }
-  if(act==="schedrm"){ const t=teamById(openTeamId); if(t&&Array.isArray(t.schedule)){ t.schedule=t.schedule.filter(s=>s.id!==arg); saveDB(); render(); } return; }
+  if(act==="schedrm"){ const t=teamById(openTeamId); if(t&&Array.isArray(t.schedule)){ if(schedEditId===arg)schedEditId=null; t.schedule=t.schedule.filter(s=>s.id!==arg); saveDB(); render(); } return; }
   if(act==="schview"){ scheduleView=(arg==="calendar"?"calendar":"list"); try{localStorage.setItem("al-sched-view",scheduleView);}catch(e){} render(); return; }
   if(act==="calprev"||act==="calnext"){ if(!calYM){const d=new Date();calYM={y:d.getFullYear(),m:d.getMonth()};} let mm=calYM.m+(act==="calnext"?1:-1),yy=calYM.y; if(mm<0){mm=11;yy--;} else if(mm>11){mm=0;yy++;} calYM={y:yy,m:mm}; calSelDay=null; render(); return; }
   if(act==="calday"){ calSelDay=(calSelDay===arg?null:arg); render(); return; }
@@ -3642,7 +3661,7 @@ function openChat(teamId){
   const inp=document.getElementById("chatInput"); const can=chatCanPost();
   if(inp){ inp.disabled=!can; inp.placeholder=can?"Message…":"Read-only — follow this team to post"; if(can)setTimeout(()=>{try{inp.focus();}catch(e){}},60); }
 }
-function closeChat(){ if(chatUnsub){try{chatUnsub();}catch(e){}chatUnsub=null;} const m=document.getElementById("chatmodal"); if(m)m.style.display="none"; chatTeamId=null; if(mode==="home"){try{render();}catch(e){}} }
+function closeChat(){ if(chatUnsub){try{chatUnsub();}catch(e){}chatUnsub=null;} const m=document.getElementById("chatmodal"); if(m)m.style.display="none"; chatTeamId=null; try{render();}catch(e){} }   // re-render so the "NEW" badge (home card + chat button) clears now that it's seen
 function sendChat(){ const inp=document.getElementById("chatInput"); if(!inp)return; const v=(inp.value||"").trim(); if(!v)return; if(!chatCanPost()){flash("You can't post here");return;} window.cloudSendMessage(chatTeamId,v); inp.value=""; }
 
 /* ===== Searchable rulebook (loads the league rules text on demand, filters/highlights) ===== */
@@ -3908,7 +3927,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v131";
+var APP_VERSION="v132";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
