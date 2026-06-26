@@ -1012,8 +1012,8 @@ function baseRunModal(){
           ${advEvents?chip("brout",b,"Out",T.surface,T.out,T.out):""}
         </div></div>`;}).join("");
   const gbtn=(act,lbl)=>`<button data-act="${act}" style="flex:1 1 auto;background:${T.surface2};border:1px solid ${T.line};color:${T.chalk};border-radius:9px;padding:11px 8px;font-family:${SANS};font-size:14px;font-weight:800;white-space:nowrap">${lbl}</button>`;
-  return `<div data-act="brclose" style="position:fixed;inset:0;z-index:60;background:rgba(8,11,16,.62);display:flex;align-items:center;justify-content:center;padding:16px">
-      <div onclick="event.stopPropagation()" style="width:100%;max-width:440px;max-height:88vh;overflow-y:auto;background:${T.surface};border:2px solid ${T.lime};border-radius:18px;padding:16px;display:flex;flex-direction:column;gap:12px;box-shadow:0 18px 54px rgba(0,0,0,.6)">
+  return `<div data-act="brclose" style="position:fixed;left:0;right:0;top:0;height:calc(var(--avh) * 100);z-index:120;background:rgba(8,11,16,.78);display:flex;align-items:center;justify-content:center;padding:16px">
+      <div onclick="event.stopPropagation()" style="width:100%;max-width:460px;max-height:calc(var(--avh) * 90);overflow-y:auto;-webkit-overflow-scrolling:touch;background:${T.surface};border:2px solid ${T.lime};border-radius:18px;padding:16px;display:flex;flex-direction:column;gap:12px;box-shadow:0 18px 54px rgba(0,0,0,.6)">
         <div style="display:flex;align-items:center;gap:10px"><div style="flex:1;font-family:${MONO};font-size:18px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:${T.lime}">Base running</div>
           <button data-act="brclose" style="${ghost};padding:8px 14px;flex:none">Close</button></div>
         <div style="font-size:12px;color:${T.sage};margin-top:-4px">No ball in play — the batter stays up with the same count.</div>
@@ -1521,7 +1521,8 @@ function floatWindow(id,title,inner,def){
       <span style="flex:1;font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:${T.lime};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${title}</span>
       <span style="font-size:9px;font-weight:700;letter-spacing:.5px;color:${T.sageDim}">drag</span></div>
     <div style="flex:1;min-height:0;overflow:auto;padding:8px;display:flex;flex-direction:column">${inner}</div>
-    <div data-floatresize="${id}" title="Drag to resize" style="position:absolute;right:0;bottom:0;width:24px;height:24px;cursor:nwse-resize;touch-action:none;background:linear-gradient(135deg,transparent 45%,${T.lime}99 45%,${T.lime}99 60%,transparent 60%,transparent 72%,${T.lime}99 72%,${T.lime}99 86%,transparent 86%)"></div>
+    <div data-floatresize="${id}" title="Drag to resize" style="position:absolute;right:0;bottom:0;width:46px;height:46px;z-index:2;cursor:nwse-resize;touch-action:none;display:flex;align-items:flex-end;justify-content:flex-end;padding:5px">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="${T.lime}" stroke-width="2.2" stroke-linecap="round"><path d="M18 8 8 18M18 13l-5 5M18 18l-1 1"/></svg></div>
   </div>`;
 }
 /* Re-apply saved geometry and (re)bind pointer drag/resize after each render. */
@@ -3794,7 +3795,7 @@ function renderToolbar(){
   // Undo gets a labeled, accent-bordered button at the far RIGHT (easiest to see/reach while
   // scoring); the rest stay compact icons to its left.
   const gc=(isWide()&&mode==="idle"&&viewMode==="scorer")
-    ? `<div style="display:flex;gap:6px;flex:none;align-items:center">${tbIcon("lineup","Lineup",IC('users',18))}${tbIcon("inninglog","Inning log",IC('doc',18))}${tbIcon("home","Home",IC('home',18))}${tbIcon("endgame","End game",IC('<rect x="6" y="6" width="12" height="12" rx="1.5"/>',18),`color:${T.out};border-color:${T.out}`)}<button data-act="undo" title="Undo last action" style="display:flex;align-items:center;gap:7px;background:${T.surface2};border:1.5px solid ${T.lime};color:${T.chalk};border-radius:9px;height:38px;padding:0 16px;font-family:${SANS};font-size:14px;font-weight:800;flex:none">${IC('undo',18)} Undo</button></div>`
+    ? `<div style="display:flex;gap:6px;flex:none;align-items:center">${tbIcon("lineup","Lineup",IC('users',18))}${tbIcon("inninglog","Inning log",IC('doc',18))}${tbIcon("ingamesettings","Game settings",IC('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>',16))}${tbIcon("home","Home",IC('home',18))}${tbIcon("endgame","End game",IC('<rect x="6" y="6" width="12" height="12" rx="1.5"/>',18),`color:${T.out};border-color:${T.out}`)}<button data-act="undo" title="Undo last action" style="display:flex;align-items:center;gap:7px;background:${T.surface2};border:1.5px solid ${T.lime};color:${T.chalk};border-radius:9px;height:38px;padding:0 16px;font-family:${SANS};font-size:14px;font-weight:800;flex:none">${IC('undo',18)} Undo</button></div>`
     : "";
   // Viewer (video on): the field/feed swap lives in the top bar, labeled with what you switch TO.
   const vsw=(isWide()&&viewMode==="viewer"&&monitorOn)
@@ -4141,7 +4142,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v140";
+var APP_VERSION="v141";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
