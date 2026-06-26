@@ -1916,7 +1916,7 @@ function actionArea(){
     // "Share game link" only makes sense once a game is live (it shares the viewer/watch link).
     // No game in progress → no button (was confusing on a fresh home screen).
     const shareBtnHome = gameActive ? `<button data-act="share" style="flex:none;display:flex;align-items:center;justify-content:center;gap:9px;background:${T.surface};border:1px solid ${T.line};color:${T.chalk};border-radius:12px;padding:13px;font-family:${SANS};font-weight:800;font-size:15px">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="${T.lime}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="19" r="2.6"/><path d="M8.3 10.8 15.7 6.4M8.3 13.2l7.4 4.4"/></svg>Share game link</button>` : "";
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="${T.lime}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="19" r="2.6"/><path d="M8.3 10.8 15.7 6.4M8.3 13.2l7.4 4.4"/></svg>Share live game &middot; ${(OUR.short||"US")} vs ${(OPP.short||"OPP")}</button>` : "";
     // Cloud sign-in bar — only appears once Firebase is configured (firebase-config.js apiKey).
     // Until then it's empty and the home looks/works exactly as the local-only version.
     const C=window.Cloud;
@@ -3252,18 +3252,23 @@ document.getElementById("app").addEventListener("click",e=>{
     // Actually SEND it: open the user's email (to this address) or texts (to this number),
     // pre-filled with the join link — no extra copy step.
     const body="You're invited to join "+team+" on All-Stars Live (a free youth-baseball scoreboard). Open this link and sign in once to score games or follow the team: "+url;
+    // mailto:/sms: don't open from inside the tablet WebView — hand them to the OS via the bridge.
+    const openExt=(u)=>{ try{ if(IS_APP&&window.AllStars&&window.AllStars.openExternal){ window.AllStars.openExternal(u); return true; } }catch(e){} try{ location.href=u; return true; }catch(e){ return false; } };
+    try{ if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(url); }catch(e){}   // copy the link as a fallback
     if(isEmail){
-      location.href="mailto:"+encodeURIComponent(v)+"?subject="+encodeURIComponent("Join "+team+" on All-Stars Live")+"&body="+encodeURIComponent(body);
-      flash(v+" authorized — opening your email");
+      openExt("mailto:"+encodeURIComponent(v)+"?subject="+encodeURIComponent("Join "+team+" on All-Stars Live")+"&body="+encodeURIComponent(body));
+      flash("✓ "+v+" can now score · invite link copied, your email is opening");
     } else {
-      location.href="sms:"+encodeURIComponent(v.replace(/[^\d+]/g,""))+"?body="+encodeURIComponent(body);
-      flash("Opening a text to "+v);
+      openExt("sms:"+encodeURIComponent(v.replace(/[^\d+]/g,""))+"?body="+encodeURIComponent(body));
+      flash("✓ Invite link copied · opening a text to "+v);
     }
     e.value="";
     return; }
   if(act==="rmscorer"){ if(window.cloudRemoveScorer)window.cloudRemoveScorer(openTeamId,arg); return; }
   if(act==="pickcontact"){ try{ if(window.AllStars&&window.AllStars.pickContact)window.AllStars.pickContact(); }catch(e){} return; }
-  if(act==="addcoowner"){ const e=document.getElementById("coOwnerWho"); if(!e)return; const v=(e.value||"").trim().toLowerCase(); if(v.indexOf("@")<0){flash("Enter a valid email");return;} const t=teamById(openTeamId); if(t){ if(!Array.isArray(t.coOwners))t.coOwners=[]; if(t.coOwners.indexOf(v)<0)t.coOwners.push(v); } if(window.cloudAddCoOwner)window.cloudAddCoOwner(openTeamId,v); e.value=""; flash(v+" is now a co-owner"); render(); return; }
+  if(act==="addcoowner"){ const e=document.getElementById("coOwnerWho"); if(!e)return; const v=(e.value||"").trim().toLowerCase(); if(v.indexOf("@")<0){flash("Enter a valid email");return;} const t=teamById(openTeamId); if(t){ if(!Array.isArray(t.coOwners))t.coOwners=[]; if(t.coOwners.indexOf(v)<0)t.coOwners.push(v); } if(window.cloudAddCoOwner)window.cloudAddCoOwner(openTeamId,v); e.value="";
+    try{ const url=appBaseUrl()+"?invite="+encodeURIComponent(openTeamId); if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(url); }catch(e){}
+    flash("✓ "+v+" is a co-owner — they get access when they sign in with that email (invite link copied)"); render(); return; }
   if(act==="rmcoowner"){ const t=teamById(openTeamId); if(t&&Array.isArray(t.coOwners)){ t.coOwners=t.coOwners.filter(x=>x!==arg); } if(window.cloudRemoveCoOwner)window.cloudRemoveCoOwner(openTeamId,arg); render(); return; }
   if(act==="lineupback"){ mode=gameActive?"idle":"home"; render(); return; }
   if(act==="closerules"){ closeRules(); return; }
@@ -3796,7 +3801,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v127";
+var APP_VERSION="v128";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
