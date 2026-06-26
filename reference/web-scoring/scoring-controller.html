@@ -1527,6 +1527,34 @@ function miniCount(){
     ${onb?`<span style="font-weight:700;color:${T.clay}">${onb} on</span>`:""}
   </div>`;
 }
+/* Scoreboard + game controls in one bar above the field (wide scorer). The score sits on the
+   left; the game controls (Undo/Home/Lineup/Inning log/End) fill the empty room on the right —
+   so the top toolbar doesn't have to carry them. Controls show only between plays (idle). */
+function scoreBar(){
+  const onb=[1,2,3].filter(n=>G.bases&&G.bases[n]).length;
+  // Compact icon buttons (tooltips name them) so the whole strip fits beside the score even in
+  // the narrow video-on column. The score and the controls are each ONE flex unit, so the bar is
+  // a single row when there's room and a tidy two rows (score / controls) when the column is narrow.
+  const cb=(act,title,icon,extra)=>`<button data-act="${act}" title="${title}" aria-label="${title}" style="background:${T.surface2};border:1px solid ${T.line};color:${T.chalk};border-radius:8px;width:40px;height:38px;flex:none;display:inline-flex;align-items:center;justify-content:center;${extra||""}">${icon}</button>`;
+  const ctrls=(mode==="idle"&&viewMode==="scorer")
+    ? `<div style="display:flex;gap:6px;flex:0 0 auto;flex-wrap:nowrap;justify-content:flex-end">${cb("undo","Undo",IC('undo',18))}${cb("lineup","Lineup",IC('users',18))}${cb("inninglog","Inning log",IC('doc',18))}${cb("home","Home",IC('home',18))}${cb("endgame","End game",IC('<rect x="6" y="6" width="12" height="12" rx="1.5"/>',18),`color:${T.out};border-color:${T.out}`)}</div>`
+    : "";
+  return `<div style="display:flex;align-items:center;gap:8px 14px;background:${T.surface};border:1px solid ${T.line};border-radius:10px;padding:8px 12px;flex-shrink:0;font-family:${MONO};flex-wrap:wrap">
+    <div style="display:flex;align-items:center;gap:13px;flex:1 1 auto;min-width:0;white-space:nowrap">
+      <span style="font-weight:800;font-size:17px;color:${T.chalk}">${TEAMS.away.short} ${G.away} · ${TEAMS.home.short} ${G.home}</span>
+      <span style="font-weight:700;color:${T.sage}">${G.half==="T"?"▲":"▼"}${G.inning}</span>
+      <span style="display:inline-flex;align-items:baseline;gap:5px">
+        <b style="font-weight:800;font-size:17px;color:${T.chalk}">${G.balls}-${G.strikes}</b>
+        <span style="font-size:10px;font-weight:700;letter-spacing:1px;color:${T.sageDim}">COUNT</span>
+        <span style="color:${T.line};margin:0 3px">·</span>
+        <b style="font-weight:800;font-size:17px;color:${T.chalk}">${G.outs}</b>
+        <span style="font-size:10px;font-weight:700;letter-spacing:1px;color:${T.sageDim}">OUT${G.outs===1?"":"S"}</span>
+      </span>
+      ${onb?`<span style="font-weight:700;color:${T.clay}">${onb} on</span>`:""}
+    </div>
+    ${ctrls}
+  </div>`;
+}
 
 /* At-a-glance stats drawn INTO the field's empty corners (no separate strip): the
    current pitcher's pitch count (top-left) and a compact R-H-E line (top-right). Hidden
@@ -3055,7 +3083,7 @@ function render(){
           ${monitorPane()}
         </div>
         <div style="flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;gap:8px">
-          ${focusPlay?"":miniCount()}${fieldEl}${actionEl}
+          ${focusPlay?"":scoreBar()}${fieldEl}${actionEl}
         </div>
       </div>`;
   } else if(wide){
@@ -3063,7 +3091,7 @@ function render(){
     // decisions get the rest of the width — more room, less scrolling.
     body=`<div id="console-row" class="video-off" style="flex:1;min-height:0;display:flex;flex-direction:row;gap:12px">
         <div style="flex:0 0 46%;max-width:46%;min-width:0;min-height:0;display:flex;flex-direction:column;gap:8px">
-          ${focusPlay?"":miniCount()}<div style="flex:1;min-height:0;display:flex;align-items:center;justify-content:center;position:relative">${diamondSVG()}${toastEl}</div>
+          ${focusPlay?"":scoreBar()}<div style="flex:1;min-height:0;display:flex;align-items:center;justify-content:center;position:relative">${diamondSVG()}${toastEl}</div>
         </div>
         <div style="flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;gap:8px">
           ${actionEl}${feedPanel()}
@@ -3400,12 +3428,10 @@ function renderToolbar(){
   const playMode=!menuModes.includes(mode);
   const vidToggle=(isWide()&&playMode)?`<button data-act="togglevideo" title="${monitorOn?"Hide video":"Show video"}" style="display:flex;align-items:center;gap:7px;background:${monitorOn?T.surface2:T.lime};border:1px solid ${monitorOn?T.line:T.lime};color:${monitorOn?T.chalk:"#fff"};border-radius:10px;padding:9px 13px;font-size:14px;font-weight:800">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>${monitorOn?"Hide video":"Show video"}</button>`:"";
-  // Game controls moved UP into the top bar (wide + scorer + idle) so the bottom row is
-  // freed for a bigger video + field. Phone keeps its own bottom footer.
+  // Game controls (Undo/Home/Lineup/Inning log/End) now live in the scoreboard bar above the
+  // field (see scoreBar()), so the top toolbar stays slim. Phone keeps its own bottom footer.
   const tbBtn=(act,label,extra)=>`<button data-act="${act}" style="background:${T.surface2};border:1px solid ${T.line};color:${T.chalk};border-radius:9px;padding:8px 12px;font-family:${SANS};font-size:13px;font-weight:700;white-space:nowrap;${extra||""}">${label}</button>`;
-  const gc=(isWide()&&mode==="idle"&&viewMode==="scorer")
-    ? `${tbBtn("undo",ICN.undo+" Undo")}${tbBtn("home",ICN.home+" Home")}${tbBtn("lineup","Lineup")}${tbBtn("inninglog","Inning log")}${tbBtn("endgame","END GAME",`color:${T.out};border-color:${T.out}`)}`
-    : "";
+  const gc="";
   // Viewer (video on): the field/feed swap lives in the top bar, labeled with what you switch TO.
   const vsw=(isWide()&&viewMode==="viewer"&&monitorOn)
     ? tbBtn("swapviewer",`${ICN.swap} ${viewerRight==="field"?"Game feed":"Field view"}`)
@@ -3727,7 +3753,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v119";
+var APP_VERSION="v120";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
