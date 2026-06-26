@@ -3209,7 +3209,9 @@ function actionArea(){
     return `${ptypeRow}
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
         ${pitchBtn("ball","Ball",ICN.ball)}${pitchBtn("strike","Strike",ICN.strike)}${pitchBtn("foul","Foul",ICN.foul)}${pitchBtn("inplay","In Play",ICN.inplay,true)}</div>
-      <button data-act="hbp" style="${flatBtn}"><span style="color:${T.sage}">${ICN.hbp}</span>HBP <span style="color:${T.sageDim};font-weight:600;font-size:11px;text-transform:none;letter-spacing:0">walks happen on ball 4</span></button>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <button data-act="hbp" style="${flatBtn}"><span style="color:${T.sage}">${ICN.hbp}</span>HBP</button>
+        <button data-act="correctopen" style="${flatBtn};border-left:4px solid ${T.lime}"><span style="color:${T.lime};font-size:16px">&#9998;</span>Fix count/score</button></div>
       ${[1,2,3].some(b=>G.bases&&G.bases[b])?`<button data-act="brsheet" style="${flatBtn};border-left:4px solid ${T.safe}"><span style="color:${T.safe};font-size:16px;line-height:1">&#9826;</span>Base running <span style="color:${T.sage};font-weight:600;font-size:11px;text-transform:none;letter-spacing:0">steal · WP/PB · balk</span></button>`:""}
       <button data-act="endinning" style="${flatBtn};border-left:4px solid ${T.amber}"><span style="color:${T.amber}">${ICN.inning}</span>End Inning <span style="color:${T.sage};font-weight:600;font-size:11px;text-transform:none;letter-spacing:0">${halfLabel} · ${G.outs} out${G.outs===1?"":"s"}</span></button>`;
   }
@@ -4041,7 +4043,7 @@ function renderToolbar(){
   // Game controls back in the top bar, as compact ICONS (wide scorer, between plays). Phone keeps
   // its own bottom footer. The scoreboard above the field is just the score now.
   const tbBtn=(act,label,extra)=>`<button data-act="${act}" style="background:${T.surface2};border:1px solid ${T.line};color:${T.chalk};border-radius:9px;padding:8px 12px;font-family:${SANS};font-size:13px;font-weight:700;white-space:nowrap;${extra||""}">${label}</button>`;
-  const tbIcon=(act,title,icon,extra)=>`<button data-act="${act}" title="${title}" aria-label="${title}" style="background:${T.surface2};border:1px solid ${T.line};color:${T.chalk};border-radius:9px;width:40px;height:38px;flex:none;display:inline-flex;align-items:center;justify-content:center;${extra||""}">${icon}</button>`;
+  const tbIcon=(act,title,icon,extra)=>`<button data-act="${act}" title="${title}" aria-label="${title}" style="background:${T.surface2};border:1px solid ${T.line};color:${T.chalk};border-radius:9px;height:38px;flex:none;display:inline-flex;align-items:center;gap:6px;padding:0 12px;font-family:${SANS};font-size:13px;font-weight:700;white-space:nowrap;${extra||""}">${icon}<span>${title}</span></button>`;
   // Undo gets a labeled, accent-bordered button at the far RIGHT (easiest to see/reach while
   // scoring); the rest stay compact icons to its left.
   const gc=(isWide()&&mode==="idle"&&viewMode==="scorer")
@@ -4402,7 +4404,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v160";
+var APP_VERSION="v161";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
