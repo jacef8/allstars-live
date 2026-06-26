@@ -732,9 +732,9 @@ function removeBatter(){
   if(posOfPlayer(ri)){flash("That batter is fielding — change their position first");return;}
   G.lineup.order.pop();
 }
-function snapshot(){hist.push(JSON.parse(JSON.stringify(G)));if(hist.length>40)hist.shift();}
+function snapshot(){hist.push({g:JSON.parse(JSON.stringify(G)),fl:(Array.isArray(gameFeed)?gameFeed.length:0)});if(hist.length>40)hist.shift();}
 function resetUI(){mode="idle";tap=null;contact=null;result=null;plan=null;showAll=false;reviewBatter=null;reviewInn=false;}
-function undo(){if(!hist.length)return;G=hist.pop();resetUI();render();broadcast();}
+function undo(){if(!hist.length)return;const e=hist.pop();G=(e&&e.g)?e.g:e;if(e&&typeof e.fl==="number"&&Array.isArray(gameFeed))gameFeed.length=Math.min(gameFeed.length,e.fl);resetUI();render();broadcast();}
 
 function nextBatter(){const k=G.half==="T"?"awayPtr":"homePtr";G[k]++;G.balls=0;G.strikes=0;}
 /* Close the current half-inning: log its totals (for review), switch sides, bump inning
@@ -3461,7 +3461,7 @@ function render(){
   }
   // Free-layout (BETA): a "⊞ Windows" toggle on the wide scorer view, and — when on — a fixed
   // overlay holding the draggable/resizable AT BAT window (prototype panel).
-  const floatToggleBtn = floatable ? `<button data-act="togglefloat" title="Free layout — drag &amp; resize windows (beta)" style="position:fixed;right:16px;bottom:16px;z-index:46;background:${floatOn?T.lime:T.surface2};border:1px solid ${floatOn?T.lime:T.line};color:${floatOn?"#fff":T.chalk};border-radius:10px;padding:9px 13px;font-family:${SANS};font-size:13px;font-weight:800;box-shadow:0 4px 16px rgba(0,0,0,.45)">&#8862; Windows${floatOn?" &#10003;":""}</button>` : "";
+  const floatToggleBtn = "";   // toggle moved into the toolbar (renderToolbar) so it can't cover scoring controls
   const floatLayer = floatActive ? `<div id="float-layer" style="position:fixed;inset:0;z-index:35;pointer-events:none">${floatWindow("batter","At Bat",batterCard(),{x:24,y:96,w:340,h:168})}</div>` : "";
   document.getElementById("content").innerHTML=`
     ${body}${confirmOverlay()}${alertOverlay()}
@@ -3843,6 +3843,8 @@ function renderToolbar(){
   // The current batter now lives in the larger AT-BAT card above the scoring buttons (batterCard),
   // so the top row just keeps a flexible spacer here — pushes the game controls to the far right.
   const batterTop=`<div style="flex:1"></div>`;
+  // Free-layout (BETA) toggle lives in the toolbar now — a corner-fixed button covered scoring controls.
+  const floatTb = (viewMode!=="viewer") ? `<button data-act="togglefloat" title="Free-layout windows (beta) — pop the AT BAT card out as a draggable window" style="flex:none;display:flex;align-items:center;justify-content:center;background:${floatOn?T.lime:T.surface2};border:1px solid ${floatOn?T.lime:T.line};color:${floatOn?"#fff":T.sageDim};border-radius:10px;width:42px;height:38px;font-size:17px;line-height:1">&#8862;</button>` : "";
   // LEFT = broadcast/meta (Scorer-Viewer, video, share, sound, LIVE). RIGHT = game info + controls
   // (batter box + Lineup/Log/Home/End/Undo) sitting over the scoring buttons.
   tb.innerHTML=`<div style="display:flex;align-items:center;gap:8px;padding:4px 2px 2px;flex-wrap:nowrap">
@@ -3850,6 +3852,7 @@ function renderToolbar(){
     ${vidToggle}
     ${shareBtnTop}
     ${soundBtn}
+    ${floatTb}
     ${liveDot}
     ${bErr}
     ${vsw}
@@ -4167,7 +4170,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v147";
+var APP_VERSION="v148";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
