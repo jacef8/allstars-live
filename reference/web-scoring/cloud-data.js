@@ -183,8 +183,15 @@
         var i = (DB.teams || []).findIndex(function (x) { return x.id === c.id; });
         if (i < 0) { DB.teams.push(c); changed = true; }
         else {
-          var merged = Object.assign({}, DB.teams[i], c);
-          if (sansTimestamp(merged) !== sansTimestamp(DB.teams[i])) { DB.teams[i] = merged; changed = true; }  // ignore updatedAt-only churn
+          // Only take the cloud copy when it's actually NEWER than ours. A stale snapshot (e.g.
+          // arriving before our own just-edited push commits) must NOT clobber local edits — that's
+          // what was silently deleting freshly-added schedule games on reload. Local edits bump
+          // updatedAt (see touchTeam), so unpushed local changes always win until they're pushed.
+          var lTs = DB.teams[i].updatedAt || 0, cTs = c.updatedAt || 0;
+          if (cTs > lTs) {
+            var merged = Object.assign({}, DB.teams[i], c);
+            if (sansTimestamp(merged) !== sansTimestamp(DB.teams[i])) { DB.teams[i] = merged; changed = true; }
+          }
         }
       });
       // A just-accepted texted invite: jump to that team's management page + favorite it (follow).

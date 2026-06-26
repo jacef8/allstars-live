@@ -271,7 +271,11 @@ function migrateTeam(t){ if(t&&t.players)t.players.forEach(ensureName); if(t&&!A
    across games & reloads. The native app will swap this for an on-device database. */
 const DB_KEY="allstars-scorer-db";
 function loadDB(){try{const r=localStorage.getItem(DB_KEY);if(r){const d=JSON.parse(r);if(d&&d.teams)return d;}}catch(e){}return {teams:[],seq:1};}
-function saveDB(){try{localStorage.setItem(DB_KEY,JSON.stringify(DB));}catch(e){} try{ if(window.cloudPushSoon)window.cloudPushSoon(); }catch(e){}}
+function saveDB(){
+  // Stamp the team(s) being edited as freshly-changed so the cloud merge keeps OUR copy until it's
+  // pushed (a stale inbound snapshot can't silently wipe a just-added schedule game any more).
+  try{ [typeof openTeamId!=="undefined"?openTeamId:null, typeof curTeamId!=="undefined"?curTeamId:null].forEach(function(id){ if(id){ var _t=(DB.teams||[]).find(function(x){return x.id===id;}); if(_t)_t.updatedAt=Date.now(); } }); }catch(e){}
+  try{localStorage.setItem(DB_KEY,JSON.stringify(DB));}catch(e){} try{ if(window.cloudPushSoon)window.cloudPushSoon(); }catch(e){}}
 // Persist the in-progress game (lineup, positions, score, everything in G) so it survives
 // reloads and app updates — the operator never re-enters a lineup. Teams/roster persist in
 // DB above; this also stores the selected team so the lineup's roster re-links on restore.
@@ -2308,8 +2312,9 @@ function actionArea(){
       if(!g.bat){ return secWrap(`${secHdr("Game")}${head}<div style="font-size:12px;color:${T.sageDim};text-align:center;padding:14px;border:1px dashed ${T.line};border-radius:12px">Per-game stats weren't recorded for this game (it finished before by-game stat tracking). The final score is above.</div>${ytBtn}${delBtn}`); }
       const maxI=g.maxI||((g.line&&g.line.away&&g.line.away.length)||1);
       const card=(inner)=>`<div class="frost-card" style="overflow-x:auto;background:${T.surface};border:1px solid ${T.line};border-radius:12px;padding:8px 10px">${inner}</div>`;
-      let lh='<th style="text-align:left;padding:4px 6px">Team</th>'; for(let i=1;i<=maxI;i++)lh+=`<th style="padding:7px 6px">${i}</th>`; lh+='<th style="padding:7px 6px">R</th><th>H</th><th>E</th>';
-      const lr=(side)=>{const sh=side==="away"?g.awayShort:g.homeShort;const arr=(g.line&&g.line[side])||[];const tot=(g.totals&&g.totals[side])||{r:0,h:0,e:0};let c=`<td style="text-align:left;padding:6px;font-weight:800">${esc(sh)}</td>`;for(let i=0;i<maxI;i++)c+=`<td style="padding:9px 6px">${arr[i]||0}</td>`;c+=`<td style="padding:9px 6px;font-weight:800;color:${T.ink}">${tot.r}</td><td style="padding:9px 6px">${tot.h}</td><td style="padding:9px 6px">${tot.e}</td>`;return `<tr style="border-top:1px solid ${T.line}">${c}</tr>`;};
+      const vL=`border-right:1px solid ${T.line}`, totL=`border-left:2px solid ${T.line}`;
+      let lh=`<th style="text-align:left;padding:4px 6px;${vL}">Team</th>`; for(let i=1;i<=maxI;i++)lh+=`<th style="padding:7px 6px;${vL}">${i}</th>`; lh+=`<th style="padding:7px 6px;${totL}">R</th><th>H</th><th>E</th>`;
+      const lr=(side)=>{const sh=side==="away"?g.awayShort:g.homeShort;const arr=(g.line&&g.line[side])||[];const tot=(g.totals&&g.totals[side])||{r:0,h:0,e:0};let c=`<td style="text-align:left;padding:6px;font-weight:800;${vL}">${esc(sh)}</td>`;for(let i=0;i<maxI;i++)c+=`<td style="padding:9px 6px;${vL}">${arr[i]||0}</td>`;c+=`<td style="padding:9px 6px;font-weight:800;color:${T.ink};${totL}">${tot.r}</td><td style="padding:9px 6px">${tot.h}</td><td style="padding:9px 6px">${tot.e}</td>`;return `<tr style="border-top:1px solid ${T.line}">${c}</tr>`;};
       const lineTbl=card(`<table style="width:100%;border-collapse:collapse;font-family:${MONO};font-size:16px;text-align:center;color:${T.chalk}"><thead><tr style="color:${T.sageDim};font-size:12px">${lh}</tr></thead><tbody>${lr("away")}${lr("home")}</tbody></table>`);
       const sideName=(side)=> side==="away"?(g.ourSide==="away"?t.name:g.opp):(g.ourSide==="home"?t.name:g.opp);
       const batTbl=(side)=>{const rows=((g.bat&&g.bat[side])||[]).map(b=>`<tr style="border-top:1px solid ${T.line}"><td style="text-align:left;padding:6px;font-weight:700;white-space:nowrap">#${esc(b.num)} ${esc(b.name)}</td><td style="padding:9px 6px">${b.ab}</td><td>${b.r}</td><td>${b.h}</td><td>${b.rbi}</td><td>${b.bb}</td><td>${b.k}</td></tr>`).join("");
@@ -2790,8 +2795,9 @@ function actionArea(){
     const box=buildBox(),o=ourRuns(),p=oppRuns();
     const res=o>p?"WIN":o<p?"LOSS":"TIE",resCol=o>p?T.safe:o<p?T.out:T.sage;
     const maxI=Math.max(1,G.inning);
-    const lineHead=`<th style="text-align:left;padding:4px 6px">Team</th>`+Array.from({length:maxI},(_,i)=>`<th style="padding:10px 7px">${i+1}</th>`).join("")+`<th style="padding:10px 7px">R</th><th style="padding:10px 7px">H</th><th style="padding:10px 7px">E</th>`;
-    const lineRow=side=>{let c=`<td style="text-align:left;padding:4px 6px;font-weight:800">${TEAMS[side].short}</td>`;for(let i=1;i<=maxI;i++)c+=`<td style="padding:10px 7px">${(G.line[side]&&G.line[side][i])||0}</td>`;c+=`<td style="padding:10px 7px;font-weight:800;color:${T.ink}">${box.totals[side].r}</td><td style="padding:10px 7px">${box.totals[side].h}</td><td style="padding:10px 7px">${box.totals[side].e}</td>`;return `<tr style="border-top:1px solid ${T.line}">${c}</tr>`;};
+    const _vL=`border-right:1px solid ${T.line}`, _totL=`border-left:2px solid ${T.line}`;
+    const lineHead=`<th style="text-align:left;padding:4px 6px;${_vL}">Team</th>`+Array.from({length:maxI},(_,i)=>`<th style="padding:10px 7px;${_vL}">${i+1}</th>`).join("")+`<th style="padding:10px 7px;${_totL}">R</th><th style="padding:10px 7px">H</th><th style="padding:10px 7px">E</th>`;
+    const lineRow=side=>{let c=`<td style="text-align:left;padding:4px 6px;font-weight:800;${_vL}">${TEAMS[side].short}</td>`;for(let i=1;i<=maxI;i++)c+=`<td style="padding:10px 7px;${_vL}">${(G.line[side]&&G.line[side][i])||0}</td>`;c+=`<td style="padding:10px 7px;font-weight:800;color:${T.ink};${_totL}">${box.totals[side].r}</td><td style="padding:10px 7px">${box.totals[side].h}</td><td style="padding:10px 7px">${box.totals[side].e}</td>`;return `<tr style="border-top:1px solid ${T.line}">${c}</tr>`;};
     // ----- Box score for EITHER team (toggle). selSide = the chosen team's batting side. -----
     const oppSide=G.ourSide==="home"?"away":"home";
     const selSide=summaryTeam==="us"?G.ourSide:oppSide;
@@ -3354,7 +3360,7 @@ document.getElementById("app").addEventListener("click",e=>{
     flash(posted?"Added — posted to team chat":"Added to schedule");
     render(); return; }
   if(act==="openmap"){ try{ openMapLoc(decodeURIComponent(arg||"")); }catch(e){} return; }
-  if(act==="schedrm"){ const t=teamById(openTeamId); if(t&&Array.isArray(t.schedule)){ if(schedEditId===arg)schedEditId=null; t.schedule=t.schedule.filter(s=>s.id!==arg); saveDB(); render(); } return; }
+  if(act==="schedrm"){ const t=teamById(openTeamId); if(t&&Array.isArray(t.schedule)){ if(schedEditId===arg)schedEditId=null; t.schedule=t.schedule.filter(s=>s.id!==arg); saveDB(); try{ if(window.cloudSaveTeam)window.cloudSaveTeam(t); }catch(e){} render(); } return; }
   if(act==="schview"){ scheduleView=(arg==="calendar"?"calendar":"list"); try{localStorage.setItem("al-sched-view",scheduleView);}catch(e){} render(); return; }
   if(act==="calprev"||act==="calnext"){ if(!calYM){const d=new Date();calYM={y:d.getFullYear(),m:d.getMonth()};} let mm=calYM.m+(act==="calnext"?1:-1),yy=calYM.y; if(mm<0){mm=11;yy--;} else if(mm>11){mm=0;yy++;} calYM={y:yy,m:mm}; calSelDay=null; render(); return; }
   if(act==="calday"){ calSelDay=(calSelDay===arg?null:arg); render(); return; }
@@ -3951,7 +3957,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v133";
+var APP_VERSION="v134";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
