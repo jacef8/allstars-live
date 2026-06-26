@@ -100,6 +100,24 @@
       .catch(function (e) { console.warn("cloudSaveTeam:", e.message); });
   };
 
+  // ===== Per-user UI preferences (e.g. floating scorer-window layout) — synced so a user's setup
+  // follows them across devices and into their next game. Stored at userPrefs/{uid}. =====
+  var _prefsTimer = null, _pendingPrefs = null;
+  window.cloudSavePrefs = function (prefs) {
+    _pendingPrefs = prefs;
+    var d = fdb(), u = myUid(); if (!d || !u) return;
+    if (_prefsTimer) clearTimeout(_prefsTimer);
+    _prefsTimer = setTimeout(function () {
+      try { d.collection("userPrefs").doc(u).set(_pendingPrefs || {}, { merge: true }).catch(function () {}); } catch (e) {}
+    }, 900);
+  };
+  window.cloudLoadPrefs = function () {
+    var d = fdb(), u = myUid(); if (!d || !u) return Promise.resolve(null);
+    return d.collection("userPrefs").doc(u).get()
+      .then(function (doc) { return doc.exists ? doc.data() : null; })
+      .catch(function () { return null; });
+  };
+
   // Debounced push of all my teams (called from saveDB on any team edit).
   var _pt;
   window.cloudPushSoon = function () {

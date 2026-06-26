@@ -553,7 +553,7 @@ function buildResults(pos,contact,bases){
       R.push(h("single","Single","1B"),h("double","Double","2B"),h("lineout",`Lineout to ${pos}`,`L${n}`),
              h("triple","Triple","3B"),h("hr","Home run","HR"));
     }else{ R.push(h("single","Single","1B"),h("double","Double","2B")); }
-    R.push(h("error",`Reached on error (${pos})`,`E${n}`)); if(advEvents)R.push(h("ci","Catcher's interference","CI")); return R;
+    R.push(h("error",`Reached on error (${pos})`,`E${n}`)); return R;
   }
   if(contact==="Grounder"){
     R.push(h("out1",`Out at first (${n}-3)`,pos==="1B"?"3U":`${n}-3`));
@@ -565,7 +565,6 @@ function buildResults(pos,contact,bases){
   }else{
     R.push(h("popout",`Popout to ${pos}`,`P${n}`),h("single","Bunt single","1B"),h("error",`Reached on error (${pos})`,`E${n}`));
   }
-  if(advEvents)R.push(h("ci","Catcher's interference","CI"));
   return R;
 }
 
@@ -1185,9 +1184,9 @@ function broadcast(){
 function pitch(type){
   snapshot();const k0=battingKey(),b0=batter(),bn=b0.name,bnum=b0.num;_pitch=type;recordPitch(type);
   const pt=(advPitch&&pitchType)?" "+pitchType:"";   // pitch type tag (if advanced tracking on)
-  if(type==="ball"){G.balls++;feedPitch("Ball"+pt,"#"+bnum+" · "+G.balls+"-"+G.strikes);if(G.balls>=4){applyPlanInline("walk");flash("Walk");bcastEvent("walk","Ball four · "+bn,k0);}}
-  else if(type==="strike"){G.strikes++;feedPitch("Strike"+pt,"#"+bnum+" · "+G.balls+"-"+G.strikes);if(G.strikes>=3){G.outs++;creditBatter("strikeout",0);nextBatter();flipIfNeeded();flash("Strikeout");bcastEvent("strikeout",bn,k0);G.anim={id:((G.anim&&G.anim.id)||0)+1,ts:Date.now(),sfx:"whiff"};}}
-  else if(type==="foul"){if(G.strikes<2)G.strikes++;feedPitch("Foul"+pt,"#"+bnum+" · "+G.balls+"-"+G.strikes);}
+  if(type==="ball"){G.balls++;try{Snd.pip("ball");}catch(e){}feedPitch("Ball"+pt,"#"+bnum+" · "+G.balls+"-"+G.strikes);if(G.balls>=4){applyPlanInline("walk");flash("Walk");bcastEvent("walk","Ball four · "+bn,k0);}}
+  else if(type==="strike"){G.strikes++;feedPitch("Strike"+pt,"#"+bnum+" · "+G.balls+"-"+G.strikes);if(G.strikes>=3){G.outs++;creditBatter("strikeout",0);nextBatter();flipIfNeeded();flash("Strikeout");bcastEvent("strikeout",bn,k0);G.anim={id:((G.anim&&G.anim.id)||0)+1,ts:Date.now(),sfx:"whiff"};}else{try{Snd.pip("strike");}catch(e){}}}
+  else if(type==="foul"){if(G.strikes<2)G.strikes++;try{Snd.pip("foul");}catch(e){}feedPitch("Foul"+pt,"#"+bnum+" · "+G.balls+"-"+G.strikes);}
   render();broadcast();try{triggerAnim(G.anim);}catch(e){}
 }
 function manual(kind,label){snapshot();const k0=battingKey(),bn=batter().name;if(kind==="hbp")recordPitch("hbp");applyPlanInline(kind);bcastEvent(kind,bn,k0);flash(label);render();broadcast();}
@@ -1292,7 +1291,17 @@ const Snd=(function(){
     const g=c.createGain(); env(g,t,0.4,0.13); o.connect(g); g.connect(c.destination); o.start(t); o.stop(t+0.14);
     const s=noise(c,0.05,3), hp=c.createBiquadFilter(); hp.type="highpass"; hp.frequency.value=1200; const ng=c.createGain(); env(ng,t,0.16,0.05); s.connect(hp); hp.connect(ng); ng.connect(c.destination); s.start(t); s.stop(t+0.06);
   }
-  return {unlock:unlock,isOn:isOn,setOn:setOn,crack:crack,cheer:cheer,whiff:whiff,out:out};
+  // Short confirmation blip on EVERY pitch tap (ball/strike/foul) so the operator hears each one
+  // register — not just the strikeout. Pitch varies by call so they're distinguishable by ear.
+  function tone(freq,dur,peak,type){ if(!on)return; const c=ac(); if(!c)return; const t=c.currentTime;
+    const o=c.createOscillator(); o.type=type||"sine"; o.frequency.setValueAtTime(freq,t);
+    const g=c.createGain(); env(g,t,peak||0.3,dur||0.06,0.001); o.connect(g); g.connect(c.destination); o.start(t); o.stop(t+(dur||0.06)+0.03); }
+  function pip(kind){ if(!on)return;
+    if(kind==="ball") tone(300,0.085,0.30,"sine");
+    else if(kind==="foul") tone(560,0.06,0.26,"triangle");
+    else tone(760,0.07,0.30,"square");   // strike / default
+  }
+  return {unlock:unlock,isOn:isOn,setOn:setOn,crack:crack,cheer:cheer,whiff:whiff,out:out,pip:pip};
 })();
 try{ document.addEventListener("pointerdown",function(){Snd.unlock();},{once:true,passive:true}); }catch(e){}
 
@@ -1512,7 +1521,9 @@ function batterStrip(){
    (tablet) scorer view; once proven we extend the same wrapper to the field, feed, score, etc. */
 let floatOn=(()=>{ try{ return localStorage.getItem("al-float-on")==="1"; }catch(e){ return false; } })();
 let FLOAT=(()=>{ try{ return JSON.parse(localStorage.getItem("al-float")||"{}")||{}; }catch(e){ return {}; } })();
-function saveFloat(){ try{ localStorage.setItem("al-float",JSON.stringify(FLOAT)); localStorage.setItem("al-float-on",floatOn?"1":"0"); }catch(e){} }
+function saveFloat(){ try{ localStorage.setItem("al-float",JSON.stringify(FLOAT)); localStorage.setItem("al-float-on",floatOn?"1":"0"); }catch(e){} try{ if(window.cloudSavePrefs)window.cloudSavePrefs({floatLayout:FLOAT, floatOn:floatOn}); }catch(e){} }
+// Pull the signed-in user's saved window layout from the cloud (follows them across devices/games).
+function loadCloudFloat(){ try{ if(!window.cloudLoadPrefs)return; window.cloudLoadPrefs().then(function(p){ if(!p)return; if(p.floatLayout&&typeof p.floatLayout==="object")FLOAT=p.floatLayout; if(typeof p.floatOn==="boolean")floatOn=p.floatOn; try{ localStorage.setItem("al-float",JSON.stringify(FLOAT)); localStorage.setItem("al-float-on",floatOn?"1":"0"); }catch(e){} try{ render(); }catch(e){} }); }catch(e){} }
 function floatGeo(id,def){ const g=FLOAT[id]||{}; return {x:g.x!=null?g.x:def.x, y:g.y!=null?g.y:def.y, w:g.w!=null?g.w:def.w, h:g.h!=null?g.h:def.h}; }
 function floatWindow(id,title,inner,def){
   const g=floatGeo(id,def);
@@ -1539,9 +1550,17 @@ function setupFloatWins(){
     const id=win.getAttribute("data-floatwin"); clampInto(win);
     const handle=win.querySelector("[data-floatdrag]"), rez=win.querySelector("[data-floatresize]");
     let act=null,sx=0,sy=0,ox=0,oy=0,ow=0,oh=0;
+    // Fine-tune snapping: glide on a small grid, with stronger magnetism to screen edges + center.
+    const GRID=8, EDGE=16;
+    const snap=(v,targets)=>{ for(let i=0;i<targets.length;i++){ if(Math.abs(v-targets[i])<=EDGE) return Math.round(targets[i]); } return Math.round(v/GRID)*GRID; };
     const move=(e)=>{ if(!act) return; const dx=e.clientX-sx, dy=e.clientY-sy;
-      if(act==="drag"){ win.style.left=(ox+dx)+"px"; win.style.top=(oy+dy)+"px"; }
-      else { win.style.width=Math.max(230,ow+dx)+"px"; win.style.height=Math.max(96,oh+dy)+"px"; }
+      const vw=window.innerWidth, vh=window.innerHeight;
+      if(act==="drag"){ const w=win.offsetWidth, h=win.offsetHeight;
+        win.style.left=snap(ox+dx,[0, vw-w, (vw-w)/2])+"px";
+        win.style.top =snap(oy+dy,[0, vh-h, (vh-h)/2])+"px"; }
+      else { const x=parseFloat(win.style.left)||0, y=parseFloat(win.style.top)||0;
+        win.style.width =Math.max(230,snap(ow+dx,[vw-x]))+"px";
+        win.style.height=Math.max(96, snap(oh+dy,[vh-y]))+"px"; }
       e.preventDefault(); };
     const up=()=>{ if(!act) return; clampInto(win);
       FLOAT[id]={x:parseFloat(win.style.left)||0,y:parseFloat(win.style.top)||0,w:win.offsetWidth,h:win.offsetHeight};
@@ -3005,8 +3024,11 @@ function actionArea(){
       <button data-act="endinning" style="${flatBtn};border-left:4px solid ${T.amber}"><span style="color:${T.amber}">${ICN.inning}</span>End Inning <span style="color:${T.sage};font-weight:600;font-size:11px;text-transform:none;letter-spacing:0">${halfLabel} · ${G.outs} out${G.outs===1?"":"s"}</span></button>`;
   }
   if(mode==="locate"){
+    // Outcomes where the ball was NOT put in play (no field location needed) — shown up front so
+    // you don't have to fake a hit location just to record them. Catcher's interference for now.
+    const noPlay=advEvents?`<button data-act="ci" style="${ghost};width:100%;margin-bottom:8px;border:1px solid ${T.amber};color:${T.amber}">&#9758; Ball NOT put in play &middot; Catcher's interference</button>`:"";
     return step("Where did it go?","Tap the field above — the fielder is set automatically.",
-      `<button data-act="cancel" style="${ghost};width:100%">Cancel</button>`);
+      `${noPlay}<button data-act="cancel" style="${ghost};width:100%">Cancel</button>`);
   }
   if(mode==="contact"){
     return step(`Hit ${tap.zone} — what kind?`,`Fielder: ${fielderLabel(tap.pos)}. Re-tap the field to move it.`,
@@ -3637,6 +3659,7 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="inplay")startInPlay();
   else if(act==="walk")manual("walk","Walk");
   else if(act==="hbp")manual("hbp","Hit by pitch");
+  else if(act==="ci"){ tap=null; contact=null; mode="idle"; manual("ci","Catcher's interference"); }   // no field location; return to scoring
   else if(act==="cancel"){resetUI();render();}
   else if(act==="contact")chooseContact(arg);
   else if(act==="result")chooseResult(curResults[+arg]);
@@ -3840,7 +3863,7 @@ window.onCloudAuth=function(u){
   // Signed OUT → drop the cloud listeners AND the local team cache so a shared tablet doesn't keep
   // showing the previous account's teams. (Signing back in re-syncs them from the cloud.)
   if(!u){ try{ if(window.cloudStopSync)window.cloudStopSync(); }catch(e){} try{ DB.teams=[]; curTeamId=null; openTeamId=null; saveDB(); }catch(e){} try{ if(["team","teams","pickteam","settings"].includes(mode)) mode="home"; }catch(e){} try{ render(); }catch(e){} return; }
-  try{ if(window.cloudSyncTeams)window.cloudSyncTeams(); }catch(e){} try{ if(window.cloudClaimInvite)window.cloudClaimInvite(); }catch(e){} try{ if(window.cloudClaimFollow)window.cloudClaimFollow(); }catch(e){} try{ if(["home","settings","teams","pickteam"].includes(mode)) mode="home"; }catch(e){} try{ render(); }catch(e){} };   // after sign-in, land on Home
+  try{ if(window.cloudSyncTeams)window.cloudSyncTeams(); }catch(e){} try{ if(window.cloudClaimInvite)window.cloudClaimInvite(); }catch(e){} try{ if(window.cloudClaimFollow)window.cloudClaimFollow(); }catch(e){} try{ loadCloudFloat(); }catch(e){} try{ if(["home","settings","teams","pickteam"].includes(mode)) mode="home"; }catch(e){} try{ render(); }catch(e){} };   // after sign-in, land on Home
 
 /* ===== Team chat (modal) — real-time messages; owner/scorers/followers can post, owner can delete ===== */
 let chatTeamId=null, chatUnsub=null, chatMsgs=[];
@@ -4144,7 +4167,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v144";
+var APP_VERSION="v146";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;

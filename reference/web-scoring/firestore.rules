@@ -123,5 +123,11 @@ service cloud.firestore {
       allow update: if canWriteTeam(resource.data.teamId);
       allow delete: if canWriteTeam(resource.data.teamId);
     }
+
+    // ===== Per-user preferences (UI layout — e.g. the floating scorer windows). Each signed-in
+    // user reads/writes ONLY their own doc, keyed by their uid, so the layout follows them. =====
+    match /userPrefs/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
   }
 }
