@@ -1380,15 +1380,16 @@ function batterCard(){
    so the field grows into its wasted side margins. Tappable for the at-bat review. */
 function batterStrip(){
   const b=batter(),k=battingKey(),c=TEAMS[k].color;
-  const lp=batterLineParts();
-  const ord=ordinal(battingSlot()+1);
-  const nameLine=b.ours?pBug(b):TEAMS[k].name.toUpperCase();
-  const sub=b.ours?`${TEAMS[k].short}${b.pos?` · ${b.pos}`:""} · ${ord}`:`${TEAMS[k].short} · ${ord}`;
-  return `<button data-act="reviewbatter" data-arg="${batterKeyOf(b)}" class="frost-card" style="display:flex;align-items:center;gap:10px;background:rgba(13,19,32,.72);border:1px solid ${c}66;border-left:5px solid ${c};border-radius:10px;padding:6px 12px;cursor:pointer;max-width:100%;min-width:0">
-    <span style="font-family:${MONO};font-size:22px;font-weight:700;color:${c};line-height:1;flex:none">${b.num}</span>
-    <div style="min-width:0;text-align:left">
-      <div style="font-family:${MONO};font-size:15px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;line-height:1;color:${T.chalk};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${nameLine}</div>
-      <div style="font-size:10px;color:${T.sage};font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${sub}</div></div>
+  const ord=battingSlot()+1;                          // the batter's spot in the lineup (1-based)
+  // The batter's NAME — never the team name. For an opponent hitter with no name entered, fall
+  // back to their jersey number so it still identifies someone.
+  const nm=b.ours?pBug(b):(b.name||"").trim();
+  const nameLine=nm||(b.num?("#"+b.num):"—");
+  return `<button data-act="reviewbatter" data-arg="${batterKeyOf(b)}" class="frost-card" style="display:flex;align-items:center;gap:11px;background:rgba(13,19,32,.72);border:1px solid ${c}66;border-left:5px solid ${c};border-radius:10px;padding:7px 12px;cursor:pointer;max-width:100%;min-width:0">
+    <span title="Lineup spot" style="font-family:${MONO};font-size:24px;font-weight:800;color:${c};line-height:1;flex:none">${ord}</span>
+    <div style="min-width:0;text-align:left;display:flex;flex-direction:column;gap:3px">
+      <div style="font-size:9px;letter-spacing:1.3px;font-weight:800;color:${T.sageDim};line-height:1">BATTING ${ordinal(ord)}</div>
+      <div style="font-family:${MONO};font-size:16px;font-weight:700;letter-spacing:.3px;text-transform:uppercase;line-height:1;color:${T.chalk};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${nameLine}</div></div>
   </button>`;
 }
 
@@ -3759,7 +3760,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v121";
+var APP_VERSION="v122";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
