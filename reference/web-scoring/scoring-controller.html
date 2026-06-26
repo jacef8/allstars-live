@@ -37,6 +37,12 @@
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;scrollbar-width:none;}
   *::-webkit-scrollbar{width:0;height:0;display:none;}
+  /* Native date/time picker glyphs render near-black by default — invisible on the dark theme.
+     color-scheme:dark themes the whole native control (light calendar/clock icon + a dark popup). */
+  input[type="date"],input[type="time"],input[type="datetime-local"]{color-scheme:dark;}
+  input[type="date"]::-webkit-calendar-picker-indicator,
+  input[type="time"]::-webkit-calendar-picker-indicator,
+  input[type="datetime-local"]::-webkit-calendar-picker-indicator{opacity:.9;cursor:pointer;}
   /* Dark theme background everywhere (browser/PWA). Inside the NATIVE app we switch this
      to transparent at runtime (see IS_APP below) so the native camera-preview layer shows
      through the monitor region; the app paints a matching #0B0E13 backdrop behind it. */
@@ -4486,7 +4492,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v166";
+var APP_VERSION="v167";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
