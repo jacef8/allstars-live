@@ -2337,9 +2337,9 @@ function actionArea(){
     // Games live on ANOTHER device for a team I score → "in progress · take over" (cross-device handoff).
     const _esc=x=>String(x==null?"":x).replace(/</g,"&lt;");
     const liveRows = otherLiveGames().map(function(o){ const s=o.live.summary||{}; const who=o.live.activeName?(" &middot; "+_esc(o.live.activeName)):"";
-      return `<button data-act="takeoverlive" data-arg="${o.team.id}" style="background:${T.surface};border:1px solid ${T.lime};color:${T.ink};border-radius:13px;padding:13px 15px;display:flex;align-items:center;justify-content:space-between;gap:10px;text-align:left;cursor:pointer">
-        <span style="display:flex;align-items:center;gap:9px;min-width:0"><span style="width:9px;height:9px;border-radius:50%;flex:none;background:#E11D2E;box-shadow:0 0 7px #E11D2E"></span><span style="min-width:0"><span style="font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block">${_esc(s.a||"")} ${s.as|0}–${s.hs|0} ${_esc(s.h||"")}</span><span style="font-size:11px;color:${T.sage}">In progress${who} · tap to take over scoring</span></span></span>
-        <span style="font-family:${MONO};font-weight:800;color:${T.lime};white-space:nowrap">Take over &rsaquo;</span></button>`; }).join("");
+      return `<button data-act="takeoverlive" data-arg="${o.team.id}" style="background:${T.surface};border:1px solid ${T.lime};color:${T.ink};border-radius:13px;padding:15px 18px;display:flex;align-items:center;justify-content:space-between;gap:10px;text-align:left;cursor:pointer">
+        <span style="display:flex;align-items:center;gap:10px;min-width:0"><span style="width:10px;height:10px;border-radius:50%;flex:none;background:#E11D2E;box-shadow:0 0 7px #E11D2E"></span><span style="min-width:0"><span style="font-size:18px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block">${_esc(s.a||"")} ${s.as|0}–${s.hs|0} ${_esc(s.h||"")}</span><span style="font-size:13.5px;color:${T.sage}">In progress${who} · tap to take over scoring</span></span></span>
+        <span style="font-family:${MONO};font-size:15px;font-weight:800;color:${T.lime};white-space:nowrap">Take over &rsaquo;</span></button>`; }).join("");
     const newGameBtn = `<button data-act="newgamestart" style="${bigBtn(T.lime,"font-size:21px;padding:17px;border:2px solid rgba(255,255,255,.92);box-shadow:0 8px 22px rgba(225,29,46,.34)")}">${IC(PLAY)} New Game</button>`;
     const manageBtn = DB.teams.length
       ? `<button data-act="gototeams" style="${ghost};padding:17px;font-size:17px;border:2px solid rgba(255,255,255,.55);color:${T.ink};display:flex;align-items:center;justify-content:center;gap:9px">${IC('<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>')} Manage teams &amp; rosters</button>`
@@ -4493,7 +4493,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v168";
+var APP_VERSION="v169";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
