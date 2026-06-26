@@ -10,5 +10,9 @@
              Older devices fall back to @drawable/splash_window above. -->
         <item name="android:windowSplashScreenBackground">#11203A</item>
         <item name="android:windowSplashScreenAnimatedIcon">@mipmap/splash_icon</item>
+        <!-- Match the icon's circular backdrop to the navy background. Without this, Samsung/One UI
+             (and some other OEMs) fill the circle behind the icon with a default light colour, which
+             reads as a white "box" around the transparent star. Navy = the circle blends away. -->
+        <item name="android:windowSplashScreenIconBackgroundColor">#11203A</item>
     </style>
 </resources>

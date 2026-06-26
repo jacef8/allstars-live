@@ -1394,7 +1394,20 @@ function commit(r,movers){
   snapshot();recordPitch("inplay");const outs=outsFromKind(r.kind);   // the pitch that was put in play
   if(G.ab&&tap)G.ab.loc={zone:tap.zone,pos:tap.pos};   // remember where it was hit
   // one-shot animation payload (ball flight + runner paths) — rides the full-G broadcast to viewers
-  try{ const _ap=planPaths(movers); G.anim={ id:((G.anim&&G.anim.id)||0)+1, ts:Date.now(), hit:(tap?{x:tap.x,y:tap.y}:null), k:r.kind, hr:(r.kind==="hr"), contact:contact||"", outKind:(outsFromKind(r.kind)>0), paths:_ap.map(p=>({pts:p.pts,color:p.color,scored:!!p.scored,out:!!p.out})) }; }catch(e){}
+  try{ const _ap=planPaths(movers);
+    // Defensive throw chain for ground-ball outs / force plays: origin = where the ball was fielded
+    // (the tap); targets = each putout base in order — lead/force outs first, the batter's relay to 1st
+    // last (so a 6-4-3 reads field→2nd→1st). A near-zero hop (e.g. 3U unassisted) is flagged not-assisted
+    // so we show the out without a phantom throw.
+    let _throws=[];
+    if(["out1","fc","dp","sacbunt"].includes(r.kind)&&tap){
+      const _po=movers.filter(mm=>mm.out).map(mm=>({base:mm.isBatter?1:(mm.start+1),isBatter:!!mm.isBatter}));
+      _po.sort((x,y)=>(x.isBatter?1:0)-(y.isBatter?1:0));
+      let _from=[tap.x,tap.y];
+      _po.forEach(po=>{ const t=(po.base>=4)?BASE.H:(BASE[po.base]||BASE[1]); const assisted=Math.hypot(t[0]-_from[0],t[1]-_from[1])>14; _throws.push({from:_from.slice(),to:t.slice(),assisted:assisted}); _from=t.slice(); });
+    }
+    G.anim={ id:((G.anim&&G.anim.id)||0)+1, ts:Date.now(), hit:(tap?{x:tap.x,y:tap.y}:null), k:r.kind, hr:(r.kind==="hr"), contact:contact||"", outKind:(outsFromKind(r.kind)>0), throws:_throws, paths:_ap.map(p=>({pts:p.pts,color:p.color,scored:!!p.scored,out:!!p.out})) };
+  }catch(e){}
   const k0=battingKey(),bn=batter().name;
   const runs=resolve(movers,outs);                 // capped runs that actually count
   const rbi=rbiEligible(r.kind)?runs:0;
@@ -1481,17 +1494,18 @@ function triggerAnim(a){
   try{
     if(a.sfx==="whiff")Snd.whiff();
     if(a.hit)Snd.crack();
-    if(a.outKind||(a.paths||[]).some(p=>p.out))setTimeout(function(){Snd.out();},a.hit?420:0);
+    if(a.outKind||(a.paths||[]).some(p=>p.out)){ const _nth=(a.throws||[]).filter(t=>t.assisted).length; setTimeout(function(){Snd.out();},a.hit?(_nth?Math.round(470+360*_nth):420):0); }
     if((a.paths||[]).some(p=>p.scored))setTimeout(function(){Snd.cheer();},650);
   }catch(e){}
   if(_animTimer)clearTimeout(_animTimer);
   try{render();}catch(e){}
-  const _hold=(a.hr||(a.paths||[]).some(p=>p.scored))?2600:1800;   // hold the HR / run-scored celebration longer
+  const _hold=(a.hr||(a.paths||[]).some(p=>p.scored))?2600:(((a.throws||[]).filter(t=>t.assisted).length>1)?2300:1800);   // hold HR / run-scored / double-play relay longer
   _animTimer=setTimeout(function(){ playAnim=null; try{render();}catch(e){} },_hold);
 }
 function playAnimSVG(){
   const a=playAnim; if(!a) return "";
   let s="";
+  let throwT0=0;   // when the defensive throw chain begins (= when the batted ball reaches the fielder)
   if(a.hit){
     const hx=+a.hit.x, hy=+a.hit.y, isHR=!!a.hr, ct=(a.contact||"").toLowerCase();
     // Trajectory shape + speed follow the batted-ball type: grounders skim low and fast, liners are
@@ -1528,7 +1542,28 @@ function playAnimSVG(){
     } else {
       s+=`<circle cx="${hx}" cy="${hy}" r="3" fill="none" stroke="${T.clay}" stroke-width="2.2" opacity="0"><animate attributeName="r" values="3;15" dur="0.5s" begin="${dur.toFixed(2)}s" fill="freeze"/><animate attributeName="opacity" values=".95;0" dur="0.5s" begin="${dur.toFixed(2)}s" fill="freeze"/></circle>`;
     }
+    throwT0=dur;
   }
+  // Defensive throw(s) across the diamond: a ball relays from the fielder to each putout base in turn
+  // (field→2nd→1st on a DP), each landing with an "out" mark. Plain unassisted putouts skip the throw.
+  const _thr=a.throws||[]; const TH=0.38;
+  let _t0=(a.hit?throwT0:0);
+  _thr.forEach(tw=>{
+    const arrive=_t0+(tw.assisted?TH:0);
+    if(tw.assisted){
+      const fx=(+tw.from[0]).toFixed(1),fy=(+tw.from[1]).toFixed(1),tx=(+tw.to[0]).toFixed(1),ty=(+tw.to[1]).toFixed(1),b=_t0.toFixed(2);
+      s+=`<line x1="${fx}" y1="${fy}" x2="${tx}" y2="${ty}" stroke="#FFFFFF" stroke-width="1.8" stroke-linecap="round" pathLength="100" stroke-dasharray="100" stroke-dashoffset="100" opacity="0">
+          <animate attributeName="stroke-dashoffset" values="100;0" dur="${TH}s" begin="${b}s" fill="freeze"/>
+          <animate attributeName="opacity" values="0;.55;.5;0" keyTimes="0;.2;.7;1" dur="${(TH+0.35).toFixed(2)}s" begin="${b}s" fill="freeze"/></line>`;
+      s+=`<g opacity="0"><animate attributeName="opacity" values="0;1;1;0" keyTimes="0;.12;.85;1" dur="${(TH+0.06).toFixed(2)}s" begin="${b}s" fill="freeze"/>
+          <circle r="4.6" fill="#fff" stroke="#C0392B" stroke-width="0.9"/>
+          <animateMotion path="M${fx},${fy} L${tx},${ty}" dur="${TH}s" begin="${b}s" fill="freeze"/></g>`;
+    }
+    const px=(+tw.to[0]).toFixed(1),py=(+tw.to[1]).toFixed(1),ab=arrive.toFixed(2);
+    s+=`<circle cx="${px}" cy="${py}" r="2" fill="none" stroke="${T.out}" stroke-width="2.4" opacity="0"><animate attributeName="r" values="2;13" dur="0.42s" begin="${ab}s" fill="freeze"/><animate attributeName="opacity" values=".95;0" dur="0.42s" begin="${ab}s" fill="freeze"/></circle>`;
+    s+=`<g transform="translate(${px},${py})" stroke="${T.out}" stroke-width="2.3" stroke-linecap="round" opacity="0"><animate attributeName="opacity" values="0;1;1;0" keyTimes="0;.2;.74;1" dur="0.85s" begin="${ab}s" fill="freeze"/><line x1="-4" y1="-4" x2="4" y2="4"/><line x1="-4" y1="4" x2="4" y2="-4"/></g>`;
+    _t0=arrive;
+  });
   (a.paths||[]).forEach(p=>{ if(p.out||!p.pts||p.pts.length<2)return;
     const d="M"+p.pts.map(pt=>(+pt[0]).toFixed(1)+","+(+pt[1]).toFixed(1)).join(" L ");
     s+=`<circle r="6.2" fill="${p.color||"#fff"}" stroke="#0C1410" stroke-width="1.2" opacity="0">
@@ -4451,7 +4486,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v164";
+var APP_VERSION="v165";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
