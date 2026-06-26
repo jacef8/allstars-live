@@ -1215,6 +1215,7 @@ let summaryTeam="us";    // end-game box score: which team's batting/pitching to
 let monitorOn=(()=>{try{ const p=new URLSearchParams(location.search); if(p.get("feed")==="1") return false; if(p.get("yt")) return true; return localStorage.getItem("al-monitor-on")!=="0";}catch(e){return true;}})();  // wide: video shown/hidden; shared ?feed=1 opens feed-only
 let viewMode=(()=>{try{ const p=new URLSearchParams(location.search); if(p.get("view")==="viewer") return "viewer"; return localStorage.getItem("al-view-mode")||"scorer";}catch(e){return "scorer";}})();  // "scorer" | "viewer"; shared links (?view=viewer) open as viewer
 let bcastMuted=(()=>{try{ return localStorage.getItem("al-bcast-mute")==="1"; }catch(e){ return false; }})();   // broadcast-audio mute (the YouTube audio is the tablet mic)
+let bcastCamAudio=(()=>{try{ return localStorage.getItem("al-bcast-camaudio")==="1"; }catch(e){ return false; }})();   // use the camera's audio (passthrough) instead of the tablet mic
 let viewerRight=(()=>{try{return localStorage.getItem("al-viewer-right")||"field";}catch(e){return "field";}})();  // viewer + video on: which of field/feed is the big one
 let viewerPhone=(()=>{try{return localStorage.getItem("al-viewer-phone")||"both";}catch(e){return "both";}})();  // phone viewer: "both" | "field" (only) | "feed" (only)
 // Opened via a watch/share link → this person is ONLY a viewer (no scoring). Lock them to viewer
@@ -2758,6 +2759,10 @@ function actionArea(){
           <button data-act="gohome" style="${ghost};padding:9px 11px">&lsaquo; Home</button>
           <div style="font-family:${MONO};font-size:23px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:${T.lime}">Settings</div></div>
         ${IS_APP?item("opencamera",IC('video',24),"Camera &amp; stream setup","Connect your camera and go live"):`<div style="font-size:13px;color:${T.sageDim};background:${T.surface};border:1px dashed ${T.line};border-radius:12px;padding:16px 18px;line-height:1.5">${IC('video',15)} Camera &amp; streaming is available in the All-Stars Live app (Android/iOS). This web view is for watching shared games.</div>`}
+        ${IS_APP?`<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;background:${T.surface};border:1px solid ${T.line};border-radius:12px;padding:16px 18px">
+          <div style="min-width:0"><div style="font-weight:800;color:${T.ink};font-size:18px">Broadcast audio</div>
+            <div style="font-size:13px;color:${T.sage};margin-top:2px">${bcastCamAudio?"Camera audio (beta) — falls back to mic if the camera sends none":"Tablet mic — the camera's own audio isn't used"}</div></div>
+          <button data-act="togglecamaudio" style="background:${bcastCamAudio?T.lime:T.surface2};border:1px solid ${bcastCamAudio?T.lime:T.line};color:${bcastCamAudio?"#fff":T.sage};border-radius:999px;padding:10px 16px;font-family:${MONO};font-weight:800;font-size:14px;min-width:92px">${bcastCamAudio?"CAMERA":"MIC"}</button></div>`:""}
         ${item("apprefresh",IC('refresh',24),"Refresh app","Reload &amp; check for the latest version + sync teams")}
         ${item("opendebug",IC('alert',24),"Diagnostics","Camera, stream, network &amp; sync status — for field troubleshooting")}
         ${signedIn?`<div style="background:${T.surface};border:1px solid ${T.line};border-radius:12px;padding:16px 18px">
@@ -3817,7 +3822,8 @@ document.getElementById("app").addEventListener("click",e=>{
   if(act==="fullscreen"){ const m=document.getElementById("monitor"); const r=m&&(m.requestFullscreen||m.webkitRequestFullscreen); if(r)r.call(m); return; }
   if(act==="ytopen"){ const ytv=streamYt(); if(ytv){ const u="https://www.youtube.com/watch?v="+encodeURIComponent(ytv); if(IS_APP&&window.AllStars.openExternal)AllStars.openExternal(u); else window.open(u,"_blank","noopener"); } return; }
   if(act==="bcasterr"){ const m=window.__bcastStatus||"Stream error"; try{ flash(m); }catch(e){} try{ alert("Stream error\n\n"+m); }catch(e){} return; }
-  if(act==="appgolive"){ try{ if(window.AllStars&&window.AllStars.setBroadcastMuted)window.AllStars.setBroadcastMuted(bcastMuted); }catch(e){} try{ window.AllStars.requestGoLive(); }catch(e){} return; }
+  if(act==="appgolive"){ try{ if(window.AllStars&&window.AllStars.setBroadcastMuted)window.AllStars.setBroadcastMuted(bcastMuted); }catch(e){} try{ if(window.AllStars&&window.AllStars.setUseCameraAudio)window.AllStars.setUseCameraAudio(bcastCamAudio); }catch(e){} try{ window.AllStars.requestGoLive(); }catch(e){} return; }
+  if(act==="togglecamaudio"){ bcastCamAudio=!bcastCamAudio; try{ localStorage.setItem("al-bcast-camaudio",bcastCamAudio?"1":"0"); }catch(e){} try{ if(window.AllStars&&window.AllStars.setUseCameraAudio)window.AllStars.setUseCameraAudio(bcastCamAudio); }catch(e){} flash(bcastCamAudio?"Broadcast audio: camera (beta)":"Broadcast audio: tablet mic"); render(); return; }
   if(act==="appstop"){ try{ window.AllStars.stopStream(); }catch(e){} return; }
   if(act==="mutebcast"){ bcastMuted=!bcastMuted; try{ localStorage.setItem("al-bcast-mute",bcastMuted?"1":"0"); }catch(e){} try{ if(window.AllStars&&window.AllStars.setBroadcastMuted)window.AllStars.setBroadcastMuted(bcastMuted); }catch(e){} flash(bcastMuted?"Broadcast audio muted":"Broadcast audio on"); render(); return; }
   if(act==="setstream"){ openStream(); return; }
@@ -4364,7 +4370,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v155";
+var APP_VERSION="v156";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;

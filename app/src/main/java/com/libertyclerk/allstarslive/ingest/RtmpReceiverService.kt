@@ -41,6 +41,12 @@ object RtmpHub {
     /** The compositor, once the pipeline is up — for encoder (stream/record) + overlay. */
     val videoCompositor: VideoCompositor? get() = compositor
 
+    // ---- Camera AAC audio (for camera-audio-passthrough to YouTube instead of the tablet mic) ----
+    @Volatile var camHasAudio = false; private set              // has the external camera sent any AAC?
+    @Volatile var camAudioConfig: ByteArray? = null; private set // latest AudioSpecificConfig
+    @Volatile var onCamAudio: ((aac: ByteArray, ptsMs: Long) -> Unit)? = null         // streamer registers here
+    @Volatile var onCamAudioConfig: ((asc: ByteArray) -> Unit)? = null
+
     /** How video gets in: "external" = a camera pushes RTMP to us; "device" = our own camera. */
     @Volatile var captureMode = "external"   // == MODE_EXTERNAL (const declared below)
     @Volatile var lensBack = true
@@ -87,10 +93,13 @@ object RtmpHub {
         publishHint = if (ip != null) "rtmp://$ip:$port/live" else "Waiting for camera…"
         _stats.value = VideoStats(state = IngestState.CONNECTING, message = publishHint)
 
+        camHasAudio = false; camAudioConfig = null
         receiver = RtmpReceiver(
             port = port,
             onConfig = { s, p -> sps = s; pps = p },
             onVideo = { au, ptsMs, kf -> onVideo(au, ptsMs, kf) },
+            onAudioConfig = { asc -> camAudioConfig = asc; camHasAudio = true; onCamAudioConfig?.invoke(asc) },
+            onAudio = { aac, ptsMs -> camHasAudio = true; onCamAudio?.invoke(aac, ptsMs) },
             onStatus = { m ->
                 if (!firstFrameSeen) {
                     val show = if (m.startsWith("Waiting")) publishHint else m

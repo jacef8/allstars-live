@@ -156,6 +156,14 @@ private class ScorerBridge(private val appContext: Context) {
     @JavascriptInterface
     fun isBroadcastMuted(): Boolean = Broadcast.muted
 
+    /** Use the external camera's audio (passthrough) vs the tablet mic. Applied at the next go-live. */
+    @JavascriptInterface
+    fun setUseCameraAudio(use: Boolean) { main.post { Broadcast.setUseCameraAudio(use) } }
+
+    /** Whether the connected camera is actually sending audio (so the UI can offer camera audio). */
+    @JavascriptInterface
+    fun cameraHasAudio(): Boolean = RtmpHub.camHasAudio
+
     /** The web tells us when a game/console is on screen (vs the menus). */
     @JavascriptInterface
     fun setInGame(inGame: Boolean) {

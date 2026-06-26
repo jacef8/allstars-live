@@ -54,6 +54,12 @@ object Broadcast {
         private set
     fun setMuted(b: Boolean) { muted = b; streamer?.muted = b }
 
+    // Use the external camera's audio (passthrough) instead of the tablet mic. Applied at the next
+    // go-live (and only when the camera is actually sending audio); default off for safety.
+    @Volatile var useCameraAudio = false
+        private set
+    fun setUseCameraAudio(b: Boolean) { useCameraAudio = b }
+
     private const val PROG_W = 1280
     private const val PROG_H = 720
     private val main = Handler(Looper.getMainLooper())
@@ -178,6 +184,7 @@ object Broadcast {
             }
         })
         s.muted = muted                                                                    // carry the mute preference into this broadcast
+        s.cameraAudio = useCameraAudio && RtmpHub.camHasAudio                               // camera audio only if it's actually arriving
         comp.setEncoderSurface(s.inputSurface, PROG_W, PROG_H, s.avBaseNs) { s.drain() }   // shared a/v clock → lip-sync
         s.start("rtmp://a.rtmp.youtube.com/live2/${live.streamKey}")
         streamer = s

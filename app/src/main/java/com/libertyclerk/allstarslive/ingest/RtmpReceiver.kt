@@ -23,6 +23,10 @@ class RtmpReceiver(
     private val onConfig: (sps: ByteArray, pps: ByteArray) -> Unit,
     private val onVideo: (annexB: ByteArray, ptsMs: Long, keyframe: Boolean) -> Unit,
     private val onStatus: (String) -> Unit,
+    // Camera AAC audio (so the broadcast can use the camera's audio instead of the tablet mic).
+    // [onAudioConfig] = AudioSpecificConfig (once); [onAudio] = each raw AAC frame. Default no-ops.
+    private val onAudioConfig: (asc: ByteArray) -> Unit = {},
+    private val onAudio: (aac: ByteArray, ptsMs: Long) -> Unit = { _, _ -> },
 ) {
     @Volatile private var running = false
     private var server: ServerSocket? = null
@@ -111,7 +115,15 @@ class RtmpReceiver(
                         }
                     }
                 }
-                // MSG_AUDIO (8) ignored for now
+                MSG_AUDIO -> {
+                    val d = msg.data
+                    if (d.size < 2) continue
+                    if (((d[0].toInt() shr 4) and 0x0F) != 10) continue   // 10 = AAC (we only pass AAC through)
+                    when (d[1].toInt() and 0xFF) {
+                        0 -> onAudioConfig(d.copyOfRange(2, d.size))        // AudioSpecificConfig
+                        1 -> onAudio(d.copyOfRange(2, d.size), msg.timestamp.toLong())   // raw AAC frame
+                    }
+                }
             }
         }
         Log.i(TAG, "session loop ended; frames=$frames")

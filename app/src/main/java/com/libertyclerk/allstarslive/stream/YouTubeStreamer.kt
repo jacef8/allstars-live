@@ -11,6 +11,8 @@ import android.util.Log
 import android.view.Surface
 import com.pedro.common.ConnectChecker
 import com.pedro.rtmp.rtmp.RtmpClient
+import com.libertyclerk.allstarslive.ingest.RtmpHub
+import java.nio.ByteBuffer
 
 /**
  * Pushes the composited program frame to YouTube Live over RTMP. The
@@ -45,6 +47,12 @@ class YouTubeStreamer(
     // When true, broadcast SILENCE instead of the mic (YouTube still needs an audio track, so we
     // keep sending silent AAC). Toggled live via Broadcast.setMuted.
     @Volatile var muted = false
+
+    // CAMERA-AUDIO PASSTHROUGH: when true, send the external camera's AAC straight through (no mic,
+    // no re-encode) instead of capturing the tablet mic. Set before start(). Falls back to mic if the
+    // camera delivers no audio.
+    @Volatile var cameraAudio = false
+    @Volatile private var camAudioConfigured = false
 
     private val client: RtmpClient = RtmpClient(object : ConnectChecker {
         override fun onConnectionStarted(url: String) = onStatus("Connecting…")
@@ -97,12 +105,34 @@ class YouTubeStreamer(
     /** Start encoding and connect. [rtmpUrl] = rtmp://a.rtmp.youtube.com/live2/<key> */
     fun start(rtmpUrl: String) {
         encoder.start()
-        audioEncoder.start()
         streaming = true
         shouldStream = true
         client.setReTries(60)          // ~5 min of 5s retries — survive a whole game's hiccups
-        startAudio()
+        if (cameraAudio) startCameraAudio() else { audioEncoder.start(); startAudio() }
         client.connect(rtmpUrl)
+    }
+
+    // ---- camera-audio passthrough: forward the camera's AAC straight to YouTube ----
+    private fun startCameraAudio() {
+        RtmpHub.camAudioConfig?.let { applyCameraAsc(it) }           // config the client from the known ASC
+        RtmpHub.onCamAudioConfig = { asc -> applyCameraAsc(asc) }    // and update if it (re)arrives
+        RtmpHub.onCamAudio = { aac, _ -> feedCameraAac(aac) }
+        Log.i(TAG, "audio: CAMERA passthrough (configured=$camAudioConfigured)")
+    }
+    private fun applyCameraAsc(asc: ByteArray) {
+        if (asc.size < 2) return
+        val sfi = ((asc[0].toInt() and 0x07) shl 1) or ((asc[1].toInt() shr 7) and 0x01)   // sampling-freq index
+        val ch = (asc[1].toInt() shr 3) and 0x0F                                            // channel config
+        val rate = AAC_RATES.getOrElse(sfi) { 44100 }
+        runCatching { client.setAudioInfo(rate, ch >= 2) }
+        camAudioConfigured = true
+        Log.i(TAG, "camera audio: ${rate}Hz ch=$ch")
+    }
+    private fun feedCameraAac(aac: ByteArray) {
+        if (!streaming || !camAudioConfigured) return
+        val pts = (System.nanoTime() - avBaseNs) / 1000 + AUDIO_DELAY_US   // shared a/v clock (+tunable offset)
+        val info = MediaCodec.BufferInfo().apply { set(0, aac.size, pts, 0) }
+        runCatching { client.sendAudio(ByteBuffer.wrap(aac), info) }
     }
 
     /** Auto-reconnect on a dropped connection (e.g. "broken pipe" after the camera
@@ -229,6 +259,7 @@ class YouTubeStreamer(
     fun stop() {
         streaming = false
         shouldStream = false        // intentional end — don't auto-reconnect
+        if (cameraAudio) { RtmpHub.onCamAudio = null; RtmpHub.onCamAudioConfig = null }   // stop forwarding camera audio
         audioThread?.interrupt(); audioThread = null
         runCatching { client.disconnect() }
         runCatching { encoder.stop() }
@@ -241,5 +272,12 @@ class YouTubeStreamer(
 
     val isStreaming: Boolean get() = streaming
 
-    companion object { private const val TAG = "YouTubeStreamer" }
+    companion object {
+        private const val TAG = "YouTubeStreamer"
+        // Tunable a/v offset for camera-audio passthrough (µs added to audio PTS). 0 = no shift; bump
+        // it positive if audio runs ahead of the (decode+composite-delayed) video on real hardware.
+        private const val AUDIO_DELAY_US = 0L
+        // AAC sampling-frequency-index → Hz (from the AudioSpecificConfig).
+        private val AAC_RATES = intArrayOf(96000, 88200, 64000, 48000, 44100, 32000, 24000, 22050, 16000, 12000, 11025, 8000, 7350)
+    }
 }
