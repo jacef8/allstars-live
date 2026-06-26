@@ -495,6 +495,15 @@ function removeGameFromSeason(t,g){
   rows.forEach(b=>{ const p=(t.players||[]).find(x=>String(x.num)===String(b.num)); const sr=p&&t.season[p.id]&&t.season[p.id].bat; if(!sr)return;
     ["ab","r","h","rbi","bb","k","sb","cs"].forEach(k=>{ sr[k]=Math.max(0,(sr[k]||0)-(b[k]||0)); }); });
 }
+/* Rebuild the season BATTING totals from scratch so they equal exactly the games in the log — fixes
+   any drift and lets you reset a team to "only the games actually recorded". Matches players by #. */
+function recomputeSeasonFromGames(t){
+  if(!t)return; t.season=t.season||{};
+  (t.players||[]).forEach(p=>{ if(t.season[p.id])t.season[p.id].bat={ab:0,r:0,h:0,rbi:0,bb:0,k:0,sb:0,cs:0}; });
+  (t.games||[]).forEach(g=>{ const rows=(g.bat&&g.bat[g.ourSide])||[]; rows.forEach(b=>{ const p=(t.players||[]).find(x=>String(x.num)===String(b.num)); if(!p)return; const sr=seasonRow(t,p.id).bat;
+    ["ab","r","h","rbi","bb","k","sb","cs"].forEach(k=>{ sr[k]=(sr[k]||0)+(b[k]||0); }); }); });
+  saveDB();
+}
 window.teamPNum=function(id,v){const t=teamById(openTeamId);if(!t)return;const p=t.players.find(p=>p.id===id);if(p){p.num=v;saveDB();}};
 window.teamPFirst=function(id,v){const t=teamById(openTeamId);if(!t)return;const p=t.players.find(p=>p.id===id);if(p){p.first=v;ensureName(p);saveDB();}};
 window.teamPLast=function(id,v){const t=teamById(openTeamId);if(!t)return;const p=t.players.find(p=>p.id===id);if(p){p.last=v;ensureName(p);saveDB();}};
@@ -2187,7 +2196,9 @@ function actionArea(){
     const GEAR='<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>';
 
     // Favorite-team cards: quick "Start" + manage, with record at a glance.
-    const favs=DB.teams.filter(t=>t.fav), list=favs.length?favs:DB.teams;
+    // Show ALL teams (favorites first), so the count and the cards always match — previously a single
+    // favorite hid every other team while the header still said "My teams (N)".
+    const list=DB.teams.slice().sort((a,b)=>(b.fav?1:0)-(a.fav?1:0));
     const card=t=>{const R=teamRec(t);const rec=`${R.w}-${R.l}${R.t?"-"+R.t:""}`;const games=R.w+R.l+R.t;
       const sub=(()=>{const n=new Date(),today=n.getFullYear()+"-"+String(n.getMonth()+1).padStart(2,"0")+"-"+String(n.getDate()).padStart(2,"0");const up=(t.schedule||[]).filter(s=>s.date&&s.date>=today).sort((a,b)=>((a.date+(a.time||""))<(b.date+(b.time||""))?-1:1))[0];if(up){try{return "Next · "+new Date(up.date+"T00:00").toLocaleDateString(undefined,{month:"short",day:"numeric"});}catch(e){return "Next game set";}}return games?(games+" game"+(games===1?"":"s")):"New season";})();
       const unread=teamHasUnread(t);
@@ -2638,7 +2649,9 @@ function actionArea(){
       const scoreBtn=`<button data-act="storedcard" data-arg="${g.id}" style="${bigBtn(T.lime,'')};display:flex;align-items:center;justify-content:center;gap:9px">&#128196; Game scorecard (PDF)</button>`;
       return secWrap(`${secHdr("Game")}${head}${lineTbl}${batTbl("away")}${batTbl("home")}${pitchTbl("away")}${pitchTbl("home")}${scoreBtn}${ytBtn}${delBtn}`);
     }
-    if(teamTab==="stats") return secWrap(`${secHdr("Stats &amp; games")}${recEditor}${gamesBlock}${statTable}`);
+    const recomputeBtn=`<button data-act="recomputeseason" style="${ghost};display:flex;align-items:center;justify-content:center;gap:9px;width:100%">${IC('refresh',17)} Recompute season stats from the game log</button>
+        <div style="font-size:11px;color:${T.sageDim};text-align:center;margin-top:-4px">Rebuilds the season totals to match exactly the finished games above.</div>`;
+    if(teamTab==="stats") return secWrap(`${secHdr("Stats &amp; games")}${recEditor}${gamesBlock}${statTable}${recomputeBtn}`);
     if(teamTab==="access"){ teamTab="manage"; return actionArea(); }   // access folded into Team management
     if(teamTab==="rules"){ teamTab="manage"; return actionArea(); }     // rules folded into Team management
     if(teamTab==="photos"&&!PHOTOS_ENABLED){ teamTab="hub"; return actionArea(); }   // gallery gated off
@@ -3780,6 +3793,7 @@ document.getElementById("app").addEventListener("click",e=>{
   if(act==="photoclose"){ photoZoom=null; render(); return; }
   if(act==="delphoto"){ const t=teamById(openTeamId); if(!t)return; const pid=arg; confirmAct={title:"Delete this photo?",msg:"It will be removed from the team gallery for everyone.",yes:"Delete",danger:true,run:function(){ if(window.cloudDeletePhoto)window.cloudDeletePhoto(t.id,pid); photoZoom=null; photoListTeam=null; render(); }}; render(); return; }
   if(act==="rewatchgame"){ const u="https://www.youtube.com/watch?v="+encodeURIComponent(arg); if(IS_APP&&window.AllStars&&window.AllStars.openExternal)AllStars.openExternal(u); else window.open(u,"_blank","noopener"); return; }
+  if(act==="recomputeseason"){ const t=teamById(openTeamId); if(!t)return; confirmAct={title:"Recompute season stats?",msg:"Rebuilds this team's season batting totals from the finished games in the log — fixes drifted totals or resets to only the games actually recorded.",yes:"Recompute",run:function(){ recomputeSeasonFromGames(t); render(); flash("Season stats rebuilt from the game log"); }}; render(); return; }
   if(act==="delgame"){ const t=teamById(openTeamId); if(!t)return; if(window.Cloud&&window.Cloud.enabled&&window.Cloud.user&&window.cloudCanManage&&!window.cloudCanManage(t)){flash("Only the owner can delete a game");return;} const g=(t.games||[]).find(x=>x.id===arg); confirmAct={title:"Delete this game?",msg:"Permanently removes this game from the record AND subtracts its player stats from the season totals.",yes:"Delete game + stats",danger:true,run:function(){ try{ removeGameFromSeason(t,g); }catch(e){} t.games=(t.games||[]).filter(x=>x.id!==arg); t.record=teamRec(t); saveDB(); teamTab="schedule"; viewGameId=null; render(); }}; render(); return; }
   if(act==="swapviewer"){ viewerRight=viewerRight==="field"?"feed":"field"; try{localStorage.setItem("al-viewer-right",viewerRight);}catch(e){} render(); return; }
   if(act==="viewerphone"){ viewerPhone=(arg==="field"||arg==="feed")?arg:"both"; try{localStorage.setItem("al-viewer-phone",viewerPhone);}catch(e){} render(); return; }
@@ -4387,7 +4401,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v157";
+var APP_VERSION="v158";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
