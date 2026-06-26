@@ -649,6 +649,17 @@ let G=initGame(),hist=[],mode="home",tap=null,contact=null,result=null,plan=null
 }catch(e){}})();
 window.oppPNum=function(i,v){if(G.oppLineup&&G.oppLineup[i])G.oppLineup[i].num=v;};
 window.oppPName=function(i,v){if(G.oppLineup&&G.oppLineup[i])G.oppLineup[i].name=v;};
+window.oppEditNum=function(v){const e=G.oppLineup&&G.oppLineup[editSlot];if(e){e.num=v;}};
+window.oppEditName=function(v){const e=G.oppLineup&&G.oppLineup[editSlot];if(e){e.name=v;}};
+/* Opponent lineup, full mirror of your team: each batting-order entry carries a defensive .pos;
+   G.oppBench holds opp players not in the order (for pinch hitter/runner). The scorer only reads
+   .num/.name for the bug, so positions/bench are record-keeping that doesn't affect scoring. */
+function oppList(){ if(!Array.isArray(G.oppLineup))G.oppLineup=[]; return G.oppLineup; }
+function oppBenchList(){ if(!Array.isArray(G.oppBench))G.oppBench=[]; return G.oppBench; }
+function oppAtPos(P){ return oppList().findIndex(e=>e&&e.pos===P); }
+function oppPitcher(){ const i=oppAtPos("P"); return i>=0?oppList()[i]:null; }
+function oppAssignPos(i,P){ const L=oppList(); if(!L[i])return; const prev=L[i].pos||null; const other=oppAtPos(P); if(other>=0&&other!==i)L[other].pos=prev; L[i].pos=P; }
+function oppDefaultPositions(){ const L=oppList(); POSLIST.forEach((P,k)=>{ if(L[k]&&!L[k].pos)L[k].pos=P; }); }
 
 const battingKey=()=>G.half==="T"?"away":"home";
 const ptr=()=>battingKey()==="away"?G.awayPtr:G.homePtr;
@@ -742,8 +753,10 @@ function startNewGame(){
   G.runCap=keep.runCap; G.oppBatters=keep.oppBatters; G.ourSide=keep.ourSide; G.innings=keep.innings; G.lineup=keep.lineup;
   G.league=keep.league; G.mercy=keep.mercy; G.pitchMax=keep.pitchMax; if(keep.alerts)G.alerts=keep.alerts;
   const ot=oppTeamId&&teamById(oppTeamId);
-  G.oppLineup = ot ? ot.players.map(p=>({num:p.num,name:p.name})) : Array.from({length:Math.max(1,G.oppBatters)},(_,i)=>({num:String(i+1),name:""}));
+  const _allOpp = ot ? ot.players.map(p=>({num:p.num,name:p.name})) : Array.from({length:Math.max(1,G.oppBatters)},(_,i)=>({num:String(i+1),name:""}));
+  G.oppLineup = _allOpp.slice(0,12); G.oppBench = _allOpp.slice(12);   // 12 bat (continuous); extras → bench
   if(ot) G.oppBatters=G.oppLineup.length;
+  oppDefaultPositions();
   settingsMode=false; resetAlerts();
   lineupTab="us"; hist=[]; gameFeed=[]; resetUI(); mode="lineup"; render(); broadcast();
 }
@@ -2620,16 +2633,29 @@ function actionArea(){
     const luToggle=`<div style="display:flex;gap:8px;flex-shrink:0">${tabBtn("us",OUR.name,OUR.color)}${tabBtn("opp",OPP.name,OPP.color)}</div>`;
     if(lineupTab==="opp"){
       if(!G.oppLineup)G.oppLineup=Array.from({length:Math.max(1,G.oppBatters)},(_,i)=>({num:String(i+1),name:""}));
-      const orows=G.oppLineup.map((e,i)=>`<div style="display:flex;align-items:center;gap:6px;background:${T.surface};border:1px solid ${T.line};border-radius:9px;padding:6px 8px">
-          <span style="font-family:${MONO};font-size:16px;font-weight:700;color:${T.sageDim};width:20px;text-align:center">${i+1}</span>
-          <input value="${(e.num||"").replace(/"/g,"&quot;")}" oninput="oppPNum(${i},this.value)" inputmode="numeric" maxlength="3" style="width:46px;text-align:center;font-family:${MONO};font-weight:800;background:${T.surface2};border:1px solid ${T.line};color:${T.ink};border-radius:7px;padding:8px 4px;outline:none">
-          <input value="${(e.name||"").replace(/"/g,"&quot;")}" oninput="oppPName(${i},this.value)" placeholder="Opponent hitter" style="flex:1;min-width:0;background:${T.surface2};border:1px solid ${T.line};color:${T.ink};border-radius:7px;padding:8px 10px;font-weight:700;outline:none">
-          <button data-act="opprem" data-arg="${i}" style="background:none;border:1px solid ${T.line};color:${T.out};border-radius:7px;padding:8px 10px;font-weight:800"${G.oppLineup.length<=1?" disabled":""}>&times;</button></div>`).join("");
-      return `<div style="flex-shrink:0"><div style="font-family:${MONO};font-size:20px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:${T.lime}">Lineups</div>
-          <div style="font-size:11px;color:${T.sage};margin-top:2px">${OPP.name} &middot; batting order (names show on the bug)</div></div>
+      if(!G.oppLineup.some(e=>e&&e.pos))oppDefaultPositions();
+      const L=oppList(), bench=oppBenchList(), n=L.length, pit=oppPitcher();
+      const orows=L.map((e,i)=>{ const pos=(e.pos)||"—",isP=pos==="P"; const nm=((e.name||"").trim())||"Hitter";
+        return `<div data-opprow data-i="${i}" style="display:flex;align-items:center;gap:6px;background:${T.surface};border:1px solid ${T.line};border-radius:9px;padding:8px 8px">
+          <span data-oppdrag style="cursor:grab;color:${T.sageDim};display:flex;align-items:center;padding:4px 2px;touch-action:none">${IC('<path d="M4 7h16M4 12h16M4 17h16"/>')}</span>
+          <span style="font-family:${MONO};font-size:17px;font-weight:800;color:${T.lime};width:18px;text-align:center">${i+1}</span>
+          <button data-act="oppedit" data-arg="${i}" style="flex:1;min-width:0;text-align:left;background:transparent;border:none;color:${T.chalk};font-size:18px;font-weight:700;display:flex;align-items:center;gap:8px;overflow:hidden"><span style="font-family:${MONO};color:${OPP.color};min-width:34px">#${(e.num||"").toString().replace(/</g,"")}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${nm.replace(/</g,"&lt;")}</span></button>
+          <button data-act="opppickpos" data-arg="${i}" style="background:${isP?OPP.color:T.surface2};border:1px solid ${isP?OPP.color:T.line};color:${isP?"#FFFFFF":T.chalk};border-radius:7px;padding:8px 12px;font-family:${MONO};font-size:16px;font-weight:800;min-width:50px">${pos}</button></div>`;}).join("");
+      const benchHtml=bench.length?bench.map((e,j)=>`<button data-act="oppbenchin" data-arg="${j}" title="Pinch in" style="font-family:${MONO};font-size:14px;color:${T.chalk};background:${T.surface};border:1px solid ${T.line};border-radius:6px;padding:6px 10px;white-space:nowrap">#${(e.num||"").toString().replace(/</g,"")} ${((e.name||"").trim()||"sub").replace(/</g,"&lt;")} <span style="color:${T.lime};font-weight:800">+</span></button>`).join(" "):`<span style="font-size:12px;color:${T.sageDim}">No bench players</span>`;
+      return `<div class="frost-card" style="flex-shrink:0;display:flex;align-items:center;gap:10px;background:${T.surface};border:1px solid ${T.line};border-radius:14px;padding:10px 12px">
+          <button data-act="lineupback" style="${ghost};padding:9px 13px;flex:none">&lsaquo; Back</button>
+          <div style="flex:1;min-width:0"><div style="font-family:${MONO};font-size:20px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:${T.lime}">Lineups</div>
+            <div style="font-size:11px;color:${T.sage};margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${OPP.name} &middot; batting ${n} &middot; drag to reorder</div></div></div>
         ${luToggle}
-        <div style="flex:1 1 auto;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:6px">${orows}</div>
-        <button data-act="oppadd" style="${ghost};flex-shrink:0">+ Add hitter</button>
+        <div style="flex-shrink:0;display:flex;align-items:center;justify-content:space-between;background:${T.surface2};border:1px solid ${T.line};border-radius:9px;padding:9px 12px">
+          <span style="font-size:14px;color:${T.sage}">Pitcher</span>
+          <button data-act="opppickpitch" style="background:transparent;border:none;color:${T.chalk};font-size:18px;font-weight:700;display:flex;align-items:center;gap:8px">${pit?`<span style="font-family:${MONO};color:${OPP.color}">#${(pit.num||"").toString().replace(/</g,"")}</span>${((pit.name||"").trim()||"Pitcher").replace(/</g,"&lt;")}`:`<span style="color:${T.sageDim}">Set pitcher</span>`}<span style="font-size:12px;color:${OPP.color};font-weight:700;margin-left:4px">CHANGE</span></button></div>
+        <div id="opp-list" style="flex:1 1 auto;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:6px">${orows}</div>
+        <div style="flex-shrink:0;display:flex;gap:8px">
+          <button data-act="oppadd" style="${ghost};flex:1" ${n>=12?"disabled":""}>+ Add hitter</button>
+          <button data-act="oppbenchadd" style="${ghost};flex:1">+ Add bench</button></div>
+        <div style="flex-shrink:0"><div style="font-size:10px;color:${T.sageDim};letter-spacing:.6px;margin:0 2px 5px">BENCH &middot; tap to pinch into the order</div>
+          <div style="display:flex;flex-wrap:wrap;gap:5px">${benchHtml}</div></div>
         <button data-act="lineupdone" style="${bigBtn(T.lime,"")}flex-shrink:0">Done</button>`;
     }
     const rows=G.lineup.order.map((ri,slot)=>{const p=ROSTER[ri],pos=posOfPlayer(ri)||"—",isP=pos==="P";
@@ -2693,6 +2719,37 @@ function actionArea(){
         <div><div style="${lb}">Last name</div>
           <input type="text" value="${(p.last||"").replace(/"/g,"&quot;")}" placeholder="Last" oninput="edLast(this.value)" style="${fld}"></div>
         <button data-act="backlineup" style="${bigBtn(OUR.color)}">Done</button>
+      </div>`),"backlineup");
+  }
+  if(mode==="opppickpos"){
+    const e=oppList()[editSlot]||{}, cur=e.pos||null;
+    const cells=POSLIST.map(p=>{const oi=oppAtPos(p),who=oi>=0?oppList()[oi]:null,sel=p===cur;const wn=who?(((who.name||"").trim())||("#"+(who.num||""))):"—";
+      return `<button data-act="oppsetpos" data-arg="${p}" style="display:flex;flex-direction:column;gap:4px;align-items:center;background:${sel?OPP.color:T.surface};border:1px solid ${sel?OPP.color:T.line};color:${sel?"#08111f":T.chalk};border-radius:9px;padding:16px 6px;font-family:${MONO};font-weight:800;font-size:23px">${p}<span style="font-size:13px;font-weight:600;color:${sel?"#08111f":T.sage};max-width:96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${wn.replace(/</g,"&lt;")}</span></button>`;}).join("");
+    return step(`${(((e.name||"").trim())||("#"+(e.num||"")))} — position`,"Tap a spot. It swaps with whoever's there.",
+      `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">${cells}</div>`,"backlineup");
+  }
+  if(mode==="opppickpitch"){
+    const L=oppList(),curP=oppAtPos("P");
+    const list=L.map((e,i)=>{const here=i===curP,nm=(((e.name||"").trim())||("#"+(e.num||(i+1))));
+      return `<button data-act="oppsetpitch" data-arg="${i}" style="display:flex;justify-content:space-between;align-items:center;background:${here?T.surface2:T.surface};border:1px solid ${here?OPP.color:T.line};color:${T.chalk};border-radius:9px;padding:11px 13px;font-size:14px;font-weight:700">
+        <span style="display:flex;gap:9px;align-items:center"><span style="font-family:${MONO};color:${OPP.color};min-width:32px">#${(e.num||"").toString().replace(/</g,"")}</span>${nm.replace(/</g,"&lt;")}</span>
+        <span style="font-family:${MONO};font-size:11px;color:${T.sage}">${here?"PITCHING":(e.pos||"")}</span></button>`;}).join("");
+    return step("Who's pitching?","Pick the opponent's pitcher — they take the P spot.",
+      `<div style="display:flex;flex-direction:column;gap:6px">${list}</div>`,"backlineup");
+  }
+  if(mode==="oppeditplayer"){
+    const e=oppList()[editSlot]||{num:"",name:""};
+    const fld=`background:${T.surface};border:1px solid ${T.line};color:${T.ink};border-radius:10px;padding:14px 16px;font-family:${SANS};font-size:16px;font-weight:700;outline:none;width:100%`;
+    const lb=`font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin:0 2px 6px`;
+    return step("Edit opponent hitter",`Batting ${editSlot+1} &middot; number &amp; name.`,
+      (`<div style="display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;gap:10px">
+          <div style="flex:none;width:92px"><div style="${lb}">Number</div>
+            <input type="text" inputmode="numeric" maxlength="3" value="${(e.num||"").toString().replace(/"/g,"&quot;")}" oninput="oppEditNum(this.value)" style="${fld};text-align:center;font-family:${MONO};font-weight:800"></div>
+          <div style="flex:1"><div style="${lb}">Name</div>
+            <input type="text" value="${(e.name||"").replace(/"/g,"&quot;")}" placeholder="Hitter name" oninput="oppEditName(this.value)" style="${fld}"></div></div>
+        ${oppList().length>1?`<button data-act="oppbenchout" style="${ghost};display:flex;align-items:center;justify-content:center;gap:8px">&minus; Move to bench (sub out)</button>`:""}
+        <button data-act="backlineup" style="${bigBtn(OPP.color)}">Done</button>
       </div>`),"backlineup");
   }
   if(mode==="summary"){
@@ -2919,6 +2976,36 @@ function setupLineupDrag(){
     });
   });
 }
+/* Same drag, for the OPPONENT batting order (commits a reordered G.oppLineup). */
+function setupOppDrag(){
+  const list=document.getElementById("opp-list"); if(!list)return;
+  list.querySelectorAll('[data-oppdrag]').forEach(handle=>{
+    handle.addEventListener('pointerdown',e=>{
+      e.preventDefault();
+      const row=handle.closest('[data-opprow]'); if(!row)return;
+      row.style.opacity='0.55'; row.style.boxShadow='0 6px 16px rgba(15,30,60,.25)';
+      document.body.style.userSelect='none';
+      const move=ev=>{
+        const rows=[...list.querySelectorAll('[data-opprow]')];
+        for(const r of rows){ if(r===row)continue;
+          const b=r.getBoundingClientRect();
+          if(ev.clientY < b.top + b.height/2){ list.insertBefore(row,r); return; } }
+        list.appendChild(row);
+      };
+      const up=()=>{
+        window.removeEventListener('pointermove',move);
+        window.removeEventListener('pointerup',up);
+        document.body.style.userSelect='';
+        row.style.opacity=''; row.style.boxShadow='';
+        const ord=[...list.querySelectorAll('[data-opprow]')].map(r=>+r.dataset.i);
+        G.oppLineup=ord.map(i=>oppList()[i]);   // commit the reordered batting order
+        render(); broadcast();
+      };
+      window.addEventListener('pointermove',move);
+      window.addEventListener('pointerup',up);
+    });
+  });
+}
 /* ---- drag-to-reorder a SAVED lineup in the builder (teamTab==="lineupedit") ---- */
 function setupBuilderDrag(){
   const list=document.getElementById("lu-list"); if(!list)return;
@@ -2971,7 +3058,7 @@ function render(){
   // canScoreNow() is permissive during sync, so this never strands a real scorer in Viewer.
   if(viewMode==="scorer" && !canScoreNow()) viewMode="viewer";
   renderToolbar();
-  const menu=(mode==="home"||mode==="teams"||mode==="team"||mode==="pickteam"||mode==="newgame"||mode==="lineup"||mode==="pickplayer"||mode==="pickpos"||mode==="editplayer"||mode==="summary"||mode==="settings"||mode==="directory"||mode==="teamstats"||mode==="debug"||mode==="player"||mode==="followcal");
+  const menu=(mode==="home"||mode==="teams"||mode==="team"||mode==="pickteam"||mode==="newgame"||mode==="lineup"||mode==="pickplayer"||mode==="pickpos"||mode==="editplayer"||mode==="opppickpos"||mode==="opppickpitch"||mode==="oppeditplayer"||mode==="summary"||mode==="settings"||mode==="directory"||mode==="teamstats"||mode==="debug"||mode==="player"||mode==="followcal");
   if(IS_APP&&window.AllStars.setInGame){ try{ AllStars.setInGame(!menu); }catch(e){} }   // hide native tabs during a game
   // Push the live score to the native compositor so it's burned into the broadcast.
   if(IS_APP&&!menu&&window.AllStars.setScore){ try{
@@ -2997,6 +3084,7 @@ function render(){
     if(prevScroll){ const c=document.querySelector("#content > div"); if(c)c.scrollTop=prevScroll; }
     if(prevLineup){ const l=document.getElementById("lineup-list"); if(l)l.scrollTop=prevLineup; }
     if(mode==="lineup")setupLineupDrag();
+    if(mode==="lineup"&&lineupTab==="opp")setupOppDrag();
     if(building)setupBuilderDrag();
     return;
   }
@@ -3328,8 +3416,17 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="lineup"){mode="lineup";render();}
   else if(act==="lineupdone"){ gameActive=true;mode="idle";render();broadcast(); }   // timer starts on first pitch (see recordPitch)
   else if(act==="lutab"){lineupTab=arg;render();}
-  else if(act==="oppadd"){if(!G.oppLineup)G.oppLineup=[];G.oppLineup.push({num:String(G.oppLineup.length+1),name:""});G.oppBatters=G.oppLineup.length;render();}
-  else if(act==="opprem"){if(G.oppLineup&&G.oppLineup.length>1){G.oppLineup.splice(+arg,1);G.oppBatters=G.oppLineup.length;render();broadcast();}}
+  else if(act==="oppadd"){const L=oppList();if(L.length<12){L.push({num:String(L.length+1),name:""});G.oppBatters=L.length;}render();}
+  else if(act==="opprem"){if(oppList().length>1){oppList().splice(+arg,1);G.oppBatters=oppList().length;render();broadcast();}}
+  // ---- opponent lineup editor (full mirror): positions, pitcher, bench/pinch, edit ----
+  else if(act==="oppedit"){editSlot=+arg;mode="oppeditplayer";render();}
+  else if(act==="opppickpos"){editSlot=+arg;mode="opppickpos";render();}
+  else if(act==="oppsetpos"){oppAssignPos(editSlot,arg);mode="lineup";render();broadcast();}
+  else if(act==="opppickpitch"){mode="opppickpitch";render();}
+  else if(act==="oppsetpitch"){oppAssignPos(+arg,"P");mode="lineup";render();broadcast();}
+  else if(act==="oppbenchadd"){oppBenchList().push({num:"",name:""});render();}
+  else if(act==="oppbenchin"){const b=oppBenchList();const e=b.splice(+arg,1)[0];if(e&&oppList().length<12){oppList().push(e);G.oppBatters=oppList().length;}render();broadcast();}
+  else if(act==="oppbenchout"){const i=editSlot;const e=oppList().splice(i,1)[0];if(e){delete e.pos;oppBenchList().push(e);}G.oppBatters=oppList().length;mode="lineup";render();broadcast();}
   else if(act==="home"){mode="home";render();}
   else if(act==="resume"){mode="idle";render();}
   else if(act==="resumegame"){G.final=false;mode="idle";render();broadcast();}
@@ -3433,7 +3530,7 @@ function renderToolbar(){
   // Menu / non-game screens that must NOT show the in-game top bar (Scorer/Viewer toggle, Share,
   // LIVE dot). "directory" (Find a team) and "teamstats" (public team stats) were missing, so the
   // toolbar wrongly appeared on those browse pages.
-  const menuModes=["home","teams","team","pickteam","newgame","lineup","pickplayer","pickpos","editplayer","summary","settings","directory","teamstats","debug","player","followcal"];
+  const menuModes=["home","teams","team","pickteam","newgame","lineup","pickplayer","pickpos","editplayer","opppickpos","opppickpitch","oppeditplayer","summary","settings","directory","teamstats","debug","player","followcal"];
   const playMode2=!menuModes.includes(mode);
   // No top bar on menu screens (home/teams/etc.) — it duplicated the page title and
   // showed a misleading "LIVE" relay dot before any game. Reclaims that space.
@@ -3761,6 +3858,7 @@ function applySetupParams(){
   G.lineup.order=Array.from({length:batters},(_,i)=>i);            // our continuous batting order
   G.oppBatters=batters;
   G.oppLineup=Array.from({length:batters},(_,i)=>({num:String(i+1),name:""}));
+  G.oppBench=[]; oppDefaultPositions();
   curTeamId=null; oppTeamId=null; gameActive=true; hist=[]; gameFeed=[]; resetUI(); mode="lineup";
   return true;
 }
@@ -3810,7 +3908,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v130";
+var APP_VERSION="v131";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
