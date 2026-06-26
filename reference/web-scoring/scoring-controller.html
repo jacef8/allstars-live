@@ -1465,9 +1465,8 @@ window.ngStartTime=function(v){ if(!v)return; const a=v.split(":"); const d=new 
 
 function statusBar(){
   const tabRow=(t,val,act)=>{const lg=TEAMS[t].logo;return `<div style="display:flex;align-items:center;height:34px">
-      <span style="width:5px;height:100%;background:${TEAMS[t].color};border-radius:2px;opacity:${act?1:.45}"></span>
-      ${lg?`<img src="${lg}" alt="" style="width:25px;height:25px;object-fit:contain;border-radius:5px;margin-left:8px;background:#fff;${act?"":"opacity:.55"}">`:""}
-      <span style="font-family:${MONO};font-weight:700;font-size:19px;letter-spacing:.4px;color:${act?T.chalk:T.sage};margin-left:${lg?"8px":"11px"};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${TEAMS[t].short}</span>
+      ${lg?`<img src="${lg}" alt="" style="width:27px;height:27px;object-fit:contain;border-radius:5px;background:#fff;${act?"":"opacity:.55"}">`:`<span style="width:5px;height:100%;background:${TEAMS[t].color};border-radius:2px;opacity:${act?1:.45}"></span>`}
+      <span style="font-family:${MONO};font-weight:700;font-size:19px;letter-spacing:.4px;color:${act?T.chalk:T.sage};margin-left:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${TEAMS[t].short}</span>
       <span class="sb-score num" id="sb-score-${t}" style="margin-left:auto;padding-left:12px;font-weight:800;font-size:32px;line-height:1;color:${act?T.chalk:T.sage}"><span class="digit">${val}</span></span>
     </div>`;};
   // base diamond: 2nd top, 1st right, 3rd left
@@ -4199,7 +4198,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v149";
+var APP_VERSION="v150";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
