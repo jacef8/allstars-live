@@ -1915,11 +1915,11 @@ function actionArea(){
     // Share only makes sense once a game (and its stream link) exists.
     // "Share game link" only makes sense once a game is live (it shares the viewer/watch link).
     // No game in progress → no button (was confusing on a fresh home screen).
-    const shareBtnHome = gameActive ? `<button data-act="share" style="flex:none;display:flex;align-items:center;justify-content:center;gap:9px;background:${T.surface};border:1px solid ${T.line};color:${T.chalk};border-radius:12px;padding:13px;font-family:${SANS};font-weight:800;font-size:15px">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="${T.lime}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="19" r="2.6"/><path d="M8.3 10.8 15.7 6.4M8.3 13.2l7.4 4.4"/></svg>Share live game &middot; ${(OUR.short||"US")} vs ${(OPP.short||"OPP")}</button>` : "";
-    // Always available: share the APP itself (text/email/QR) so others can download it.
-    const shareAppBtn = `<button data-act="shareapp" style="flex:none;display:flex;align-items:center;justify-content:center;gap:9px;background:${T.surface2};border:1px solid ${T.line};color:${T.sage};border-radius:12px;padding:12px;font-family:${SANS};font-weight:800;font-size:14px">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${T.lime}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="19" r="2.6"/><path d="M8.3 10.8 15.7 6.4M8.3 13.2l7.4 4.4"/></svg>Share All-Stars Live</button>`;
+    const shareIco=`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="${T.lime}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="19" r="2.6"/><path d="M8.3 10.8 15.7 6.4M8.3 13.2l7.4 4.4"/></svg>`;
+    // Compact share row — share the live game (only while one's on) and share the app itself. Kept
+    // small so they never push the team cards into a scroll.
+    const shareBtnHome = gameActive ? `<button data-act="share" style="flex:1;min-width:0;display:flex;align-items:center;justify-content:center;gap:7px;background:${T.surface};border:1px solid ${T.line};color:${T.chalk};border-radius:11px;padding:9px 12px;font-family:${SANS};font-weight:800;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${shareIco}Share game &middot; ${(OUR.short||"US")} vs ${(OPP.short||"OPP")}</button>` : "";
+    const shareAppBtn = `<button data-act="shareapp" style="flex:1;min-width:0;display:flex;align-items:center;justify-content:center;gap:7px;background:${T.surface2};border:1px solid ${T.line};color:${T.sage};border-radius:11px;padding:9px 12px;font-family:${SANS};font-weight:800;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${shareIco}Share All-Stars Live</button>`;
     // Cloud sign-in bar — only appears once Firebase is configured (firebase-config.js apiKey).
     // Until then it's empty and the home looks/works exactly as the local-only version.
     const C=window.Cloud;
@@ -1990,11 +1990,11 @@ function actionArea(){
             ${actionsRow}
             ${teamsArea}
             ${followingBlock?`<div style="flex:none">${followingBlock}</div>`:""}
-            <div style="flex:none;display:flex;flex-direction:column;gap:10px">${shareBtnHome}${shareAppBtn}${authBar}</div>
+            <div style="flex:none;display:flex;flex-direction:column;gap:8px"><div style="display:flex;gap:8px">${shareBtnHome}${shareAppBtn}</div>${authBar}</div>
           </div>
         </div>`;
     }
-    return `<div style="position:relative;min-height:100%;display:flex;flex-direction:column;justify-content:safe center;gap:14px;padding:6px 0">${settingsGear}${hero}${resumeBtn}${newGameBtn}${showTeams?teamsBlock:""}${showTeams?manageBtn:""}${followingBlock}${shareBtnHome}${shareAppBtn}${authBar}</div>`;
+    return `<div style="position:relative;min-height:100%;display:flex;flex-direction:column;justify-content:safe center;gap:14px;padding:6px 0">${settingsGear}${hero}${resumeBtn}${newGameBtn}${showTeams?teamsBlock:""}${showTeams?manageBtn:""}${followingBlock}<div style="display:flex;gap:8px">${shareBtnHome}${shareAppBtn}</div>${authBar}</div>`;
   }
   if(mode==="teams"){
     const sorted=DB.teams.slice().sort((a,b)=>(b.fav?1:0)-(a.fav?1:0));
@@ -3098,7 +3098,7 @@ function render(){
           ${monitorPane()}
         </div>
         <div style="flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;gap:8px">
-          ${focusPlay?"":scoreBar()}${fieldEl}${actionEl}
+          ${focusPlay?"":scoreBar()}${fieldEl}${focusPlay?"":batterCard()}${actionEl}
         </div>
       </div>`;
   } else if(wide){
@@ -3485,11 +3485,9 @@ function renderToolbar(){
   const soundBtn=`<button data-act="soundtoggle" title="${sOn?"Mute sounds":"Unmute sounds"}" style="flex:none;display:flex;align-items:center;justify-content:center;background:${T.surface2};border:1px solid ${T.line};color:${sOn?T.lime:T.sageDim};border-radius:10px;width:42px;height:38px">
       <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4z"/>${sOn?'<path d="M15.5 8.5a5 5 0 0 1 0 7M18.8 6a9 9 0 0 1 0 12"/>':'<path d="M22 9l-6 6M16 9l6 6"/>'}</svg></button>`;
   // Current-batter box back in the top bar (wide scorer, live). It's flex:1 so it fills the middle
-  // The stretched batter box fills the middle and pushes the game controls to the far right
-  // (directly over the scoring buttons). Broadcast/meta stays on the left; otherwise a spacer.
-  const batterTop=(isWide()&&viewMode==="scorer"&&!menuModes.includes(mode))
-    ? `<div style="flex:1;min-width:0;display:flex;padding:0 2px">${batterStrip()}</div>`
-    : `<div style="flex:1"></div>`;
+  // The current batter now lives in the larger AT-BAT card above the scoring buttons (batterCard),
+  // so the top row just keeps a flexible spacer here — pushes the game controls to the far right.
+  const batterTop=`<div style="flex:1"></div>`;
   // LEFT = broadcast/meta (Scorer-Viewer, video, share, sound, LIVE). RIGHT = game info + controls
   // (batter box + Lineup/Log/Home/End/Undo) sitting over the scoring buttons.
   tb.innerHTML=`<div style="display:flex;align-items:center;gap:8px;padding:4px 2px 2px;flex-wrap:nowrap">
@@ -3812,7 +3810,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v129";
+var APP_VERSION="v130";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
