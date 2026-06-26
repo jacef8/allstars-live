@@ -479,13 +479,13 @@ function printStoredGameCard(g,t){
 }
 window.importGame=function(){ pickJSON(function(o){ if(!o||!o.G){try{alert("That's not a game file.");}catch(e){} return;} G=o.G; if(o.OUR)Object.assign(OUR,o.OUR); if(o.OPP)Object.assign(OPP,o.OPP); curTeamId=o.curTeamId||null; oppTeamId=o.oppTeamId||null; const t=curTeamId&&teamById(curTeamId); if(t)ROSTER=t.players; gameActive=true; resetUI(); render(); try{broadcast();}catch(e){} }); };
 /* Season accumulation row, keyed by player id (full box). */
-function seasonRow(t,pid){if(!t.season[pid])t.season[pid]={bat:{ab:0,r:0,h:0,rbi:0,bb:0,k:0},pitch:{ip:0,k:0,bb:0,h:0,r:0},field:{po:0,a:0,e:0}};return t.season[pid];}
+function seasonRow(t,pid){if(!t.season[pid])t.season[pid]={bat:{ab:0,r:0,h:0,rbi:0,bb:0,k:0,sb:0,cs:0},pitch:{ip:0,k:0,bb:0,h:0,r:0},field:{po:0,a:0,e:0}};return t.season[pid];}
 const ourRuns=()=>G.ourSide==="home"?G.home:G.away, oppRuns=()=>G.ourSide==="home"?G.away:G.home;
 /* Roll this game's batting box into the current team's season totals (once per game). */
 function rollupSeason(){const t=curTeam();if(!t)return;
   Object.keys(G.stats).forEach(key=>{const s=G.stats[key];if(s.team!=="our")return;
     const idx=+String(key).replace(/^o/,"");const p=ROSTER[idx];if(!p)return;
-    const r=seasonRow(t,p.id).bat;r.ab+=s.ab||0;r.r+=s.r||0;r.h+=s.h||0;r.rbi+=s.rbi||0;r.bb+=s.bb||0;r.k+=s.k||0;});
+    const r=seasonRow(t,p.id).bat;r.ab+=s.ab||0;r.r+=s.r||0;r.h+=s.h||0;r.rbi+=s.rbi||0;r.bb+=s.bb||0;r.k+=s.k||0;r.sb=(r.sb||0)+(s.sb||0);r.cs=(r.cs||0)+(s.cs||0);});
   saveDB();}
 window.teamPNum=function(id,v){const t=teamById(openTeamId);if(!t)return;const p=t.players.find(p=>p.id===id);if(p){p.num=v;saveDB();}};
 window.teamPFirst=function(id,v){const t=teamById(openTeamId);if(!t)return;const p=t.players.find(p=>p.id===id);if(p){p.first=v;ensureName(p);saveDB();}};
@@ -583,7 +583,7 @@ function buildPlan(kind,bases,batterLabel,batterName,opt,batterKey){
     case"triple":add(batterLabel,batterName,batterColor,0,3,{isBatter:1});adv(3);break;
     case"hr":add(batterLabel,batterName,batterColor,0,4,{isBatter:1});adv(4);break;
     case"error":add(batterLabel,batterName,batterColor,0,1,{isBatter:1});if(r3)add(r3.label,nm(r3),col(r3),3,4);if(r2)add(r2.label,nm(r2),col(r2),2,3);if(r1)add(r1.label,nm(r1),col(r1),1,2);break;
-    case"walk":case"hbp":{
+    case"walk":case"hbp":case"ci":{   // ci = catcher's interference — batter awarded 1st, forced runners advance
       add(batterLabel,batterName,batterColor,0,1,{isBatter:1});
       if(r1){add(r1.label,nm(r1),col(r1),1,2);if(r2){add(r2.label,nm(r2),col(r2),2,3);if(r3)add(r3.label,nm(r3),col(r3),3,4);}else if(r3)add(r3.label,nm(r3),col(r3),3,3);}
       else{if(r2)add(r2.label,nm(r2),col(r2),2,2);if(r3)add(r3.label,nm(r3),col(r3),3,3);} break;}
@@ -886,7 +886,7 @@ function creditBatter(kind,rbi){
   const b=batter(),s=statFor(batterKeyOf(b));
   s.num=b.num; s.name=b.name||("Batter "+b.num); s.team=b.ours?"our":"opp";
   s.slot=b.ours?G.lineup.order.indexOf(b.ri):(b.spot-1);
-  if(!["walk","hbp","sacfly","sacbunt"].includes(kind)) s.ab++;   // AB excludes BB/HBP/sacrifices
+  if(!["walk","hbp","sacfly","sacbunt","ci"].includes(kind)) s.ab++;   // AB excludes BB/HBP/sacrifices/interference
   if(HIT_KINDS.includes(kind)) s.h++;
   if(kind==="walk") s.bb++;
   if(kind==="strikeout") s.k++;
@@ -992,6 +992,8 @@ function brScore(base){ const d=brName(base)+" scores"; brApply({[base]:{dest:4}
 function brCaught(base){ const k=brRunner(base)&&brRunner(base).key; const d=brName(base)+" caught stealing"; brApply({[base]:{out:true}},1,"Caught stealing",d,()=>{ if(k)statFor(k).cs++; }); }
 function brPickoff(base){ const d=brName(base)+" picked off"; brApply({[base]:{out:true}},1,"Picked off",d); }
 function brAdvanceAll(label){ const ov={}; [3,2,1].forEach(b=>{ if(G.bases[b])ov[b]={dest:b+1}; }); brApply(ov,0,label,label); }
+function brOnError(base){ const d=brName(base)+" advances on error"; brApply({[base]:{dest:Math.min(4,base+1)}},0,"Advances on error",d,()=>{ const fs=battingKey()==="away"?"home":"away"; if(G.errors)G.errors[fs]=(G.errors[fs]||0)+1; }); }
+function brOut(base){ const d=brName(base)+" out"; brApply({[base]:{out:true}},1,"Runner out",d); }
 /* The base-running sheet (opened by the "Runners" button when anyone's on base). */
 function baseRunModal(){
   const occ=[3,2,1].filter(b=>G.bases&&G.bases[b]);
@@ -1006,6 +1008,8 @@ function baseRunModal(){
           ${chip("brscore",b,"Score",T.lime,"#fff")}
           ${chip("brcaught",b,"Caught",T.surface,T.out,T.out)}
           ${chip("brpick",b,"Pickoff",T.surface,T.out,T.out)}
+          ${advEvents?chip("bronerror",b,"On error +1",T.surface,T.amber,T.amber):""}
+          ${advEvents?chip("brout",b,"Out",T.surface,T.out,T.out):""}
         </div></div>`;}).join("");
   const gbtn=(act,lbl)=>`<button data-act="${act}" style="flex:1 1 auto;background:${T.surface2};border:1px solid ${T.line};color:${T.chalk};border-radius:9px;padding:11px 8px;font-family:${SANS};font-size:14px;font-weight:800;white-space:nowrap">${lbl}</button>`;
   return `<div data-act="brclose" style="position:fixed;inset:0;z-index:60;background:rgba(8,11,16,.62);display:flex;align-items:center;justify-content:center;padding:16px">
@@ -1118,6 +1122,7 @@ function feedPitch(label,detail){
 // Advanced pitch tracking: when on, the scorer arms a pitch type that's recorded with
 // each pitch. reviewBatter / reviewInn drive the tap-to-review modals (read-only).
 let advPitch=(()=>{try{return localStorage.getItem("al-adv-pitch")==="1";}catch(e){return false;}})();
+let advEvents=(()=>{try{return localStorage.getItem("al-adv-events")==="1";}catch(e){return false;}})();   // detailed events: catcher's interference, runner out / advance-on-error
 let pitchType=null;     // armed (sticky) pitch type while advPitch is on
 let reviewBatter=null;  // batterKey shown in the batter-review modal
 let reviewInn=false;    // inning-log modal open
@@ -2751,11 +2756,15 @@ function actionArea(){
           <div><div style="font-weight:800;color:${T.ink};font-size:19px">Track pitch types</div>
             <div style="color:${T.sage};font-size:14px;margin-top:3px">Adds FB/CB/CH/SL/OTH per pitch while scoring</div></div>
           <button data-act="advtoggle" style="background:${advPitch?T.lime:T.surface2};border:1px solid ${advPitch?T.lime:T.line};color:${advPitch?"#fff":T.sage};border-radius:999px;padding:10px 20px;font-family:${MONO};font-weight:800;font-size:15px;min-width:66px">${advPitch?"ON":"OFF"}</button></div>`;
+    const detailedCard=`<div style="${rowCard}">
+          <div><div style="font-weight:800;color:${T.ink};font-size:19px">Detailed events</div>
+            <div style="color:${T.sage};font-size:14px;margin-top:3px">Adds catcher's interference, runner-out &amp; advance-on-error to the Base-running sheet</div></div>
+          <button data-act="adveventstoggle" style="background:${advEvents?T.lime:T.surface2};border:1px solid ${advEvents?T.lime:T.line};color:${advEvents?"#fff":T.sage};border-radius:999px;padding:10px 20px;font-family:${MONO};font-weight:800;font-size:15px;min-width:66px">${advEvents?"ON":"OFF"}</button></div>`;
     // Print a lineup card pre-filled with the opponent + date/time from this game setup.
     const lineupCardBtn=`<button data-act="nglineupcard" style="${ghost};display:flex;align-items:center;justify-content:center;gap:9px;width:100%;flex:none">${ICN.doc} Print lineup card</button>`;
     // In settings mode (mid-game) we show ONLY the rule cards + Done — no team/side pickers,
     // and no "Start game" (that would reset the live game).
-    const ruleCards=`${leagueCard}${rulebookCard}${runCapCard}${hittersCard}${pitchTypeCard}${alertsCard}${startCard}`;
+    const ruleCards=`${leagueCard}${rulebookCard}${runCapCard}${hittersCard}${pitchTypeCard}${detailedCard}${alertsCard}${startCard}`;
     const doneBtn=`<button data-act="settingsdone" style="${bigBtn(T.lime,"width:100%;font-size:22px;padding:20px")};flex:none;margin-top:2px">Done &#10003;</button>`;
     if(isWide()){
       if(setMode) return `<div style="min-height:100%;display:flex;flex-direction:column;gap:16px;justify-content:safe center">
@@ -2990,6 +2999,7 @@ function actionArea(){
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
         <button data-act="walk" style="${flatBtn}"><span style="color:${T.sage}">${ICN.walk}</span>Walk</button>
         <button data-act="hbp" style="${flatBtn}"><span style="color:${T.sage}">${ICN.hbp}</span>HBP</button></div>
+      ${advEvents?`<button data-act="ci" style="${flatBtn}"><span style="color:${T.sage}">&#9758;</span>Catcher's interference <span style="color:${T.sage};font-weight:600;font-size:11px;text-transform:none;letter-spacing:0">batter to 1st</span></button>`:""}
       ${[1,2,3].some(b=>G.bases&&G.bases[b])?`<button data-act="brsheet" style="${flatBtn};border-left:4px solid ${T.safe}"><span style="color:${T.safe};font-size:16px;line-height:1">&#9826;</span>Base running <span style="color:${T.sage};font-weight:600;font-size:11px;text-transform:none;letter-spacing:0">steal · WP/PB · balk</span></button>`:""}
       <button data-act="endinning" style="${flatBtn};border-left:4px solid ${T.amber}"><span style="color:${T.amber}">${ICN.inning}</span>End Inning <span style="color:${T.sage};font-weight:600;font-size:11px;text-transform:none;letter-spacing:0">${halfLabel} · ${G.outs} out${G.outs===1?"":"s"}</span></button>`;
   }
@@ -3491,10 +3501,13 @@ document.getElementById("app").addEventListener("click",e=>{
   if(act==="brwp"){ brAdvanceAll("Wild pitch"); return; }
   if(act==="brpb"){ brAdvanceAll("Passed ball"); return; }
   if(act==="brbalk"){ brAdvanceAll("Balk"); return; }
+  if(act==="bronerror"){ brOnError(+arg); return; }
+  if(act==="brout"){ brOut(+arg); return; }
   if(act==="closereview"){ reviewBatter=null; render(); return; }
   if(act==="inninglog"){ reviewInn=true; render(); return; }
   if(act==="closeinnlog"){ reviewInn=false; render(); return; }
   if(act==="advtoggle"){ advPitch=!advPitch; try{localStorage.setItem("al-adv-pitch",advPitch?"1":"0");}catch(e){} render(); return; }
+  if(act==="adveventstoggle"){ advEvents=!advEvents; try{localStorage.setItem("al-adv-events",advEvents?"1":"0");}catch(e){} render(); return; }
   if(act==="alerttoggle"){ const c=alertsCfg(); c[arg]=!c[arg]; render(); return; }
   if(act==="alertdismiss"||act==="alertbackdrop"){ activeAlert=null; render(); return; }
   if(act==="alertsilence"){ if(activeAlert)dismissedAlerts.add(activeAlert.key); activeAlert=null; render(); return; }
@@ -3620,6 +3633,7 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="inplay")startInPlay();
   else if(act==="walk")manual("walk","Walk");
   else if(act==="hbp")manual("hbp","Hit by pitch");
+  else if(act==="ci")manual("ci","Catcher's interference");
   else if(act==="cancel"){resetUI();render();}
   else if(act==="contact")chooseContact(arg);
   else if(act==="result")chooseResult(curResults[+arg]);
@@ -4127,7 +4141,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v139";
+var APP_VERSION="v140";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
