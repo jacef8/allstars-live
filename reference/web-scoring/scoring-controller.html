@@ -4167,11 +4167,13 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v146";
+var APP_VERSION="v147";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
-  _vb.setAttribute("style","position:fixed;right:6px;bottom:3px;z-index:9998;font:700 11px 'Saira Condensed',system-ui,sans-serif;color:rgba(255,255,255,.32);letter-spacing:.5px;pointer-events:none");
+  // Bottom-LEFT, inset past the safe area so rounded phone corners / the home indicator don't clip
+  // it (and clear of the bottom-right "Windows" toggle). env() falls back to 0 on devices without it.
+  _vb.setAttribute("style","position:fixed;left:calc(env(safe-area-inset-left,0px) + 12px);bottom:calc(env(safe-area-inset-bottom,0px) + 10px);z-index:9998;font:700 11px 'Saira Condensed',system-ui,sans-serif;color:rgba(255,255,255,.32);letter-spacing:.5px;pointer-events:none");
   document.addEventListener("DOMContentLoaded",function(){ try{document.body.appendChild(_vb);}catch(e){} });
   if(document.body){ document.body.appendChild(_vb); }
 }catch(e){}
