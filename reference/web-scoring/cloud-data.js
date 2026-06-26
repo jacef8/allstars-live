@@ -357,16 +357,35 @@
 
   /* ===== Persistent cloud game — owner/scorer writes games/{id}; anyone with the link reads (watch) ===== */
   var _gp;
-  window.cloudPublishGame = function (id, payload) {
+  // Publish the live game. `meta` carries cross-device coordination fields: who's the ACTIVE scorer
+  // (activeUid/activeName/activeAt — last writer wins, drives the one-scorer-at-a-time handoff),
+  // whether the game is final, and a compact summary so the home screen can show "in progress"
+  // without reading the whole state.
+  window.cloudPublishGame = function (id, payload, meta) {
     var d = fdb(), u = myUid(); if (!d || !u || !id) return;
     if (window._cloudApplying) return;
+    meta = meta || {};
     clearTimeout(_gp);
     _gp = setTimeout(function () {
-      d.collection("games").doc(id).set({
+      var doc = {
         id: id, teamId: payload.teamId || "", ownerUid: u,
         state: payload, updatedAt: Date.now(),
-      }, { merge: true }).catch(function (e) { console.warn("cloudPublishGame:", e.message); });
+        final: !!meta.final,
+        summary: meta.summary || null,
+      };
+      if (meta.activeUid) { doc.activeUid = meta.activeUid; doc.activeName = meta.activeName || ""; doc.activeAt = Date.now(); }
+      d.collection("games").doc(id).set(doc, { merge: true }).catch(function (e) { console.warn("cloudPublishGame:", e.message); });
     }, 1000);
+  };
+  // Cancel a pending debounced publish (used when relinquishing scoring, so a stale write can't
+  // re-claim the active slot after another device took over).
+  window.cloudCancelPublish = function () { clearTimeout(_gp); };
+  // Claim the ACTIVE-scorer slot immediately (take-over) — not debounced, so the handoff is instant.
+  window.cloudClaimScoring = function (id, name) {
+    var d = fdb(), u = myUid(); if (!d || !u || !id) return Promise.resolve();
+    return d.collection("games").doc(id)
+      .set({ activeUid: u, activeName: name || "", activeAt: Date.now() }, { merge: true })
+      .catch(function (e) { console.warn("cloudClaimScoring:", e.message); });
   };
   window.cloudSubscribeGame = function (id, cb) {
     var d = fdb(); if (!d || !id) return function () {};
@@ -374,6 +393,16 @@
       return d.collection("games").doc(id).onSnapshot(function (s) {
         var v = s.exists ? s.data() : null; try { cb(v && v.state ? v.state : null); } catch (e) {}
       }, function (e) { console.warn("game:", e.message); });
+    } catch (e) { return function () {}; }
+  };
+  // Full-doc subscriber (state + activeUid + final + summary) — used for take-over detection and the
+  // home-screen "game in progress" indicator.
+  window.cloudSubscribeGameDoc = function (id, cb) {
+    var d = fdb(); if (!d || !id) return function () {};
+    try {
+      return d.collection("games").doc(id).onSnapshot(function (s) {
+        try { cb(s.exists ? s.data() : null); } catch (e) {}
+      }, function (e) { console.warn("gamedoc:", e.message); });
     } catch (e) { return function () {}; }
   };
 

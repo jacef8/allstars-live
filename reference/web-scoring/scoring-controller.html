@@ -784,6 +784,7 @@ function startNewGame(){
   if(ot) G.oppBatters=G.oppLineup.length;
   oppDefaultPositions();
   settingsMode=false; resetAlerts();
+  amActiveScorer=true; _myClaimAt=Date.now();   // starting a fresh game → I'm the active scorer
   lineupTab="us"; hist=[]; gameFeed=[]; resetUI(); mode="lineup"; render(); broadcast();
 }
 /* Opponent name from the New Game text field (no re-render, so typing keeps focus). */
@@ -1161,6 +1162,52 @@ function applyRemote(raw){
     try{ triggerAnim(G.anim); }catch(e){}   // play the ball-flight + baserunning animation for the viewer
   }catch(e){}
 }
+/* ===== Cross-device live game: one ACTIVE scorer at a time, resumable/handoffable across devices.
+   The live game lives at games/<teamId>-live. Whoever last "claims" is the active scorer; the
+   previous device relinquishes (drops to read-only). Other devices see it "in progress" on Home. ===== */
+let amActiveScorer=true;             // is THIS device the active scorer for the current game?
+let _myClaimAt=0;                    // when I last claimed scoring (vs another device's claim)
+let _takeoverUnsub=null,_takeoverTeam=null;
+let _liveGames={},_liveHomeSubs={};  // teamId → {summary,activeUid,activeName} for the Home "in progress" row
+function myCloudUid(){ return (window.Cloud&&window.Cloud.user&&window.Cloud.user.uid)||""; }
+function myCloudName(){ try{ return window.cloudMyName?window.cloudMyName():""; }catch(e){ return ""; } }
+// Watch our live doc so that if ANOTHER device takes over scoring, we relinquish and follow read-only.
+function watchLiveTakeover(teamId){
+  if(!teamId||!window.cloudSubscribeGameDoc) return;
+  if(_takeoverTeam===teamId&&_takeoverUnsub) return;
+  if(_takeoverUnsub){ try{_takeoverUnsub();}catch(e){} _takeoverUnsub=null; }
+  _takeoverTeam=teamId;
+  _takeoverUnsub=window.cloudSubscribeGameDoc(teamId+"-live",function(doc){
+    if(!doc||!doc.activeUid) return;
+    if(doc.activeUid!==myCloudUid() && (doc.activeAt||0)>=_myClaimAt && amActiveScorer){
+      amActiveScorer=false;
+      try{ if(window.cloudCancelPublish)window.cloudCancelPublish(); }catch(e){}   // don't let a pending write re-claim
+      flash("Scoring taken over"+(doc.activeName?(" by "+doc.activeName):"")+" — now watching");
+      viewMode="viewer"; _remoteLive=true;
+      try{ if(window._watchUnsub)window._watchUnsub(); }catch(e){}
+      try{ window._watchUnsub=window.cloudSubscribeGame(teamId+"-live",function(state){ if(state){ try{ applyRemote(Object.assign({type:"full"},state)); }catch(e){} } }); }catch(e){}
+      render();
+    }
+  });
+}
+// Subscribe to live docs for all teams I can score, so Home can show "game in progress · take over".
+function setupLiveHomeWatch(){
+  if(!(window.Cloud&&window.Cloud.user&&window.cloudSubscribeGameDoc)) return;
+  (DB.teams||[]).forEach(function(t){
+    if(!(window.cloudIsScorer&&window.cloudIsScorer(t))) return;
+    if(_liveHomeSubs[t.id]) return;
+    _liveHomeSubs[t.id]=window.cloudSubscribeGameDoc(t.id+"-live",function(doc){
+      if(doc&&!doc.final&&doc.summary&&doc.activeUid) _liveGames[t.id]={summary:doc.summary,activeUid:doc.activeUid,activeName:doc.activeName||"",activeAt:doc.activeAt||0};
+      else delete _liveGames[t.id];
+      if(mode==="home")render();
+    });
+  });
+}
+// Live games on OTHER devices that I'm not already actively scoring locally (drives the Home row).
+function otherLiveGames(){ return (DB.teams||[]).filter(function(t){
+  if(!_liveGames[t.id]) return false;
+  if(gameActive&&curTeamId===t.id&&amActiveScorer&&_liveGames[t.id].activeUid===myCloudUid()) return false;  // it's mine, here
+  return true; }).map(function(t){ return {team:t, live:_liveGames[t.id]}; }); }
 let _seq=0,_event=null,_eventId=0,_pitch=null;
 let phonePane="score";   // phone-only paging: "score" | "video" (large screens show both)
 let summaryTeam="us";    // end-game box score: which team's batting/pitching to show ("us" | "opp")
@@ -1251,7 +1298,15 @@ function broadcast(){
   const _full={type:"full",G:G,ROSTER:ROSTER,OUR:OUR,OPP:OPP,curTeamId:curTeamId,oppTeamId:oppTeamId,gameFeed:gameFeed};
   try{ LINK.send(_full); }catch(e){}
   // Persist the game to the cloud so it survives a dead phone + co-scorers share it (owner/scorer only).
-  try{ if(window.Cloud&&window.Cloud.user&&curTeamId&&window.cloudPublishGame){ const _t=teamById(curTeamId); if(_t&&window.cloudIsScorer&&window.cloudIsScorer(_t)){ if(!G.cloudId)G.cloudId=curTeamId+"-"+Date.now().toString(36); window.cloudPublishGame(G.cloudId, Object.assign({teamId:curTeamId},_full)); } } }catch(e){}
+  try{ if(window.Cloud&&window.Cloud.user&&curTeamId&&window.cloudPublishGame){ const _t=teamById(curTeamId);
+    if(_t&&window.cloudIsScorer&&window.cloudIsScorer(_t)&&amActiveScorer){
+      G.cloudId=curTeamId+"-live";                                   // stable per-team live doc (resumable cross-device)
+      if(!_myClaimAt)_myClaimAt=Date.now();
+      const _meta={ final:!!G.final, activeUid:myCloudUid(), activeName:myCloudName(),
+        summary:{a:TEAMS.away.short||"AWAY",h:TEAMS.home.short||"HOME",as:G.away|0,hs:G.home|0,inn:G.inning|0,half:G.half} };
+      window.cloudPublishGame(G.cloudId, Object.assign({teamId:curTeamId},_full), _meta);
+      try{ watchLiveTakeover(curTeamId); }catch(e){}
+    } } }catch(e){}
   _seq++; const k=battingKey(),b=batter();
   LINK.send({type:"state",seq:_seq,
     away:G.away,home:G.home,inning:G.inning,half:G.half,balls:G.balls,strikes:G.strikes,outs:G.outs,
@@ -2164,6 +2219,12 @@ function actionArea(){
             style="height:clamp(112px,calc(var(--avh) * 20),156px);width:auto;display:block;filter:drop-shadow(0 8px 18px rgba(0,0,0,.6))">
           <div style="font-family:${MONO};font-size:clamp(26px,3.6vw,42px);font-weight:800;letter-spacing:1.5px;line-height:1;color:#fff">ALL-STARS <span style="color:${T.lime}">LIVE</span></div></div>`;
     const resumeBtn = gameActive?`<button data-act="resume" style="${bigBtn("#FFFFFF","border:1px solid rgba(0,0,0,.10)",T.field)};font-size:17px;padding:16px;display:flex;align-items:center;justify-content:center;gap:8px">${IC(PLAY)} Resume &middot; ${OUR.short} vs ${OPP.short}</button>`:"";
+    // Games live on ANOTHER device for a team I score → "in progress · take over" (cross-device handoff).
+    const _esc=x=>String(x==null?"":x).replace(/</g,"&lt;");
+    const liveRows = otherLiveGames().map(function(o){ const s=o.live.summary||{}; const who=o.live.activeName?(" &middot; "+_esc(o.live.activeName)):"";
+      return `<button data-act="takeoverlive" data-arg="${o.team.id}" style="background:${T.surface};border:1px solid ${T.lime};color:${T.ink};border-radius:13px;padding:13px 15px;display:flex;align-items:center;justify-content:space-between;gap:10px;text-align:left;cursor:pointer">
+        <span style="display:flex;align-items:center;gap:9px;min-width:0"><span style="width:9px;height:9px;border-radius:50%;flex:none;background:#E11D2E;box-shadow:0 0 7px #E11D2E"></span><span style="min-width:0"><span style="font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block">${_esc(s.a||"")} ${s.as|0}–${s.hs|0} ${_esc(s.h||"")}</span><span style="font-size:11px;color:${T.sage}">In progress${who} · tap to take over scoring</span></span></span>
+        <span style="font-family:${MONO};font-weight:800;color:${T.lime};white-space:nowrap">Take over &rsaquo;</span></button>`; }).join("");
     const newGameBtn = `<button data-act="newgamestart" style="${bigBtn(T.lime,"font-size:21px;padding:17px;border:2px solid rgba(255,255,255,.92);box-shadow:0 8px 22px rgba(225,29,46,.34)")}">${IC(PLAY)} New Game</button>`;
     const manageBtn = DB.teams.length
       ? `<button data-act="gototeams" style="${ghost};padding:17px;font-size:17px;border:2px solid rgba(255,255,255,.55);color:${T.ink};display:flex;align-items:center;justify-content:center;gap:9px">${IC('<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>')} Manage teams &amp; rosters</button>`
@@ -2244,13 +2305,14 @@ function actionArea(){
           <div style="width:100%;max-width:1120px;flex:1;min-height:0;display:flex;flex-direction:column;gap:13px">
             ${heroWide}
             ${actionsRow}
+            ${liveRows?`<div style="flex:none;display:flex;flex-direction:column;gap:8px">${liveRows}</div>`:""}
             ${teamsArea}
             ${followingBlock?`<div style="flex:none">${followingBlock}</div>`:""}
             <div style="flex:none;display:flex;flex-direction:column;gap:8px"><div style="display:flex;gap:8px">${shareBtnHome}${shareAppBtn}</div>${authBar}</div>
           </div>
         </div>`;
     }
-    return `<div style="position:relative;min-height:100%;display:flex;flex-direction:column;justify-content:safe center;gap:14px;padding:6px 0">${settingsGear}${hero}${resumeBtn}${newGameBtn}${showTeams?teamsBlock:""}${showTeams?manageBtn:""}${followingBlock}<div style="display:flex;gap:8px">${shareBtnHome}${shareAppBtn}</div>${authBar}</div>`;
+    return `<div style="position:relative;min-height:100%;display:flex;flex-direction:column;justify-content:safe center;gap:14px;padding:6px 0">${settingsGear}${hero}${resumeBtn}${liveRows}${newGameBtn}${showTeams?teamsBlock:""}${showTeams?manageBtn:""}${followingBlock}<div style="display:flex;gap:8px">${shareBtnHome}${shareAppBtn}</div>${authBar}</div>`;
   }
   if(mode==="teams"){
     const sorted=DB.teams.slice().sort((a,b)=>(b.fav?1:0)-(a.fav?1:0));
@@ -3788,7 +3850,24 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="oppbenchin"){const b=oppBenchList();const e=b.splice(+arg,1)[0];if(e&&oppList().length<12){oppList().push(e);G.oppBatters=oppList().length;}render();broadcast();}
   else if(act==="oppbenchout"){const i=editSlot;const e=oppList().splice(i,1)[0];if(e){delete e.pos;oppBenchList().push(e);}G.oppBatters=oppList().length;mode="lineup";render();broadcast();}
   else if(act==="home"){mode="home";render();}
-  else if(act==="resume"){mode="idle";render();}
+  else if(act==="resume"){ amActiveScorer=true; _myClaimAt=Date.now(); mode="idle"; render(); broadcast(); }
+  else if(act==="takeoverlive"){ const teamId=arg;
+    if(!(window.cloudSubscribeGameDoc&&window.Cloud&&window.Cloud.user)){ flash("Sign in to take over scoring"); return; }
+    flash("Loading game…");
+    let got=false,unsub=null;
+    unsub=window.cloudSubscribeGameDoc(teamId+"-live",function(doc){
+      if(got)return; got=true; try{ if(unsub)unsub(); }catch(e){}
+      if(!doc||!doc.state||doc.final){ flash("No live game to take over"); return; }
+      try{ const s=doc.state;
+        G=s.G; if(Array.isArray(s.ROSTER))ROSTER=s.ROSTER; if(s.OUR)Object.assign(OUR,s.OUR); if(s.OPP)Object.assign(OPP,s.OPP);
+        if(Array.isArray(s.gameFeed))gameFeed=s.gameFeed; if(s.curTeamId)curTeamId=s.curTeamId; if(s.oppTeamId!=null)oppTeamId=s.oppTeamId;
+        gameActive=true; G.cloudId=teamId+"-live"; amActiveScorer=true; _myClaimAt=Date.now(); viewMode="scorer"; _remoteLive=false;
+        try{ if(window.cloudClaimScoring)window.cloudClaimScoring(teamId+"-live", myCloudName()); }catch(e){}
+        try{ watchLiveTakeover(teamId); }catch(e){}
+        hist=[]; resetUI(); mode="idle"; flash("You're now scoring this game"); render(); broadcast();
+      }catch(e){ flash("Couldn't load that game"); }
+    });
+  }
   else if(act==="resumegame"){G.final=false;mode="idle";render();broadcast();}
   else if(act==="summary-done"){gameActive=false;mode="teams";render();broadcast();}
   else if(act==="pickplayer"){editSlot=+arg;mode="pickplayer";render();}
@@ -3968,7 +4047,7 @@ window.onCloudAuth=function(u){
   // Signed OUT → drop the cloud listeners AND the local team cache so a shared tablet doesn't keep
   // showing the previous account's teams. (Signing back in re-syncs them from the cloud.)
   if(!u){ try{ if(window.cloudStopSync)window.cloudStopSync(); }catch(e){} try{ DB.teams=[]; curTeamId=null; openTeamId=null; saveDB(); }catch(e){} try{ if(["team","teams","pickteam","settings"].includes(mode)) mode="home"; }catch(e){} try{ render(); }catch(e){} return; }
-  try{ if(window.cloudSyncTeams)window.cloudSyncTeams(); }catch(e){} try{ if(window.cloudClaimInvite)window.cloudClaimInvite(); }catch(e){} try{ if(window.cloudClaimFollow)window.cloudClaimFollow(); }catch(e){} try{ loadCloudFloat(); }catch(e){} try{ if(["home","settings","teams","pickteam"].includes(mode)) mode="home"; }catch(e){} try{ render(); }catch(e){} };   // after sign-in, land on Home
+  try{ if(window.cloudSyncTeams)window.cloudSyncTeams(); }catch(e){} try{ if(window.cloudClaimInvite)window.cloudClaimInvite(); }catch(e){} try{ if(window.cloudClaimFollow)window.cloudClaimFollow(); }catch(e){} try{ loadCloudFloat(); }catch(e){} try{ setupLiveHomeWatch(); }catch(e){} try{ if(["home","settings","teams","pickteam"].includes(mode)) mode="home"; }catch(e){} try{ render(); }catch(e){} };   // after sign-in, land on Home
 
 /* ===== Team chat (modal) — real-time messages; owner/scorers/followers can post, owner can delete ===== */
 let chatTeamId=null, chatUnsub=null, chatMsgs=[];
@@ -4279,7 +4358,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v152";
+var APP_VERSION="v153";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
