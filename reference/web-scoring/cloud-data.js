@@ -22,6 +22,8 @@
       id: t.id, name: t.name || "", short: t.short || "", color: t.color || "#2E6BE6",
       players: t.players || [], record: t.record || { w: 0, l: 0, t: 0 }, season: t.season || {}, fav: !!t.fav,
       schedule: t.schedule || [], lineup: t.lineup || null, rulesUrl: t.rulesUrl || "",
+      lineups: t.lineups || [], activeLineupId: t.activeLineupId || null,   // saved batting orders
+      rulebookId: t.rulebookId || null,
       ownerUid: t.ownerUid || myUid(), ownerEmail: t.ownerEmail || myEmail(),
       scorers: t.scorers || [], followers: t.followers || [], coOwners: t.coOwners || [], updatedAt: Date.now(),
       public: !!t.public, statsPublic: !!t.statsPublic,   // owner-controlled discoverability

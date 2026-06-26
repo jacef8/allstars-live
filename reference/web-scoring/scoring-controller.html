@@ -669,6 +669,13 @@ function batter(){
 }
 const batterLabel=()=>"#"+batter().num;
 function flash(msg){toast=msg;clearTimeout(toastTimer);toastTimer=setTimeout(()=>{toast=null;render();},1900);}
+/* Open a game/practice location in Maps (directions). Native → hand off to the OS via the
+   bridge so it opens the Maps app; browser → a new tab. */
+function openMapLoc(loc){ loc=(loc||"").trim(); if(!loc)return;
+  const url="https://www.google.com/maps/search/?api=1&query="+encodeURIComponent(loc);
+  try{ if(IS_APP&&window.AllStars&&window.AllStars.openExternal){ window.AllStars.openExternal(url); return; } }catch(e){}
+  try{ window.open(url,"_blank","noopener"); }catch(e){ try{ location.href=url; }catch(x){} }
+}
 function fielderLabel(pos){const nm=fielderName(pos);return nm?`${nm} (${pos})`:`${pos} (${POSNUM[pos]})`;}
 /* ---- lineup edits ---- */
 function assignSlot(slot,ri){
@@ -2005,12 +2012,14 @@ function actionArea(){
   if(mode==="team"){
     const t=teamById(openTeamId); if(!t){mode="teams";return actionArea();}
     const cell=`background:${T.surface2};border:1px solid ${T.line};color:${T.ink};border-radius:7px;padding:8px 8px;font-weight:700;outline:none`;
-    const roster=t.players.map((p,i)=>`<div style="display:flex;align-items:center;gap:6px;padding:7px 0;${i>0?`border-top:1px solid ${T.line};`:""}">
-        <input value="${(p.num||"").replace(/"/g,"&quot;")}" oninput="teamPNum('${p.id}',this.value)" inputmode="numeric" maxlength="3" style="${cell};width:46px;text-align:center;font-family:${MONO};font-weight:800">
-        <input value="${(p.first||"").replace(/"/g,"&quot;")}" oninput="teamPFirst('${p.id}',this.value)" placeholder="First" style="${cell};flex:1;min-width:0">
-        <input value="${(p.last||"").replace(/"/g,"&quot;")}" oninput="teamPLast('${p.id}',this.value)" placeholder="Last" style="${cell};flex:1;min-width:0">
-        <button data-act="openplayer" data-arg="${t.id}:${p.id}" title="View / follow player" style="background:${T.surface2};border:1px solid ${T.line};color:${isFollowingPlayer(t.id,p.id)?T.amber:T.lime};border-radius:7px;padding:8px 10px;font-weight:800;flex:none;line-height:1">${isFollowingPlayer(t.id,p.id)?IC('starFill',16):"&rsaquo;"}</button>
-        <button data-act="rmteamp" data-arg="${p.id}" style="background:none;border:1px solid ${T.line};color:${T.out};border-radius:7px;padding:8px 10px;font-weight:800"${t.players.length<=9?" disabled":""}>&times;</button></div>`).join("");
+    const roster=t.players.map((p,i)=>`<div style="display:flex;align-items:center;gap:8px;padding:8px 0;${i>0?`border-top:1px solid ${T.line};`:""}">
+        <span title="Player ${i+1} of ${t.players.length}" style="flex:none;width:26px;text-align:center;font-family:${MONO};font-size:16px;font-weight:800;color:${T.sageDim}">${i+1}</span>
+        <input value="${(p.num||"").replace(/"/g,"&quot;")}" oninput="teamPNum('${p.id}',this.value)" inputmode="numeric" maxlength="3" style="${cell};width:54px;text-align:center;font-family:${MONO};font-weight:800;font-size:18px">
+        <input value="${(p.first||"").replace(/"/g,"&quot;")}" oninput="teamPFirst('${p.id}',this.value)" placeholder="First" style="${cell};flex:1 1 130px;max-width:250px;min-width:0;font-size:18px">
+        <input value="${(p.last||"").replace(/"/g,"&quot;")}" oninput="teamPLast('${p.id}',this.value)" placeholder="Last" style="${cell};flex:1 1 130px;max-width:250px;min-width:0;font-size:18px">
+        <div style="flex:1;min-width:0"></div>
+        <button data-act="openplayer" data-arg="${t.id}:${p.id}" title="View / follow player" style="background:${T.surface2};border:1px solid ${T.line};color:${isFollowingPlayer(t.id,p.id)?T.amber:T.lime};border-radius:7px;padding:9px 12px;font-weight:800;flex:none;line-height:1">${isFollowingPlayer(t.id,p.id)?IC('starFill',16):"&rsaquo;"}</button>
+        <button data-act="rmteamp" data-arg="${p.id}" style="background:none;border:1px solid ${T.line};color:${T.out};border-radius:7px;padding:9px 12px;font-weight:800;flex:none"${t.players.length<=9?" disabled":""}>&times;</button></div>`).join("");
     const sRows=t.players.map(p=>{const s=(t.season[p.id]||{}).bat||{};const ab=s.ab||0,h=s.h||0;const avg=ab?(h/ab).toFixed(3).replace(/^0/,""):"—";
       return `<tr style="border-top:1px solid ${T.line}"><td style="text-align:left;padding:10px 8px;font-weight:700;white-space:nowrap">#${p.num} ${p.name}</td><td style="padding:10px 6px">${ab}</td><td style="padding:10px 6px">${s.r||0}</td><td style="padding:10px 6px">${h}</td><td style="padding:10px 6px">${s.rbi||0}</td><td style="padding:10px 6px">${s.bb||0}</td><td style="padding:10px 6px">${s.k||0}</td><td style="padding:10px 6px;font-weight:800">${avg}</td></tr>`;}).join("");
     const statTable=`<div class="frost-card" style="background:${T.surface};border:1px solid ${T.line};border-radius:14px;padding:14px 18px;overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-family:${MONO};font-size:18px;color:${T.chalk};text-align:center">
@@ -2044,8 +2053,8 @@ function actionArea(){
       return `<div style="display:flex;align-items:center;gap:8px;background:${T.surface2};border:1px solid ${T.line};border-left:5px solid ${isG?OUR.color:T.sage};border-radius:9px;padding:9px 11px">
           <div style="flex:1;min-width:0">
             <div style="font-weight:800;color:${T.ink};font-size:18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${isG?ICN.inplay+" "+(s.opp?("vs "+(s.opp||"").replace(/</g,"")):"Game"):ICN.ball+" Practice"}</div>
-            <div style="font-size:15px;color:${T.sage};margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${fmtSched(s)}${s.loc?(" · "+(s.loc||"").replace(/</g,"")):""}${s.notes?(" · "+(s.notes||"").replace(/</g,"")):""}</div></div>
-          <button data-act="schedrm" data-arg="${s.id}" style="background:none;border:1px solid ${T.line};color:${T.out};border-radius:7px;padding:7px 9px;font-weight:800">&times;</button></div>`;}).join("");
+            <div style="font-size:15px;color:${T.sage};margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${fmtSched(s)}${s.loc?` &middot; <span data-act="openmap" data-arg="${encodeURIComponent(s.loc)}" title="Open in Maps — get directions" style="color:${T.lime};cursor:pointer;text-decoration:underline;text-underline-offset:2px">${IC('<path d="M12 21s-6-5.7-6-10a6 6 0 1 1 12 0c0 4.3-6 10-6 10z"/><circle cx="12" cy="11" r="2.1"/>',13)} ${(s.loc||"").replace(/</g,"&lt;")}</span>`:""}${s.notes?(" &middot; "+(s.notes||"").replace(/</g,"&lt;")):""}</div></div>
+          <button data-act="schedrm" data-arg="${s.id}" style="background:none;border:1px solid ${T.line};color:${T.out};border-radius:7px;padding:7px 9px;font-weight:800;flex:none">&times;</button></div>`;}).join("");
     const fLbl=`font-size:10px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:${T.sageDim};margin:0 2px 3px`;
     const fld=(lbl,inner)=>`<div style="flex:1;min-width:120px;display:flex;flex-direction:column">${lbl?`<div style="${fLbl}">${lbl}</div>`:""}${inner}</div>`;
     const svBtn=(v,lbl)=>`<button data-act="schview" data-arg="${v}" style="flex:1;background:${scheduleView===v?T.lime:T.surface2};color:${scheduleView===v?"#fff":T.sage};border:1px solid ${scheduleView===v?T.lime:T.line};border-radius:8px;padding:8px 0;font-weight:800;font-size:12px;letter-spacing:.4px">${lbl}</button>`;
@@ -3187,6 +3196,10 @@ document.getElementById("app").addEventListener("click",e=>{
   if(act==="schedadd"){ const t=teamById(openTeamId); if(!t)return; const g=id=>{const e=document.getElementById(id);return e?(e.value||""):"";}; const date=g("schDate"); if(!date){flash("Pick a date");return;} const _sel=g("schOppSel"); const opp=(_sel==="__new__"?g("schOppNew"):_sel).trim(); if(!Array.isArray(t.schedule))t.schedule=[];
     const ev={id:"s"+Date.now().toString(36),type:g("schType")||"game",date:date,time:g("schTime"),opp:opp,loc:g("schLoc").trim(),notes:g("schNotes").trim()};
     t.schedule.push(ev); saveDB();
+    // Push the team (with the new game) to the cloud IMMEDIATELY — before the chat message below.
+    // Otherwise the chat message bumps the team's updatedAt, an inbound snapshot (still holding the
+    // OLD schedule, since our own push is debounced) merges back, and the game vanishes a beat later.
+    try{ if(window.cloudSaveTeam) window.cloudSaveTeam(t); }catch(e){}
     // Announce the new event in team chat so everyone following/joined sees it (this also bumps
     // the team's lastMsgAt → the "NEW" badge on their home team card = the in-app notification).
     let posted=false;
@@ -3198,6 +3211,7 @@ document.getElementById("app").addEventListener("click",e=>{
     } }catch(e){}
     flash(posted?"Added — posted to team chat":"Added to schedule");
     render(); return; }
+  if(act==="openmap"){ try{ openMapLoc(decodeURIComponent(arg||"")); }catch(e){} return; }
   if(act==="schedrm"){ const t=teamById(openTeamId); if(t&&Array.isArray(t.schedule)){ t.schedule=t.schedule.filter(s=>s.id!==arg); saveDB(); render(); } return; }
   if(act==="schview"){ scheduleView=(arg==="calendar"?"calendar":"list"); try{localStorage.setItem("al-sched-view",scheduleView);}catch(e){} render(); return; }
   if(act==="calprev"||act==="calnext"){ if(!calYM){const d=new Date();calYM={y:d.getFullYear(),m:d.getMonth()};} let mm=calYM.m+(act==="calnext"?1:-1),yy=calYM.y; if(mm<0){mm=11;yy--;} else if(mm>11){mm=0;yy++;} calYM={y:yy,m:mm}; calSelDay=null; render(); return; }
@@ -3545,7 +3559,16 @@ window.rulesSearch=function(q){
   if(cnt)cnt.textContent=hits.length+" match"+(hits.length===1?"":"es"); body.scrollTop=0;
 };
 (function(){ const rm=document.getElementById("rulesmodal"); if(rm)rm.addEventListener("click",e=>{ if(e.target.id==="rulesmodal")closeRules(); }); })();
-(function(){ const cm=document.getElementById("chatmodal"); if(cm)cm.addEventListener("click",e=>{ if(e.target.id==="chatmodal")closeChat(); });
+(function(){ const cm=document.getElementById("chatmodal"); if(cm)cm.addEventListener("click",e=>{
+    // The chat modal lives OUTSIDE #app, so the main data-act delegation never sees its buttons —
+    // route them here (close / send / delete), then fall through to the backdrop-close.
+    const el=e.target.closest("[data-act]");
+    if(el){ const act=el.getAttribute("data-act"), arg=el.getAttribute("data-arg");
+      if(act==="closechat"){ closeChat(); return; }
+      if(act==="sendmsg"){ sendChat(); return; }
+      if(act==="delmsg"){ if(window.cloudDeleteMessage&&chatTeamId)window.cloudDeleteMessage(chatTeamId,arg); return; }
+    }
+    if(e.target.id==="chatmodal")closeChat(); });
   const ci=document.getElementById("chatInput"); if(ci)ci.addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); sendChat(); } }); })();   // sign-in → sync teams, claim texted invite, repaint
 // OS back button (native): go BACK one screen instead of exiting. Returns true if it handled
 // the back (navigated); false only at the root (home) so the app can background, not close.
@@ -3764,7 +3787,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v124";
+var APP_VERSION="v125";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
