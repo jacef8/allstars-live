@@ -143,6 +143,11 @@ private class ScorerBridge(private val appContext: Context) {
     @JavascriptInterface
     fun stopStream() { main.post { Broadcast.requestStop() } }
 
+    /** Stop the broadcast immediately, NO confirm — used when ending the game auto-ends the stream
+     *  (the End-game confirmation already happened on the web side). No-op if not broadcasting. */
+    @JavascriptInterface
+    fun stopStreamNow() { main.post { if (Broadcast.isActive) Broadcast.stop() } }
+
     /** The web tells us when a game/console is on screen (vs the menus). */
     @JavascriptInterface
     fun setInGame(inGame: Boolean) {

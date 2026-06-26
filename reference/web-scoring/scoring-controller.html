@@ -758,6 +758,7 @@ const capReached=()=>G.runCap>0&&G.halfRuns>=G.runCap;
 function endInning(){snapshot();doFlip();resetUI();flash("Inning ended");render();broadcast();}
 /* Mark the game final (toggle) so the viewer shows its Final summary. Undoable. */
 function endGame(){snapshot();G.final=true;
+  try{ if(window.AllStars&&window.AllStars.stopStreamNow)window.AllStars.stopStreamNow(); }catch(e){}   // ending the game auto-ends the YouTube broadcast
   if(curTeam()&&!G.rolledUp){rollupSeason();const t=curTeam(),o=ourRuns(),p=oppRuns();
     // Archive this game (final score, opponent, date) — the W-L-T record is DERIVED from this
     // log via teamRec(), so the record can never disagree with the games shown below it.
@@ -4358,7 +4359,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v153";
+var APP_VERSION="v154";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;

@@ -50,14 +50,16 @@ class VideoCompositor {
     // stays alive instead of YouTube auto-stopping it. Resumes real frames when the camera
     // returns. lastCamNs = wall time (ms) of the last real camera frame.
     @Volatile private var lastCamNs = 0L
-    private val heartbeat = object : Runnable {
+    // Drive the ENCODER at a steady ~30fps, DECOUPLED from camera-frame arrival, so the YouTube
+    // stream has a constant frame rate (smooth) even when the camera delivers frames unevenly — which
+    // was the cause of the choppy video on good networks. Each tick re-renders the latest camera frame
+    // + overlay (so a camera stall also just freezes the last frame, keeping RTMP alive). Idles slowly
+    // when not streaming so it costs nothing off-air.
+    private val encoderTick = object : Runnable {
         override fun run() {
-            if (encoderSurface != null && lastCamNs > 0L &&
-                System.currentTimeMillis() - lastCamNs > STALE_MS
-            ) {
-                runCatching { renderEncoder() }   // re-push the last frame to keep RTMP alive
-            }
-            handler.postDelayed(this, KEEPALIVE_MS)
+            val attached = encoderSurface != null
+            if (attached) runCatching { renderEncoder() }
+            handler.postDelayed(this, if (attached) FRAME_MS else IDLE_MS)
         }
     }
 
@@ -93,7 +95,7 @@ class VideoCompositor {
             latch.countDown()
         }
         latch.await()
-        handler.postDelayed(heartbeat, KEEPALIVE_MS)   // keep-alive while streaming
+        handler.postDelayed(encoderTick, FRAME_MS)   // steady ~30fps encoder cadence (smooth stream)
         Log.i(TAG, "compositor started")
     }
 
@@ -196,8 +198,8 @@ class VideoCompositor {
             }
             egl.swapBuffers(display)
         }
-
-        renderEncoder()
+        // NOTE: the encoder is NOT pushed here — encoderTick drives it at a steady ~30fps so the
+        // outgoing stream stays smooth even when these camera frames arrive unevenly.
     }
 
     /** Draw the clean program frame (last camera frame + overlay) to the encoder. Called
@@ -250,7 +252,7 @@ class VideoCompositor {
 
     companion object {
         private const val TAG = "VideoCompositor"
-        private const val KEEPALIVE_MS = 200L   // re-push the last frame ~5fps while stalled
-        private const val STALE_MS = 350L       // camera considered stalled after this gap
+        private const val FRAME_MS = 33L   // ~30fps steady encoder cadence (smooth YouTube stream)
+        private const val IDLE_MS = 200L   // slow tick when no encoder is attached (off-air)
     }
 }
