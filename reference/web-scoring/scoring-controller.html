@@ -4103,7 +4103,7 @@ function renderChatList(){
   box.innerHTML=chatMsgs.map(m=>{ const mine=m.authorUid===myUid; const canDel=mine||owner;
     const when=(()=>{try{return new Date(m.ts).toLocaleString(undefined,{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"});}catch(e){return "";}})();
     return `<div style="align-self:${mine?"flex-end":"flex-start"};max-width:84%;background:${mine?"#1E2C16":"#1A2233"};border:1px solid ${mine?"#3A5A1E":"#2A3650"};border-radius:12px;padding:8px 11px">
-        <div style="font-size:11px;color:${mine?"#E11D2E":"#8FA0BD"};font-weight:800;margin-bottom:2px">${(m.authorName||"Someone").replace(/</g,"&lt;")}${canDel?` <button data-act="delmsg" data-arg="${m.id}" style="background:none;border:none;color:#E2574C;font-size:11px;font-weight:700;cursor:pointer;padding:0 0 0 6px">delete</button>`:""}</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:3px"><span style="font-size:11px;color:${mine?"#E11D2E":"#8FA0BD"};font-weight:800;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${(m.authorName||"Someone").replace(/</g,"&lt;")}</span>${canDel?`<button data-act="delmsg" data-arg="${m.id}" title="Delete this message" style="background:rgba(226,87,76,.16);border:1px solid #E2574C66;color:#E2574C;font-size:11px;font-weight:800;cursor:pointer;border-radius:7px;padding:3px 9px;flex:none">&#128465; Delete</button>`:""}</div>
         <div style="font-size:14px;color:#EAEDF2;line-height:1.4;white-space:pre-wrap;word-break:break-word">${(m.text||"").replace(/</g,"&lt;")}</div>
         <div style="font-size:10px;color:#5B6880;margin-top:3px">${when}</div></div>`;}).join("");
   box.scrollTop=box.scrollHeight;
@@ -4125,7 +4125,7 @@ function openChat(teamId){
     if(chatTeamId===teamId) markSeenChat(teamId);   // chat is open → keep "seen" current (incl. own sends)
   });
   const inp=document.getElementById("chatInput"); const can=chatCanPost();
-  if(inp){ inp.disabled=!can; inp.placeholder=can?"Message…":"Read-only — follow this team to post"; if(can)setTimeout(()=>{try{inp.focus();}catch(e){}},60); }
+  if(inp){ inp.disabled=!can; inp.placeholder=can?"Message…":"Read-only — follow this team to post"; }   // no auto-focus → keyboard stays down until you tap the box
 }
 function closeChat(){ if(chatUnsub){try{chatUnsub();}catch(e){}chatUnsub=null;} const m=document.getElementById("chatmodal"); if(m)m.style.display="none"; chatTeamId=null; try{render();}catch(e){} }   // re-render so the "NEW" badge (home card + chat button) clears now that it's seen
 function sendChat(){ const inp=document.getElementById("chatInput"); if(!inp)return; const v=(inp.value||"").trim(); if(!v)return; if(!chatCanPost()){flash("You can't post here");return;} window.cloudSendMessage(chatTeamId,v); inp.value=""; }
@@ -4167,7 +4167,7 @@ window.rulesSearch=function(q){
     if(el){ const act=el.getAttribute("data-act"), arg=el.getAttribute("data-arg");
       if(act==="closechat"){ closeChat(); return; }
       if(act==="sendmsg"){ sendChat(); return; }
-      if(act==="delmsg"){ if(window.cloudDeleteMessage&&chatTeamId)window.cloudDeleteMessage(chatTeamId,arg); return; }
+      if(act==="delmsg"){ try{ if(!confirm("Delete this message for everyone?"))return; }catch(e){} if(window.cloudDeleteMessage&&chatTeamId)window.cloudDeleteMessage(chatTeamId,arg); return; }
     }
     if(e.target.id==="chatmodal")closeChat(); });
   const ci=document.getElementById("chatInput"); if(ci)ci.addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); sendChat(); } }); })();   // sign-in → sync teams, claim texted invite, repaint
@@ -4401,7 +4401,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v158";
+var APP_VERSION="v159";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
