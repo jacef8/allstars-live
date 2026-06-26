@@ -109,6 +109,10 @@ const DB_KEY="allstars-scorer-db";
 const LOG_KEY="alpp-test-log-v1";     // {teamId:{playerId:[{date,pitches}]}}
 const RULE_KEY="alpp-test-rules-v1";  // {table:[{max,rest}]}
 const STATE_KEY="alpp-test-state-v1"; // {teamId,div,tab}
+const MANUAL_KEY="alpp-test-roster-v1"; // [{id,num,name}] — fallback roster when app teams aren't on this device
+const MANUAL_ID="__manual__";
+function loadManual(){ try{ return JSON.parse(localStorage.getItem(MANUAL_KEY))||[]; }catch(e){ return []; } }
+function saveManual(a){ try{ localStorage.setItem(MANUAL_KEY,JSON.stringify(a)); }catch(e){} }
 
 // ---- data ----
 function loadDB(){ try{ const r=localStorage.getItem(DB_KEY); if(r){const d=JSON.parse(r); if(d&&Array.isArray(d.teams))return d.teams;} }catch(e){} return []; }
@@ -123,7 +127,7 @@ function saveState(){ try{ localStorage.setItem(STATE_KEY,JSON.stringify({teamId
 let TEAMS=loadDB();
 let RULES=loadRules();
 let st=loadState();
-let teamId=st.teamId||(TEAMS[0]&&TEAMS[0].id)||null;
+let teamId=st.teamId||(TEAMS[0]&&TEAMS[0].id)||MANUAL_ID;
 let div=st.div||"12u";
 let tab=st.tab||"avail";
 
@@ -140,7 +144,7 @@ function daysBetween(a,b){ return Math.round((parseISO(b)-parseISO(a))/86400000)
 function restForPitches(p){ for(const t of RULES.table){ if(p<=t.max) return t.rest; } return RULES.table[RULES.table.length-1].rest; }
 
 // team + pitchers
-function team(){ return TEAMS.find(t=>t.id===teamId)||null; }
+function team(){ if(teamId===MANUAL_ID) return {id:MANUAL_ID,name:"Manual list (test)",players:loadManual()}; return TEAMS.find(t=>t.id===teamId)||null; }
 function pitchers(){ const t=team(); if(!t||!Array.isArray(t.players))return []; return t.players.slice().sort((a,b)=>(+a.num||999)-(+b.num||999)); }
 function pName(p){ if(!p)return""; const n=((p.first||"")+" "+(p.last||"")).trim()||p.name||""; return n||("#"+(p.num||"?")); }
 
@@ -164,7 +168,8 @@ function status(pid,asOf){
 // ---- render ----
 const $=id=>document.getElementById(id);
 function fillSelectors(){
-  const ts=$("teamSel"); ts.innerHTML = TEAMS.length? TEAMS.map(t=>`<option value="${t.id}" ${t.id===teamId?"selected":""}>${esc(t.name||t.short||"Team")}</option>`).join("") : `<option value="">No teams found on this device</option>`;
+  const ts=$("teamSel"); const opts=TEAMS.map(t=>`<option value="${t.id}" ${t.id===teamId?"selected":""}>${esc(t.name||t.short||"Team")}</option>`).join("");
+  ts.innerHTML = opts + `<option value="${MANUAL_ID}" ${teamId===MANUAL_ID?"selected":""}>✎ Manual list (test)</option>`;
   $("divSel").value=div;
   [...$("tabs").children].forEach(b=>b.classList.toggle("on",b.dataset.tab===tab));
 }
@@ -213,6 +218,20 @@ function viewAvail(){
 function viewLog(){
   const ps=pitchers();
   const sel = window._logPid || (ps[0]&&ps[0].id) || "";
+  let manualBlk="";
+  if(teamId===MANUAL_ID){
+    const list=loadManual();
+    const chips=list.map((p,i)=>`<span class="pill" style="background:var(--surface2);border:1px solid var(--line);color:var(--ink)">#${esc(p.num||"?")} ${esc(p.name||"")} <button class="x" data-rmpitcher="${i}" style="font-size:13px;padding:0 2px">✕</button></span>`).join(" ");
+    manualBlk=`<div style="margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--surface2)">
+      <label class="fld">Manual roster (no app teams on this device)</label>
+      <div class="row" style="align-items:flex-end">
+        <div style="max-width:90px"><input id="mNum" class="ctl" placeholder="#" inputmode="numeric"></div>
+        <div><input id="mName" class="ctl" placeholder="Pitcher name"></div>
+        <div style="flex:0 0 auto"><button class="btn sm" id="mAdd">+ Add</button></div>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px">${chips||'<span class="muted">No pitchers yet — add a few above.</span>'}</div>
+    </div>`;
+  }
   const opts=ps.map(p=>`<option value="${p.id}" ${p.id===sel?"selected":""}>#${esc(p.num||"?")} ${esc(pName(p))}</option>`).join("");
   const hist=sel?logFor(sel):[];
   const histRows=hist.map((o,i)=>`<tr>
@@ -221,8 +240,9 @@ function viewLog(){
       <td class="tag">${restForPitches(o.pitches)===0?"next day":restForPitches(o.pitches)+" day rest"}</td>
       <td class="right"><button class="x" data-del="${i}" title="Delete">✕</button></td></tr>`).join("");
   return `<div class="card">
+    ${manualBlk}
     <label class="fld">Pitcher</label>
-    <select id="logPid" class="ctl" style="margin-bottom:12px">${opts||`<option>No players</option>`}</select>
+    <select id="logPid" class="ctl" style="margin-bottom:12px">${opts||`<option value="">— add a pitcher above —</option>`}</select>
     <div class="row">
       <div><label class="fld">Date</label><input type="date" id="logDate" class="ctl" value="${todayStr()}"></div>
       <div><label class="fld">Pitches thrown</label><input type="number" id="logPitches" class="ctl" min="0" max="200" placeholder="e.g. 42"></div>
@@ -262,6 +282,10 @@ function bind(){
   if(tab==="avail"){ const a=$("asOf"); if(a)a.onchange=e=>{ window._asOf=e.target.value; render(); }; }
 
   if(tab==="log"){
+    if(teamId===MANUAL_ID){
+      const add=$("mAdd"); if(add)add.onclick=()=>{ const num=($("mNum")||{}).value||""; const name=(($("mName")||{}).value||"").trim(); if(!name){ alert("Enter a pitcher name"); return; } const list=loadManual(); list.push({id:"m"+Date.now()+Math.floor((""+num+name).length),num:num,name:name}); saveManual(list); window._logPid=null; render(); };
+      document.querySelectorAll("[data-rmpitcher]").forEach(b=>b.onclick=()=>{ const list=loadManual(); list.splice(+b.dataset.rmpitcher,1); saveManual(list); window._logPid=null; render(); });
+    }
     const ps=$("logPid"); if(ps)ps.onchange=e=>{ window._logPid=e.target.value; render(); };
     const save=$("logSave"); if(save)save.onclick=()=>{
       const pid=($("logPid")||{}).value; const date=($("logDate")||{}).value; const n=+($("logPitches")||{}).value;
