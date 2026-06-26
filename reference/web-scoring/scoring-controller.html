@@ -1962,12 +1962,13 @@ function scoreBar(){
   const onb=[1,2,3].filter(n=>G.bases&&G.bases[n]).length;
   const big=`font-weight:800;font-size:25px;color:${T.chalk};line-height:1`;
   const lab=`font-size:11px;font-weight:700;letter-spacing:1.5px;color:${T.sageDim}`;
-  return `<div style="display:flex;align-items:center;gap:24px;background:rgba(13,19,32,.82);border:1px solid ${T.line};border-radius:10px;padding:11px 20px;flex-shrink:0;font-family:${MONO};flex-wrap:wrap">
+  return `<div id="scorebar" data-longpress="correct" title="Tap the pencil (or hold) to correct the count / outs / score" style="display:flex;align-items:center;gap:24px;background:rgba(13,19,32,.82);border:1px solid ${T.line};border-radius:10px;padding:11px 20px;flex-shrink:0;font-family:${MONO};flex-wrap:wrap;position:relative;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none">
     <span style="${big};letter-spacing:.5px">${TEAMS.away.short} ${G.away}<span style="color:${T.line};font-weight:600;margin:0 13px">·</span>${TEAMS.home.short} ${G.home}</span>
     <span style="font-weight:800;font-size:23px;color:${T.sage};line-height:1">${G.half==="T"?"▲":"▼"}${G.inning}</span>
     <span style="display:inline-flex;align-items:baseline;gap:8px"><b style="${big}">${G.balls}-${G.strikes}</b><span style="${lab}">COUNT</span></span>
     <span style="display:inline-flex;align-items:baseline;gap:8px"><b style="${big}">${G.outs}</b><span style="${lab}">OUT${G.outs===1?"":"S"}</span></span>
     ${onb?`<span style="font-weight:800;font-size:19px;color:${T.clay};line-height:1">${onb} ON</span>`:""}
+    <button data-act="correctopen" title="Correct the count, outs, score &amp; inning" style="margin-left:auto;flex:none;display:inline-flex;align-items:center;justify-content:center;gap:6px;background:${T.surface2};border:1px solid ${T.line};color:${T.lime};border-radius:8px;height:32px;padding:0 12px;font-family:${SANS};font-size:13px;font-weight:700;cursor:pointer"><span style="font-size:15px;line-height:1">&#9998;</span>Edit</button>
   </div>`;
 }
 
@@ -4165,7 +4166,6 @@ function renderToolbar(){
     ${liveDot}
     ${bErr}
     ${vsw}
-    ${batterTop}
     ${gc}
   </div>`;
 }
@@ -4486,7 +4486,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v165";
+var APP_VERSION="v166";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
