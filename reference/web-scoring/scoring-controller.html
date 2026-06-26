@@ -487,6 +487,14 @@ function rollupSeason(){const t=curTeam();if(!t)return;
     const idx=+String(key).replace(/^o/,"");const p=ROSTER[idx];if(!p)return;
     const r=seasonRow(t,p.id).bat;r.ab+=s.ab||0;r.r+=s.r||0;r.h+=s.h||0;r.rbi+=s.rbi||0;r.bb+=s.bb||0;r.k+=s.k||0;r.sb=(r.sb||0)+(s.sb||0);r.cs=(r.cs||0)+(s.cs||0);});
   saveDB();}
+/* Subtract a stored game's batting box from the team's season totals (when deleting that game),
+   matching players by jersey number. Clamps at 0 so a number change can't push a total negative. */
+function removeGameFromSeason(t,g){
+  if(!t||!t.season||!g||!g.bat)return;
+  const rows=(g.bat[g.ourSide])||[];
+  rows.forEach(b=>{ const p=(t.players||[]).find(x=>String(x.num)===String(b.num)); const sr=p&&t.season[p.id]&&t.season[p.id].bat; if(!sr)return;
+    ["ab","r","h","rbi","bb","k","sb","cs"].forEach(k=>{ sr[k]=Math.max(0,(sr[k]||0)-(b[k]||0)); }); });
+}
 window.teamPNum=function(id,v){const t=teamById(openTeamId);if(!t)return;const p=t.players.find(p=>p.id===id);if(p){p.num=v;saveDB();}};
 window.teamPFirst=function(id,v){const t=teamById(openTeamId);if(!t)return;const p=t.players.find(p=>p.id===id);if(p){p.first=v;ensureName(p);saveDB();}};
 window.teamPLast=function(id,v){const t=teamById(openTeamId);if(!t)return;const p=t.players.find(p=>p.id===id);if(p){p.last=v;ensureName(p);saveDB();}};
@@ -2352,8 +2360,8 @@ function actionArea(){
         <input value="${(p.first||"").replace(/"/g,"&quot;")}" oninput="teamPFirst('${p.id}',this.value)" placeholder="First" style="${cell};flex:1 1 130px;max-width:250px;min-width:0;font-size:18px">
         <input value="${(p.last||"").replace(/"/g,"&quot;")}" oninput="teamPLast('${p.id}',this.value)" placeholder="Last" style="${cell};flex:1 1 130px;max-width:250px;min-width:0;font-size:18px">
         <div style="flex:1;min-width:0"></div>
-        <button data-act="openplayer" data-arg="${t.id}:${p.id}" title="View / follow player" style="background:${T.surface2};border:1px solid ${T.line};color:${isFollowingPlayer(t.id,p.id)?T.amber:T.lime};border-radius:7px;padding:9px 12px;font-weight:800;flex:none;line-height:1">${isFollowingPlayer(t.id,p.id)?IC('starFill',16):"&rsaquo;"}</button>
-        <button data-act="rmteamp" data-arg="${p.id}" style="background:none;border:1px solid ${T.line};color:${T.out};border-radius:7px;padding:9px 12px;font-weight:800;flex:none"${t.players.length<=9?" disabled":""}>&times;</button></div>`).join("");
+        <button data-act="openplayer" data-arg="${t.id}:${p.id}" title="View / follow player" style="background:${T.surface2};border:1px solid ${T.line};color:${isFollowingPlayer(t.id,p.id)?T.amber:T.lime};border-radius:9px;min-width:48px;height:46px;display:inline-flex;align-items:center;justify-content:center;font-size:24px;font-weight:800;flex:none;line-height:1">${isFollowingPlayer(t.id,p.id)?IC('starFill',22):"&rsaquo;"}</button>
+        <button data-act="rmteamp" data-arg="${p.id}" title="Remove player" style="background:none;border:1px solid ${T.out}66;color:${T.out};border-radius:9px;min-width:48px;height:46px;display:inline-flex;align-items:center;justify-content:center;font-size:26px;font-weight:800;flex:none;line-height:1"${t.players.length<=9?" disabled":""}>&times;</button></div>`).join("");
     const sRows=t.players.map(p=>{const s=(t.season[p.id]||{}).bat||{};const ab=s.ab||0,h=s.h||0;const avg=ab?(h/ab).toFixed(3).replace(/^0/,""):"—";
       return `<tr style="border-top:1px solid ${T.line}"><td style="text-align:left;padding:10px 8px;font-weight:700;white-space:nowrap">#${p.num} ${p.name}</td><td style="padding:10px 6px">${ab}</td><td style="padding:10px 6px">${s.r||0}</td><td style="padding:10px 6px">${h}</td><td style="padding:10px 6px">${s.rbi||0}</td><td style="padding:10px 6px">${s.bb||0}</td><td style="padding:10px 6px">${s.k||0}</td><td style="padding:10px 6px;font-weight:800">${avg}</td></tr>`;}).join("");
     const statTable=`<div class="frost-card" style="background:${T.surface};border:1px solid ${T.line};border-radius:14px;padding:14px 18px;overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-family:${MONO};font-size:18px;color:${T.chalk};text-align:center">
@@ -2396,8 +2404,14 @@ function actionArea(){
           ${isG?`<button data-act="schedstart" data-arg="${s.id}" title="Start this game now" style="background:${T.lime};border:1px solid ${T.lime};color:#fff;border-radius:8px;padding:9px 15px;font-weight:800;font-size:13px;letter-spacing:.4px;flex:none;display:inline-flex;align-items:center;gap:6px;box-shadow:0 3px 10px rgba(225,29,46,.28)">&#9654; Start</button>`:""}
           <button data-act="schededit" data-arg="${s.id}" title="Edit" style="background:${schedEditId===s.id?T.lime:"none"};border:1px solid ${schedEditId===s.id?T.lime:T.line};color:${schedEditId===s.id?"#fff":T.lime};border-radius:8px;padding:9px 12px;font-weight:800;font-size:13px;flex:none">Edit</button>
           <button data-act="schedrm" data-arg="${s.id}" style="background:none;border:1px solid ${T.line};color:${T.out};border-radius:8px;padding:9px 12px;font-weight:800;font-size:18px;flex:none">&times;</button></div>`;};
-    const schedUpcoming=sched.filter(s=>schedWhen(s)+_grace>=_now);
-    const schedEarlier=sched.filter(s=>schedWhen(s)+_grace<_now).reverse();   // most-recent first
+    // A scheduled GAME counts as played once a finished game exists for the same date (+ opponent if set),
+    // so it moves to "Earlier" even if you scored it before its listed time.
+    const schedPlayed=(s)=>{ if(s.type==="practice")return false; return (t.games||[]).some(gm=>gm.date===s.date && (!s.opp || (gm.opp||"").toLowerCase()===(s.opp||"").toLowerCase())); };
+    const schedPast=(s)=>schedPlayed(s)||(schedWhen(s)+_grace<_now);
+    // LIST view: drop PAST PRACTICES entirely (they stay on the Calendar view); past GAMES move to Earlier.
+    const listItems=sched.filter(s=> s.type!=="practice" || !schedPast(s));
+    const schedUpcoming=listItems.filter(s=>!schedPast(s));
+    const schedEarlier=listItems.filter(s=>schedPast(s)).reverse();   // past games, most-recent first
     const _earlierDiv=`<div style="display:flex;align-items:center;gap:10px;margin:8px 2px 2px"><div style="flex:1;height:1px;background:${T.line}"></div><div style="font-size:10px;font-weight:800;letter-spacing:1.2px;color:${T.sageDim}">EARLIER &middot; TAP &times; TO CLEAR</div><div style="flex:1;height:1px;background:${T.line}"></div></div>`;
     const schedRows=`${schedUpcoming.map(s=>schedRow(s,false)).join("")||(schedEarlier.length?"":`<div style="font-size:12px;color:${T.sageDim}">Nothing scheduled yet.</div>`)}${schedEarlier.length?_earlierDiv+schedEarlier.map(s=>schedRow(s,true)).join(""):""}`;
     const fLbl=`font-size:12px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:${T.sageDim};margin:0 2px 5px`;
@@ -2427,10 +2441,13 @@ function actionArea(){
     // Past games — the finished-game log, newest first, TAPPABLE to open the score + box score.
     const pastRows=(t.games||[]).slice(0,25).map(g=>{const rc=g.result==="W"?T.lime:(g.result==="L"?T.out:T.sage);
       const gdt=(()=>{try{return new Date((g.date||"")+"T00:00").toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"});}catch(e){return g.date||"";}})();
+      const resWord=g.result==="W"?"WON":(g.result==="L"?"LOST":"TIE");
       return `<button data-act="opengame" data-arg="${g.id}" style="display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:${T.surface2};border:1px solid ${T.line};border-left:6px solid ${rc};border-radius:11px;padding:12px 14px;cursor:pointer">
-          <span style="width:32px;height:32px;flex:none;display:flex;align-items:center;justify-content:center;border-radius:8px;background:${rc};color:${T.field};font-family:${MONO};font-weight:800;font-size:15px">${g.result||""}</span>
+          <span style="width:34px;height:34px;flex:none;display:flex;align-items:center;justify-content:center;border-radius:8px;background:${rc};color:${T.field};font-family:${MONO};font-weight:800;font-size:16px">${g.result||""}</span>
           <div style="flex:1;min-width:0"><div style="font-weight:800;color:${T.ink};font-size:18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">vs ${(g.opp||"Opponent").replace(/</g,"&lt;")}</div><div style="font-size:14px;color:${T.sage};margin-top:2px">${gdt}</div></div>
-          <span style="font-family:${MONO};font-weight:800;font-size:22px;color:${T.chalk}">${g.us}&ndash;${g.them}</span>
+          <div style="text-align:right;flex:none;line-height:1.05"><div style="font-family:${MONO};font-size:9px;font-weight:800;letter-spacing:1.2px;color:${rc}">${resWord} &middot; FINAL</div>
+            <div style="font-family:${MONO};font-weight:800;font-size:21px;color:${T.chalk}"><span title="${(t.short||'Us')}">${g.us}</span>&ndash;<span title="${(g.oppShort||g.opp||'Opp')}">${g.them}</span></div>
+            <div style="font-size:9px;color:${T.sageDim};letter-spacing:.3px">${(t.short||"US")} &ndash; ${(g.oppShort||(g.opp||"OPP").slice(0,3)).toUpperCase()}</div></div>
           <span style="color:${T.lime};font-weight:800;font-size:18px">&rsaquo;</span></button>`;}).join("");
     const pastGamesCard=`<div class="frost-card" style="background:${T.surface};border:1px solid ${T.line};border-radius:14px;padding:16px 18px;display:flex;flex-direction:column;gap:9px">
         <div style="font-size:14px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime}">Past games &mdash; tap to see the score &amp; stats</div>
@@ -3763,7 +3780,7 @@ document.getElementById("app").addEventListener("click",e=>{
   if(act==="photoclose"){ photoZoom=null; render(); return; }
   if(act==="delphoto"){ const t=teamById(openTeamId); if(!t)return; const pid=arg; confirmAct={title:"Delete this photo?",msg:"It will be removed from the team gallery for everyone.",yes:"Delete",danger:true,run:function(){ if(window.cloudDeletePhoto)window.cloudDeletePhoto(t.id,pid); photoZoom=null; photoListTeam=null; render(); }}; render(); return; }
   if(act==="rewatchgame"){ const u="https://www.youtube.com/watch?v="+encodeURIComponent(arg); if(IS_APP&&window.AllStars&&window.AllStars.openExternal)AllStars.openExternal(u); else window.open(u,"_blank","noopener"); return; }
-  if(act==="delgame"){ const t=teamById(openTeamId); if(!t)return; if(window.Cloud&&window.Cloud.enabled&&window.Cloud.user&&window.cloudCanManage&&!window.cloudCanManage(t)){flash("Only the owner can delete a game");return;} confirmAct={title:"Delete this game?",msg:"This permanently removes the game and its stats from the team's record.",yes:"Delete game",danger:true,run:function(){ t.games=(t.games||[]).filter(x=>x.id!==arg); t.record=teamRec(t); saveDB(); teamTab="schedule"; viewGameId=null; render(); }}; render(); return; }
+  if(act==="delgame"){ const t=teamById(openTeamId); if(!t)return; if(window.Cloud&&window.Cloud.enabled&&window.Cloud.user&&window.cloudCanManage&&!window.cloudCanManage(t)){flash("Only the owner can delete a game");return;} const g=(t.games||[]).find(x=>x.id===arg); confirmAct={title:"Delete this game?",msg:"Permanently removes this game from the record AND subtracts its player stats from the season totals.",yes:"Delete game + stats",danger:true,run:function(){ try{ removeGameFromSeason(t,g); }catch(e){} t.games=(t.games||[]).filter(x=>x.id!==arg); t.record=teamRec(t); saveDB(); teamTab="schedule"; viewGameId=null; render(); }}; render(); return; }
   if(act==="swapviewer"){ viewerRight=viewerRight==="field"?"feed":"field"; try{localStorage.setItem("al-viewer-right",viewerRight);}catch(e){} render(); return; }
   if(act==="viewerphone"){ viewerPhone=(arg==="field"||arg==="feed")?arg:"both"; try{localStorage.setItem("al-viewer-phone",viewerPhone);}catch(e){} render(); return; }
   if(act==="soundtoggle"){ Snd.setOn(!Snd.isOn()); if(Snd.isOn())Snd.crack(); renderToolbar(); return; }
@@ -4370,7 +4387,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v156";
+var APP_VERSION="v157";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
