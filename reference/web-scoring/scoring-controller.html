@@ -2778,7 +2778,7 @@ function actionArea(){
           ${header}
           <div style="width:100%;max-width:1180px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start">
             <div style="display:flex;flex-direction:column;gap:12px">${teamRow("Your team",OUR.name,OUR.short,OUR.color,"pickour")}${teamRow("Opponent",OPP.name,OPP.short,OPP.color,"pickopp")}${sideSel}<div style="display:flex;gap:12px"><div style="flex:1;min-width:0">${runCapCard}</div><div style="flex:1;min-width:0">${hittersCard}</div></div></div>
-            <div style="display:flex;flex-direction:column;gap:12px">${leagueCard}${alertsCard}${pitchTypeCard}${startCard}</div>
+            <div style="display:flex;flex-direction:column;gap:12px">${leagueCard}${alertsCard}${pitchTypeCard}${detailedCard}${startCard}</div>
           </div>
           <div style="width:100%;max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:10px">${lineupCardBtn}</div>
         </div>`;
@@ -4142,7 +4142,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v141";
+var APP_VERSION="v142";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
