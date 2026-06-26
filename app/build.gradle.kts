@@ -11,8 +11,8 @@ android {
         applicationId = "com.libertyclerk.allstarslive.app"   // unique install id (avoids an OAuth package+SHA-1 conflict in another project); code namespace stays the same
         minSdk = 26
         targetSdk = 34
-        versionCode = 9
-        versionName = "0.1.8-m0"
+        versionCode = 10
+        versionName = "0.1.9-m0"
         vectorDrawables { useSupportLibrary = true }
 
         // M1 SRT ingest (libsrt + NDK). arm64 only for the spike — add

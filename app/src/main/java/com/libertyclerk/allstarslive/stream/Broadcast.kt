@@ -171,7 +171,7 @@ object Broadcast {
                 }
             }
         })
-        comp.setEncoderSurface(s.inputSurface, PROG_W, PROG_H) { s.drain() }
+        comp.setEncoderSurface(s.inputSurface, PROG_W, PROG_H, s.avBaseNs) { s.drain() }   // shared a/v clock → lip-sync
         s.start("rtmp://a.rtmp.youtube.com/live2/${live.streamKey}")
         streamer = s
         _state.value = _state.value.copy(

@@ -36,6 +36,12 @@ class YouTubeStreamer(
     // ending the broadcast. Cleared by stop() so an intentional end doesn't retry.
     @Volatile private var shouldStream = false
 
+    // SHARED audio/video timeline origin. Both the audio PTS (below) and the video PTS (the
+    // compositor, via setEncoderSurface(..., avBaseNs, ...)) are zero-based to THIS instant, so the
+    // two streams share one clock and stay in lip-sync. (Previously audio was sample-counted from the
+    // audio thread's start while video was wall-clock from the first frame → they drifted apart.)
+    val avBaseNs: Long = System.nanoTime()
+
     private val client: RtmpClient = RtmpClient(object : ConnectChecker {
         override fun onConnectionStarted(url: String) = onStatus("Connecting…")
         override fun onConnectionSuccess() {
@@ -152,8 +158,6 @@ class YouTubeStreamer(
             val chunkSamples = 1024
             val chunkBytes = chunkSamples * 2          // 16-bit mono
             val pcm = ByteArray(chunkBytes)
-            val usPerChunk = chunkSamples * 1_000_000L / sampleRate
-            var ptsUs = 0L
 
             // Try the mic; fall back to silence (so YouTube still gets an audio track).
             val mic = runCatching {
@@ -169,6 +173,8 @@ class YouTubeStreamer(
 
             try {
                 while (streaming) {
+                    // Wall-clock PTS from the SHARED a/v base → stays in lock-step with the video.
+                    val ptsUs = (System.nanoTime() - avBaseNs) / 1000
                     if (mic != null) {
                         val n = mic.read(pcm, 0, chunkBytes)
                         if (n <= 0) { Thread.sleep(5); continue }
@@ -178,7 +184,6 @@ class YouTubeStreamer(
                         feedAudio(pcm, chunkBytes, ptsUs)
                         Thread.sleep(20)               // pace silence ~real-time
                     }
-                    ptsUs += usPerChunk
                     drainAudio()
                 }
             } catch (_: InterruptedException) {

@@ -157,11 +157,14 @@ class VideoCompositor {
         }
     }
 
-    /** Attach an encoder input [surface] (video-sized) to also receive the composite. */
-    fun setEncoderSurface(surface: Surface?, width: Int, height: Int, onFrame: ((Long) -> Unit)?) {
+    /** Attach an encoder input [surface] (video-sized) to also receive the composite. [baseNs] is the
+     *  SHARED a/v timeline origin (System.nanoTime units) — pass the YouTubeStreamer's avBaseNs so the
+     *  video PTS matches the audio PTS (lip-sync). Pass -1 (default) to zero the clock at the first
+     *  frame instead (used by the MP4 recorder, which has no separate audio clock to match). */
+    fun setEncoderSurface(surface: Surface?, width: Int, height: Int, baseNs: Long = -1L, onFrame: ((Long) -> Unit)?) {
         handler.post {
             encoderSurface?.let { egl.releaseSurface(it) }
-            encoderBaseNs = -1L          // re-zero the video clock for the new stream
+            encoderBaseNs = baseNs       // >=0: shared a/v base; <0: zero at first frame (see renderEncoder)
             if (surface == null) {
                 encoderSurface = null
                 onEncoderFrame = null
