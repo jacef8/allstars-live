@@ -659,7 +659,7 @@ const initGame=()=>({inning:1,half:"T",away:0,home:0,outs:0,balls:0,strikes:0,
   startedAt:null,  // wall-clock ms when the game ACTUALLY started (auto-set at first pitch / game start; editable in Game Setup) — drives the game timer
   lineup:{ order:[0,1,2,3,4,5,6,7,8],   // batting order: 9-12 entries (slots 10+ = extra hitters)
            pos:{P:0,C:1,"1B":2,"2B":3,"3B":4,SS:5,LF:6,CF:7,RF:8} }});
-let G=initGame(),hist=[],mode="home",tap=null,contact=null,result=null,plan=null,toast=null,toastTimer=null,curResults=[],showAll=false,showZones=false,editSlot=null,confirmAct=null,gameActive=false,lineupTab="us",newgameFrom="home",brSheet=false;
+let G=initGame(),hist=[],mode="home",tap=null,contact=null,result=null,plan=null,toast=null,toastTimer=null,curResults=[],showAll=false,showZones=false,editSlot=null,confirmAct=null,gameActive=false,lineupTab="us",newgameFrom="home",brSheet=false,correctOpen=false;
 // Resume the last in-progress game (saved by saveGame) across reloads/app updates, so the
 // lineup/score is never lost. Stays on the home screen → shows "Resume". Re-links ROSTER
 // to the saved team so the lineup's player indices resolve correctly.
@@ -740,6 +740,11 @@ function nextBatter(){const k=G.half==="T"?"awayPtr":"homePtr";G[k]++;G.balls=0;
 /* Close the current half-inning: log its totals (for review), switch sides, bump inning
    on T->B->T, clear everything (count, bases, per-half tallies). */
 function doFlip(){
+  // Flip trace (Diagnostics) — records WHAT triggered each half-inning change so we can pin down the
+  // "inning swapped unexpectedly" reports. Shows the action tapped just before, outs, and run cap.
+  try{ if(!window._flipLog)window._flipLog=[]; const d=new Date(),p=n=>String(n).padStart(2,"0");
+    window._flipLog.push(`${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}  ${G.half==="T"?"Top":"Bot"} ${G.inning} → flip · after=${window._lastAct||"?"} · outs=${G.outs} · cap=${G.runCap||0} · halfRuns=${G.halfRuns||0}`);
+    if(window._flipLog.length>80)window._flipLog.shift(); }catch(e){}
   if(!G.innLog)G.innLog=[];
   G.innLog.push({inning:G.inning, half:G.half, batteam:battingKey(),
     pitches:G.halfPitches||0, runs:G.halfRuns||0, hits:G.halfHits||0,
@@ -1050,6 +1055,54 @@ function baseRunModal(){
           <div style="display:flex;gap:6px">${gbtn("brwp","Wild pitch")}${gbtn("brpb","Passed ball")}${gbtn("brbalk","Balk")}</div></div>
         <div style="display:flex;flex-direction:column;gap:8px">${runnerRows||`<div style="font-size:13px;color:${T.sageDim};text-align:center;padding:14px">No runners on base.</div>`}</div>`}
       </div></div>`;
+}
+
+/* Manual correction sheet — fix the count / outs / score / inning directly when the play flow
+   couldn't capture it right. Long-press the scoreboard (or the toolbar Setup) to open it. Every
+   nudge is a single Undo step. */
+function correctModal(){
+  const sBtn=`background:${T.surface};border:1px solid ${T.line};color:${T.chalk};border-radius:10px;width:46px;height:46px;font-size:24px;font-weight:800;line-height:1;flex:none`;
+  const step=(field,label,val,sub)=>`<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;background:${T.surface2};border:1px solid ${T.line};border-radius:12px;padding:10px 12px">
+      <div style="min-width:0"><div style="font-weight:700;color:${T.ink};font-size:15px">${label}</div>${sub?`<div style="font-size:11px;color:${T.sageDim}">${sub}</div>`:""}</div>
+      <div style="display:flex;align-items:center;gap:12px;flex:none">
+        <button data-act="corr" data-arg="${field}:-1" style="${sBtn}">&minus;</button>
+        <span style="font-family:${MONO};font-size:24px;font-weight:800;color:${T.chalk};min-width:30px;text-align:center">${val}</span>
+        <button data-act="corr" data-arg="${field}:1" style="${sBtn}">+</button></div></div>`;
+  const halfRow=`<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;background:${T.surface2};border:1px solid ${T.line};border-radius:12px;padding:10px 12px">
+      <div style="font-weight:700;color:${T.ink};font-size:15px">Half</div>
+      <button data-act="corr" data-arg="half:0" style="background:${T.surface};border:1px solid ${T.line};color:${T.chalk};border-radius:10px;padding:11px 18px;font-family:${MONO};font-weight:800;font-size:15px">${G.half==="T"?"▲ TOP":"▼ BOTTOM"} &middot; tap to flip</button></div>`;
+  return `<div data-act="correctclose" style="position:fixed;left:0;right:0;top:0;height:calc(var(--avh) * 100);z-index:120;background:rgba(8,11,16,.78);display:flex;align-items:center;justify-content:center;padding:16px">
+      <div data-act="noop" style="width:100%;max-width:440px;max-height:calc(var(--avh) * 92);overflow-y:auto;-webkit-overflow-scrolling:touch;background:${T.surface};border:2px solid ${T.lime};border-radius:18px;padding:16px;display:flex;flex-direction:column;gap:10px;box-shadow:0 18px 54px rgba(0,0,0,.6)">
+        <div style="display:flex;align-items:center;gap:10px"><div style="flex:1;font-family:${MONO};font-size:18px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:${T.lime}">Correct the game</div>
+          <button data-act="correctclose" style="${ghost};padding:8px 14px;flex:none">Done</button></div>
+        <div style="font-size:12px;color:${T.sage};margin-top:-4px">Directly fix the count, outs, score &amp; inning. Each change is undoable.</div>
+        <div style="font-size:10px;font-weight:800;letter-spacing:1px;color:${T.sageDim};margin:4px 2px 0">COUNT &amp; OUTS</div>
+        ${step("balls","Balls",G.balls)}
+        ${step("strikes","Strikes",G.strikes)}
+        ${step("outs","Outs",G.outs)}
+        <div style="font-size:10px;font-weight:800;letter-spacing:1px;color:${T.sageDim};margin:6px 2px 0">SCORE</div>
+        ${step("away",(TEAMS.away.short||"Away")+" runs",G.away,"this inning &amp; total")}
+        ${step("home",(TEAMS.home.short||"Home")+" runs",G.home,"this inning &amp; total")}
+        <div style="font-size:10px;font-weight:800;letter-spacing:1px;color:${T.sageDim};margin:6px 2px 0">INNING</div>
+        ${step("inning","Inning",G.inning)}
+        ${halfRow}
+      </div></div>`;
+}
+/* Long-press any [data-longpress] element (re-bound after each render). Currently the scoreboard
+   → opens the correction sheet. */
+function setupLongPress(){
+  document.querySelectorAll("[data-longpress]").forEach(el=>{
+    let timer=null,sx=0,sy=0;
+    const fire=()=>{ timer=null; const what=el.getAttribute("data-longpress"); try{ if(navigator.vibrate)navigator.vibrate(15); }catch(_){} if(what==="correct"){ correctOpen=true; render(); } };
+    const start=(e)=>{ const p=e.touches?e.touches[0]:e; sx=p.clientX; sy=p.clientY; if(timer)clearTimeout(timer); timer=setTimeout(fire,480); };
+    const cancel=()=>{ if(timer){ clearTimeout(timer); timer=null; } };
+    const moveCancel=(e)=>{ const p=e.touches?e.touches[0]:e; if(Math.abs(p.clientX-sx)>10||Math.abs(p.clientY-sy)>10)cancel(); };
+    el.addEventListener("pointerdown",start);
+    el.addEventListener("pointermove",moveCancel);
+    el.addEventListener("pointerup",cancel);
+    el.addEventListener("pointerleave",cancel);
+    el.addEventListener("pointercancel",cancel);
+  });
 }
 
 /* ===== broadcast link — the controller is the single source of truth =====
@@ -1475,7 +1528,7 @@ function statusBar(){
   const pipRow=(label,cls,n,max,id)=>`<div class="bso-row" id="${id}" style="display:flex;align-items:center;gap:7px;height:16px">
       <span style="font-family:${MONO};font-size:13px;font-weight:800;color:${T.sageDim};width:12px">${label}</span>
       ${Array.from({length:max},(_,i)=>`<span class="bso-pip ${cls}${i<n?" on":""}"></span>`).join("")}</div>`;
-  return `<div style="display:flex;align-items:stretch;background:${T.surface};border:1px solid ${T.line};border-radius:12px;overflow:hidden;flex-shrink:0;box-shadow:0 1px 0 rgba(15,30,60,.04)">
+  return `<div id="statusbar" data-longpress="correct" title="Hold to correct the count / outs / score" style="display:flex;align-items:stretch;background:${T.surface};border:1px solid ${T.line};border-radius:12px;overflow:hidden;flex-shrink:0;box-shadow:0 1px 0 rgba(15,30,60,.04);position:relative">
     <div style="display:flex;flex-direction:column;justify-content:center;gap:7px;padding:13px 14px;min-width:140px;max-width:210px;border-right:1px solid ${T.line}">
       ${tabRow("away",G.away,G.half==="T")}${tabRow("home",G.home,G.half==="B")}</div>
     <div style="display:flex;align-items:center;justify-content:center;padding:0 12px;flex:1;gap:clamp(10px,4.5vw,38px)">
@@ -2688,12 +2741,20 @@ function actionArea(){
       "Screen: "+window.innerWidth+"x"+window.innerHeight,
       "UA: "+(navigator.userAgent||"")].join("\n");
     const tip=`<div style="font-size:12px;color:${T.sageDim};background:${T.surface};border:1px dashed ${T.line};border-radius:11px;padding:13px 15px;line-height:1.5">${IC('alert',14)} <b style="color:${T.sage}">Camera won't connect?</b> Check the camera and this device are on the <b style="color:${T.sage}">same Wi-Fi</b>, the camera app is running, and the hotspot has internet. Most connection issues are on the camera side, not the app.</div>`;
+    // Flip trace — every half-inning change with the action that triggered it (debugging the
+    // "inning swapped unexpectedly" reports). Newest last. Included in Copy.
+    const flips=(window._flipLog||[]);
+    const flipBlock=`<div style="background:${T.surface};border:1px solid ${T.line};border-radius:11px;padding:13px 15px">
+        <div style="font-size:13px;font-weight:800;color:${T.ink};margin-bottom:8px">Inning-flip trace <span style="font-weight:600;color:${T.sageDim};font-size:11px">(what triggered each half-inning change)</span></div>
+        ${flips.length?`<div style="font-family:${MONO};font-size:11px;color:${T.sage};line-height:1.7;max-height:210px;overflow:auto;white-space:pre-wrap">${flips.slice(-30).map(l=>l.replace(/</g,"&lt;")).join("\n")}</div>`:`<div style="font-size:12px;color:${T.sageDim}">No half-inning changes yet this session.</div>`}</div>`;
+    window.__diagText += "\n\nInning-flip trace:\n"+(flips.length?flips.join("\n"):"(none)");
     return `<div style="display:flex;flex-direction:column;gap:12px">
         <div class="frost-card" style="display:flex;align-items:center;gap:10px;background:${T.surface};border:1px solid ${T.line};border-radius:14px;padding:12px 14px">
           <button data-act="opensettings" style="${ghost};padding:9px 11px">&lsaquo; Settings</button>
           <div style="font-family:${MONO};font-size:23px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:${T.lime}">Diagnostics</div></div>
         <div style="font-size:12px;color:${T.sage};margin:0 2px">Live status for field troubleshooting.</div>
         <div style="display:flex;flex-direction:column;gap:8px">${rows}</div>
+        ${flipBlock}
         ${tip}
         <div style="display:flex;gap:8px">
           <button data-act="opendebug" style="${ghost};flex:1;display:flex;align-items:center;justify-content:center;gap:8px">${ICN.refresh} Refresh</button>
@@ -3494,10 +3555,12 @@ function render(){
     ${reviewBatter?batterReviewModal():""}
     ${reviewInn?inningLogModal():""}
     ${brSheet?baseRunModal():""}
+    ${correctOpen?correctModal():""}
     ${(pickerModal&&wide)?`<div style="${sheetWrap}">
         <div id="action-area" style="${sheetCard};overflow-y:auto;-webkit-overflow-scrolling:touch;background:${T.surface};padding:16px;display:flex;flex-direction:column;gap:8px">${actionArea()}</div></div>`:""}
     ${floatLayer}${floatToggleBtn}`;
   try{ setupFloatWins(); }catch(e){}
+  try{ setupLongPress(); }catch(e){}
   animateStatusBar();
   try{ startClock(); }catch(e){}
   if(mode!==_lastMode){ const a=document.getElementById("action-area"); if(a)a.classList.add("screen-in"); _lastMode=mode; }
@@ -3541,10 +3604,21 @@ document.getElementById("app").addEventListener("click",e=>{
   }
   const el=e.target.closest("[data-act]"); if(!el)return;
   const act=el.dataset.act,arg=el.dataset.arg;
+  window._lastAct=act;                                       // flip-trace: remember the last tapped action
   if(act==="noop")return;                                    // swallow taps inside a modal card
   if(act==="reviewbatter"){ reviewBatter=arg; render(); return; }
   if(act==="brsheet"){ brSheet=true; brPitchPick=null; render(); return; }
   if(act==="brclose"){ brSheet=false; brPitchPick=null; render(); return; }
+  if(act==="correctopen"){ correctOpen=true; render(); return; }
+  if(act==="correctclose"){ correctOpen=false; render(); return; }
+  if(act==="corr"){ const i=arg.indexOf(":"),f=arg.slice(0,i),d=+arg.slice(i+1); snapshot();
+    if(f==="balls") G.balls=Math.max(0,Math.min(3,G.balls+d));
+    else if(f==="strikes") G.strikes=Math.max(0,Math.min(2,G.strikes+d));
+    else if(f==="outs") G.outs=Math.max(0,Math.min(3,G.outs+d));
+    else if(f==="inning") G.inning=Math.max(1,G.inning+d);
+    else if(f==="half") G.half=(G.half==="T"?"B":"T");
+    else if(f==="away"||f==="home"){ G[f]=Math.max(0,(G[f]||0)+d); if(!G.line)G.line={away:[],home:[]}; if(!G.line[f])G.line[f]=[]; G.line[f][G.inning]=Math.max(0,(G.line[f][G.inning]||0)+d); }
+    render(); broadcast(); return; }
   if(act==="brsteal"){ brSteal(+arg); return; }
   if(act==="bradv"){ brAdvance(+arg); return; }
   if(act==="brscore"){ brScore(+arg); return; }
@@ -4198,7 +4272,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v150";
+var APP_VERSION="v151";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
