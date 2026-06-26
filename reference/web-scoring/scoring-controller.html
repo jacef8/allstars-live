@@ -3300,6 +3300,10 @@ function render(){
   // Responsive event picker: bottom-sheet on phone/portrait, SIDE panel on tablet/landscape
   // (more room, no scroll) — the first step toward the operator split-screen.
   const wide=isWide();
+  // Free-layout windows (BETA): scorer only, BOTH phone and tablet. The floating AT BAT auto-docks
+  // during a full-screen play (locate/runners/picker) so it never duplicates the inline card.
+  const floatable = viewMode!=="viewer";
+  const floatActive = floatable && floatOn && !focusPlay;
   const sheetWrap=wide
     ? `position:fixed;inset:0;z-index:50;display:flex;justify-content:flex-end;background:rgba(8,11,16,.5)`
     : `position:fixed;left:0;right:0;bottom:0;z-index:50;display:flex;justify-content:center;background:rgba(8,11,16,.55)`;
@@ -3384,7 +3388,7 @@ function render(){
           ${monitorPane()}
         </div>
         <div style="flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;gap:8px">
-          ${focusPlay?"":scoreBar()}${fieldEl}${(focusPlay||floatOn)?"":batterCard()}${actionEl}
+          ${focusPlay?"":scoreBar()}${fieldEl}${floatActive?"":batterCard()}${actionEl}
         </div>
       </div>`;
   } else if(wide){
@@ -3395,7 +3399,7 @@ function render(){
           ${focusPlay?"":scoreBar()}<div style="flex:1;min-height:0;display:flex;align-items:center;justify-content:center;position:relative">${diamondSVG()}${toastEl}</div>
         </div>
         <div style="flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;gap:8px">
-          ${(focusPlay||floatOn)?"":batterCard()}${actionEl}${feedPanel()}
+          ${floatActive?"":batterCard()}${actionEl}${feedPanel()}
         </div>
       </div>`;
   } else if(pickerModal){
@@ -3427,7 +3431,7 @@ function render(){
       : isView
         ? (function(){var vp=viewerPhone;var vseg=(id,l)=>`<button data-act="viewerphone" data-arg="${id}" style="flex:1;background:${vp===id?T.lime:T.surface2};color:${vp===id?"#fff":T.sage};border:1px solid ${vp===id?T.lime:T.line};border-radius:9px;padding:8px;font-family:${MONO};font-weight:800;font-size:12.5px;letter-spacing:.4px;text-transform:uppercase">${l}</button>`;
           return `<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px">${statusBar()}${batterCard()}<div style="display:flex;gap:8px;flex:none">${vseg("both","Both")}${vseg("field","Field")}${vseg("feed","Feed")}</div>${vp==="feed"?"":fieldEl}${vp==="field"?"":feedPanel()}</div>`;})()
-        : `<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px">${focusPlay?"":statusBar()}${batterCard()}${focusPlay?fieldEl:pcLine+'<div style="flex:1;min-height:0"></div>'}${actionEl}${controls}</div>`;
+        : `<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px">${focusPlay?"":statusBar()}${floatActive?"":batterCard()}${focusPlay?fieldEl:pcLine+'<div style="flex:1;min-height:0"></div>'}${actionEl}${controls}</div>`;
     body=`<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:9px">
         ${focusPlay?"":`<div style="display:flex;gap:8px;flex:none">${tab("score",isView?ICN.inplay+" Field":ICN.dot+" Scoring")}${tab("video",ICN.play+" Video")}</div>`}
         ${pane}
@@ -3435,9 +3439,8 @@ function render(){
   }
   // Free-layout (BETA): a "⊞ Windows" toggle on the wide scorer view, and — when on — a fixed
   // overlay holding the draggable/resizable AT BAT window (prototype panel).
-  const floatable = wide && viewMode!=="viewer";   // prototype: scorer, tablet/PC only
   const floatToggleBtn = floatable ? `<button data-act="togglefloat" title="Free layout — drag &amp; resize windows (beta)" style="position:fixed;right:16px;bottom:16px;z-index:46;background:${floatOn?T.lime:T.surface2};border:1px solid ${floatOn?T.lime:T.line};color:${floatOn?"#fff":T.chalk};border-radius:10px;padding:9px 13px;font-family:${SANS};font-size:13px;font-weight:800;box-shadow:0 4px 16px rgba(0,0,0,.45)">&#8862; Windows${floatOn?" &#10003;":""}</button>` : "";
-  const floatLayer = (floatable && floatOn) ? `<div id="float-layer" style="position:fixed;inset:0;z-index:35;pointer-events:none">${floatWindow("batter","At Bat",batterCard(),{x:24,y:96,w:360,h:168})}</div>` : "";
+  const floatLayer = floatActive ? `<div id="float-layer" style="position:fixed;inset:0;z-index:35;pointer-events:none">${floatWindow("batter","At Bat",batterCard(),{x:24,y:96,w:340,h:168})}</div>` : "";
   document.getElementById("content").innerHTML=`
     ${body}${confirmOverlay()}${alertOverlay()}
     ${reviewBatter?batterReviewModal():""}
@@ -4141,7 +4144,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v143";
+var APP_VERSION="v144";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
