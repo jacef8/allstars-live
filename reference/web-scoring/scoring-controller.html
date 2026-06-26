@@ -1917,6 +1917,9 @@ function actionArea(){
     // No game in progress → no button (was confusing on a fresh home screen).
     const shareBtnHome = gameActive ? `<button data-act="share" style="flex:none;display:flex;align-items:center;justify-content:center;gap:9px;background:${T.surface};border:1px solid ${T.line};color:${T.chalk};border-radius:12px;padding:13px;font-family:${SANS};font-weight:800;font-size:15px">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="${T.lime}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="19" r="2.6"/><path d="M8.3 10.8 15.7 6.4M8.3 13.2l7.4 4.4"/></svg>Share live game &middot; ${(OUR.short||"US")} vs ${(OPP.short||"OPP")}</button>` : "";
+    // Always available: share the APP itself (text/email/QR) so others can download it.
+    const shareAppBtn = `<button data-act="shareapp" style="flex:none;display:flex;align-items:center;justify-content:center;gap:9px;background:${T.surface2};border:1px solid ${T.line};color:${T.sage};border-radius:12px;padding:12px;font-family:${SANS};font-weight:800;font-size:14px">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${T.lime}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="19" r="2.6"/><path d="M8.3 10.8 15.7 6.4M8.3 13.2l7.4 4.4"/></svg>Share All-Stars Live</button>`;
     // Cloud sign-in bar — only appears once Firebase is configured (firebase-config.js apiKey).
     // Until then it's empty and the home looks/works exactly as the local-only version.
     const C=window.Cloud;
@@ -1987,11 +1990,11 @@ function actionArea(){
             ${actionsRow}
             ${teamsArea}
             ${followingBlock?`<div style="flex:none">${followingBlock}</div>`:""}
-            ${(shareBtnHome||authBar)?`<div style="flex:none">${shareBtnHome}${authBar}</div>`:""}
+            <div style="flex:none;display:flex;flex-direction:column;gap:10px">${shareBtnHome}${shareAppBtn}${authBar}</div>
           </div>
         </div>`;
     }
-    return `<div style="position:relative;min-height:100%;display:flex;flex-direction:column;justify-content:safe center;gap:14px;padding:6px 0">${settingsGear}${hero}${resumeBtn}${newGameBtn}${showTeams?teamsBlock:""}${showTeams?manageBtn:""}${followingBlock}${shareBtnHome}${authBar}</div>`;
+    return `<div style="position:relative;min-height:100%;display:flex;flex-direction:column;justify-content:safe center;gap:14px;padding:6px 0">${settingsGear}${hero}${resumeBtn}${newGameBtn}${showTeams?teamsBlock:""}${showTeams?manageBtn:""}${followingBlock}${shareBtnHome}${shareAppBtn}${authBar}</div>`;
   }
   if(mode==="teams"){
     const sorted=DB.teams.slice().sort((a,b)=>(b.fav?1:0)-(a.fav?1:0));
@@ -3371,6 +3374,10 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="newteam"){const t=newTeam("");openTeamId=t.id;teamTab="hub";mode="team";render();}
   else if(act==="teamsback"){mode="teams";render();}
   else if(act==="deleteteam"){ const delId=openTeamId; const td=teamById(delId); if(!td)return; confirmAct={title:"Delete "+(td.name||"team")+"?",msg:"This removes the roster and all season stats and can't be undone.",yes:"Delete",danger:true,run:function(){ try{ if(window.cloudDeleteTeam)cloudDeleteTeam(delId); }catch(e){} DB.teams=DB.teams.filter(t=>t.id!==delId); if(curTeamId===delId)curTeamId=null; openTeamId=null; teamTab="hub"; saveDB(); mode="teams"; render(); }}; render(); }
+  else if(act==="shareapp"){ openShareLink({ url:appDownloadUrl(), title:"SHARE ALL-STARS LIVE",
+      sub:'Send the app to a coach, parent, or scorekeeper &mdash; <b style="color:#E11D2E">scan</b> or send the link.',
+      subject:"Check out All-Stars Live",
+      body:"All-Stars Live is a free youth-baseball app — keep score, live-stream games to YouTube with a scorebug, and let parents follow the team & chat. Get it here:" }); return; }
   else if(act==="shareteam"){ const t=teamById(openTeamId); if(!t)return; const url=appBaseUrl()+"?follow="+encodeURIComponent(openTeamId); const nm=(t.name||"our team"); const nmE=nm.replace(/</g,"&lt;");
     openShareLink({ url:url, title:"SHARE "+nm.toUpperCase().replace(/</g,"&lt;"),
       sub:`Parents &amp; fans can <b style="color:#E11D2E">follow ${nmE}</b> — watch live &amp; chat (no scoring).`,
@@ -3636,6 +3643,10 @@ function appBaseUrl(){
     return location.origin+location.pathname;
   return "https://allstars-live.web.app/";
 }
+/* The link the "Share All-Stars Live" button sends. TODO: once the app is published, return the
+   Play Store page instead so it installs the native app:
+   return "https://play.google.com/store/apps/details?id=com.libertyclerk.allstarslive.app"; */
+function appDownloadUrl(){ return "https://allstars-live.web.app/"; }
 let shareMode="feed";   // "feed" = scorebug + play-by-play only (no video); "video" = include the stream
 function shareUrl(){
   const base=appBaseUrl();
@@ -3801,7 +3812,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v128";
+var APP_VERSION="v129";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
