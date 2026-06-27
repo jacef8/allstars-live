@@ -47,7 +47,8 @@ Status: [ ] todo · [~] in progress · [x] done. Grouped by theme; recurring/met
 - [ ] C2. Better position changes: a single swap shouldn't cascade-reassign others. Offer a field-map
       view on the lineup page to place players (drag-and-drop), or a simple single swap.
 - [ ] C3. Skip a batter in the batting order.
-- [ ] C4. Highlight the CURRENT batter on the in-game lineup edit page (find the next-to-edit fast).
+- [x] C4. Current batter highlighted on the in-game lineup edit (v199): our up-batter slot gets a lime
+      border + tint + an "AT BAT" badge, so the row most likely to need editing is easy to find.
 - [ ] C5. Record lineup changes throughout the game for the historical record.
 - [ ] C6. Edit the OPPONENT roster before the game-setup screen.
 
