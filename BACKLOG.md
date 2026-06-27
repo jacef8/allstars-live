@@ -12,9 +12,11 @@ Status: [ ] todo · [~] in progress · [x] done. Grouped by theme; recurring/met
 - [x] A3. Editing a number: tapping the number box should select it so I can type a new value WITHOUT
       deleting the old one first (v189: global select-on-focus).
 - [x] A4. Background is too dark — brighten the page background a little (v189: lightened turf scrim).
-- [~] A5. A play is animating TWICE — animations are de-duped by anim id (triggerAnim guards
-      a.id===_lastAnimId), so a same-play double shouldn't happen. Needs on-device repro: which play
-      type? (e.g. a hit that's then thrown out plays ball-flight + throw — that's two arcs by design.)
+- [~] A5. Double-animation: the play animation uses SVG SMIL (begin="0s"), which RESTARTS whenever
+      render() re-inserts it. flash() fired a full render() at 1900ms to clear its toast — restarting the
+      animation for any play whose hold runs >1.9s (HR/DP/run-scored). Fixed v200: flash now removes
+      just its toast element, no render. Verified no extra render fires. If plain singles/outs still
+      double on-device, a different trigger remains — needs repro of the exact play.
 - [x] A6. Window borders: consistent thick white, no stray red/thin (done v185–v188 sweep).
 
 ## B. Scoreboard + game feed

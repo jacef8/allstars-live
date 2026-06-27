@@ -745,7 +745,11 @@ function batter(){
   return {num:e.num||String(i+1),name:e.name||"",bats:"",spot:i+1,opp:true};
 }
 const batterLabel=()=>"#"+batter().num;
-function flash(msg){toast=msg;clearTimeout(toastTimer);toastTimer=setTimeout(()=>{toast=null;render();},1900);}
+function flash(msg){toast=msg;clearTimeout(toastTimer);toastTimer=setTimeout(()=>{toast=null;
+  // Clear the toast by removing JUST its element — a full render() here would re-insert the play
+  // animation's SVG and RESTART its SMIL (begin="0s"), which is what made plays animate twice. (A5)
+  var el=document.getElementById("toastEl"); if(el&&el.parentNode){ el.parentNode.removeChild(el); } else { try{render();}catch(e){} }
+},1900);}
 /* Open a game/practice location in Maps (directions). Native → hand off to the OS via the
    bridge so it opens the Maps app; browser → a new tab. */
 function openMapLoc(loc){ loc=(loc||"").trim(); if(!loc)return;
@@ -3774,7 +3778,7 @@ function render(){
   }
   maybeAlert();   // rule-reminder popups (run cap / run rule / pitch limit / final inning)
   const playing=!(mode==="idle"||mode==="locate");
-  const toastEl=toast?`<div style="position:absolute;bottom:12px;left:50%;transform:translateX(-50%);background:#0B0E13;color:${T.lime};border:2px solid ${T.lime};font-family:${MONO};font-weight:800;font-size:14px;letter-spacing:.5px;text-transform:uppercase;padding:7px 16px;border-radius:999px;white-space:nowrap;z-index:5;box-shadow:0 4px 16px rgba(0,0,0,.55)">${toast}</div>`:"";
+  const toastEl=toast?`<div id="toastEl" style="position:absolute;bottom:12px;left:50%;transform:translateX(-50%);background:#0B0E13;color:${T.lime};border:2px solid ${T.lime};font-family:${MONO};font-weight:800;font-size:14px;letter-spacing:.5px;text-transform:uppercase;padding:7px 16px;border-radius:999px;white-space:nowrap;z-index:5;box-shadow:0 4px 16px rgba(0,0,0,.55)">${toast}</div>`:"";
   // GameChanger model: the field stays the big hero, and the pick-an-event steps
   // appear as a bottom-sheet MODAL over it (no inline scrolling to choose).
   const pickerModal=(mode==="contact"||mode==="result"||mode==="errpos"||mode==="dppick"||mode==="outpos");
@@ -4709,7 +4713,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v199";
+var APP_VERSION="v200";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
