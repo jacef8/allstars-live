@@ -105,12 +105,11 @@ Status: [ ] todo · [~] in progress · [x] done. Grouped by theme; recurring/met
       shows + Go Live succeeds over cellular. NOTE: tablet USB dropped repeatedly today (check cable).
 
 ## H. Remote scorebug overlay (NEW 2026-06-27)
-- [ ] H1. Burn the live scorebug into a YouTube stream the user is NOT the source of (scores from home,
-      someone else films). Build a TRANSPARENT overlay URL (scorebug-only, transparent bg) that
-      subscribes to the user's live game (?watch=<gameId>) — usable as an OBS/Streamlabs/vMix BROWSER
-      SOURCE so the encoder burns it in. App already broadcasts state continuously. Gated on knowing the
-      filming person's streaming setup (OBS = works; phone-direct-to-YouTube = needs OBS or the app).
-      Fallback today: share the live-score link beside the YouTube video (not burned in).
+- [x] H1. Remote scorebug overlay (v210): ?overlay=1 on a watch link renders ONLY a clean broadcast
+      scorebug (team colours, score, inning, count, outs, bases) on a TRANSPARENT page — drop it into an
+      OBS/Streamlabs/vMix browser source to burn the live score into a stream from another device. Fed by
+      the ?watch= subscription (no login). "Copy OBS overlay link" button added to the game-share sheet.
+      Verified: transparent bg, bug only, empty until live.
 
 ## F2b. End Game must end the YouTube stream (NEW 2026-06-27)
 - [x] Root cause: Broadcast.stop() only stopped the local RTMP push + set OFFLINE; it never told YouTube

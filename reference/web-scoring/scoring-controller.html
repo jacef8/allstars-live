@@ -173,6 +173,7 @@
       <button data-act="sharecopy" style="flex:1;display:flex;align-items:center;justify-content:center;gap:8px;background:#324056;border:1px solid #4A5870;color:#EAEDF2;border-radius:10px;padding:13px;font-family:'Barlow',sans-serif;font-size:15px;font-weight:800;cursor:pointer">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#EAEDF2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>Copy</button>
     </div>
+    <button data-act="shareoverlay" title="For OBS / Streamlabs / vMix — a transparent scorebug to burn into a stream" style="width:100%;margin-top:8px;display:flex;align-items:center;justify-content:center;gap:7px;background:#1A2233;border:1px solid #2A3650;color:#B7C2D6;border-radius:10px;padding:11px;font-family:'Barlow',sans-serif;font-size:12.5px;font-weight:700;cursor:pointer">&#128250; Copy OBS overlay link</button>
     <button data-act="closeshare" style="width:100%;margin-top:8px;background:transparent;border:none;color:#B7C2D6;padding:8px;font-family:'Barlow',sans-serif;font-size:13px;font-weight:700;cursor:pointer">Done</button>
   </div>
 </div>
@@ -1400,6 +1401,11 @@ let viewerPhone=(()=>{try{return localStorage.getItem("al-viewer-phone")||"both"
 // Opened via a watch/share link → this person is ONLY a viewer (no scoring). Lock them to viewer
 // mode and hide the Scorer/Viewer toggle (and reuse that space for the matchup they're watching).
 let viewerLocked=(()=>{try{ const p=new URLSearchParams(location.search); return p.get("view")==="viewer"||p.get("feed")==="1"||!!p.get("watch"); }catch(e){return false;}})();
+// OBS/broadcast OVERLAY mode (H1): ?overlay=1 on a watch link renders ONLY a clean scorebug on a
+// transparent page, so a streamer can drop the URL into a browser source and burn in the live score —
+// even though the video is on a different device. Forces transparent background everywhere.
+const OVERLAY=(()=>{try{ return new URLSearchParams(location.search).get("overlay")==="1"; }catch(e){ return false; }})();
+if(OVERLAY){ try{ var _st=document.createElement("style"); _st.textContent="html,body,#wrap,#app{background:transparent !important;}"; document.head.appendChild(_st); }catch(e){} }
 // May the current user actually SCORE right now? Used to grey the Scorer toggle + hide scoring
 // for followers/viewers. Intentionally permissive so it NEVER bumps a legit scorer out:
 //  • watch-link viewer → no
@@ -3821,7 +3827,26 @@ function restoreScroll(){ var m=window._scrollMemo||{}; for(var id in m){ if(m[i
 /* Paint new HTML into #content and put the scroll positions back (no jump-to-top). */
 function paintContent(html){ var c=document.getElementById("content"); if(!c) return; c.innerHTML=html; restoreScroll(); }
 
+// Clean broadcast scorebug for OBS overlay mode (H1) — transparent page, just this bug, fed by the
+// ?watch= subscription. Top-left lower-third; nothing renders until a game is live.
+function overlayBug(){
+  if(!(gameActive||_remoteLive)) return "";
+  const tw=(t,act)=>{const c=TEAMS[t].color,val=(t==="away")?G.away:G.home;return `<div style="display:flex;align-items:center;gap:11px;padding:8px 15px;background:${act?c:"rgba(13,19,32,.95)"};border-left:7px solid ${c}">
+      <span style="font-family:${MONO};font-weight:800;font-size:19px;letter-spacing:.5px;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.6);white-space:nowrap">${TEAMS[t].short||(t==="away"?"AWAY":"HOME")}</span>
+      ${act?`<span style="width:8px;height:8px;border-radius:50%;background:#fff;box-shadow:0 0 8px #fff;flex:none"></span>`:""}
+      <span style="margin-left:auto;font-weight:800;font-size:30px;line-height:1;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.7)">${val}</span></div>`;};
+  const b=G.bases||{}, base=(on)=>`<span style="display:inline-block;width:10px;height:10px;transform:rotate(45deg);background:${on?"#F4B233":"transparent"};border:2px solid ${on?"#F4B233":"rgba(255,255,255,.55)"}"></span>`;
+  return `<div style="position:fixed;top:20px;left:20px;display:inline-flex;flex-direction:column;border-radius:11px;overflow:hidden;box-shadow:0 10px 34px rgba(0,0,0,.65);font-family:${SANS};min-width:240px">
+      ${tw("away",G.half==="T")}<div style="height:1.5px;background:rgba(255,255,255,.22)"></div>${tw("home",G.half==="B")}
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:13px;background:rgba(8,11,16,.96);padding:8px 15px;color:#fff">
+        <span style="font-family:${MONO};font-weight:800;font-size:17px">${G.half==="T"?"▲":"▼"}${G.inning}</span>
+        <span style="font-family:${MONO};font-weight:800;font-size:17px">${G.balls}-${G.strikes}</span>
+        <span style="font-family:${MONO};font-weight:800;font-size:17px">${G.outs}<span style="color:rgba(255,255,255,.6);font-size:10px;margin-left:2px">OUT</span></span>
+        <span style="display:inline-flex;gap:9px;align-items:center">${base(b[3])}${base(b[2])}${base(b[1])}</span>
+      </div></div>`;
+}
 function render(){
+  if(OVERLAY){ try{ var _oc=document.getElementById("content"); if(_oc)_oc.innerHTML=overlayBug(); }catch(e){} return; }   // H1: OBS overlay = bug only
   // Watch-link viewer, but no live game yet → show a friendly lobby instead of the Home screen
   // (a fan opening "Invite to watch" before first pitch shouldn't land on New Game / Manage Teams).
   // It auto-switches to the live game the moment the scorer's broadcast arrives (see applyRemote).
@@ -4738,6 +4763,11 @@ document.getElementById("qrmodal").addEventListener("click",e=>{
     const done=()=>{ const o=a.innerHTML; a.innerHTML="Copied &#10003;"; setTimeout(()=>{ a.innerHTML=o; },1500); };
     if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(u).then(done).catch(done); } else { done(); }
   }
+  else if(a.dataset.act==="shareoverlay"){   // H1: the transparent OBS overlay link = watch link + &overlay=1
+    let u=curShareUrl(); if(!u)return; u=u+(u.indexOf("?")>=0?"&":"?")+"overlay=1";
+    const done=()=>{ const o=a.innerHTML; a.innerHTML="Overlay link copied &#10003;"; setTimeout(()=>{ a.innerHTML=o; },1700); };
+    if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(u).then(done).catch(done); } else { done(); }
+  }
 });
 
 /* ===== connect-stream modal: point the monitor at a YouTube Live stream ===== */
@@ -4836,7 +4866,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v209";
+var APP_VERSION="v210";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
