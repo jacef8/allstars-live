@@ -1723,8 +1723,7 @@ function statusBar(){
   const pipRow=(label,cls,n,max,id)=>`<div class="bso-row" id="${id}" style="display:flex;align-items:center;gap:6px;height:14px">
       <span style="font-family:${MONO};font-size:12px;font-weight:800;color:${T.sageDim};width:11px">${label}</span>
       ${Array.from({length:max},(_,i)=>`<span class="bso-pip ${cls}${i<n?" on":""}"></span>`).join("")}</div>`;
-  return `<div id="statusbar" data-longpress="correct" title="Tap the pencil (or hold) to correct the count / outs / score" style="display:flex;align-items:stretch;background:${T.surface};border:1.5px solid ${T.line};border-radius:11px;overflow:hidden;flex-shrink:0;box-shadow:0 1px 0 rgba(15,30,60,.04);position:relative;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none">
-    <button data-act="correctopen" title="Correct the count, outs, score &amp; inning" style="position:absolute;top:5px;right:6px;z-index:3;background:${T.surface2};border:1.5px solid ${T.line};color:${T.lime};border-radius:7px;width:28px;height:24px;display:flex;align-items:center;justify-content:center;font-size:14px;padding:0;line-height:1;cursor:pointer">&#9998;</button>
+  return `<div id="statusbar" data-longpress="correct" title="Tap the pencil (or hold) to correct the count / outs / score" style="display:flex;align-items:stretch;background:${T.surface};border:1.5px solid ${T.line};border-radius:11px;overflow:hidden;flex-shrink:0;box-shadow:0 1px 0 rgba(15,30,60,.04);user-select:none;-webkit-user-select:none;-webkit-touch-callout:none">
     <div style="display:flex;flex-direction:column;justify-content:center;gap:5px;padding:9px 12px;min-width:116px;max-width:174px;border-right:1.5px solid ${T.line}">
       ${tabRow("away",G.away,G.half==="T")}${tabRow("home",G.home,G.half==="B")}</div>
     <div style="display:flex;align-items:center;justify-content:center;padding:0 10px;flex:1;gap:clamp(7px,2.4vw,18px)">
@@ -1737,6 +1736,7 @@ function statusBar(){
         ${pipRow("S","s",G.strikes,2,"sb-strikes")}
         ${pipRow("O","o",G.outs,3,"sb-outs")}</div>
     </div>
+    <button data-act="correctopen" title="Correct the count, outs, score &amp; inning" style="flex:none;width:34px;border:none;border-left:1.5px solid ${T.line};background:${T.surface2};color:${T.lime};display:flex;align-items:center;justify-content:center;font-size:16px;padding:0;cursor:pointer">&#9998;</button>
   </div>`;
 }
 
@@ -2529,14 +2529,18 @@ function actionArea(){
     // no time use end-of-day. Passed items drop into a dimmed "Earlier" group instead of cluttering Upcoming.
     const _now=Date.now(), _grace=6*3600*1000;
     const schedWhen=(s)=>{ try{ const dt=new Date((s.date||"")+"T"+(s.time||"23:59")); return isNaN(dt.getTime())?0:dt.getTime(); }catch(e){ return 0; } };
-    const schedRow=(s,past)=>{const isG=s.type!=="practice";
-      return `<div style="display:flex;align-items:center;gap:10px;background:${T.surface2};border:1.5px solid ${T.line};border-left:6px solid ${isG?OUR.color:T.sage};border-radius:11px;padding:13px 15px${past?";opacity:.6":""}">
-          <div style="flex:1;min-width:0">
-            <div style="font-weight:800;color:${T.ink};font-size:21px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${isG?ICN.inplay+" "+(s.opp?("vs "+(s.opp||"").replace(/</g,"")):"Game"):ICN.ball+" Practice"}</div>
-            <div style="font-size:17px;color:${T.sage};margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${fmtSched(s)}${s.loc?` &middot; <span data-act="openmap" data-arg="${encodeURIComponent(s.loc)}" title="Open in Maps — get directions" style="color:${T.lime};cursor:pointer;text-decoration:underline;text-underline-offset:2px">${IC('<path d="M12 21s-6-5.7-6-10a6 6 0 1 1 12 0c0 4.3-6 10-6 10z"/><circle cx="12" cy="11" r="2.1"/>',15)} ${(s.loc||"").replace(/</g,"&lt;")}</span>`:""}${s.notes?(" &middot; "+(s.notes||"").replace(/</g,"&lt;")):""}</div></div>
-          ${isG?`<button data-act="schedstart" data-arg="${s.id}" title="Start this game now" style="background:${T.lime};border:1px solid ${T.lime};color:#fff;border-radius:8px;padding:9px 15px;font-weight:800;font-size:13px;letter-spacing:.4px;flex:none;display:inline-flex;align-items:center;gap:6px;box-shadow:0 3px 10px rgba(225,29,46,.28)">&#9654; Start</button>`:""}
-          <button data-act="schededit" data-arg="${s.id}" title="Edit" style="background:${schedEditId===s.id?T.lime:"none"};border:1px solid ${schedEditId===s.id?T.lime:T.line};color:${schedEditId===s.id?"#fff":T.lime};border-radius:8px;padding:9px 12px;font-weight:800;font-size:13px;flex:none">Edit</button>
-          <button data-act="schedrm" data-arg="${s.id}" style="background:none;border:1.5px solid ${T.line};color:${T.out};border-radius:8px;padding:9px 12px;font-weight:800;font-size:18px;flex:none">&times;</button></div>`;};
+    const schedRow=(s,past)=>{const isG=s.type!=="practice"; const wide=isWide();
+      const title=isG?ICN.inplay+" "+(s.opp?("vs "+(s.opp||"").replace(/</g,"")):"Game"):ICN.ball+" Practice";
+      const sub=`${fmtSched(s)}${s.loc?` &middot; <span data-act="openmap" data-arg="${encodeURIComponent(s.loc)}" title="Open in Maps — get directions" style="color:${T.lime};cursor:pointer;text-decoration:underline;text-underline-offset:2px">${IC('<path d="M12 21s-6-5.7-6-10a6 6 0 1 1 12 0c0 4.3-6 10-6 10z"/><circle cx="12" cy="11" r="2.1"/>',15)} ${(s.loc||"").replace(/</g,"&lt;")}</span>`:""}${s.notes?(" &middot; "+(s.notes||"").replace(/</g,"&lt;")):""}`;
+      const textBlock=`<div style="flex:1;min-width:0">
+            <div style="font-weight:800;color:${T.ink};font-size:${wide?21:20}px;${wide?"white-space:nowrap;overflow:hidden;text-overflow:ellipsis":"line-height:1.25"}">${title}</div>
+            <div style="font-size:${wide?17:16}px;color:${T.sage};margin-top:5px;${wide?"white-space:nowrap;overflow:hidden;text-overflow:ellipsis":"line-height:1.4"}">${sub}</div></div>`;
+      const btns=`<div style="display:flex;gap:8px;flex:none;align-items:center${wide?"":";justify-content:flex-end"}">
+          ${isG?`<button data-act="schedstart" data-arg="${s.id}" title="Start this game now" style="background:${T.lime};border:1px solid ${T.lime};color:#fff;border-radius:8px;padding:9px 15px;font-weight:800;font-size:13px;letter-spacing:.4px;display:inline-flex;align-items:center;gap:6px;box-shadow:0 3px 10px rgba(225,29,46,.28)">&#9654; Start</button>`:""}
+          <button data-act="schededit" data-arg="${s.id}" title="Edit" style="background:${schedEditId===s.id?T.lime:"none"};border:1px solid ${schedEditId===s.id?T.lime:T.line};color:${schedEditId===s.id?"#fff":T.lime};border-radius:8px;padding:9px 14px;font-weight:800;font-size:13px">Edit</button>
+          <button data-act="schedrm" data-arg="${s.id}" title="Remove" style="background:none;border:1.5px solid ${T.line};color:${T.out};border-radius:8px;padding:9px 13px;font-weight:800;font-size:18px">&times;</button></div>`;
+      return `<div style="display:flex;${wide?"flex-direction:row;align-items:center":"flex-direction:column;align-items:stretch"};gap:10px;background:${T.surface2};border:1.5px solid ${T.line};border-left:6px solid ${isG?OUR.color:T.sage};border-radius:11px;padding:14px 15px${past?";opacity:.6":""}">
+          ${textBlock}${btns}</div>`;};
     // A scheduled GAME counts as played once a finished game exists for the same date (+ opponent if set),
     // so it moves to "Earlier" even if you scored it before its listed time.
     const schedPlayed=(s)=>{ if(s.type==="practice")return false; return (t.games||[]).some(gm=>gm.date===s.date && (!s.opp || (gm.opp||"").toLowerCase()===(s.opp||"").toLowerCase())); };
@@ -3605,9 +3609,12 @@ function render(){
     // tapping a game in the stats list to open its summary — is a real page change, so it should
     // start at the TOP, not inherit the list's scroll position.
     const subTab=mode==="team"?(teamTab+":"+(typeof viewGameId!=="undefined"?(viewGameId||""):"")):"";
-    const prevScroll=(scroll&&mode===_lastMode&&subTab===_lastSubTab)?(()=>{const c=document.querySelector("#content > div");return c?c.scrollTop:0;})():0;
-    // Preserve the lineup list's scroll across a reorder re-render so it doesn't snap to the top.
-    const prevLineup=(mode==="lineup")?(()=>{const l=document.getElementById("lineup-list");return l?l.scrollTop:0;})():0;
+    // Scroll memory: remember each view's scroll position keyed by its identity, BEFORE we wipe the
+    // DOM. This survives a detour into a picker/sub-step (e.g. tapping a lineup slot to choose a
+    // position) and is restored when you come back, and a same-view re-render (flipping a toggle,
+    // changing a position) never jumps back to the top of the list.
+    try{ const _cOld=document.querySelector("#content > div"); if(_cOld) _scrollMem[(_lastMode||"")+"|"+(_lastSubTab||"")]=_cOld.scrollTop;
+         const _lOld=document.getElementById("lineup-list"); if(_lOld) _scrollMem["__lineup"]=_lOld.scrollTop; }catch(e){}
     // page-zoom (scroll pages only) scales the UI up on big monitors; lineup is excluded so
     // its drag coordinates stay accurate.
     const building=(mode==="team"&&teamTab==="lineupedit");   // exclude page-zoom so drag coords stay accurate
@@ -3617,8 +3624,8 @@ function render(){
     const cls=`${(mode!==_lastMode&&!stepModes.includes(mode))?"screen-in ":""}${(scroll&&!building)?"page-zoom":""}`;
     document.getElementById("content").innerHTML=`<div class="${cls}" style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px;${scroll?"overflow-y:auto;-webkit-overflow-scrolling:touch":""}">${actionArea()}</div>${confirmOverlay()}`;
     _lastMode=mode; _lastSubTab=subTab;
-    if(prevScroll){ const c=document.querySelector("#content > div"); if(c)c.scrollTop=prevScroll; }
-    if(prevLineup){ const l=document.getElementById("lineup-list"); if(l)l.scrollTop=prevLineup; }
+    try{ const _sk=mode+"|"+subTab; if(scroll&&_scrollMem[_sk]!=null){ const c=document.querySelector("#content > div"); if(c)c.scrollTop=_scrollMem[_sk]; }
+         if(mode==="lineup"&&_scrollMem["__lineup"]!=null){ const l=document.getElementById("lineup-list"); if(l)l.scrollTop=_scrollMem["__lineup"]; } }catch(e){}
     if(mode==="lineup")setupLineupDrag();
     if(mode==="lineup"&&lineupTab==="opp")setupOppDrag();
     if(building)setupBuilderDrag();
@@ -3798,7 +3805,7 @@ function render(){
 }
 
 /* ---- diff the last-shown scoreboard vs current and fire one-shot animations ---- */
-let _disp=null,_lastMode=null,_lastSubTab=null;
+let _disp=null,_lastMode=null,_lastSubTab=null,_scrollMem={};
 function animateStatusBar(){
   if(!document.getElementById("sb-balls")) return;   // status bar not on screen; keep _disp as the baseline
   const cur={away:G.away,home:G.home,balls:G.balls,strikes:G.strikes,outs:G.outs,
@@ -4529,7 +4536,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v172";
+var APP_VERSION="v173";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
