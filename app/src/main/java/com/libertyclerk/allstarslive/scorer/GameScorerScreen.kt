@@ -244,7 +244,7 @@ fun GameScorerScreen(webView: WebView) {
 
     // Dark backdrop matching the scorer theme: the WebView is transparent, so this shows
     // everywhere except the monitor rect (where the camera TextureView sits).
-    Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color(0xFF0B0E13))) {
+    Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color(0xFF1B3050))) {   // lighter navy base (was near-black) — brighter, easier in sunlight
         // Blue turf behind the transparent WebView so the native app matches the web look
         // (the web body is transparent in the app). Camera + web UI draw on top of this.
         Image(
@@ -252,8 +252,11 @@ fun GameScorerScreen(webView: WebView) {
             contentDescription = null,
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Crop,
+            alpha = 0.78f,   // let the lighter base show through so the dark turf reads brighter
         )
-        Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color(0x99070B13)))  // scrim for contrast
+        // A SLIGHT light lift instead of the old heavy 60%-dark scrim (that's what made it hard to see
+        // even at full brightness). The frosted cards in the web UI carry the contrast, not a dark wash.
+        Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color(0x14FFFFFF)))
         // Native camera preview, BEHIND the transparent WebView, at the web's monitor rect.
         // TextureView (not SurfaceView) so it composites in the normal view hierarchy and
         // reliably shows through the transparent WebView, with web controls drawn on top.

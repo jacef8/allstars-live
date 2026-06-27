@@ -2743,7 +2743,9 @@ function actionArea(){
             onerror="if(this.src.indexOf('logo-mark')<0){this.src='icons/logo-mark.png';}else{this.style.display='none';}"
             style="height:clamp(112px,calc(var(--avh) * 20),156px);width:auto;display:block;filter:drop-shadow(0 8px 18px rgba(0,0,0,.6))">
           <div style="font-family:${MONO};font-size:clamp(26px,3.6vw,42px);font-weight:800;letter-spacing:1.5px;line-height:1;color:#fff">ALL-STARS <span style="color:${T.lime}">LIVE</span></div></div>`;
-    const resumeBtn = gameActive?`<button data-act="resume" style="${bigBtn("#FFFFFF","border:1px solid rgba(0,0,0,.10)",T.field)};font-size:17px;padding:16px;display:flex;align-items:center;justify-content:center;gap:8px">${IC(PLAY)} Resume &middot; ${OUR.short} vs ${OPP.short}</button>`:"";
+    const resumeBtn = gameActive?`<button data-act="resume" style="${bigBtn("#FFFFFF","border:1px solid rgba(0,0,0,.10)",T.field)};font-size:16px;padding:14px 16px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px">
+        <span style="display:flex;align-items:center;gap:8px;font-weight:800">${IC(PLAY)} Resume game</span>
+        <span style="font-size:13px;font-weight:700;color:${T.navy}">${(OUR.short||"US").replace(/</g,"")} ${ourRuns()} &middot; ${(OPP.short||"OPP").replace(/</g,"")} ${oppRuns()} &nbsp;—&nbsp; ${G.half==="T"?"Top":"Bot"} ${ordinal(G.inning)}</span></button>`:"";
     // Games live on ANOTHER device for a team I score → "in progress · take over" (cross-device handoff).
     const _esc=x=>String(x==null?"":x).replace(/</g,"&lt;");
     const liveRows = otherLiveGames().map(function(o){ const s=o.live.summary||{}; const who=o.live.activeName?(" &middot; "+_esc(o.live.activeName)):"";
@@ -4343,7 +4345,7 @@ document.getElementById("app").addEventListener("click",e=>{
   }
   // While editing the toolbar layout, a tap on a draggable bar button must NOT fire its action — it's
   // being moved. (The Done toggle isn't inside a [data-baritem], so it still works to exit.)
-  if(barEdit && e.target.closest("[data-baritem]")) return;
+  if(barEdit && e.target.closest("[data-baritem],[data-barfloat]")) return;
   const el=e.target.closest("[data-act]"); if(!el)return;
   const act=el.dataset.act,arg=el.dataset.arg;
   window._lastAct=act;                                       // flip-trace: remember the last tapped action
@@ -4455,7 +4457,8 @@ document.getElementById("app").addEventListener("click",e=>{
   if(act==="viewerphone"){ viewerPhone=(arg==="field"||arg==="feed")?arg:"both"; try{localStorage.setItem("al-viewer-phone",viewerPhone);}catch(e){} render(); return; }
   if(act==="soundtoggle"){ Snd.setOn(!Snd.isOn()); if(Snd.isOn())Snd.crack(); renderToolbar(); return; }
   if(act==="gcarrange"){ gcArrange=!gcArrange; renderToolbar(); if(!gcArrange)flash("Toolbar order saved"); return; }
-  if(act==="togglebaredit"){ barEdit=!barEdit; renderToolbar(); flash(barEdit?"Drag the buttons to rearrange them":"Toolbar layout saved"); return; }
+  if(act==="togglebaredit"){ barEdit=!barEdit; renderToolbar(); flash(barEdit?"Drag any button anywhere — tap Done to lock":"Toolbar layout saved"); return; }
+  if(act==="barreset"){ clearBarLayout(); renderToolbar(); flash("Buttons reset to the top row"); return; }
   if(act==="bugpreview"){ bugPreview=true; render(); return; }
   if(act==="closebugpreview"){ bugPreview=false; render(); return; }
   if(act==="inviteadd"){ const e=document.getElementById("inviteWho"); if(!e)return; const v=(e.value||"").trim(); if(!v){flash("Enter an email or phone number");return;}
@@ -4739,28 +4742,52 @@ function setupGcDrag(){
     });
   });
 }
-/* Top-bar button layout (jford): the window button toggles "edit" mode, in which EVERY top-bar button
-   can be dragged left/right to reorder it. Order persists per device (al-bar-order). The scoreboard and
-   game feed are NOT touched — only the buttons move. */
+/* Top-bar button layout (jford): the window button toggles "edit" mode. In edit mode ANY button can be
+   dragged FREELY anywhere on screen (not just the top row, gaps allowed) — it lifts out of the toolbar
+   to a fixed position, snapped to an 8px grid. Buttons with no saved position stay in the top-row flow.
+   Reset returns them all to the row. Persists per device (al-bar-layout / al-bar-order). Scoreboard +
+   feed are untouched. _barPieces holds the current button HTML so the float layer can render them. */
 const BAR_DEFAULT=["videotoggle","share","sound","live","swap","lineup","inninglog","ingamesettings","home","endgame","undo"];
+let _barPieces={};
 function barOrder(){ let s=[]; try{ s=JSON.parse(localStorage.getItem("al-bar-order")||"[]"); }catch(e){}
   if(!Array.isArray(s))s=[]; const known=s.filter(k=>BAR_DEFAULT.includes(k));
   return known.concat(BAR_DEFAULT.filter(k=>!known.includes(k))); }
-function saveBarOrder(a){ try{ localStorage.setItem("al-bar-order",JSON.stringify(a)); }catch(e){} }
+function barLayout(){ try{ const o=JSON.parse(localStorage.getItem("al-bar-layout")||"{}"); return (o&&typeof o==="object")?o:{}; }catch(e){ return {}; } }
+function saveBarPos(k,x,y){ try{ const L=barLayout(); L[k]={x:Math.round(x),y:Math.round(y)}; localStorage.setItem("al-bar-layout",JSON.stringify(L)); }catch(e){} }
+function clearBarLayout(){ try{ localStorage.removeItem("al-bar-layout"); localStorage.removeItem("al-bar-order"); }catch(e){} }
+const _snap=v=>Math.round(v/8)*8;
+// Lift a node to a fixed, pointer-following position while dragging; on drop, persist via saveFn.
+function _dragFree(el,startEvt,key,opts){
+  startEvt.preventDefault();
+  const r=el.getBoundingClientRect(), offX=startEvt.clientX-r.left, offY=startEvt.clientY-r.top; let moved=false;
+  if(opts&&opts.lift){ el.style.position="fixed"; el.style.margin="0"; el.style.left=r.left+"px"; el.style.top=r.top+"px"; }
+  el.style.zIndex="80"; el.style.opacity="0.85"; document.body.style.userSelect="none";
+  const move=ev=>{ moved=true; let x=_snap(ev.clientX-offX), y=_snap(ev.clientY-offY);
+    x=Math.max(0,Math.min(x,window.innerWidth-el.offsetWidth)); y=Math.max(0,Math.min(y,window.innerHeight-el.offsetHeight));
+    el.style.left=x+"px"; el.style.top=y+"px"; };
+  const up=()=>{ window.removeEventListener("pointermove",move); window.removeEventListener("pointerup",up);
+    document.body.style.userSelect=""; el.style.opacity="";
+    if(moved) saveBarPos(key, parseInt(el.style.left)||0, parseInt(el.style.top)||0);
+    renderToolbar(); };
+  window.addEventListener("pointermove",move); window.addEventListener("pointerup",up);
+}
+// Flow buttons (still in the toolbar): drag lifts them OUT to a free position.
 function setupBarDrag(){
   const bar=document.getElementById("toolbar"); if(!bar)return; const row=bar.firstElementChild; if(!row)return;
   row.querySelectorAll('[data-baritem]').forEach(chip=>{
-    chip.addEventListener('pointerdown',e=>{
-      e.preventDefault(); chip.style.opacity='0.55'; document.body.style.userSelect='none';
-      const move=ev=>{ const chips=[...row.querySelectorAll('[data-baritem]')].filter(c=>c!==chip); let placed=false;
-        for(const c of chips){ const b=c.getBoundingClientRect(); if(ev.clientX < b.left+b.width/2){ row.insertBefore(chip,c); placed=true; break; } }
-        if(!placed){ const lastC=chips[chips.length-1]; if(lastC) lastC.after(chip); } };
-      const up=()=>{ window.removeEventListener('pointermove',move); window.removeEventListener('pointerup',up);
-        document.body.style.userSelect=''; chip.style.opacity='';
-        saveBarOrder([...row.querySelectorAll('[data-baritem]')].map(c=>c.getAttribute('data-baritem'))); };
-      window.addEventListener('pointermove',move); window.addEventListener('pointerup',up);
-    });
+    chip.addEventListener('pointerdown',e=>{ _dragFree(chip, e, chip.getAttribute('data-baritem'), {lift:true}); });
   });
+}
+// The free-floating buttons (those with a saved position), drawn in a fixed overlay INSIDE #app so the
+// #app click-delegation still routes their data-act when NOT editing. In edit mode they're draggable.
+function renderBarFloat(){
+  const app=document.getElementById("app"); if(!app) return;
+  let layer=document.getElementById("bar-float");
+  if(!layer){ layer=document.createElement("div"); layer.id="bar-float"; layer.style.cssText="position:fixed;inset:0;z-index:36;pointer-events:none"; app.appendChild(layer); }
+  const L=barLayout(); const keys=Object.keys(L).filter(k=>_barPieces[k]);
+  layer.innerHTML=keys.map(k=>{ const p=L[k];
+    return `<div data-barfloat="${k}" style="position:fixed;left:${p.x}px;top:${p.y}px;pointer-events:auto;${barEdit?`outline:2px dashed ${T.lime};outline-offset:2px;border-radius:11px;cursor:grab;touch-action:none`:""}">${_barPieces[k]}</div>`; }).join("");
+  if(barEdit){ layer.querySelectorAll('[data-barfloat]').forEach(el=>{ el.addEventListener('pointerdown',e=>{ _dragFree(el, e, el.getAttribute('data-barfloat'), {lift:false}); }); }); }
 }
 function renderToolbar(){
   const tb=document.getElementById("toolbar"); if(!tb)return;
@@ -4772,10 +4799,10 @@ function renderToolbar(){
   const playMode2=!menuModes.includes(mode);
   // No top bar on menu screens (home/teams/etc.) — it duplicated the page title and
   // showed a misleading "LIVE" relay dot before any game. Reclaims that space.
-  if(!playMode2){ tb.innerHTML=""; return; }
+  if(!playMode2){ tb.innerHTML=""; _barPieces={}; renderBarFloat(); return; }   // also clear any floating buttons on menu screens
   // While the scorer works through a play (locate/pick/runners), hide the top bar so the
   // field gets the room — it comes back when they're done.
-  if(["locate","contact","result","runners","errpos","outpos","dppick"].includes(mode)){ tb.innerHTML=""; return; }
+  if(["locate","contact","result","runners","errpos","outpos","dppick"].includes(mode)){ tb.innerHTML=""; _barPieces={}; renderBarFloat(); return; }
   // In a live game the title slot becomes the Scorer/Viewer role toggle (the matchup
   // already shows in the scorebug below — no need to repeat it here).
   const scorerLocked=!canScoreNow();   // signed-in follower (not a scorer) → grey the Scorer tab
@@ -4839,26 +4866,31 @@ function renderToolbar(){
   // Current-batter box back in the top bar (wide scorer, live). It's flex:1 so it fills the middle
   // The current batter now lives in the larger AT-BAT card above the scoring buttons (batterCard),
   // so the top row just keeps a flexible spacer here — pushes the game controls to the far right.
-  // The window button now toggles BUTTON-EDIT mode: drag any top-bar button to reorder it (saved).
-  const editToggle = `<button data-act="togglebaredit" title="${barEdit?"Done — lock the toolbar":"Move the top-bar buttons — drag to rearrange, saved for every game"}" aria-label="Edit toolbar layout" style="flex:none;display:inline-flex;align-items:center;justify-content:center;gap:6px;background:${barEdit?T.lime:T.surface2};border:2px solid ${barEdit?T.lime:T.line};color:${barEdit?"#fff":T.sageDim};border-radius:10px;${barEdit?"padding:0 12px":"width:42px"};height:38px;font-size:16px;font-weight:800;line-height:1">${barEdit?"&#10003; Done":"&#8862;"}</button>`;
-  // Every reorderable button, keyed. gc controls only exist while actively scoring (wide).
+  // The window button toggles BUTTON-EDIT mode: drag ANY button anywhere on the screen (free placement).
+  const lay=barLayout(); const anyFloat=Object.keys(lay).length>0;
+  const editToggle = `<button data-act="togglebaredit" title="${barEdit?"Done — lock the layout":"Move the buttons — drag any one anywhere on the screen, gaps allowed"}" aria-label="Edit toolbar layout" style="flex:none;display:inline-flex;align-items:center;justify-content:center;gap:6px;background:${barEdit?T.lime:T.surface2};border:2px solid ${barEdit?T.lime:T.line};color:${barEdit?"#fff":T.sageDim};border-radius:10px;${barEdit?"padding:0 12px":"width:42px"};height:38px;font-size:16px;font-weight:800;line-height:1">${barEdit?"&#10003; Done":"&#8862;"}</button>`;
+  const resetBtn = (barEdit&&anyFloat)?`<button data-act="barreset" title="Put every button back on the top row" style="flex:none;display:inline-flex;align-items:center;justify-content:center;background:${T.surface2};border:2px solid ${T.out};color:${T.out};border-radius:10px;padding:0 12px;height:38px;font-family:${SANS};font-size:13px;font-weight:800;white-space:nowrap">Reset</button>`:"";
+  // Every movable button, keyed. gc controls only exist while actively scoring (wide).
   const inCtl=(isWide()&&mode==="idle"&&viewMode==="scorer");
   const barPieces={ videotoggle:vidToggle, share:shareBtnTop, sound:soundBtn, live:liveDot, swap:vsw,
     lineup:inCtl?gcBtn("lineup"):"", inninglog:inCtl?gcBtn("inninglog"):"", ingamesettings:inCtl?gcBtn("ingamesettings"):"",
     home:inCtl?gcBtn("home"):"", endgame:inCtl?gcBtn("endgame"):"", undo:inCtl?gcBtn("undo"):"" };
+  _barPieces=barPieces;   // the float layer renders the moved-out buttons from this
   const wrap=k=>{ const html=barPieces[k]; if(!html)return"";
     return `<span data-baritem="${k}" style="display:inline-flex;align-items:center;flex:none;${barEdit?`outline:2px dashed ${T.lime};outline-offset:2px;border-radius:11px;cursor:grab;touch-action:none`:""}">${html}</span>`; };
-  const barHtml = barOrder().map(wrap).join("");
-  const editHint = barEdit?`<span style="flex:none;font-family:${SANS};font-size:11px;font-weight:700;color:${T.lime};white-space:nowrap;margin-left:4px">&#9776; drag to move</span>`:"";
+  const barHtml = barOrder().filter(k=>!lay[k]).map(wrap).join("");   // only buttons NOT moved out stay in the row
+  const editHint = barEdit?`<span style="flex:none;font-family:${SANS};font-size:11px;font-weight:700;color:${T.lime};white-space:nowrap;margin-left:4px">&#9776; drag anywhere</span>`:"";
   tb.innerHTML=`<div style="display:flex;align-items:center;gap:${isWide()?"8px":"6px"};padding:4px 2px 2px;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none">
     <div style="flex:none;min-width:0;font-family:${MONO};font-weight:700;font-size:16px;letter-spacing:.5px;color:${T.chalk};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${chip}</div>
     ${barHtml}
     ${bErr}
     <div style="flex:1;min-width:8px"></div>
     ${editHint}
+    ${resetBtn}
     ${editToggle}
   </div>`;
-  if(barEdit) setupBarDrag();   // wire drag-to-reorder once the toolbar is in the DOM
+  if(barEdit) setupBarDrag();   // flow buttons: drag lifts them out to a free position
+  renderBarFloat();             // draw + (in edit mode) wire the free-floating buttons
 }
 window.onLinkChange=renderToolbar;   // relay open/close → repaint the dot
 window.cloudMyName=function(){ const u=window.Cloud&&window.Cloud.user; if(!u)return ""; return u.displayName||(u.email||"").split("@")[0]||"Someone"; };
@@ -5192,7 +5224,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v227";
+var APP_VERSION="v228";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
