@@ -1829,31 +1829,33 @@ function startClock(){ if(_clockTimer)return; _clockTimer=setInterval(function()
 window.ngStartTime=function(v){ if(!v)return; const a=v.split(":"); const d=new Date(); d.setHours(+a[0]||0,+a[1]||0,0,0); G.startedAt=d.getTime(); try{saveGame();}catch(e){} render(); };
 
 function statusBar(){
-  const tabRow=(t,val,act)=>{const lg=TEAMS[t].logo;return `<div style="display:flex;align-items:center;height:28px">
-      ${lg?`<img src="${lg}" alt="" style="width:22px;height:22px;object-fit:contain;border-radius:4px;background:#fff;${act?"":"opacity:.55"}">`:`<span style="width:4px;height:100%;background:${TEAMS[t].color};border-radius:2px;opacity:${act?1:.45}"></span>`}
-      <span style="font-family:${MONO};font-weight:700;font-size:16px;letter-spacing:.3px;color:${act?T.chalk:T.sage};margin-left:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${TEAMS[t].short}</span>
-      <span class="sb-score num" id="sb-score-${t}" style="margin-left:auto;padding-left:9px;font-weight:800;font-size:26px;line-height:1;color:${act?T.chalk:T.sage}"><span class="digit">${val}</span></span>
+  // B1 redesign: a clearer, bigger GRID scoreboard. Each team gets a colour band + tint when batting,
+  // and the count/outs/bases sit in labelled cells so it's obvious what's what. Animation hooks
+  // (sb-score-*, sb-balls/strikes/outs, sb-base-*) are preserved so the pops/rolls still fire.
+  const tabRow=(t,val,act)=>{const c=TEAMS[t].color,lg=TEAMS[t].logo;return `<div style="display:flex;align-items:center;gap:9px;height:34px;padding:0 11px;background:${act?c+"2b":"transparent"};border-left:6px solid ${c}">
+      ${lg?`<img src="${lg}" alt="" style="width:21px;height:21px;object-fit:contain;border-radius:4px;background:#fff;flex:none;${act?"":"opacity:.5"}">`:""}
+      <span style="font-family:${MONO};font-weight:800;font-size:16px;letter-spacing:.4px;color:${act?T.chalk:T.sage};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${TEAMS[t].short}</span>
+      ${act?`<span title="at bat" style="width:7px;height:7px;border-radius:50%;background:${c};box-shadow:0 0 7px ${c};flex:none"></span>`:""}
+      <span class="sb-score num" id="sb-score-${t}" style="margin-left:auto;padding-left:8px;font-weight:800;font-size:27px;line-height:1;color:${act?T.chalk:T.sage}"><span class="digit">${val}</span></span>
     </div>`;};
-  // base diamond: 2nd top, 1st right, 3rd left
   const b=G.bases,base=(x,y,on,id)=>`<rect id="${id}" class="sb-base" x="${x-7}" y="${y-7}" width="14" height="14" rx="2" transform="rotate(45 ${x} ${y})" fill="${on?T.clay:"none"}" stroke="${on?T.clay:T.sageDim}" stroke-width="2"/>`;
-  const diamond=`<svg width="46" height="40" viewBox="0 0 48 44" style="overflow:visible">${base(24,10,b[2],"sb-base-2")}${base(38,24,b[1],"sb-base-1")}${base(10,24,b[3],"sb-base-3")}</svg>`;
-  const pipRow=(label,cls,n,max,id)=>`<div class="bso-row" id="${id}" style="display:flex;align-items:center;gap:6px;height:14px">
-      <span style="font-family:${MONO};font-size:12px;font-weight:800;color:${T.sageDim};width:11px">${label}</span>
+  const diamond=`<svg width="44" height="38" viewBox="0 0 48 44" style="overflow:visible">${base(24,10,b[2],"sb-base-2")}${base(38,24,b[1],"sb-base-1")}${base(10,24,b[3],"sb-base-3")}</svg>`;
+  const pipRow=(label,cls,n,max,id)=>`<div class="bso-row" id="${id}" style="display:flex;align-items:center;gap:5px;height:13px">
+      ${label?`<span style="font-family:${MONO};font-size:11px;font-weight:800;color:${T.sageDim};width:10px">${label}</span>`:""}
       ${Array.from({length:max},(_,i)=>`<span class="bso-pip ${cls}${i<n?" on":""}"></span>`).join("")}</div>`;
-  return `<div id="statusbar" data-longpress="correct" title="Tap the pencil (or hold) to correct the count / outs / score" style="display:flex;align-items:stretch;background:${T.surface};border:2px solid ${T.line};border-radius:11px;overflow:hidden;flex-shrink:0;box-shadow:0 1px 0 rgba(15,30,60,.04);user-select:none;-webkit-user-select:none;-webkit-touch-callout:none">
-    <div style="display:flex;flex-direction:column;justify-content:center;gap:5px;padding:9px 12px;min-width:116px;max-width:174px;border-right:1.5px solid ${T.line}">
-      ${tabRow("away",G.away,G.half==="T")}${tabRow("home",G.home,G.half==="B")}</div>
-    <div style="display:flex;align-items:center;justify-content:center;padding:0 10px;flex:1;gap:clamp(7px,2.4vw,18px)">
-      <div style="text-align:center"><div style="font-family:${MONO};font-size:12px;font-weight:700;color:${T.sage};letter-spacing:.6px">${G.half==="T"?"TOP":"BOT"}</div>
-        <div style="font-family:${MONO};font-size:27px;font-weight:800;color:${T.chalk};line-height:.95">${G.inning}</div>
-        ${G.startedAt?`<div style="font-family:${MONO};font-size:10px;font-weight:700;color:${T.sage};margin-top:3px;white-space:nowrap" title="Game time">&#9201; <span class="game-clock">${gameClockStr()}</span></div>`:""}</div>
-      ${diamond}
-      <div style="display:flex;flex-direction:column;gap:5px">
-        ${pipRow("B","b",G.balls,3,"sb-balls")}
-        ${pipRow("S","s",G.strikes,2,"sb-strikes")}
-        ${pipRow("O","o",G.outs,3,"sb-outs")}</div>
-    </div>
-    <button data-act="correctopen" title="Correct the count, outs, score &amp; inning" style="flex:none;width:34px;border:none;border-left:1.5px solid ${T.line};background:${T.surface2};color:${T.lime};display:flex;align-items:center;justify-content:center;font-size:16px;padding:0;cursor:pointer">&#9998;</button>
+  const cell=(label,inner)=>`<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:6px 11px;border-left:1.5px solid ${T.line};flex:none">
+      <div style="font-family:${MONO};font-size:8.5px;font-weight:800;letter-spacing:1px;color:${T.sageDim};white-space:nowrap">${label}</div>${inner}</div>`;
+  return `<div id="statusbar" data-longpress="correct" title="Tap the pencil (or hold) to correct the count / outs / score" style="display:flex;align-items:stretch;background:${T.surface};border:2px solid ${T.line};border-radius:11px;overflow:hidden;flex-shrink:0;box-shadow:0 2px 11px rgba(0,0,0,.4);user-select:none;-webkit-user-select:none;-webkit-touch-callout:none">
+    <div style="display:flex;flex-direction:column;justify-content:center;min-width:130px;max-width:190px;flex:none">
+      ${tabRow("away",G.away,G.half==="T")}
+      <div style="height:1.5px;background:${T.line}"></div>
+      ${tabRow("home",G.home,G.half==="B")}</div>
+    ${cell("INNING",`<div style="font-family:${MONO};font-size:23px;font-weight:800;color:${T.chalk};line-height:.95">${G.half==="T"?"▲":"▼"}${G.inning}</div>`)}
+    ${cell("COUNT",`<div style="display:flex;flex-direction:column;gap:4px">${pipRow("B","b",G.balls,3,"sb-balls")}${pipRow("S","s",G.strikes,2,"sb-strikes")}</div>`)}
+    ${cell("OUTS",`<div style="margin-top:1px">${pipRow("","o",G.outs,3,"sb-outs")}</div>`)}
+    ${cell("ON BASE",diamond)}
+    ${G.startedAt?cell("TIME",`<div style="font-family:${MONO};font-size:13px;font-weight:700;color:${T.sage};white-space:nowrap"><span class="game-clock">${gameClockStr()}</span></div>`):""}
+    <button data-act="correctopen" title="Correct the count, outs, score &amp; inning" style="flex:none;width:38px;border:none;border-left:1.5px solid ${T.line};background:${T.surface2};color:${T.lime};display:flex;align-items:center;justify-content:center;font-size:17px;padding:0;cursor:pointer">&#9998;</button>
   </div>`;
 }
 
@@ -4802,7 +4804,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v206";
+var APP_VERSION="v207";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;

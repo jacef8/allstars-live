@@ -20,7 +20,10 @@ Status: [ ] todo · [~] in progress · [x] done. Grouped by theme; recurring/met
 - [x] A6. Window borders: consistent thick white, no stray red/thin (done v185–v188 sweep).
 
 ## B. Scoreboard + game feed
-- [ ] B1. Scorer scoreboard is too small, not grid-defined, no colors — hard to read what's what. Redesign.
+- [~] B1. Scoreboard redesign (v207): statusBar rebuilt as a bigger, GRID scoreboard — team rows with a
+      6px team-colour band + tint/dot for whoever is batting, and labelled cells (INNING / COUNT / OUTS
+      / ON BASE / TIME). All animation hooks preserved. NOTE: this is the compact scorebug (float window
+      + phone); the wide inline scoreBar may need the same treatment depending on what jford sees — awaiting his eyes/iteration.
 - [~] B2. Game feed: out-making plays now show "· N OUT(S)" (v195). Runs-scored on a play still TODO —
       folded into B5 (RBI detail) since both need run-attribution.
 - [~] B3. "Score doesnt need to be on every feed update" DONE (v198): per-pitch feed lines no longer
