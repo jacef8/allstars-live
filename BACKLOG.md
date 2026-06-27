@@ -63,9 +63,15 @@ Status: [ ] todo · [~] in progress · [x] done. Grouped by theme; recurring/met
       to tablet 2026-06-27): RtmpHub.currentPublishUrl() re-detects the IP; Camera setup re-polls it every
       2s so the address is always current, and a new "✓ receiving video (fps) / ○ waiting" status line
       shows whether the camera actually connected. App launches clean; on-device confirm with the Mevo owed.
-- [~] F2. YouTube "sign in failed / unable to connect": reconnected fine on retry 2026-06-27; earlier
-      ~8:45am failure was transient (likely no internet at that moment). Native sign-in code unchanged this
-      session. Watch for recurrence; capture logcat live if it happens again (tablet must be plugged in).
+- [~] F2. YouTube "sign in failed / unable to connect": ROOT CAUSE = dual-network. At the field the
+      tablet is cellular-only; the Mevo serves its own internet-less Wi-Fi the tablet must join to
+      receive the camera → no internet for YouTube (and a catch-22: Wi-Fi for camera vs internet for
+      YouTube). Fix (native, built, NOT yet installed — USB dropped): NetworkRouter keeps cellular warm
+      + pins YouTube API calls to cellular when the active net has no internet; new no-internet warning
+      banner in the stream overlay. User also enabled "Mobile data always active" (system fallback).
+      Google sign-in runs in Play Services (separate process) so it relies on the system fallback, not
+      app binding. On-device verify owed: install, confirm NetworkRouter starts + Go Live over cellular
+      while on the Mevo Wi-Fi. NOTE: the tablet's USB connection has been dropping repeatedly today.
 
 ## G. Small / polish
 - [x] G1. Short, light haptic vibrate on pitch-button input (v189).
