@@ -58,8 +58,14 @@ Status: [ ] todo · [~] in progress · [x] done. Grouped by theme; recurring/met
 - [ ] E1. Track the OPPONENT pitch count too, and expose it in the editor.
 
 ## F. Streaming / connectivity
-- [ ] F1. IP address changed — no way to see whether the video is connected to the app (status).
-- [ ] F2. YouTube connector is broken again (investigate).
+- [~] F1. IP changed → Mevo couldn't reach the app. Root cause: the RTMP address shown to the camera
+      was captured ONCE at receiver start, so a changed Wi-Fi/AP IP left it stale. Fix (native, installed
+      to tablet 2026-06-27): RtmpHub.currentPublishUrl() re-detects the IP; Camera setup re-polls it every
+      2s so the address is always current, and a new "✓ receiving video (fps) / ○ waiting" status line
+      shows whether the camera actually connected. App launches clean; on-device confirm with the Mevo owed.
+- [~] F2. YouTube "sign in failed / unable to connect": reconnected fine on retry 2026-06-27; earlier
+      ~8:45am failure was transient (likely no internet at that moment). Native sign-in code unchanged this
+      session. Watch for recurrence; capture logcat live if it happens again (tablet must be plugged in).
 
 ## G. Small / polish
 - [x] G1. Short, light haptic vibrate on pitch-button input (v189).

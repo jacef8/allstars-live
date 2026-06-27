@@ -430,7 +430,10 @@ private fun CameraSetupSheet(
 ) {
     val clipboard = LocalClipboardManager.current
     val ctx = LocalContext.current
-    val url = if (publishUrl.startsWith("rtmp://")) publishUrl else ""
+    // Re-detect the tablet's IP every 2s so the address shown to the camera is ALWAYS current. When
+    // the Wi-Fi/AP hands out a new IP, a stale address is the #1 reason the Mevo won't connect.
+    var url by remember { mutableStateOf(RtmpHub.currentPublishUrl().ifEmpty { if (publishUrl.startsWith("rtmp://")) publishUrl else "" }) }
+    LaunchedEffect(Unit) { while (true) { val u = RtmpHub.currentPublishUrl(); if (u.isNotEmpty()) url = u; delay(2000) } }
     val profile = profileOf(profileId)
     val isDevice = setupMode == "allInOne"
     val isPhone = setupMode == "phoneCam"
@@ -567,6 +570,16 @@ private fun CameraSetupSheet(
                     }
                 }
                 Text("Stream key: anything (e.g. live).", color = Color(0xFF6B7585), fontSize = 12.sp)
+
+                // Live connection readout — instantly tells the operator whether the camera actually
+                // reached this address (vs. a stale IP / wrong address silently going nowhere).
+                val receiving = stats.state == IngestState.PLAYING
+                Text(
+                    if (receiving) "✓ Camera connected — receiving video" + (if (stats.fps > 0) " (${stats.fps.toInt()} fps)" else "")
+                    else "○ Waiting for the camera to connect to this address…",
+                    color = if (receiving) Color(0xFFA3E635) else Color(0xFFF0A33C),
+                    fontSize = 13.sp, fontWeight = FontWeight.Bold,
+                )
 
                 // ----- Mevo: one tap to jump into the Mevo Multicam app (paste the address, Go Live) -----
                 if (!isPhone && profile.id == "mevo") {

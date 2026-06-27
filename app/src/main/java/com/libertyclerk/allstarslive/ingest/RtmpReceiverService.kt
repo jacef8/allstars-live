@@ -238,6 +238,11 @@ object RtmpHub {
             ?.hostAddress
     } catch (e: Exception) { Log.w(TAG, "ip lookup failed", e); null }
 
+    /** The RTMP address the camera should push to, rebuilt from the CURRENT IP on every call.
+     *  Re-detecting live means a changed Wi-Fi/AP address never leaves the operator typing a stale
+     *  address into the Mevo — the #1 reason "the camera won't connect". Empty until an IP exists. */
+    fun currentPublishUrl(): String = localWifiIp()?.let { "rtmp://$it:$port/live" } ?: ""
+
     const val MODE_EXTERNAL = "external"   // a camera pushes RTMP to this tablet
     const val MODE_DEVICE = "device"       // this device's own built-in camera (all-in-one)
     private const val TAG = "RtmpHub"
