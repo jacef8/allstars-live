@@ -32,7 +32,8 @@ object YouTubeAuth {
      */
     fun fetchChannelTitle(accessToken: String): String {
         val url = URL("https://www.googleapis.com/youtube/v3/channels?part=snippet&mine=true")
-        val conn = (url.openConnection() as HttpURLConnection).apply {
+        // Route over cellular when the active (Mevo) Wi-Fi has no internet (else normal default).
+        val conn = com.libertyclerk.allstarslive.net.NetworkRouter.openConnection(url).apply {
             requestMethod = "GET"
             setRequestProperty("Authorization", "Bearer $accessToken")
             connectTimeout = 15000

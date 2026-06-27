@@ -81,7 +81,7 @@ object YouTubeLive {
         var lastErr: java.io.IOException? = null
         repeat(3) { attempt ->
             try {
-                val conn = (URL("https://www.googleapis.com/youtube/v3/$path").openConnection() as HttpURLConnection).apply {
+                val conn = com.libertyclerk.allstarslive.net.NetworkRouter.openConnection(URL("https://www.googleapis.com/youtube/v3/$path")).apply {
                     requestMethod = method
                     setRequestProperty("Authorization", "Bearer $token")
                     setRequestProperty("Connection", "close")   // don't reuse a stale pooled socket

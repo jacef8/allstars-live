@@ -10,6 +10,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
@@ -82,6 +83,8 @@ fun SrtIngestScreen(onUseTestPattern: () -> Unit = {}) {
     val bcast by Broadcast.state.collectAsStateWithLifecycle()
     // Local recording state (offline fallback).
     val rec by Broadcast.recState.collectAsStateWithLifecycle()
+    // True when the active network (e.g. the Mevo's Wi-Fi) has no internet → warn that YouTube needs it.
+    val noInternet by com.libertyclerk.allstarslive.net.NetworkRouter.noInternet.collectAsStateWithLifecycle()
     LaunchedEffect(rec.savedLocation) {
         if (rec.savedLocation.isNotEmpty()) Toast.makeText(ctx, "Recording saved to ${rec.savedLocation}", Toast.LENGTH_LONG).show()
     }
@@ -192,6 +195,32 @@ fun SrtIngestScreen(onUseTestPattern: () -> Unit = {}) {
             // (When YouTube isn't connected we show the first-run prompt below INSTEAD, so the two
             // never overlap.)
             CameraStatus(stats.state, stats.message, isDevice(), onSetup = { showSetup = true }, onUseTestPattern = onUseTestPattern)
+        }
+
+        // No-internet warning — the active network (often the Mevo's own Wi-Fi) can't reach the
+        // internet, so YouTube sign-in / Go Live will fail until cellular carries it. Tells the
+        // operator exactly what's wrong instead of a vague "sign in failed".
+        if (noInternet) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .statusBarsPadding()
+                    .padding(top = 12.dp, start = 80.dp, end = 80.dp)
+                    .widthIn(max = 560.dp)
+                    .background(Color(0xFF3A2A0A), RoundedCornerShape(10.dp))
+                    .border(1.dp, Color(0xFFF0A33C), RoundedCornerShape(10.dp))
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
+            ) {
+                Text(
+                    "⚠ This Wi-Fi has no internet",
+                    color = Color(0xFFF0A33C), fontSize = 14.sp, fontWeight = FontWeight.Bold,
+                )
+                Text(
+                    "YouTube needs internet. The camera's Wi-Fi doesn't have it — turn on Mobile data so the app can go live over cellular while it receives the camera over Wi-Fi.",
+                    color = Color(0xFFE8EAED), fontSize = 12.sp, textAlign = TextAlign.Center,
+                )
+            }
         }
 
         // Go Live control — reflects the shared broadcast state (synced with the Game

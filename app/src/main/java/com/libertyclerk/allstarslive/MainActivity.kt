@@ -108,6 +108,9 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         // The scorer is handheld for a whole game on top of live video — keep the screen on.
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        // Multi-network: keep cellular available + route YouTube over it when the (Mevo) Wi-Fi has no
+        // internet, so you can receive the camera over Wi-Fi AND reach YouTube over cell at once.
+        com.libertyclerk.allstarslive.net.NetworkRouter.start(this)
         // Restore the chosen capture mode (external camera vs this device's own camera).
         val camPrefs = getSharedPreferences("allstars", android.content.Context.MODE_PRIVATE)
         com.libertyclerk.allstarslive.ingest.RtmpHub.captureMode =
