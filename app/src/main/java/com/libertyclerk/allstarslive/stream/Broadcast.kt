@@ -64,6 +64,11 @@ object Broadcast {
     private const val PROG_H = 720
     private val main = Handler(Looper.getMainLooper())
     @Volatile private var streamer: YouTubeStreamer? = null
+    // The live broadcast we're streaming — kept so stop()/End Game can tell YouTube to actually END it
+    // (transition to "complete"), not just stop sending video. appCtx lets us re-acquire a fresh OAuth
+    // token at stop time (the start-time token can expire during a long game).
+    @Volatile private var liveBroadcastId: String? = null
+    @Volatile private var appCtx: Context? = null
 
     // ---- local recording (fallback when streaming isn't possible) ----
     data class RecordState(
@@ -123,6 +128,7 @@ object Broadcast {
      */
     fun goLive(context: Context, title: String, privacy: String) {
         if (isActive) return
+        appCtx = context.applicationContext   // kept so stop() can end the broadcast with a fresh token
         if (recorder != null) stopRecording()   // recording shares the encoder surface — going live supersedes it
         // Ensure the camera pipeline is running even if the operator went straight to the
         // Game tab and never opened Video — otherwise there'd be no compositor to stream.
@@ -170,6 +176,7 @@ object Broadcast {
     }
 
     private fun beginPush(comp: VideoCompositor, live: YouTubeLive.Live, token: String) {
+        liveBroadcastId = live.broadcastId   // remember it so stop() can transition it to "complete"
         val s = YouTubeStreamer(PROG_W, PROG_H, onStatus = { status ->
             main.post {
                 val cur = _state.value
@@ -232,6 +239,27 @@ object Broadcast {
         val s = streamer; streamer = null
         val comp = RtmpHub.videoCompositor
         if (comp != null) comp.detachEncoder { s?.stop() } else s?.stop()
+        // CRITICAL: stopping the push alone leaves the broadcast "live" on YouTube (just receiving no
+        // data) until it times out — that's why the stream kept running after End Game. Tell YouTube to
+        // actually END it. Re-acquire a fresh token (the start-time one may have expired on a long game),
+        // then transition the broadcast to "complete".
+        val bId = liveBroadcastId; liveBroadcastId = null
+        val ctx = appCtx
+        if (bId != null && ctx != null) {
+            runCatching {
+                YouTubeAuth.client(ctx).authorize(YouTubeAuth.request())
+                    .addOnSuccessListener { res ->
+                        val tok = res.accessToken
+                        if (tok != null) {
+                            Thread {
+                                runCatching { YouTubeLive.transition(tok, bId, "complete") }
+                                    .onFailure { Log.w(TAG, "end broadcast (complete) failed: ${it.message}") }
+                            }.start()
+                        } else Log.w(TAG, "end broadcast: no token from authorize")
+                    }
+                    .addOnFailureListener { Log.w(TAG, "end broadcast auth failed: ${it.message}") }
+            }.onFailure { Log.w(TAG, "end broadcast: ${it.message}") }
+        }
         _state.value = State(phase = Phase.OFFLINE)
     }
 

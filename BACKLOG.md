@@ -109,6 +109,16 @@ Status: [ ] todo · [~] in progress · [x] done. Grouped by theme; recurring/met
       filming person's streaming setup (OBS = works; phone-direct-to-YouTube = needs OBS or the app).
       Fallback today: share the live-score link beside the YouTube video (not burned in).
 
+## F2b. End Game must end the YouTube stream (NEW 2026-06-27)
+- [x] Root cause: Broadcast.stop() only stopped the local RTMP push + set OFFLINE; it never told YouTube
+      to END the broadcast (transition to "complete"), so the stream stayed "live" (no data) until it
+      timed out. End Game calls stopStreamNow->stop(), so the stream kept running. FIX (native, built +
+      installed to tablet 2026-06-27): store the live broadcastId + app context at go-live; stop() now
+      re-acquires a FRESH OAuth token (start-time one expires on a long game) and transitions the
+      broadcast to "complete" — routed via NetworkRouter so it works on the Mevo cellular setup. NOTE: a
+      stream orphaned by a PREVIOUS app session (broadcastId lost on restart) must still be ended in
+      YouTube Studio; the fix ends streams within the same session.
+
 ## G. Small / polish
 - [x] G1. Short, light haptic vibrate on pitch-button input (v189).
 - [x] G2. Already supported: in-game Setup (settingsMode) edits G.runCap/innings/mercy/pitchMax (and
