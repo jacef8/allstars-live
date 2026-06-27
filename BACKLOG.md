@@ -40,8 +40,9 @@ Status: [ ] todo · [~] in progress · [x] done. Grouped by theme; recurring/met
 - [x] B7. End-of-inning notification in the feed (v193): doFlip adds a centered divider line
       "End of Top 3 · 3 outs · TEAM 2 runs, 3 hits" (reason = 3 outs vs run cap). Verified.
 - [ ] B8. Update the batter display after his at-bat completes.
-- [ ] B9. Pitch controls: dark bg behind red B/S/F icons is hard to read — use a light/white background;
-      explore baseball graphics (white ball + red stitching), B/S/F over a baseball emblem.
+- [x] B9. Pitch controls (v209): Ball/Strike/Foul are now white BASEBALLS — red stitching + the B/S/F
+      letter (strike S in red) — so the call reads at a glance instead of a red icon lost on a dark circle.
+      In Play stays the lime primary button.
 - [x] B10/B11. (v191) Followers can now WATCH a live game from inside the app. Home subscribes to live
       docs for ALL my teams (not just scorable); a follower sees the in-progress row with "Watch live"
       (scorers still get "Take over"). Tapping it streams the game + FEED from the cloud live doc in
@@ -66,7 +67,9 @@ Status: [ ] todo · [~] in progress · [x] done. Grouped by theme; recurring/met
       Back (luFromSetup flag). So you can enter their numbers/names before starting. Verified round-trip.
 
 ## D. Schedule / teams / setup
-- [ ] D1. Send a link to the game from the schedule window.
+- [x] D1. Share a game link from the schedule (v209): each scheduled GAME row has a Share button that
+      opens the share sheet with a watch link for that team's live game (?watch=<teamId>-live). Opens for
+      a no-login viewer; shows a waiting screen until you start, then goes live. Verified the URL is scoped.
 - [x] D2. Scheduled opponent now selectable in the opponent picker (v196). schedadd already saved it to
       local recent-opps; now opening the opponent picker ALSO seeds quick-picks from the team schedule
       (which syncs), so a scheduled opponent shows even on a different device. Verified.

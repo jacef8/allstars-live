@@ -2325,10 +2325,21 @@ const bigBtn=(bg,extra="",fg="#FFFFFF")=>`background:${bg};border:1px solid rgba
 const ghost=`background:${T.surface};border:2px solid ${T.line};color:${T.sage};border-radius:8px;padding:11px;font-family:${MONO};font-size:14px;font-weight:700;letter-spacing:.5px;text-transform:uppercase`;
 /* GameChanger-style pitch button: round icon badge + label beneath. accent=primary (lime). */
 function pitchBtn(act,label,icon,accent){
-  const bg=accent?T.lime:T.surface, bd=accent?T.lime:"#3F6CA8", txt=accent?"#fff":T.ink;
-  const circ=accent?"rgba(0,0,0,.16)":T.surface2, ic=accent?"#fff":T.lime;
-  return `<button data-act="${act}" style="background:${bg};border:none;border-radius:0;color:${txt};padding:11px 4px;display:flex;flex-direction:column;align-items:center;gap:5px;font-family:${SANS};font-size:12.5px;font-weight:800;line-height:1.05;text-align:center;letter-spacing:.2px">
-    <span style="width:34px;height:34px;border-radius:50%;background:${circ};display:flex;align-items:center;justify-content:center;color:${ic}">${icon}</span>${label}</button>`;
+  if(accent){   // In Play — keep the bold primary-action look
+    return `<button data-act="${act}" style="background:${T.lime};border:none;border-radius:0;color:#fff;padding:11px 4px;display:flex;flex-direction:column;align-items:center;gap:5px;font-family:${SANS};font-size:12.5px;font-weight:800;line-height:1.05;text-align:center;letter-spacing:.2px">
+      <span style="width:36px;height:36px;border-radius:50%;background:rgba(0,0,0,.16);display:flex;align-items:center;justify-content:center;color:#fff">${icon}</span>${label}</button>`;
+  }
+  // Ball / Strike / Foul (B9): a white BASEBALL — red stitching + the letter — so the call reads at a
+  // glance instead of a red icon lost on a dark circle. Letter colour cues the call (strike = red).
+  const L={ball:"B",strike:"S",foul:"F"}[act]||"";
+  const lc=(act==="strike")?"#C0392B":"#0C1410";
+  const ball=`<svg width="37" height="37" viewBox="0 0 36 36" style="display:block">
+      <circle cx="18" cy="18" r="16" fill="#FFFFFF" stroke="#DCE0E8" stroke-width="1"/>
+      <path d="M8.2 5.4C12 11 12 25 8.2 30.6" fill="none" stroke="#E11D2E" stroke-width="1.8" stroke-linecap="round"/>
+      <path d="M27.8 5.4C24 11 24 25 27.8 30.6" fill="none" stroke="#E11D2E" stroke-width="1.8" stroke-linecap="round"/>
+      <text x="18" y="24" text-anchor="middle" font-family="${MONO}" font-size="18" font-weight="800" fill="${lc}">${L}</text></svg>`;
+  return `<button data-act="${act}" style="background:${T.surface};border:none;border-radius:0;color:${T.ink};padding:10px 4px 11px;display:flex;flex-direction:column;align-items:center;gap:5px;font-family:${SANS};font-size:12.5px;font-weight:800;line-height:1.05;text-align:center;letter-spacing:.2px">
+    ${ball}${label}</button>`;
 }
 function chip(c){const a=contact===c;return `<button data-act="contact" data-arg="${c}" style="background:${a?T.clay:T.surface};border:none;border-radius:0;color:${a?"#FFFFFF":T.chalk};padding:13px 6px;font-family:${MONO};font-size:14px;font-weight:800;letter-spacing:.5px;text-transform:uppercase">${c}</button>`;}
 
@@ -2725,6 +2736,7 @@ function actionArea(){
             <div style="font-size:${wide?17:16}px;color:${T.sage};margin-top:5px;${wide?"white-space:nowrap;overflow:hidden;text-overflow:ellipsis":"line-height:1.4"}">${sub}</div></div>`;
       const btns=`<div style="display:flex;gap:8px;flex:none;align-items:center${wide?"":";justify-content:flex-end"}">
           ${isG?`<button data-act="schedstart" data-arg="${s.id}" title="Start this game now" style="background:${T.lime};border:2px solid ${T.lime};color:#fff;border-radius:8px;padding:9px 15px;font-weight:800;font-size:13px;letter-spacing:.4px;display:inline-flex;align-items:center;gap:6px;box-shadow:0 3px 10px rgba(225,29,46,.28)">&#9654; Start</button>`:""}
+          ${isG?`<button data-act="schedshare" data-arg="${s.id}" title="Send family/fans a watch link for this game" style="background:none;border:2px solid ${T.line};color:${T.lime};border-radius:8px;padding:9px 12px;font-weight:800;font-size:13px;display:inline-flex;align-items:center;gap:5px">${IC('share',15)} Share</button>`:""}
           <button data-act="schededit" data-arg="${s.id}" title="Edit" style="background:${schedEditId===s.id?T.lime:"none"};border:2px solid ${schedEditId===s.id?T.lime:T.line};color:${schedEditId===s.id?"#fff":T.lime};border-radius:8px;padding:9px 14px;font-weight:800;font-size:13px">Edit</button>
           <button data-act="schedrm" data-arg="${s.id}" title="Remove" style="background:none;border:2px solid ${T.line};color:${T.out};border-radius:8px;padding:9px 13px;font-weight:800;font-size:18px">&times;</button></div>`;
       return `<div style="display:flex;${wide?"flex-direction:row;align-items:center":"flex-direction:column;align-items:stretch"};gap:10px;background:${T.surface2};border:2px solid ${T.line};border-left:6px solid ${isG?OUR.color:T.sage};border-radius:11px;padding:14px 15px${past?";opacity:.6":""}">
@@ -4122,6 +4134,11 @@ document.getElementById("app").addEventListener("click",e=>{
   if(act==="alerttoggle"){ const c=alertsCfg(); c[arg]=!c[arg]; if(arg==="pcRules"){try{localStorage.setItem("al-pc-rules",c.pcRules?"1":"0");}catch(e){}} render(); return; }
   if(act==="alertdismiss"||act==="alertbackdrop"){ activeAlert=null; render(); return; }
   if(act==="alertsilence"){ if(activeAlert)dismissedAlerts.add(activeAlert.key); activeAlert=null; render(); return; }
+  if(act==="schedshare"){ const t=teamById(openTeamId); if(!t)return; const s=(t.schedule||[]).find(x=>x.id===arg);   // D1: share a watch link from the schedule
+    const nm=(t.name||"our team"), opp=(s&&s.opp)?(" vs "+s.opp):"";
+    const url=appBaseUrl()+"?view=viewer&feed=1&watch="+encodeURIComponent(t.id+"-live")+"&team="+encodeURIComponent(t.id)+"&tn="+encodeURIComponent(t.short||t.name||"");
+    openShareLink({ url:url, title:"SHARE THE GAME", sub:'Opens the live scoreboard &amp; play-by-play — no login. Shows a "waiting" screen until you start, then goes live.',
+      subject:"Watch "+nm+opp+" live", body:"Watch "+nm+opp+" live on All-Stars Live — no app or login needed, just tap the link:" }); return; }
   if(act==="schedstart"){ const t=teamById(openTeamId); if(!t)return; const s=(t.schedule||[]).find(x=>x.id===arg);
     newgameFrom="team"; selectTeam(t.id); G=initGame(); loadTeamLineup(teamById(curTeamId)); hist=[]; resetUI();
     if(s){ G.schedId=s.id; G.schedDate=s.date||null; }   // remember WHICH scheduled game this is, so end-game marks it played for sure
@@ -4819,7 +4836,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v208";
+var APP_VERSION="v209";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
