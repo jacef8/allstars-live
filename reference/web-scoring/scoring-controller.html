@@ -66,7 +66,7 @@
        getting a black, near-invisible icon on the dark surfaces. Buttons that need dark text
        (lime/green/amber, etc.) set their own color inline and override this. */
     transition:transform .12s var(--ease-soft), filter .15s ease, box-shadow .18s ease, background .15s ease;}
-  button:active{transform:scale(.94);filter:brightness(1.14) drop-shadow(0 0 7px rgba(225,29,46,.32));}
+  button:active{transform:scale(.92);filter:brightness(1.32) saturate(1.12);box-shadow:0 0 0 3px rgba(255,255,255,.45), 0 0 16px rgba(255,255,255,.30);}
   button:disabled{opacity:.4;filter:none;cursor:default;}
   #wrap{position:fixed;inset:0;display:flex;justify-content:center;
     /* Only subtle, semi-transparent accent glows — NO opaque base — so the body's blue turf
@@ -2826,7 +2826,11 @@ function actionArea(){
           <span style="font-family:${MONO};font-weight:800;font-size:20px;letter-spacing:.5px">${label}</span></button>`;
       const PLAYP='<path d="M8 5l11 7-11 7z" fill="currentColor" stroke="none"/>';
       const PEOPLE='<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>';
-      const actionsRow=`<div style="flex:none;display:flex;gap:12px;flex-wrap:wrap">${gameActive?aBtn("resume","Resume","#FFFFFF",T.field,PLAYP,1):""}${aBtn("newgamestart","New Game",T.lime,"#fff",PLAYP,1.3,"rgba(225,29,46,.34)")}${aBtn("gototeams","Manage Teams",T.surface2,T.ink,PEOPLE,1)}</div>`;
+      // Resume shows WHICH game (matchup · score · inning) so it's never just a bare "Resume".
+      const resumeWide=gameActive?`<button data-act="resume" style="flex:1;min-width:200px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;background:#FFFFFF;color:${T.field};border:1px solid ${T.line};border-radius:14px;padding:11px 18px;box-shadow:0 6px 16px rgba(0,0,0,.3)">
+          <span style="display:flex;align-items:center;gap:9px;font-family:${MONO};font-weight:800;font-size:19px;letter-spacing:.5px"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${PLAYP}</svg>Resume game</span>
+          <span style="font-family:${MONO};font-size:13px;font-weight:700;color:${T.navy}">${(OUR.short||"US").replace(/</g,"")} ${ourRuns()} &middot; ${(OPP.short||"OPP").replace(/</g,"")} ${oppRuns()} &nbsp;—&nbsp; ${G.half==="T"?"Top":"Bot"} ${ordinal(G.inning)}</span></button>`:"";
+      const actionsRow=`<div style="flex:none;display:flex;gap:12px;flex-wrap:wrap;align-items:stretch">${resumeWide}${aBtn("newgamestart","New Game",T.lime,"#fff",PLAYP,1.3,"rgba(225,29,46,.34)")}${aBtn("gototeams","Manage Teams",T.surface2,T.ink,PEOPLE,1)}</div>`;
       const teamsArea=(showTeams&&DB.teams.length)
         ? `<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px">
              <div style="font-size:13px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:${T.lime};flex:none">My teams (${DB.teams.length})</div>
@@ -4350,6 +4354,9 @@ document.getElementById("app").addEventListener("click",e=>{
   const act=el.dataset.act,arg=el.dataset.arg;
   window._lastAct=act;                                       // flip-trace: remember the last tapped action
   if(act==="noop")return;                                    // swallow taps inside a modal card
+  // Light haptic on the scoring buttons that DON'T route through recordPitch (which already buzzes):
+  // In Play opens the locate step, base-running opens the sheet — give the tap an immediate confirm too.
+  if(act==="inplay"||act==="brsheet"){ try{ if(navigator.vibrate)navigator.vibrate(13); }catch(e){} }
   if(act==="reviewbatter"){ reviewBatter=arg; render(); return; }
   if(act==="brsheet"){ brSheet=true; brPitchPick=null; render(); return; }
   if(act==="brclose"){ brSheet=false; brPitchPick=null; render(); return; }
@@ -5224,7 +5231,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v228";
+var APP_VERSION="v229";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
