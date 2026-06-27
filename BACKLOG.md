@@ -3,9 +3,10 @@
 Status: [ ] todo · [~] in progress · [x] done. Grouped by theme; recurring/meta items first.
 
 ## A. Recurring layout/UX rules (these have been reported more than once — fix durably)
-- [ ] A1. Tablet/PC windows must NOT scroll; top row of scorer page is back to 2 rows. Responsive rule:
-      large devices (PC/tablet) → buttons can be LARGER but stay on ONE top row; phones → smaller
-      icons, stay on one top row. Conserve vertical space for the important content.
+- [~] A1. Top toolbar one row (v194): container is now flex-wrap:nowrap (+ horizontal-scroll safety),
+      and the tablet game-controls (Lineup/Inning log/Settings/Home/End) are ICON-ONLY 44px buttons so
+      they fit one row instead of wrapping. Verified one row at 1280 (47px) and 380 (44px), no overflow.
+      Undo stays labeled. (Tablet/PC windows-shouldnt-scroll part of A1 still open per-window.)
 - [x] A2. Windows must not snap-scroll back to top every time I enter an input (v189: scroll positions
       remembered + restored after each render).
 - [x] A3. Editing a number: tapping the number box should select it so I can type a new value WITHOUT
