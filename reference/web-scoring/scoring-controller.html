@@ -1196,17 +1196,21 @@ function brWPApply(type){   // type: "ball" | "strike"
   const label=brPitchPick||"Wild pitch"; brPitchPick=null;
   snapshot();
   recordPitch(type); try{ Snd.pip(type); }catch(e){}
-  const advance=()=>{ const ov={}; [3,2,1].forEach(b=>{ if(G.bases[b])ov[b]={dest:b+1}; }); resolve(brMovers(ov),0); };
+  // Advance all runners; RETURN the names of any who scored so the feed line can credit them
+  // (e.g. "Wild pitch — Filer scores"). Runs are resolved BEFORE the feed line is written so the
+  // line carries the post-play score and the score-change badge lands on it.
+  const advance=()=>{ const ov={}; [3,2,1].forEach(b=>{ if(G.bases[b])ov[b]={dest:b+1}; }); const mv=brMovers(ov); const sc=mv.filter(m=>m.dest===4).map(m=>(m.name||m.label||"Runner")+" scores"); resolve(mv,0); return sc; };
+  const _adv=sc=>"runners advance"+(sc.length?" · "+sc.join(", "):"");
   if(type==="ball"){
     G.balls++;
-    if(G.balls>=4){ feedPitch(label,"ball four · walk"); applyPlanInline("walk"); }   // walk handles the forced advance
-    else { feedPitch(label,"ball · runners advance"); advance(); }
+    if(G.balls>=4){ applyPlanInline("walk"); feedPitch(label,"ball four · walk"); }   // walk handles the forced advance
+    else { const sc=advance(); feedPitch(label,_adv(sc)); }
   } else {
     G.strikes++;
     if(G.strikes>=3){ G.outs++; creditBatter("strikeout",0); nextBatter();
-      if(G.outs>=3){ feedPitch(label,"strike three · inning over"); doFlip(); }
-      else { feedPitch(label,"strike three · runners advance"); advance(); } }
-    else { feedPitch(label,"strike · runners advance"); advance(); }
+      if(G.outs>=3){ doFlip(); feedPitch(label,"strike three · inning over"); }
+      else { const sc=advance(); feedPitch(label,"strike three · "+_adv(sc)); } }
+    else { const sc=advance(); feedPitch(label,"strike · "+_adv(sc)); }
   }
   brSheet=false; render(); broadcast();
 }
@@ -1625,7 +1629,8 @@ function commit(r,movers){
   // "Caden Schaefer; Jones scores from 3rd · 1 RBI" — richer than a bare run/RBI count.
   const _ord={1:"1st",2:"2nd",3:"3rd"};
   const _scd=movers.filter(m=>!m.out&&m.dest===4&&!m.isBatter).map(m=>((m.name||m.label||"Runner")+(_ord[m.start]?" scores from "+_ord[m.start]:" scores")));
-  bcastEvent(r.kind, bn+(_scd.length?"; "+_scd.join(", "):"")+(rbi?` · ${rbi} RBI`:""), k0);
+  const _loc=(tap&&tap.zone)?(" "+tap.zone):"";   // where it was hit, e.g. "to left field" (B5 — name the hitter + where)
+  bcastEvent(r.kind, bn+_loc+(_scd.length?"; "+_scd.join(", "):"")+(rbi?` · ${rbi} RBI`:""), k0);
   flash(r.note+(runs?` · ${runs} run${runs>1?"s":""}`:"")+(rbi?` · ${rbi} RBI`:"")+(capped?" · run cap":""));resetUI();render();broadcast();
   try{ triggerAnim(G.anim); }catch(e){}
 }
@@ -2364,7 +2369,14 @@ function inningLogModal(){
 /* Live feed (viewer + scorer). Most recent on top. Toggle: "play" = one line per at-bat;
    "pitch" = every pitch + the result. */
 function feedPanel(){
-  const items=gameFeed.filter(e=> feedView==="pitch" ? true : e.type!=="pitch");
+  // Score-change flags: the running score now appears on a feed line ONLY when that event actually
+  // changed the score (a run crossed). Walk the WHOLE feed chronologically so the flag is correct
+  // regardless of the play/pitch filter. (B3 refinement — jford: "score only when it changes".)
+  const _chg={}; let _pa=null,_ph=null;
+  for(const ev of gameFeed){ _chg[ev.id]=(_pa!==null)&&(ev.away!==_pa||ev.home!==_ph); _pa=ev.away; _ph=ev.home; }
+  // At-bat view = plays, PLUS any pitch-type entry that scored (e.g. a wild pitch/passed ball/steal that
+  // brought a run home) so scoring plays are never hidden behind the Pitch filter.
+  const items=gameFeed.filter(e=> feedView==="pitch" ? true : (e.type!=="pitch" || _chg[e.id]));
   const rows=items.slice(-70).reverse().map(e=>{
     // End-of-inning marker: a centered divider line so it visibly breaks the feed between innings.
     if(e.kind==="inningend"){
@@ -2377,7 +2389,7 @@ function feedPanel(){
     return `<div style="display:flex;align-items:baseline;gap:12px;padding:${pit?"6px 15px":"11px 15px"};border-bottom:1.5px solid ${pit?";background:rgba(255,255,255,.02)":""}">
       <span style="font-family:${MONO};font-size:${pit?"13px":"15px"};font-weight:800;color:${pit?T.sageDim:T.lime};min-width:38px">${e.half==="T"?"▲":"▼"}${e.inn}</span>
       <span style="flex:1;min-width:0;color:${pit?T.sage:T.chalk};font-size:${pit?"14px":"17px"};font-weight:${pit?"600":"700"}">${e.head}${e.sub?` <span style="color:${T.sageDim};font-weight:600">— ${e.sub}</span>`:""}${(!pit&&OUT_KINDS.includes(e.kind)&&e.outs!=null)?` <span style="font-family:${MONO};font-size:12px;font-weight:800;color:${e.outs>=3?T.lime:T.sageDim};white-space:nowrap">&middot; ${e.outs} OUT${e.outs===1?"":"S"}</span>`:""}</span>
-      ${pit?"":`<span style="font-family:${MONO};font-size:15px;color:${T.sage};white-space:nowrap">${TEAMS.away.short} ${e.away}-${e.home} ${TEAMS.home.short}</span>`}
+      ${_chg[e.id]?`<span style="font-family:${MONO};font-size:15px;font-weight:800;color:${T.lime};white-space:nowrap;background:rgba(225,29,46,.12);border-radius:6px;padding:2px 8px">${TEAMS.away.short} ${e.away}-${e.home} ${TEAMS.home.short}</span>`:""}
     </div>`;}).join("");
   const seg=(v,lbl)=>`<button data-act="feedview" data-arg="${v}" style="padding:5px 11px;border:none;font-family:${MONO};font-weight:800;font-size:11px;letter-spacing:.4px;cursor:pointer;background:${feedView===v?T.lime:"transparent"};color:${feedView===v?"#fff":T.sage}">${lbl}</button>`;
   return `<div style="flex:1;min-height:0;display:flex;flex-direction:column;background:${T.surface};border:2px solid ${T.line};border-radius:12px;overflow:hidden">
@@ -5074,7 +5086,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v219";
+var APP_VERSION="v220";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
