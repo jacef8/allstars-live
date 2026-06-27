@@ -1828,13 +1828,13 @@ function setupFloatWins(){
     const handle=win.querySelector("[data-floatdrag]"), rez=win.querySelector("[data-floatresize]");
     let act=null,sx=0,sy=0,ox=0,oy=0,ow=0,oh=0;
     // Fine-tune snapping: glide on a small grid, with stronger magnetism to screen edges + center.
-    const GRID=8, EDGE=16;
-    const snap=(v,targets)=>{ for(let i=0;i<targets.length;i++){ if(Math.abs(v-targets[i])<=EDGE) return Math.round(targets[i]); } return Math.round(v/GRID)*GRID; };
+    const GRID=8, EDGE=16, CTR=48;   // CTR = wide magnetic zone so it lands on EXACT center, not just near it
+    const snap=(v,targets,ctr)=>{ if(ctr!=null && Math.abs(v-ctr)<=CTR) return Math.round(ctr); for(let i=0;i<targets.length;i++){ if(Math.abs(v-targets[i])<=EDGE) return Math.round(targets[i]); } return Math.round(v/GRID)*GRID; };
     const move=(e)=>{ if(!act) return; const dx=e.clientX-sx, dy=e.clientY-sy;
       const vw=window.innerWidth, vh=window.innerHeight;
       if(act==="drag"){ const w=win.offsetWidth, h=win.offsetHeight;
-        win.style.left=snap(ox+dx,[0, vw-w, (vw-w)/2])+"px";
-        win.style.top =snap(oy+dy,[0, vh-h, (vh-h)/2])+"px"; }
+        win.style.left=snap(ox+dx,[0, vw-w], (vw-w)/2)+"px";
+        win.style.top =snap(oy+dy,[0, vh-h], (vh-h)/2)+"px"; }
       else { const x=parseFloat(win.style.left)||0, y=parseFloat(win.style.top)||0;
         win.style.width =Math.max(230,snap(ow+dx,[vw-x]))+"px";
         win.style.height=Math.max(96, snap(oh+dy,[vh-y]))+"px"; }
@@ -2488,7 +2488,7 @@ function actionArea(){
           </div>
         </div>`;
     }
-    return `<div style="position:relative;min-height:100%;display:flex;flex-direction:column;justify-content:safe center;gap:14px;padding:6px 0">${settingsGear}${hero}${resumeBtn}${liveRows}${newGameBtn}${showTeams?teamsBlock:""}${showTeams?manageBtn:""}${followingBlock}<div style="display:flex;gap:8px">${shareBtnHome}${shareAppBtn}</div>${authBar}</div>`;
+    return `<div style="position:relative;min-height:100%;display:flex;flex-direction:column;justify-content:safe center;gap:14px;padding:6px 0">${settingsGear}${hero}${resumeBtn}${liveRows}${newGameBtn}${showTeams?`<div style="flex:none">${teamsBlock}</div>`:""}${showTeams?manageBtn:""}${followingBlock}<div style="display:flex;gap:8px">${shareBtnHome}${shareAppBtn}</div>${authBar}</div>`;
   }
   if(mode==="teams"){
     const sorted=DB.teams.slice().sort((a,b)=>(b.fav?1:0)-(a.fav?1:0));
@@ -3362,8 +3362,8 @@ function actionArea(){
     const flatBtn=`background:${T.surface};border:2px solid #3F6CA8;color:${T.chalk};border-radius:10px;padding:11px;font-size:14px;font-weight:800;display:flex;align-items:center;justify-content:center;gap:8px;letter-spacing:.3px;text-transform:uppercase`;
     const miniBtn=`background:${T.surface};border:2px solid ${T.line};color:${T.sage};border-radius:9px;padding:9px;font-size:12px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;display:flex;align-items:center;justify-content:center;gap:6px`;
     // Advanced: a sticky pitch-type selector recorded with each pitch (shown only when on).
-    const ptypeRow=advPitch?`<div style="display:grid;grid-template-columns:repeat(${PITCH_TYPES.length},1fr);gap:6px">
-        ${PITCH_TYPES.map(pt=>{const on=pitchType===pt.k;return `<button data-act="ptype" data-arg="${pt.k}" title="${pt.n}" style="background:${on?T.amber:T.surface};border:1px solid ${on?T.amber:T.line};color:${on?T.field:T.chalk};border-radius:8px;padding:9px 2px;font-family:${MONO};font-size:13px;font-weight:800">${pt.k}</button>`;}).join("")}
+    const ptypeRow=advPitch?`<div style="display:grid;grid-template-columns:repeat(${PITCH_TYPES.length},1fr);gap:2px;background:${T.line};border:2px solid ${T.line};border-radius:10px;overflow:hidden">
+        ${PITCH_TYPES.map(pt=>{const on=pitchType===pt.k;return `<button data-act="ptype" data-arg="${pt.k}" title="${pt.n}" style="background:${on?T.amber:T.surface};border:none;border-radius:0;color:${on?T.field:T.chalk};padding:10px 2px;font-family:${MONO};font-size:13px;font-weight:800">${pt.k}</button>`;}).join("")}
       </div>`:"";
     return `${ptypeRow}
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:2px;background:${T.line};border:2px solid ${T.line};border-radius:12px;overflow:hidden">
@@ -4569,7 +4569,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v176";
+var APP_VERSION="v177";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
