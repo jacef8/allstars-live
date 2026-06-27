@@ -930,7 +930,7 @@ function alertOverlay(){
         <div style="font-size:15px;color:${T.chalk};line-height:1.45">${a.msg}</div>
         <div style="display:flex;gap:8px;margin-top:16px">
           <button data-act="alertdismiss" style="flex:1;background:${accent};color:${T.field};border:none;border-radius:10px;padding:12px;font-family:${MONO};font-weight:800;font-size:15px">Got it</button>
-          <button data-act="alertsilence" style="flex:none;background:transparent;border:1.5px solid ${T.line};color:${T.sage};border-radius:10px;padding:12px 14px;font-weight:700;font-size:13px">Don't show again</button>
+          <button data-act="alertsilence" style="flex:none;background:transparent;border:2px solid ${T.line};color:${T.sage};border-radius:10px;padding:12px 14px;font-weight:700;font-size:13px">Don't show again</button>
         </div></div></div>`;
 }
 
@@ -1085,7 +1085,7 @@ function baseRunModal(){
   const occ=[3,2,1].filter(b=>G.bases&&G.bases[b]);
   const chip=(act,base,lbl,bg,fg,bd)=>`<button data-act="${act}" data-arg="${base}" style="flex:1 1 auto;min-width:0;background:${bg};border:1px solid ${bd||bg};color:${fg};border-radius:8px;padding:9px 6px;font-family:${SANS};font-size:13px;font-weight:800;white-space:nowrap">${lbl}</button>`;
   const runnerRows=occ.map(b=>{ const r=G.bases[b];
-    return `<div style="background:${T.surface2};border:1.5px solid ${T.line};border-radius:11px;padding:10px 11px;display:flex;flex-direction:column;gap:8px">
+    return `<div style="background:${T.surface2};border:2px solid ${T.line};border-radius:11px;padding:10px 11px;display:flex;flex-direction:column;gap:8px">
         <div style="display:flex;align-items:center;gap:9px"><span style="font-family:${MONO};font-size:15px;font-weight:800;color:${r.color||T.clay}">${b}B</span>
           <span style="font-size:16px;font-weight:700;color:${T.chalk};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${((r.name||r.label||"Runner")+"").replace(/</g,"&lt;")}</span></div>
         <div style="display:flex;flex-wrap:wrap;gap:6px">
@@ -1097,7 +1097,7 @@ function baseRunModal(){
           ${advEvents?chip("bronerror",b,"On error +1",T.surface,T.amber,T.amber):""}
           ${advEvents?chip("brout",b,"Out",T.surface,T.out,T.out):""}
         </div></div>`;}).join("");
-  const gbtn=(act,lbl)=>`<button data-act="${act}" style="flex:1 1 auto;background:${T.surface2};border:1.5px solid ${T.line};color:${T.chalk};border-radius:9px;padding:11px 8px;font-family:${SANS};font-size:14px;font-weight:800;white-space:nowrap">${lbl}</button>`;
+  const gbtn=(act,lbl)=>`<button data-act="${act}" style="flex:1 1 auto;background:${T.surface2};border:2px solid ${T.line};color:${T.chalk};border-radius:9px;padding:11px 8px;font-family:${SANS};font-size:14px;font-weight:800;white-space:nowrap">${lbl}</button>`;
   return `<div data-act="brclose" style="position:fixed;left:0;right:0;top:0;height:calc(var(--avh) * 100);z-index:120;background:rgba(8,11,16,.78);display:flex;align-items:center;justify-content:center;padding:16px">
       <div data-act="noop" style="width:100%;max-width:460px;max-height:calc(var(--avh) * 90);overflow-y:auto;-webkit-overflow-scrolling:touch;background:${T.surface};border:2px solid ${T.lime};border-radius:18px;padding:16px;display:flex;flex-direction:column;gap:12px;box-shadow:0 18px 54px rgba(0,0,0,.6)">
         <div style="display:flex;align-items:center;gap:10px"><div style="flex:1;font-family:${MONO};font-size:18px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:${T.lime}">Base running</div>
@@ -1106,8 +1106,8 @@ function baseRunModal(){
         <div style="font-size:15px;color:${T.chalk};font-weight:700;margin:2px">${brPitchPick} — was the pitch a ball or a strike?</div>
         <div style="font-size:12px;color:${T.sage};margin:-6px 2px 2px">It counts as a pitch and updates the count, then the runners advance.</div>
         <div style="display:flex;gap:8px">
-          <button data-act="brwpkind" data-arg="ball" style="flex:1;background:${T.surface2};border:1.5px solid ${T.line};color:${T.chalk};border-radius:10px;padding:14px;font-family:${SANS};font-size:16px;font-weight:800">Ball</button>
-          <button data-act="brwpkind" data-arg="strike" style="flex:1;background:${T.surface2};border:1.5px solid ${T.line};color:${T.chalk};border-radius:10px;padding:14px;font-family:${SANS};font-size:16px;font-weight:800">Strike</button></div>
+          <button data-act="brwpkind" data-arg="ball" style="flex:1;background:${T.surface2};border:2px solid ${T.line};color:${T.chalk};border-radius:10px;padding:14px;font-family:${SANS};font-size:16px;font-weight:800">Ball</button>
+          <button data-act="brwpkind" data-arg="strike" style="flex:1;background:${T.surface2};border:2px solid ${T.line};color:${T.chalk};border-radius:10px;padding:14px;font-family:${SANS};font-size:16px;font-weight:800">Strike</button></div>
         <button data-act="brwpback" style="${ghost};width:100%">&lsaquo; Back</button>
         `:`
         <div style="font-size:12px;color:${T.sage};margin-top:-4px">No ball in play — the batter stays up with the same count.</div>
@@ -1121,19 +1121,19 @@ function baseRunModal(){
    couldn't capture it right. Long-press the scoreboard (or the toolbar Setup) to open it. Every
    nudge is a single Undo step. */
 function correctModal(){
-  const sBtn=`background:${T.surface};border:1.5px solid ${T.line};color:${T.chalk};border-radius:10px;width:46px;height:46px;font-size:24px;font-weight:800;line-height:1;flex:none`;
+  const sBtn=`background:${T.surface};border:2px solid ${T.line};color:${T.chalk};border-radius:10px;width:46px;height:46px;font-size:24px;font-weight:800;line-height:1;flex:none`;
   // Pitch-count row targets whoever is on the mound right now (the fielding team's pitcher).
   const _corrPName=fielding()?(fielderName("P")||"Current pitcher"):((OPP.short||"OPP")+" pitcher");
   const _corrPC=currentPitchCount();
-  const step=(field,label,val,sub)=>`<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;background:${T.surface2};border:1.5px solid ${T.line};border-radius:12px;padding:10px 12px">
+  const step=(field,label,val,sub)=>`<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;background:${T.surface2};border:2px solid ${T.line};border-radius:12px;padding:10px 12px">
       <div style="min-width:0"><div style="font-weight:700;color:${T.ink};font-size:15px">${label}</div>${sub?`<div style="font-size:11px;color:${T.sageDim}">${sub}</div>`:""}</div>
       <div style="display:flex;align-items:center;gap:12px;flex:none">
         <button data-act="corr" data-arg="${field}:-1" style="${sBtn}">&minus;</button>
         <span style="font-family:${MONO};font-size:24px;font-weight:800;color:${T.chalk};min-width:30px;text-align:center">${val}</span>
         <button data-act="corr" data-arg="${field}:1" style="${sBtn}">+</button></div></div>`;
-  const halfRow=`<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;background:${T.surface2};border:1.5px solid ${T.line};border-radius:12px;padding:10px 12px">
+  const halfRow=`<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;background:${T.surface2};border:2px solid ${T.line};border-radius:12px;padding:10px 12px">
       <div style="font-weight:700;color:${T.ink};font-size:15px">Half</div>
-      <button data-act="corr" data-arg="half:0" style="background:${T.surface};border:1.5px solid ${T.line};color:${T.chalk};border-radius:10px;padding:11px 18px;font-family:${MONO};font-weight:800;font-size:15px">${G.half==="T"?"▲ TOP":"▼ BOTTOM"} &middot; tap to flip</button></div>`;
+      <button data-act="corr" data-arg="half:0" style="background:${T.surface};border:2px solid ${T.line};color:${T.chalk};border-radius:10px;padding:11px 18px;font-family:${MONO};font-weight:800;font-size:15px">${G.half==="T"?"▲ TOP":"▼ BOTTOM"} &middot; tap to flip</button></div>`;
   return `<div data-act="correctclose" style="position:fixed;left:0;right:0;top:0;height:calc(var(--avh) * 100);z-index:120;background:rgba(8,11,16,.78);display:flex;align-items:center;justify-content:center;padding:16px">
       <div data-act="noop" style="width:100%;max-width:440px;max-height:calc(var(--avh) * 92);overflow-y:auto;-webkit-overflow-scrolling:touch;background:${T.surface};border:2px solid ${T.lime};border-radius:18px;padding:16px;display:flex;flex-direction:column;gap:10px;box-shadow:0 18px 54px rgba(0,0,0,.6)">
         <div style="display:flex;align-items:center;gap:10px"><div style="flex:1;font-family:${MONO};font-size:18px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:${T.lime}">Correct the game</div>
@@ -1678,7 +1678,7 @@ function diamondSVG(){
   const zoneSVG=showZones?zonesOverlay():"";
   const banner=armed?`<div style="position:absolute;inset:0;display:flex;align-items:flex-start;justify-content:center;pointer-events:none;padding-top:8px">
       <span style="background:${T.clay};color:#FFFFFF;font-size:11px;font-weight:800;padding:4px 10px;border-radius:999px;letter-spacing:.3px">Tap where the ball went</span></div>`:"";
-  return `<div id="field-surface" style="height:100%;width:auto;max-width:100%;aspect-ratio:300/280;margin:auto;position:relative;border:1.5px solid ${T.line};border-radius:10px;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,.5);${armed?"cursor:crosshair":""};touch-action:manipulation">
+  return `<div id="field-surface" style="height:100%;width:auto;max-width:100%;aspect-ratio:300/280;margin:auto;position:relative;border:2px solid ${T.line};border-radius:10px;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,.5);${armed?"cursor:crosshair":""};touch-action:manipulation">
     <svg id="field-svg" viewBox="0 0 300 280" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" style="display:block">
       <defs>${markerDefs}</defs>
       <path d="M150,250 L292,108 Q150,-12 8,108 Z" fill="${T.grass}"/>
@@ -1723,7 +1723,7 @@ function statusBar(){
   const pipRow=(label,cls,n,max,id)=>`<div class="bso-row" id="${id}" style="display:flex;align-items:center;gap:6px;height:14px">
       <span style="font-family:${MONO};font-size:12px;font-weight:800;color:${T.sageDim};width:11px">${label}</span>
       ${Array.from({length:max},(_,i)=>`<span class="bso-pip ${cls}${i<n?" on":""}"></span>`).join("")}</div>`;
-  return `<div id="statusbar" data-longpress="correct" title="Tap the pencil (or hold) to correct the count / outs / score" style="display:flex;align-items:stretch;background:${T.surface};border:1.5px solid ${T.line};border-radius:11px;overflow:hidden;flex-shrink:0;box-shadow:0 1px 0 rgba(15,30,60,.04);user-select:none;-webkit-user-select:none;-webkit-touch-callout:none">
+  return `<div id="statusbar" data-longpress="correct" title="Tap the pencil (or hold) to correct the count / outs / score" style="display:flex;align-items:stretch;background:${T.surface};border:2px solid ${T.line};border-radius:11px;overflow:hidden;flex-shrink:0;box-shadow:0 1px 0 rgba(15,30,60,.04);user-select:none;-webkit-user-select:none;-webkit-touch-callout:none">
     <div style="display:flex;flex-direction:column;justify-content:center;gap:5px;padding:9px 12px;min-width:116px;max-width:174px;border-right:1.5px solid ${T.line}">
       ${tabRow("away",G.away,G.half==="T")}${tabRow("home",G.home,G.half==="B")}</div>
     <div style="display:flex;align-items:center;justify-content:center;padding:0 10px;flex:1;gap:clamp(7px,2.4vw,18px)">
@@ -1807,7 +1807,7 @@ function floatWindow(id,title,inner,def){
   return `<div data-floatwin="${id}" style="position:absolute;left:${g.x}px;top:${g.y}px;width:${g.w}px;height:${g.h}px;z-index:40;pointer-events:auto;display:flex;flex-direction:column;background:rgba(47,62,85,.97);border:1px solid ${T.lime};border-radius:12px;box-shadow:0 14px 44px rgba(0,0,0,.6);overflow:hidden">
     <div data-floatdrag="${id}" style="flex:none;display:flex;align-items:center;gap:8px;padding:6px 10px;background:${T.surface2};border-bottom:1.5px solid ${T.line};cursor:move;touch-action:none;user-select:none">
       <span style="font-size:14px;color:${T.sageDim};line-height:1">&#9783;</span>
-      <span style="flex:1;font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:${T.lime};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${title}</span>
+      <span style="flex:1;font-size:12.5px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:${T.lime};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${title}</span>
       <span style="font-size:9px;font-weight:700;letter-spacing:.5px;color:${T.sageDim}">drag</span></div>
     <div style="flex:1;min-height:0;overflow:auto;padding:8px;display:flex;flex-direction:column">${inner}</div>
     <div data-floatresize="${id}" title="Drag to resize" style="position:absolute;right:0;bottom:0;width:46px;height:46px;z-index:2;cursor:nwse-resize;touch-action:none;display:flex;align-items:flex-end;justify-content:flex-end;padding:5px">
@@ -1981,7 +1981,7 @@ function monitorPane(){
    (wide layout) — so the count/score stays visible without the monitor's scorebug. */
 function miniCount(){
   const onb=[1,2,3].filter(n=>G.bases&&G.bases[n]).length;
-  return `<div class="mini-count" style="align-items:center;gap:16px;background:${T.surface};border:1.5px solid ${T.line};border-radius:10px;padding:10px 14px;flex-shrink:0;font-family:${MONO}">
+  return `<div class="mini-count" style="align-items:center;gap:16px;background:${T.surface};border:2px solid ${T.line};border-radius:10px;padding:10px 14px;flex-shrink:0;font-family:${MONO}">
     <span style="font-weight:800;font-size:17px;color:${T.chalk}">${TEAMS.away.short} ${G.away} · ${TEAMS.home.short} ${G.home}</span>
     <span style="font-weight:700;color:${T.sage}">${G.half==="T"?"▲":"▼"}${G.inning}</span>
     <span style="display:inline-flex;align-items:baseline;gap:5px">
@@ -2000,13 +2000,13 @@ function scoreBar(){
   const onb=[1,2,3].filter(n=>G.bases&&G.bases[n]).length;
   const big=`font-weight:800;font-size:25px;color:${T.chalk};line-height:1`;
   const lab=`font-size:11px;font-weight:700;letter-spacing:1.5px;color:${T.sageDim}`;
-  return `<div id="scorebar" data-longpress="correct" title="Tap the pencil (or hold) to correct the count / outs / score" style="display:flex;align-items:center;gap:24px;background:rgba(47,62,85,.82);border:1.5px solid ${T.line};border-radius:10px;padding:11px 20px;flex-shrink:0;font-family:${MONO};flex-wrap:wrap;position:relative;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none">
+  return `<div id="scorebar" data-longpress="correct" title="Tap the pencil (or hold) to correct the count / outs / score" style="display:flex;align-items:center;gap:24px;background:rgba(47,62,85,.82);border:2px solid ${T.line};border-radius:10px;padding:11px 20px;flex-shrink:0;font-family:${MONO};flex-wrap:wrap;position:relative;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none">
     <span style="${big};letter-spacing:.5px">${TEAMS.away.short} ${G.away}<span style="color:${T.line};font-weight:600;margin:0 13px">·</span>${TEAMS.home.short} ${G.home}</span>
     <span style="font-weight:800;font-size:23px;color:${T.sage};line-height:1">${G.half==="T"?"▲":"▼"}${G.inning}</span>
     <span style="display:inline-flex;align-items:baseline;gap:8px"><b style="${big}">${G.balls}-${G.strikes}</b><span style="${lab}">COUNT</span></span>
     <span style="display:inline-flex;align-items:baseline;gap:8px"><b style="${big}">${G.outs}</b><span style="${lab}">OUT${G.outs===1?"":"S"}</span></span>
     ${onb?`<span style="font-weight:800;font-size:19px;color:${T.clay};line-height:1">${onb} ON</span>`:""}
-    <button data-act="correctopen" title="Correct the count, outs, score &amp; inning" style="margin-left:auto;flex:none;display:inline-flex;align-items:center;justify-content:center;gap:6px;background:${T.surface2};border:1.5px solid ${T.line};color:${T.lime};border-radius:8px;height:32px;padding:0 12px;font-family:${SANS};font-size:13px;font-weight:700;cursor:pointer"><span style="font-size:15px;line-height:1">&#9998;</span>Edit</button>
+    <button data-act="correctopen" title="Correct the count, outs, score &amp; inning" style="margin-left:auto;flex:none;display:inline-flex;align-items:center;justify-content:center;gap:6px;background:${T.surface2};border:2px solid ${T.line};color:${T.lime};border-radius:8px;height:32px;padding:0 12px;font-family:${SANS};font-size:13px;font-weight:700;cursor:pointer"><span style="font-size:15px;line-height:1">&#9998;</span>Edit</button>
   </div>`;
 }
 
@@ -2021,7 +2021,7 @@ function fieldOverlays(){
   const pc=currentPitchCount(),pn=currentPitcherName();
   const aH=sideHits("away"),hH=sideHits("home");
   const aE=(G.errors&&G.errors.away)||0,hE=(G.errors&&G.errors.home)||0;
-  const box=`position:absolute;z-index:4;background:rgba(9,13,19,.74);border:1.5px solid ${T.line};border-radius:11px;box-shadow:0 3px 12px rgba(0,0,0,.45)`;
+  const box=`position:absolute;z-index:4;background:rgba(9,13,19,.74);border:2px solid ${T.line};border-radius:11px;box-shadow:0 3px 12px rgba(0,0,0,.45)`;
   const pcChip=`<div style="${box};bottom:8px;left:8px;padding:5px 11px 5px 9px;display:flex;align-items:center;gap:9px;line-height:1">
       <div style="font-family:${MONO};font-size:23px;font-weight:800;color:${T.amber}">${pc}</div>
       <div style="display:flex;flex-direction:column;gap:2px;min-width:0">
@@ -2045,7 +2045,7 @@ function modalWrap(title,sub,inner,closeAct){
         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">
           <div style="min-width:0"><div style="font-family:${MONO};font-size:19px;font-weight:800;color:${T.chalk};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${title}</div>
             <div style="font-size:12px;color:${T.sage};margin-top:3px">${sub}</div></div>
-          <button data-act="${closeAct}" style="background:${T.surface2};border:1.5px solid ${T.line};color:${T.chalk};border-radius:8px;padding:8px 14px;font-weight:800;font-size:13px;flex:none">Done</button></div>
+          <button data-act="${closeAct}" style="background:${T.surface2};border:2px solid ${T.line};color:${T.chalk};border-radius:8px;padding:8px 14px;font-weight:800;font-size:13px;flex:none">Done</button></div>
         <div style="margin-top:12px;display:flex;flex-direction:column;gap:8px">${inner}</div>
       </div>
     </div></div>`;
@@ -2090,7 +2090,7 @@ function inningLogModal(){
       <span style="font-family:${MONO};font-size:14px;font-weight:800;color:${T.lime}">${G.half==="T"?"Top":"Bot"} ${G.inning} · now</span>
       <span style="font-family:${MONO};font-size:13px;color:${T.sage}">${G.halfRuns||0} R · ${G.halfHits||0} H · ${G.halfPitches||0} P</span></div>`;
   const rows=log.length?log.slice().reverse().map(e=>`
-      <div style="display:flex;align-items:center;justify-content:space-between;background:${T.surface};border:1.5px solid ${T.line};border-radius:10px;padding:11px 13px">
+      <div style="display:flex;align-items:center;justify-content:space-between;background:${T.surface};border:2px solid ${T.line};border-radius:10px;padding:11px 13px">
         <span style="font-family:${MONO};font-size:14px;font-weight:800;color:${T.chalk}">${e.half==="T"?"Top":"Bot"} ${e.inning}<span style="color:${T.sage};font-weight:600;font-size:12px"> · ${TEAMS[e.batteam].short} batting</span></span>
         <span style="font-family:${MONO};font-size:13px;color:${T.sage}">${e.runs} R · ${e.hits} H · ${e.pitches} P${e.lob?` · ${e.lob} LOB`:""}</span></div>`).join("")
     :`<div style="color:${T.sageDim};padding:14px;text-align:center">No completed innings yet.</div>`;
@@ -2108,10 +2108,10 @@ function feedPanel(){
       <span style="font-family:${MONO};font-size:${pit?"13px":"15px"};color:${T.sage};white-space:nowrap">${TEAMS.away.short} ${e.away}-${e.home} ${TEAMS.home.short}</span>
     </div>`;}).join("");
   const seg=(v,lbl)=>`<button data-act="feedview" data-arg="${v}" style="padding:5px 11px;border:none;font-family:${MONO};font-weight:800;font-size:11px;letter-spacing:.4px;cursor:pointer;background:${feedView===v?T.lime:"transparent"};color:${feedView===v?"#fff":T.sage}">${lbl}</button>`;
-  return `<div style="flex:1;min-height:0;display:flex;flex-direction:column;background:${T.surface};border:1.5px solid ${T.line};border-radius:12px;overflow:hidden">
+  return `<div style="flex:1;min-height:0;display:flex;flex-direction:column;background:${T.surface};border:2px solid ${T.line};border-radius:12px;overflow:hidden">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 13px;border-bottom:1.5px solid ${T.line};flex:none">
         <span style="font-family:${MONO};font-weight:800;font-size:15px;letter-spacing:1.4px;color:${T.lime}">GAME FEED</span>
-        <div style="display:inline-flex;background:${T.surface2};border:1.5px solid ${T.line};border-radius:8px;overflow:hidden">${seg("play","At-bat")}${seg("pitch","Pitch")}</div></div>
+        <div style="display:inline-flex;background:${T.surface2};border:2px solid ${T.line};border-radius:8px;overflow:hidden">${seg("play","At-bat")}${seg("pitch","Pitch")}</div></div>
       <div style="flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch">${rows||`<div style="padding:16px;color:${T.sageDim};font-size:13px">Plays show here as the game happens.</div>`}</div>
     </div>`;
 }
@@ -2167,7 +2167,7 @@ const PATHS={
 const ICN={}; for(var _ik in PATHS) ICN[_ik]=IC(PATHS[_ik]);
 // Flat, bordered buttons (GroundLink style): solid fill, 1px border, no gradients.
 const bigBtn=(bg,extra="",fg="#FFFFFF")=>`background:${bg};border:1px solid rgba(0,0,0,.16);color:${fg};border-radius:10px;padding:16px;font-family:${MONO};font-size:18px;font-weight:800;letter-spacing:1px;text-transform:uppercase;display:flex;align-items:center;justify-content:center;gap:10px;${extra}`;
-const ghost=`background:${T.surface};border:1.5px solid ${T.line};color:${T.sage};border-radius:8px;padding:11px;font-family:${MONO};font-size:14px;font-weight:700;letter-spacing:.5px;text-transform:uppercase`;
+const ghost=`background:${T.surface};border:2px solid ${T.line};color:${T.sage};border-radius:8px;padding:11px;font-family:${MONO};font-size:14px;font-weight:700;letter-spacing:.5px;text-transform:uppercase`;
 /* GameChanger-style pitch button: round icon badge + label beneath. accent=primary (lime). */
 function pitchBtn(act,label,icon,accent){
   const bg=accent?T.lime:T.surface, bd=accent?T.lime:"#3F6CA8", txt=accent?"#fff":T.ink;
@@ -2185,7 +2185,7 @@ function timeSelects(idp, val24, cb){
   if(cb) window["_tpcb_"+idp]=cb;
   val24=val24||""; let h24=-1,mn=0; if(/^\d{1,2}:\d{2}$/.test(val24)){const a=val24.split(":");h24=+a[0];mn=+a[1];}
   const ap=h24>=12?"PM":"AM"; const h12=h24<0?-1:(h24%12===0?12:h24%12); const mn5=Math.round(mn/5)*5%60;
-  const sel=`background:${T.surface2};border:1.5px solid ${T.line};color:${T.ink};border-radius:8px;padding:10px 6px;font-family:${MONO};font-size:16px;font-weight:800;outline:none`;
+  const sel=`background:${T.surface2};border:2px solid ${T.line};color:${T.ink};border-radius:8px;padding:10px 6px;font-family:${MONO};font-size:16px;font-weight:800;outline:none`;
   const oc=`onchange="window._tpSync('${idp}')"`;
   const hOpts=`<option value="">--</option>`+Array.from({length:12},(_,i)=>i+1).map(n=>`<option value="${n}"${n===h12?" selected":""}>${n}</option>`).join("");
   const mOpts=Array.from({length:12},(_,i)=>i*5).map(n=>`<option value="${n}"${(h12>0&&n===mn5)?" selected":""}>${String(n).padStart(2,"0")}</option>`).join("");
@@ -2245,9 +2245,9 @@ function calendarHtml(t){
     const sel=inM&&calSelDay===ds, isToday=inM&&ds===todayStr;
     const dots=evs.length?`<div style="display:flex;gap:3px;flex-wrap:wrap;justify-content:center;max-width:100%">${evs.slice(0,4).map(s=>`<span style="width:8px;height:8px;border-radius:50%;background:${s.type==="practice"?T.sage:t.color}"></span>`).join("")}</div>`:`<div style="height:8px"></div>`;
     cells+=inM
-      ? `<button data-act="calday" data-arg="${ds}" style="min-height:62px;border:1.5px solid ${sel?t.color:(isToday?T.lime:T.line)};border-radius:9px;padding:5px 2px;background:${sel?T.surface:T.surface2};display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:5px;cursor:pointer">
+      ? `<button data-act="calday" data-arg="${ds}" style="min-height:62px;border:2px solid ${T.line}${sel?t.color:(isToday?T.lime:T.line)};border-radius:9px;padding:5px 2px;background:${sel?T.surface:T.surface2};display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:5px;cursor:pointer">
           <div style="font-family:${MONO};font-size:17px;font-weight:800;color:${sel?t.color:(isToday?T.lime:T.ink)}">${dn}</div>${dots}</button>`
-      : `<div style="min-height:62px;opacity:.18;border:1.5px solid ${T.line};border-radius:9px"></div>`; }
+      : `<div style="min-height:62px;opacity:.18;border:2px solid ${T.line};border-radius:9px"></div>`; }
   const dow=["Su","Mo","Tu","We","Th","Fr","Sa"].map(d=>`<div style="text-align:center;font-family:${MONO};font-size:12px;font-weight:800;color:${T.sageDim};padding:2px 0">${d}</div>`).join("");
   // Selected-day detail strip (tap a day to expand what's on it).
   const selEvs=calSelDay?(byDate[calSelDay]||[]):[];
@@ -2255,16 +2255,16 @@ function calendarHtml(t){
   if(calSelDay){
     const dlabel=(()=>{try{return new Date(calSelDay+"T00:00").toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric"});}catch(e){return calSelDay;}})();
     const evRows=selEvs.map(s=>{const isG=s.type!=="practice";const tm=s.time?(()=>{try{return new Date("2000-01-01T"+s.time).toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"});}catch(e){return s.time;}})():"";
-      return `<div style="display:flex;align-items:center;gap:8px;background:${T.surface2};border:1.5px solid ${T.line};border-left:5px solid ${isG?t.color:T.sage};border-radius:9px;padding:9px 11px">
+      return `<div style="display:flex;align-items:center;gap:8px;background:${T.surface2};border:2px solid ${T.line};border-left:5px solid ${isG?t.color:T.sage};border-radius:9px;padding:9px 11px">
           <div style="flex:1;min-width:0">
             <div style="font-weight:800;color:${T.ink};font-size:16px">${isG?ICN.inplay+" "+(s.opp?("vs "+(s.opp||"").replace(/</g,"&lt;")):"Game"):ICN.ball+" Practice"}</div>
             <div style="font-size:13px;color:${T.sage};margin-top:2px">${tm||"Time TBD"}${s.loc?(" · "+(s.loc||"").replace(/</g,"&lt;")):""}${s.notes?(" · "+(s.notes||"").replace(/</g,"&lt;")):""}</div></div>
-          <button data-act="schedrm" data-arg="${s.id}" style="background:none;border:1.5px solid ${T.line};color:${T.out};border-radius:7px;padding:7px 9px;font-weight:800">&times;</button></div>`;}).join("");
+          <button data-act="schedrm" data-arg="${s.id}" style="background:none;border:2px solid ${T.line};color:${T.out};border-radius:7px;padding:7px 9px;font-weight:800">&times;</button></div>`;}).join("");
     detail=`<div style="margin-top:10px;border-top:1.5px solid ${T.line};padding-top:10px;display:flex;flex-direction:column;gap:7px">
         <div style="font-size:12px;font-weight:800;letter-spacing:.4px;color:${T.lime}">${dlabel}</div>
         ${selEvs.length?evRows:`<div style="font-size:12px;color:${T.sageDim}">Nothing scheduled. The date is filled into the editor below — add a game or practice.</div>`}</div>`;
   }
-  return `<div style="background:${T.surface};border:1.5px solid ${T.line};border-radius:10px;padding:10px">
+  return `<div style="background:${T.surface};border:2px solid ${T.line};border-radius:10px;padding:10px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
         <button data-act="calprev" style="${ghost};padding:9px 15px;font-size:18px">&lsaquo;</button>
         <div style="font-family:${MONO};font-size:17px;font-weight:800;color:${T.ink}">${monthName}</div>
@@ -2288,16 +2288,16 @@ function multiCalendarHtml(fps){
     const sel=inM&&calSelDay===ds, isToday=inM&&ds===todayStr;
     const dots=evs.length?`<div style="display:flex;gap:3px;flex-wrap:wrap;justify-content:center;max-width:100%">${evs.slice(0,4).map(s=>`<span style="width:8px;height:8px;border-radius:50%;background:${s.__col}"></span>`).join("")}</div>`:`<div style="height:8px"></div>`;
     cells+=inM
-      ? `<button data-act="calday" data-arg="${ds}" style="min-height:62px;border:1.5px solid ${sel?T.lime:(isToday?T.lime:T.line)};border-radius:9px;padding:5px 2px;background:${sel?T.surface:T.surface2};display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:5px;cursor:pointer">
+      ? `<button data-act="calday" data-arg="${ds}" style="min-height:62px;border:2px solid ${T.line}${sel?T.lime:(isToday?T.lime:T.line)};border-radius:9px;padding:5px 2px;background:${sel?T.surface:T.surface2};display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:5px;cursor:pointer">
           <div style="font-family:${MONO};font-size:17px;font-weight:800;color:${sel||isToday?T.lime:T.ink}">${dn}</div>${dots}</button>`
-      : `<div style="min-height:62px;opacity:.18;border:1.5px solid ${T.line};border-radius:9px"></div>`; }
+      : `<div style="min-height:62px;opacity:.18;border:2px solid ${T.line};border-radius:9px"></div>`; }
   const dow=["Su","Mo","Tu","We","Th","Fr","Sa"].map(d=>`<div style="text-align:center;font-family:${MONO};font-size:12px;font-weight:800;color:${T.sageDim};padding:2px 0">${d}</div>`).join("");
   let detail="";
   if(calSelDay){
     const selEvs=byDate[calSelDay]||[];
     const dlabel=(()=>{try{return new Date(calSelDay+"T00:00").toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric"});}catch(e){return calSelDay;}})();
     const evRows=selEvs.map(s=>{const isG=s.type!=="practice";const tm=s.time?(()=>{try{return new Date("2000-01-01T"+s.time).toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"});}catch(e){return s.time;}})():"";
-      return `<div style="display:flex;align-items:center;gap:8px;background:${T.surface2};border:1.5px solid ${T.line};border-left:5px solid ${s.__col};border-radius:9px;padding:9px 11px">
+      return `<div style="display:flex;align-items:center;gap:8px;background:${T.surface2};border:2px solid ${T.line};border-left:5px solid ${s.__col};border-radius:9px;padding:9px 11px">
           <div style="flex:1;min-width:0">
             <div style="font-weight:800;color:${T.ink};font-size:15px">${(s.__who||"").replace(/</g,"&lt;")}</div>
             <div style="font-size:12px;color:${T.sage};margin-top:2px">${isG?(s.opp?("vs "+(s.opp||"").replace(/</g,"&lt;")):"Game"):"Practice"}${tm?(" · "+tm):""}${s.loc?(" · "+(s.loc||"").replace(/</g,"&lt;")):""}</div></div></div>`;}).join("");
@@ -2305,7 +2305,7 @@ function multiCalendarHtml(fps){
         <div style="font-size:12px;font-weight:800;letter-spacing:.4px;color:${T.lime}">${dlabel}</div>
         ${selEvs.length?evRows:`<div style="font-size:12px;color:${T.sageDim}">Nothing scheduled for any followed player.</div>`}</div>`;
   }
-  return `<div style="background:${T.surface};border:1.5px solid ${T.line};border-radius:10px;padding:10px">
+  return `<div style="background:${T.surface};border:2px solid ${T.line};border-radius:10px;padding:10px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
         <button data-act="calprev" style="${ghost};padding:9px 15px;font-size:18px">&lsaquo;</button>
         <div style="font-family:${MONO};font-size:17px;font-weight:800;color:${T.ink}">${monthName}</div>
@@ -2334,7 +2334,7 @@ function actionArea(){
             <span style="font-family:${MONO};font-size:28px;font-weight:800;color:${t.color};line-height:1">${rec}</span><span style="font-size:13px;color:${T.sage}">${sub}</span></div>
           <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:14px;background:${t.color};color:#fff;border-radius:9px;padding:13px;font-family:${MONO};font-weight:800;font-size:16px;letter-spacing:.8px;pointer-events:none">${IC(GEAR)} ${t.external?"VIEW TEAM":"MANAGE TEAM"}</div></div>`;};
     // Collapsible section headers (drawers) for Home — tap to open/close the list beneath.
-    const drawerHdr=(act,label,open)=>`<button data-act="${act}" style="display:flex;align-items:center;justify-content:space-between;width:100%;background:rgba(47,62,85,.55);border:1.5px solid ${T.line};border-radius:11px;padding:11px 14px;cursor:pointer;margin-top:2px">
+    const drawerHdr=(act,label,open)=>`<button data-act="${act}" style="display:flex;align-items:center;justify-content:space-between;width:100%;background:rgba(47,62,85,.55);border:2px solid ${T.line};border-radius:11px;padding:11px 14px;cursor:pointer;margin-top:2px">
         <span style="font-size:13px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:${T.lime}">${label}</span>
         <span style="color:${T.lime};font-size:17px;display:inline-block;transition:transform .2s;transform:rotate(${open?90:0}deg)">&rsaquo;</span></button>`;
     const teamsBlock = DB.teams.length
@@ -2342,7 +2342,7 @@ function actionArea(){
       : "";
     // Followed-players drawer (only shows once you follow someone) + the combined calendar.
     const _fps=followedPlayers();
-    const followCard=f=>`<button data-act="openplayer" data-arg="${f.key}" style="display:flex;align-items:center;gap:11px;width:100%;text-align:left;background:${T.surface};border:1.5px solid ${T.line};border-left:5px solid ${playerHue(f.key)};border-radius:11px;padding:11px 13px;cursor:pointer">
+    const followCard=f=>`<button data-act="openplayer" data-arg="${f.key}" style="display:flex;align-items:center;gap:11px;width:100%;text-align:left;background:${T.surface};border:2px solid ${T.line};border-left:5px solid ${playerHue(f.key)};border-radius:11px;padding:11px 13px;cursor:pointer">
         <span style="width:34px;height:34px;flex:none;border-radius:8px;background:${f.team.color};color:#fff;display:flex;align-items:center;justify-content:center;font-family:${MONO};font-weight:800;font-size:15px">${(f.player.num||"–")}</span>
         <div style="flex:1;min-width:0"><div style="font-weight:800;color:${T.ink};font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${(f.player.name||"Player").replace(/</g,"&lt;")}</div>
           <div style="font-size:12px;color:${T.sage}">${(f.team.name||"").replace(/</g,"&lt;")}</div></div>
@@ -2382,8 +2382,8 @@ function actionArea(){
     const shareIco=`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="${T.lime}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="19" r="2.6"/><path d="M8.3 10.8 15.7 6.4M8.3 13.2l7.4 4.4"/></svg>`;
     // Compact share row — share the live game (only while one's on) and share the app itself. Kept
     // small so they never push the team cards into a scroll.
-    const shareBtnHome = gameActive ? `<button data-act="share" style="flex:1;min-width:0;display:flex;align-items:center;justify-content:center;gap:7px;background:${T.surface};border:1.5px solid ${T.line};color:${T.chalk};border-radius:11px;padding:9px 12px;font-family:${SANS};font-weight:800;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${shareIco}Share game &middot; ${(OUR.short||"US")} vs ${(OPP.short||"OPP")}</button>` : "";
-    const shareAppBtn = `<button data-act="shareapp" style="flex:1;min-width:0;display:flex;align-items:center;justify-content:center;gap:7px;background:${T.surface2};border:1.5px solid ${T.line};color:${T.sage};border-radius:11px;padding:9px 12px;font-family:${SANS};font-weight:800;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${shareIco}Share All-Stars Live</button>`;
+    const shareBtnHome = gameActive ? `<button data-act="share" style="flex:1;min-width:0;display:flex;align-items:center;justify-content:center;gap:7px;background:${T.surface};border:2px solid ${T.line};color:${T.chalk};border-radius:11px;padding:9px 12px;font-family:${SANS};font-weight:800;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${shareIco}Share game &middot; ${(OUR.short||"US")} vs ${(OPP.short||"OPP")}</button>` : "";
+    const shareAppBtn = `<button data-act="shareapp" style="flex:1;min-width:0;display:flex;align-items:center;justify-content:center;gap:7px;background:${T.surface2};border:2px solid ${T.line};color:${T.sage};border-radius:11px;padding:9px 12px;font-family:${SANS};font-weight:800;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${shareIco}Share All-Stars Live</button>`;
     // Cloud sign-in bar — only appears once Firebase is configured (firebase-config.js apiKey).
     // Until then it's empty and the home looks/works exactly as the local-only version.
     const C=window.Cloud;
@@ -2395,18 +2395,18 @@ function actionArea(){
       ? (C.user
           ? `<div style="flex:none;display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;font-size:13px;color:${T.sage}">
                <span>Signed in as <b style="color:${T.chalk}">${(C.user.email||"account").replace(/</g,"")}</b></span>
-               <button data-act="signout" style="background:${T.surface};border:1.5px solid ${T.line};color:${T.chalk};border-radius:8px;padding:6px 12px;font-weight:800;font-size:12px">Sign out</button></div>`
+               <button data-act="signout" style="background:${T.surface};border:2px solid ${T.line};color:${T.chalk};border-radius:8px;padding:6px 12px;font-weight:800;font-size:12px">Sign out</button></div>`
           : `<div style="flex:none;display:flex;flex-direction:column;align-items:center;gap:9px">
                ${`<button data-act="signingoogle" style="display:flex;align-items:center;justify-content:center;gap:10px;background:#fff;color:#1f1f1f;border:1px solid #dadce0;border-radius:8px;padding:11px 18px;font-family:${SANS};font-weight:700;font-size:14px;min-width:240px">
                  <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.6l6.7-6.7C35.6 2.6 30.2 0 24 0 14.6 0 6.5 5.4 2.6 13.3l7.8 6.1C12.2 13.7 17.6 9.5 24 9.5z"/><path fill="#4285F4" d="M46.1 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.4c-.5 2.9-2.2 5.3-4.7 6.9l7.3 5.7c4.3-3.9 6.8-9.7 6.8-17.1z"/><path fill="#FBBC05" d="M10.4 28.6c-.5-1.5-.8-3-.8-4.6s.3-3.1.8-4.6l-7.8-6.1C1 16.5 0 20.1 0 24s1 7.5 2.6 10.7l7.8-6.1z"/><path fill="#34A853" d="M24 48c6.2 0 11.5-2 15.3-5.5l-7.3-5.7c-2 1.4-4.7 2.3-8 2.3-6.4 0-11.8-4.2-13.6-9.9l-7.8 6.1C6.5 42.6 14.6 48 24 48z"/></svg>
                  Continue with Google</button>
                <div style="display:flex;align-items:center;gap:8px;color:${T.sageDim};font-size:11px;font-weight:700;letter-spacing:1px"><span style="width:40px;height:1px;background:${T.line}"></span>OR<span style="width:40px;height:1px;background:${T.line}"></span></div>`}
                <div style="display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap">
-                 <input id="authEmail" type="email" autocomplete="email" placeholder="you@email.com" style="flex:1;min-width:160px;max-width:240px;background:${T.surface2};border:1.5px solid ${T.line};color:${T.ink};border-radius:8px;padding:10px 12px;font-size:14px;outline:none">
+                 <input id="authEmail" type="email" autocomplete="email" placeholder="you@email.com" style="flex:1;min-width:160px;max-width:240px;background:${T.surface2};border:2px solid ${T.line};color:${T.ink};border-radius:8px;padding:10px 12px;font-size:14px;outline:none">
                  <button data-act="signin" style="background:${T.lime};color:#fff;border:none;border-radius:8px;padding:10px 16px;font-weight:800;font-size:13px">Email link</button></div></div>`)
       : "";
     // Single Settings gear (top-right) — app/camera/account settings. Same on native + web.
-    const gBtn=(act,glyph,title)=>`<button data-act="${act}" title="${title}" style="background:rgba(47,62,85,.72);border:1.5px solid ${T.line};color:${T.chalk};border-radius:11px;width:44px;height:44px;display:flex;align-items:center;justify-content:center;font-size:20px;cursor:pointer">${glyph}</button>`;
+    const gBtn=(act,glyph,title)=>`<button data-act="${act}" title="${title}" style="background:rgba(47,62,85,.72);border:2px solid ${T.line};color:${T.chalk};border-radius:11px;width:44px;height:44px;display:flex;align-items:center;justify-content:center;font-size:20px;cursor:pointer">${glyph}</button>`;
     const settingsGear=`<div style="position:absolute;top:8px;right:10px;z-index:6;display:flex;gap:8px">${gBtn("settings",IC('gear',20),"Settings")}</div>`;   // Refresh moved into Settings
     // Wide (tablet): two columns so the key actions fit without scrolling — only a long
     // team list scrolls, inside its own column. Narrow (phone): the classic vertical stack.
@@ -2474,7 +2474,7 @@ function actionArea(){
           <span style="color:${t.color};font-weight:800;font-size:15px;letter-spacing:.5px;white-space:nowrap">MANAGE &rsaquo;</span></button></div>`;}).join("")
       ||`<div style="color:${T.sage};font-size:15px;text-align:center;padding:24px 8px;border:1px dashed ${T.line};border-radius:12px">No teams yet — create one to start tracking rosters &amp; season stats.</div>`;
     return `<div style="display:flex;flex-direction:column;gap:14px">
-        <div class="frost-card" style="display:flex;align-items:center;gap:10px;background:${T.surface};border:1.5px solid ${T.line};border-radius:14px;padding:12px 14px">
+        <div class="frost-card" style="display:flex;align-items:center;gap:10px;background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:12px 14px">
           <button data-act="gohome" style="${ghost};padding:9px 11px">&lsaquo; Home</button>
           <div style="font-family:${MONO};font-size:23px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:${T.lime}">Teams</div></div>
         <div style="font-size:12px;color:${T.sage};margin-top:-6px">Manage rosters &amp; season stats.</div>
@@ -2486,18 +2486,18 @@ function actionArea(){
   }
   if(mode==="team"){
     const t=teamById(openTeamId); if(!t){mode="teams";return actionArea();}
-    const cell=`background:${T.surface2};border:1.5px solid ${T.line};color:${T.ink};border-radius:7px;padding:8px 8px;font-weight:700;outline:none`;
+    const cell=`background:${T.surface2};border:2px solid ${T.line};color:${T.ink};border-radius:7px;padding:8px 8px;font-weight:700;outline:none`;
     const roster=t.players.map((p,i)=>`<div style="display:flex;align-items:center;gap:8px;padding:8px 0;${i>0?`border-top:1.5px solid ${T.line};`:""}">
         <span title="Player ${i+1} of ${t.players.length}" style="flex:none;width:26px;text-align:center;font-family:${MONO};font-size:16px;font-weight:800;color:${T.sageDim}">${i+1}</span>
         <input value="${(p.num||"").replace(/"/g,"&quot;")}" oninput="teamPNum('${p.id}',this.value)" inputmode="numeric" maxlength="3" style="${cell};width:54px;text-align:center;font-family:${MONO};font-weight:800;font-size:18px">
         <input value="${(p.first||"").replace(/"/g,"&quot;")}" oninput="teamPFirst('${p.id}',this.value)" placeholder="First" style="${cell};flex:1 1 130px;max-width:250px;min-width:0;font-size:18px">
         <input value="${(p.last||"").replace(/"/g,"&quot;")}" oninput="teamPLast('${p.id}',this.value)" placeholder="Last" style="${cell};flex:1 1 130px;max-width:250px;min-width:0;font-size:18px">
         <div style="flex:1;min-width:0"></div>
-        <button data-act="openplayer" data-arg="${t.id}:${p.id}" title="View / follow player" style="background:${T.surface2};border:1.5px solid ${T.line};color:${isFollowingPlayer(t.id,p.id)?T.amber:T.lime};border-radius:9px;min-width:48px;height:46px;display:inline-flex;align-items:center;justify-content:center;font-size:24px;font-weight:800;flex:none;line-height:1">${isFollowingPlayer(t.id,p.id)?IC('starFill',22):"&rsaquo;"}</button>
+        <button data-act="openplayer" data-arg="${t.id}:${p.id}" title="View / follow player" style="background:${T.surface2};border:2px solid ${T.line};color:${isFollowingPlayer(t.id,p.id)?T.amber:T.lime};border-radius:9px;min-width:48px;height:46px;display:inline-flex;align-items:center;justify-content:center;font-size:24px;font-weight:800;flex:none;line-height:1">${isFollowingPlayer(t.id,p.id)?IC('starFill',22):"&rsaquo;"}</button>
         <button data-act="rmteamp" data-arg="${p.id}" title="Remove player" style="background:none;border:1px solid ${T.out}66;color:${T.out};border-radius:9px;min-width:48px;height:46px;display:inline-flex;align-items:center;justify-content:center;font-size:26px;font-weight:800;flex:none;line-height:1"${t.players.length<=9?" disabled":""}>&times;</button></div>`).join("");
     const sRows=t.players.map(p=>{const s=(t.season[p.id]||{}).bat||{};const ab=s.ab||0,h=s.h||0;const avg=ab?(h/ab).toFixed(3).replace(/^0/,""):"—";
       return `<tr style="border-top:1.5px solid ${T.line}"><td style="text-align:left;padding:10px 8px;font-weight:700;white-space:nowrap">#${p.num} ${p.name}</td><td style="padding:10px 6px">${ab}</td><td style="padding:10px 6px">${s.r||0}</td><td style="padding:10px 6px">${h}</td><td style="padding:10px 6px">${s.rbi||0}</td><td style="padding:10px 6px">${s.bb||0}</td><td style="padding:10px 6px">${s.k||0}</td><td style="padding:10px 6px;font-weight:800">${avg}</td></tr>`;}).join("");
-    const statTable=`<div class="frost-card" style="background:${T.surface};border:1.5px solid ${T.line};border-radius:14px;padding:14px 18px;overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-family:${MONO};font-size:18px;color:${T.chalk};text-align:center">
+    const statTable=`<div class="frost-card" style="background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:14px 18px;overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-family:${MONO};font-size:18px;color:${T.chalk};text-align:center">
         <thead><tr style="color:${T.sageDim};font-size:14px;letter-spacing:.5px"><th style="text-align:left;padding:0 8px 10px">SEASON · BATTING</th><th>AB</th><th>R</th><th>H</th><th>RBI</th><th>BB</th><th>K</th><th>AVG</th></tr></thead>
         <tbody>${sRows}</tbody></table>
       <div style="font-size:12px;color:${T.sageDim};margin-top:10px;padding:0 4px">Pitching &amp; fielding season stats are stored too — they fill in as in-game tracking expands.</div></div>`;
@@ -2509,17 +2509,17 @@ function actionArea(){
           <div style="flex:1;min-width:0"><div style="font-weight:800;color:${T.ink};font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">vs ${(g.opp||"Opponent").replace(/</g,"&lt;")}</div><div style="font-size:12px;color:${T.sage};margin-top:1px">${dt}</div></div>
           <div style="font-family:${MONO};font-weight:800;font-size:19px;color:${T.chalk}">${g.us}&ndash;${g.them}</div>
           <span style="color:${T.lime};font-weight:800;font-size:16px">&rsaquo;</span></button>`;}).join("");
-    const gamesBlock=`<div class="frost-card" style="background:${T.surface};border:1.5px solid ${T.line};border-radius:14px;padding:12px 16px">
-        <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin-bottom:2px">Recent games</div>
+    const gamesBlock=`<div class="frost-card" style="background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:12px 16px">
+        <div style="font-size:13.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin-bottom:2px">Recent games</div>
         ${gamesList||`<div style="font-size:12px;color:${T.sageDim};padding:8px 0">No finished games yet — each game appears here once you end it.</div>`}</div>`;
     // Read-only W-L-T record, DERIVED from the finished-game log above — so it can never disagree
     // with the games shown. (No manual editing: the record simply reflects the games played.)
     const REC=teamRec(t);
     const recCell=(v,label)=>`<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:5px">
-        <div style="font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:${T.sageDim}">${label}</div>
+        <div style="font-size:13.5px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:${T.sageDim}">${label}</div>
         <span style="font-family:${MONO};font-size:30px;font-weight:800;color:${T.ink}">${v}</span></div>`;
-    const recEditor=`<div class="frost-card" style="background:${T.surface};border:1.5px solid ${T.line};border-radius:14px;padding:14px 16px">
-        <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin-bottom:10px">Record</div>
+    const recEditor=`<div class="frost-card" style="background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:14px 16px">
+        <div style="font-size:13.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin-bottom:10px">Record</div>
         <div style="display:flex;gap:8px">${recCell(REC.w,"Wins")}${recCell(REC.l,"Losses")}${recCell(REC.t,"Ties")}</div></div>`;
     // Schedule — games & practices stored on the team (syncs to the cloud with the team).
     const fmtSched=(s)=>{ try{ const dt=new Date((s.date||"")+"T"+(s.time||"00:00")); if(isNaN(dt))return s.date||""; let o=dt.toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"}); if(s.time)o+=" · "+dt.toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"}); return o; }catch(e){ return s.date||""; } };
@@ -2538,8 +2538,8 @@ function actionArea(){
       const btns=`<div style="display:flex;gap:8px;flex:none;align-items:center${wide?"":";justify-content:flex-end"}">
           ${isG?`<button data-act="schedstart" data-arg="${s.id}" title="Start this game now" style="background:${T.lime};border:1px solid ${T.lime};color:#fff;border-radius:8px;padding:9px 15px;font-weight:800;font-size:13px;letter-spacing:.4px;display:inline-flex;align-items:center;gap:6px;box-shadow:0 3px 10px rgba(225,29,46,.28)">&#9654; Start</button>`:""}
           <button data-act="schededit" data-arg="${s.id}" title="Edit" style="background:${schedEditId===s.id?T.lime:"none"};border:1px solid ${schedEditId===s.id?T.lime:T.line};color:${schedEditId===s.id?"#fff":T.lime};border-radius:8px;padding:9px 14px;font-weight:800;font-size:13px">Edit</button>
-          <button data-act="schedrm" data-arg="${s.id}" title="Remove" style="background:none;border:1.5px solid ${T.line};color:${T.out};border-radius:8px;padding:9px 13px;font-weight:800;font-size:18px">&times;</button></div>`;
-      return `<div style="display:flex;${wide?"flex-direction:row;align-items:center":"flex-direction:column;align-items:stretch"};gap:10px;background:${T.surface2};border:1.5px solid ${T.line};border-left:6px solid ${isG?OUR.color:T.sage};border-radius:11px;padding:14px 15px${past?";opacity:.6":""}">
+          <button data-act="schedrm" data-arg="${s.id}" title="Remove" style="background:none;border:2px solid ${T.line};color:${T.out};border-radius:8px;padding:9px 13px;font-weight:800;font-size:18px">&times;</button></div>`;
+      return `<div style="display:flex;${wide?"flex-direction:row;align-items:center":"flex-direction:column;align-items:stretch"};gap:10px;background:${T.surface2};border:2px solid ${T.line};border-left:6px solid ${isG?OUR.color:T.sage};border-radius:11px;padding:14px 15px${past?";opacity:.6":""}">
           ${textBlock}${btns}</div>`;};
     // A scheduled GAME counts as played once a finished game exists for the same date (+ opponent if set),
     // so it moves to "Earlier" even if you scored it before its listed time.
@@ -2555,7 +2555,7 @@ function actionArea(){
     const cellL=cell+";font-size:17px;padding:12px 12px";   // larger inputs for the schedule form
     const fld=(lbl,inner)=>`<div style="flex:1;min-width:150px;display:flex;flex-direction:column">${lbl?`<div style="${fLbl}">${lbl}</div>`:""}${inner}</div>`;
     const svBtn=(v,lbl)=>`<button data-act="schview" data-arg="${v}" style="flex:1;background:${scheduleView===v?T.lime:T.surface2};color:${scheduleView===v?"#fff":T.sage};border:1px solid ${scheduleView===v?T.lime:T.line};border-radius:8px;padding:8px 0;font-weight:800;font-size:12px;letter-spacing:.4px">${lbl}</button>`;
-    const scheduleViewCard=`<div class="frost-card" style="background:${T.surface};border:1.5px solid ${T.line};border-radius:14px;padding:16px 18px;display:flex;flex-direction:column;gap:11px">
+    const scheduleViewCard=`<div class="frost-card" style="background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:16px 18px;display:flex;flex-direction:column;gap:11px">
         <div style="font-size:14px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime}">Upcoming — games &amp; practices</div>
         <div style="display:flex;gap:6px">${svBtn("list",IC('list',15)+" List")}${svBtn("calendar",IC('grid',15)+" Calendar")}</div>
         ${scheduleView==="calendar" ? calendarHtml(t) : (schedRows||`<div style="font-size:12px;color:${T.sageDim}">Nothing scheduled yet.</div>`)}</div>`;
@@ -2579,14 +2579,14 @@ function actionArea(){
     const pastRows=(t.games||[]).slice(0,25).map(g=>{const rc=g.result==="W"?T.lime:(g.result==="L"?T.out:T.sage);
       const gdt=(()=>{try{return new Date((g.date||"")+"T00:00").toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"});}catch(e){return g.date||"";}})();
       const resWord=g.result==="W"?"WON":(g.result==="L"?"LOST":"TIE");
-      return `<button data-act="opengame" data-arg="${g.id}" style="display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:${T.surface2};border:1.5px solid ${T.line};border-left:6px solid ${rc};border-radius:11px;padding:12px 14px;cursor:pointer">
+      return `<button data-act="opengame" data-arg="${g.id}" style="display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:${T.surface2};border:2px solid ${T.line};border-left:6px solid ${rc};border-radius:11px;padding:12px 14px;cursor:pointer">
           <span style="width:34px;height:34px;flex:none;display:flex;align-items:center;justify-content:center;border-radius:8px;background:${rc};color:${T.field};font-family:${MONO};font-weight:800;font-size:16px">${g.result||""}</span>
           <div style="flex:1;min-width:0"><div style="font-weight:800;color:${T.ink};font-size:18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">vs ${(g.opp||"Opponent").replace(/</g,"&lt;")}</div><div style="font-size:14px;color:${T.sage};margin-top:2px">${gdt}</div></div>
           <div style="text-align:right;flex:none;line-height:1.05"><div style="font-family:${MONO};font-size:9px;font-weight:800;letter-spacing:1.2px;color:${rc}">${resWord} &middot; FINAL</div>
             <div style="font-family:${MONO};font-weight:800;font-size:21px;color:${T.chalk}"><span title="${(t.short||'Us')}">${g.us}</span>&ndash;<span title="${(g.oppShort||g.opp||'Opp')}">${g.them}</span></div>
             <div style="font-size:9px;color:${T.sageDim};letter-spacing:.3px">${(t.short||"US")} &ndash; ${(g.oppShort||(g.opp||"OPP").slice(0,3)).toUpperCase()}</div></div>
           <span style="color:${T.lime};font-weight:800;font-size:18px">&rsaquo;</span></button>`;}).join("");
-    const pastGamesCard=`<div class="frost-card" style="background:${T.surface};border:1.5px solid ${T.line};border-radius:14px;padding:16px 18px;display:flex;flex-direction:column;gap:9px">
+    const pastGamesCard=`<div class="frost-card" style="background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:16px 18px;display:flex;flex-direction:column;gap:9px">
         <div style="font-size:14px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime}">Past games &mdash; tap to see the score &amp; stats</div>
         ${pastRows||`<div style="font-size:12px;color:${T.sageDim}">No finished games yet — each game lands here once you end it.</div>`}</div>`;
     const scheduleSection=scheduleViewCard+pastGamesCard+scheduleEditCard;
@@ -2596,56 +2596,56 @@ function actionArea(){
         <button data-act="setrulebook" data-arg="${r.id}" title="Use for this team" style="width:22px;height:22px;flex:none;border-radius:50%;border:2px solid ${rbSel===r.id?T.lime:T.line};background:${rbSel===r.id?T.lime:'transparent'};cursor:pointer"></button>
         <div style="flex:1;min-width:0"><div style="font-weight:700;color:${T.ink};font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${(r.name||'').replace(/</g,'&lt;')}</div>
           <div style="font-size:11px;color:${T.sageDim}">${r.kind==="text"?IC('doc',13)+" Searchable in-app":(/\.pdf($|\?)/i.test(r.src||"")?IC('doc',13)+" Official PDF &mdash; searchable":IC('link',13)+" Opens official site")}</div></div>
-        <button data-act="viewrulebook" data-arg="${r.id}" style="background:${T.surface2};color:${T.lime};border:1.5px solid ${T.line};border-radius:8px;padding:8px 12px;font-weight:800;font-size:12px;white-space:nowrap">View &rsaquo;</button>
-        ${r.custom?`<button data-act="rmrulebook" data-arg="${r.id}" style="background:none;border:1.5px solid ${T.line};color:${T.out};border-radius:8px;padding:8px 10px;font-weight:800;font-size:12px">&times;</button>`:""}</div>`;
-    const rulebookSection=`<div class="frost-card" style="background:${T.surface};border:1.5px solid ${T.line};border-radius:14px;padding:14px 16px">
-        <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin-bottom:4px">Rulebook</div>
+        <button data-act="viewrulebook" data-arg="${r.id}" style="background:${T.surface2};color:${T.lime};border:2px solid ${T.line};border-radius:8px;padding:8px 12px;font-weight:800;font-size:12px;white-space:nowrap">View &rsaquo;</button>
+        ${r.custom?`<button data-act="rmrulebook" data-arg="${r.id}" style="background:none;border:2px solid ${T.line};color:${T.out};border-radius:8px;padding:8px 10px;font-weight:800;font-size:12px">&times;</button>`:""}</div>`;
+    const rulebookSection=`<div class="frost-card" style="background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:14px 16px">
+        <div style="font-size:13.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin-bottom:4px">Rulebook</div>
         <div style="font-size:11px;color:${T.sageDim};margin-bottom:4px;line-height:1.45">Tap the dot to set this team's league (it carries into each game for quick dispute lookups). Tap <b style="color:${T.sage}">View</b> to read any rulebook.</div>
         ${allRulebooks().map(rbRow).join("")}
-        <div style="font-size:10px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:${T.sageDim};margin:12px 0 4px">Add a rulebook (name + link)</div>
+        <div style="font-size:12.5px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:${T.sageDim};margin:12px 0 4px">Add a rulebook (name + link)</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <input id="rbName" placeholder="League name" autocomplete="off" style="${cell};flex:1;min-width:120px;font-size:13px">
           <input id="rbUrl" placeholder="https://… rules link" type="url" inputmode="url" autocapitalize="off" style="${cell};flex:1.4;min-width:140px;font-size:13px">
-          <button data-act="addrulebook" style="background:${T.surface2};color:${T.lime};border:1.5px solid ${T.line};border-radius:8px;padding:9px 16px;font-weight:800;font-size:13px">Add</button></div></div>`;
+          <button data-act="addrulebook" style="background:${T.surface2};color:${T.lime};border:2px solid ${T.line};border-radius:8px;padding:9px 16px;font-weight:800;font-size:13px">Add</button></div></div>`;
     // Team access (cloud) — owner + authorized scorers. Only when signed in.
     const C=window.Cloud, signedIn=!!(C&&C.enabled&&C.user);
     const owner=signedIn && typeof window.cloudIsOwner==="function" && window.cloudIsOwner(t);
     const canManage=signedIn && typeof window.cloudCanManage==="function" && window.cloudCanManage(t);
     const ownerEmail=(t.ownerEmail||(C&&C.user&&C.user.email)||"you").replace(/</g,"");
-    const cardCss=`background:${T.surface};border:1.5px solid ${T.line};border-radius:14px;padding:14px 16px`;
-    const subLbl=`font-size:11px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:${T.sage};margin:8px 0 2px`;
+    const cardCss=`background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:14px 16px`;
+    const subLbl=`font-size:13.5px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:${T.sage};margin:8px 0 2px`;
     // OWNERS box: the primary owner + co-owners (full management). SCORERS box: authorized scorers.
     const ownersCard=`<div class="frost-card" style="${cardCss}">
-        <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin-bottom:8px">Owners</div>
+        <div style="font-size:13.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin-bottom:8px">Owners</div>
         <div style="display:flex;align-items:center;gap:10px;padding:4px 0">
           ${IC('crown',20)}
           <div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:700;color:${T.chalk};word-break:break-all">${ownerEmail}</div><div style="font-size:11px;color:${T.sageDim}">Primary owner &middot; full control</div></div></div>
         <div style="${subLbl}">Co-owners &mdash; full management access</div>
-        ${(t.coOwners&&t.coOwners.length)?t.coOwners.map(co=>`<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 0;border-top:1.5px solid ${T.line}"><span style="font-size:13px;color:${T.chalk};word-break:break-all">${IC('starFill',14)} ${co.replace(/</g,"")}</span>${owner?`<button data-act="rmcoowner" data-arg="${co}" style="background:none;border:1.5px solid ${T.line};color:${T.out};border-radius:7px;padding:5px 10px;font-weight:800;font-size:12px">Remove</button>`:""}</div>`).join(""):`<div style="font-size:12px;color:${T.sageDim};padding:2px 0">No co-owners yet.</div>`}
-        ${owner?`<div style="display:flex;gap:8px;margin:10px 0 4px"><input id="coOwnerWho" type="email" autocomplete="off" autocapitalize="off" placeholder="Co-owner email" style="${cell};flex:1;min-width:0"><button data-act="addcoowner" style="background:${T.surface2};color:${T.lime};border:1.5px solid ${T.line};border-radius:8px;padding:9px 16px;font-weight:800;font-size:13px">Add</button></div>
+        ${(t.coOwners&&t.coOwners.length)?t.coOwners.map(co=>`<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 0;border-top:1.5px solid ${T.line}"><span style="font-size:13px;color:${T.chalk};word-break:break-all">${IC('starFill',14)} ${co.replace(/</g,"")}</span>${owner?`<button data-act="rmcoowner" data-arg="${co}" style="background:none;border:2px solid ${T.line};color:${T.out};border-radius:7px;padding:5px 10px;font-weight:800;font-size:12px">Remove</button>`:""}</div>`).join(""):`<div style="font-size:12px;color:${T.sageDim};padding:2px 0">No co-owners yet.</div>`}
+        ${owner?`<div style="display:flex;gap:8px;margin:10px 0 4px"><input id="coOwnerWho" type="email" autocomplete="off" autocapitalize="off" placeholder="Co-owner email" style="${cell};flex:1;min-width:0"><button data-act="addcoowner" style="background:${T.surface2};color:${T.lime};border:2px solid ${T.line};border-radius:8px;padding:9px 16px;font-weight:800;font-size:13px">Add</button></div>
           <div style="font-size:11px;color:${T.sageDim};margin-top:4px">A co-owner can manage the roster, schedule, scorers &amp; settings — only you can delete the team or change co-owners.</div>`:`<div style="font-size:11px;color:${T.sageDim};margin-top:6px">Only the primary owner can add or remove co-owners.</div>`}</div>`;
     const scorersCard=`<div class="frost-card" style="${cardCss}">
-        <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin-bottom:4px">Scorers</div>
+        <div style="font-size:13.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin-bottom:4px">Scorers</div>
         <div style="font-size:12px;color:${T.sageDim};margin-bottom:4px">Can score games &amp; edit the team — but can't manage owners or delete the team.</div>
-        ${(t.scorers&&t.scorers.length)?t.scorers.map(s=>`<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 0;border-top:1.5px solid ${T.line}"><span style="font-size:13px;color:${T.chalk};word-break:break-all">${s.replace(/</g,"")}</span>${canManage?`<button data-act="rmscorer" data-arg="${s}" style="background:none;border:1.5px solid ${T.line};color:${T.out};border-radius:7px;padding:5px 10px;font-weight:800;font-size:12px">Remove</button>`:""}</div>`).join(""):`<div style="font-size:12px;color:${T.sageDim};padding:4px 0">No authorized scorers yet.</div>`}
-        ${canManage?`<div style="display:flex;gap:8px;margin-top:10px"><input id="inviteWho" type="text" autocomplete="off" autocapitalize="off" placeholder="Email or phone number" style="${cell};flex:1;min-width:0">${(window.AllStars&&window.AllStars.pickContact)?`<button data-act="pickcontact" title="Pick from contacts" style="background:${T.surface2};color:${T.lime};border:1.5px solid ${T.line};border-radius:8px;padding:9px 13px;font-size:16px">${IC('user',18)}</button>`:""}<button data-act="inviteadd" style="background:${T.lime};color:#fff;border:none;border-radius:8px;padding:9px 16px;font-weight:800;font-size:13px">Invite</button></div>
+        ${(t.scorers&&t.scorers.length)?t.scorers.map(s=>`<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 0;border-top:1.5px solid ${T.line}"><span style="font-size:13px;color:${T.chalk};word-break:break-all">${s.replace(/</g,"")}</span>${canManage?`<button data-act="rmscorer" data-arg="${s}" style="background:none;border:2px solid ${T.line};color:${T.out};border-radius:7px;padding:5px 10px;font-weight:800;font-size:12px">Remove</button>`:""}</div>`).join(""):`<div style="font-size:12px;color:${T.sageDim};padding:4px 0">No authorized scorers yet.</div>`}
+        ${canManage?`<div style="display:flex;gap:8px;margin-top:10px"><input id="inviteWho" type="text" autocomplete="off" autocapitalize="off" placeholder="Email or phone number" style="${cell};flex:1;min-width:0">${(window.AllStars&&window.AllStars.pickContact)?`<button data-act="pickcontact" title="Pick from contacts" style="background:${T.surface2};color:${T.lime};border:2px solid ${T.line};border-radius:8px;padding:9px 13px;font-size:16px">${IC('user',18)}</button>`:""}<button data-act="inviteadd" style="background:${T.lime};color:#fff;border:none;border-radius:8px;padding:9px 16px;font-weight:800;font-size:13px">Invite</button></div>
           <div style="font-size:11px;color:${T.sageDim};margin-top:6px">Enter an <b style="color:${T.sage}">email</b> to authorize a scorer, or a <b style="color:${T.sage}">phone number</b> to text them a join link. Either way they sign in once and they're in.</div>`:`<div style="font-size:11px;color:${T.sageDim};margin-top:6px">Only the owner or a co-owner can add scorers.</div>`}</div>`;
     const scorersSection = !(C&&C.enabled) ? ""
       : !signedIn ? `<div style="${cardCss}">
-          <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin-bottom:6px">Owners &amp; scorers</div>
+          <div style="font-size:13.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin-bottom:6px">Owners &amp; scorers</div>
           <div style="font-size:12px;color:${T.sageDim}">Sign in on the Home screen to see and manage who owns and scores this team.</div></div>`
       : ownersCard + scorersCard;
     // Owner-only discovery toggles (public team directory + public stats).
-    const toggleRow=(act,on,label,sub)=>`<button data-act="${act}" style="display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;background:${T.surface};border:1.5px solid ${T.line};border-radius:10px;padding:12px 14px;text-align:left;cursor:pointer">
+    const toggleRow=(act,on,label,sub)=>`<button data-act="${act}" style="display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;background:${T.surface};border:2px solid ${T.line};border-radius:10px;padding:12px 14px;text-align:left;cursor:pointer">
         <div style="flex:1;min-width:0"><div style="font-weight:800;color:${T.ink};font-size:14px">${label}</div><div style="font-size:11px;color:${T.sageDim};margin-top:2px;line-height:1.35">${sub}</div></div>
         <span style="flex:none;width:46px;height:26px;border-radius:13px;background:${on?T.lime:T.line};position:relative;display:inline-block"><span style="position:absolute;top:3px;left:${on?"23px":"3px"};width:20px;height:20px;border-radius:50%;background:#fff"></span></span></button>`;
     const discoverySection = owner ? `<div style="display:flex;flex-direction:column;gap:10px">
-        <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime}">Discovery</div>
+        <div style="font-size:13.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime}">Discovery</div>
         ${toggleRow("togglepublic",!!t.public,"Public team","Anyone can search for this team by name and add it as an opponent in a new game.")}
         ${toggleRow("togglestatspublic",!!t.statsPublic,"Public season stats","Let people who find your team also see its season stats.")}
       </div>` : "";
     // ----- section sub-pages (reached from the hub grid); each has a back-to-hub header -----
-    const secHdr=(title)=>`<div class="frost-card" style="display:flex;align-items:center;gap:12px;background:${T.surface};border:1.5px solid ${T.line};border-radius:14px;padding:12px 14px">
+    const secHdr=(title)=>`<div class="frost-card" style="display:flex;align-items:center;gap:12px;background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:12px 14px">
         <button data-act="teamhub" title="Back" style="${ghost};padding:9px 13px;flex:none;font-size:15px">&lsaquo; Back</button>
         <div style="flex:1;min-width:0;font-family:${MONO};font-size:20px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:${T.lime};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${title}</div></div>`;
     // Cap sub-pages to a comfortable reading column, centered — on a wide PC the full-width
@@ -2656,7 +2656,7 @@ function actionArea(){
       const esc=s=>(s==null?"":String(s)).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
       // ---- saved lineups card ----
       const LUs=teamLineups(t), actId=t.activeLineupId||(LUs[0]&&LUs[0].id);
-      const sBtn=(act,id,label,col)=>`<button data-act="${act}" data-arg="${id}" style="flex:1;background:${T.surface};border:1.5px solid ${T.line};color:${col||T.sage};border-radius:7px;padding:7px 4px;font-size:11px;font-weight:700;letter-spacing:.3px">${label}</button>`;
+      const sBtn=(act,id,label,col)=>`<button data-act="${act}" data-arg="${id}" style="flex:1;background:${T.surface};border:2px solid ${T.line};color:${col||T.sage};border-radius:7px;padding:7px 4px;font-size:11px;font-weight:700;letter-spacing:.3px">${label}</button>`;
       const luRow=lu=>{ const idx=lineupToIdx(t,lu),cnt=idx?idx.order.length:0,isDef=lu.id===actId;
         return `<div style="background:${T.surface2};border:1px solid ${isDef?T.lime:T.line};border-radius:11px;padding:10px 11px;display:flex;flex-direction:column;gap:8px">
           <button data-act="luedit" data-arg="${lu.id}" style="text-align:left;background:transparent;border:none;color:${T.ink};display:flex;align-items:center;gap:8px;padding:0">
@@ -2670,16 +2670,16 @@ function actionArea(){
             ${sBtn("ludup",lu.id,"Duplicate",T.sage)}
             ${sBtn("ludel",lu.id,"Delete",T.out)}
           </div></div>`; };
-      const lineupsCard=`<div class="frost-card" style="background:${T.surface};border:1.5px solid ${T.line};border-radius:14px;padding:12px 13px;display:flex;flex-direction:column;gap:9px">
+      const lineupsCard=`<div class="frost-card" style="background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:12px 13px;display:flex;flex-direction:column;gap:9px">
           <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
-            <div><div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime}">Lineups</div>
+            <div><div style="font-size:13.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime}">Lineups</div>
               <div style="font-size:11px;color:${T.sageDim};margin-top:2px">Batting orders you can load instantly at game start</div></div>
             <button data-act="lunew" style="background:${T.lime};border:none;color:#fff;border-radius:9px;padding:9px 13px;font-weight:800;font-size:13px;white-space:nowrap">+ New</button></div>
           ${LUs.length?LUs.map(luRow).join(""):`<div style="font-size:12px;color:${T.sageDim};text-align:center;padding:10px 6px;border:1px dashed ${T.line};border-radius:10px">No saved lineups yet. Build one batting order &amp; field assignment and reuse it every game.</div>`}
         </div>`;
       return secWrap(`${secHdr("Roster &amp; lineup")}
-          <div class="frost-card" style="background:${T.surface};border:1.5px solid ${T.line};border-radius:12px;padding:11px 12px 4px">
-            <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin:0 2px 8px">Roster — tap to edit #/name &middot; &rsaquo; for player stats</div>${roster}</div>
+          <div class="frost-card" style="background:${T.surface};border:2px solid ${T.line};border-radius:12px;padding:11px 12px 4px">
+            <div style="font-size:13.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin:0 2px 8px">Roster — tap to edit #/name &middot; &rsaquo; for player stats</div>${roster}</div>
           <button data-act="addteamp" style="${ghost}">+ Add player</button>
           <div style="display:flex;gap:8px">
             <button data-act="pasteplayers" style="${ghost};flex:2;font-size:13px">&#8593; Paste roster</button>
@@ -2687,7 +2687,7 @@ function actionArea(){
             <button data-act="sortname" style="${ghost};flex:1;font-size:13px">Sort A&ndash;Z</button>
           </div>
           ${lineupsCard}
-          ${canMng?`<button data-act="teamtab" data-arg="manage" style="display:flex;align-items:center;justify-content:center;gap:10px;width:100%;background:${T.surface2};border:1.5px solid ${T.line};color:${T.ink};border-radius:12px;padding:15px;font-family:${MONO};font-weight:800;font-size:16px;letter-spacing:.5px;margin-top:6px">${IC('gear',20)} Team management</button>`:""}`);
+          ${canMng?`<button data-act="teamtab" data-arg="manage" style="display:flex;align-items:center;justify-content:center;gap:10px;width:100%;background:${T.surface2};border:2px solid ${T.line};color:${T.ink};border-radius:12px;padding:15px;font-family:${MONO};font-weight:800;font-size:16px;letter-spacing:.5px;margin-top:6px">${IC('gear',20)} Team management</button>`:""}`);
     }
     if(teamTab==="lineupedit"){
       const lu=lineupById(t,editLineupId);
@@ -2695,32 +2695,32 @@ function actionArea(){
       const esc=s=>(s==null?"":String(s)).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
       lu.order=(lu.order||[]).filter(id=>t.players.some(p=>p.id===id));   // drop any released players
       const n=lu.order.length;
-      const back=`<div class="frost-card" style="display:flex;align-items:center;gap:12px;background:${T.surface};border:1.5px solid ${T.line};border-radius:14px;padding:12px 14px">
+      const back=`<div class="frost-card" style="display:flex;align-items:center;gap:12px;background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:12px 14px">
           <button data-act="teamtab" data-arg="roster" title="Back" style="${ghost};padding:9px 13px;flex:none;font-size:15px">&lsaquo; Back</button>
           <div style="flex:1;min-width:0;font-family:${MONO};font-size:20px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:${T.lime};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Edit lineup</div></div>`;
-      const nameCard=`<div class="frost-card" style="background:${T.surface};border:1.5px solid ${T.line};border-radius:12px;padding:11px 12px">
-          <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin:0 2px 6px">Lineup name</div>
+      const nameCard=`<div class="frost-card" style="background:${T.surface};border:2px solid ${T.line};border-radius:12px;padding:11px 12px">
+          <div style="font-size:13.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin:0 2px 6px">Lineup name</div>
           <input value="${esc(lu.name)}" oninput="window.luName(this.value)" placeholder="e.g. Vs lefties" style="${cell};width:100%;font-family:${MONO};font-weight:800;font-size:16px">
           <div style="font-size:11px;color:${T.sageDim};margin-top:6px">${n} batting${n>9?" (continuous)":""} &middot; positions fill the field; spots without one bat as EH.${n<9?` <span style="color:${T.out}">Add ${9-n} more to use this in a game.</span>`:""}</div></div>`;
       const posOpts=cur=>["",...POSLIST].map(P=>`<option value="${P}"${P===cur?" selected":""}>${P||"EH"}</option>`).join("");
       const rows=lu.order.map((id,i)=>{ const p=t.players.find(x=>x.id===id)||{num:"",name:"?"};
         const cur=Object.keys(lu.pos||{}).find(k=>lu.pos[k]===id)||"";
-        return `<div data-lurow data-id="${id}" style="display:flex;align-items:center;gap:5px;background:${T.surface};border:1.5px solid ${T.line};border-radius:9px;padding:7px 8px">
+        return `<div data-lurow data-id="${id}" style="display:flex;align-items:center;gap:5px;background:${T.surface2};border:2px solid ${T.line};border-radius:9px;padding:7px 8px">
           <span data-ludrag title="Drag to reorder" style="cursor:grab;color:${T.sageDim};display:flex;align-items:center;padding:4px 1px;touch-action:none">${IC('<path d="M4 7h16M4 12h16M4 17h16"/>')}</span>
           <span style="font-family:${MONO};font-size:16px;font-weight:800;color:${T.lime};width:16px;text-align:center">${i+1}</span>
           <span style="flex:1;min-width:0;display:flex;align-items:center;gap:7px;overflow:hidden"><span style="font-family:${MONO};color:${t.color};min-width:32px">#${esc(p.num)}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700">${esc(p.name)}</span></span>
-          <select onchange="window.luSetPos('${id}',this.value)" style="background:${T.surface2};border:1.5px solid ${T.line};color:${T.chalk};border-radius:7px;padding:7px 6px;font-family:${MONO};font-weight:800;font-size:14px">${posOpts(cur)}</select>
-          <button data-act="luremove" data-arg="${id}" ${n<=9?"disabled":""} title="Move to bench" style="background:none;border:1.5px solid ${T.line};color:${n<=9?T.sageDim:T.out};border-radius:7px;padding:7px 9px;font-weight:800">&times;</button></div>`; }).join("");
+          <select onchange="window.luSetPos('${id}',this.value)" style="background:${T.surface2};border:2px solid ${T.line};color:${T.chalk};border-radius:7px;padding:7px 6px;font-family:${MONO};font-weight:800;font-size:14px">${posOpts(cur)}</select>
+          <button data-act="luremove" data-arg="${id}" ${n<=9?"disabled":""} title="Move to bench" style="background:none;border:2px solid ${T.line};color:${n<=9?T.sageDim:T.out};border-radius:7px;padding:7px 9px;font-weight:800">&times;</button></div>`; }).join("");
       const benchIds=t.players.filter(p=>lu.order.indexOf(p.id)<0);
-      const bench=benchIds.length?benchIds.map(p=>`<button data-act="luadd" data-arg="${p.id}" ${n>=12?"disabled":""} style="display:inline-flex;align-items:center;gap:6px;background:${T.surface};border:1.5px solid ${T.line};color:${n>=12?T.sageDim:T.chalk};border-radius:8px;padding:7px 11px;font-size:13px;font-weight:700"><span style="font-family:${MONO};color:${t.color}">#${esc(p.num)}</span>${esc(p.name)} <span style="color:${T.lime};font-weight:800">+</span></button>`).join(" "):`<span style="font-size:12px;color:${T.sageDim}">Everyone is in the order</span>`;
+      const bench=benchIds.length?benchIds.map(p=>`<button data-act="luadd" data-arg="${p.id}" ${n>=12?"disabled":""} style="display:inline-flex;align-items:center;gap:6px;background:${T.surface};border:2px solid ${T.line};color:${n>=12?T.sageDim:T.chalk};border-radius:8px;padding:7px 11px;font-size:13px;font-weight:700"><span style="font-family:${MONO};color:${t.color}">#${esc(p.num)}</span>${esc(p.name)} <span style="color:${T.lime};font-weight:800">+</span></button>`).join(" "):`<span style="font-size:12px;color:${T.sageDim}">Everyone is in the order</span>`;
       return secWrap(`${back}${nameCard}
-          <div class="frost-card" style="background:${T.surface};border:1.5px solid ${T.line};border-radius:12px;padding:11px 12px;display:flex;flex-direction:column;gap:6px">
+          <div class="frost-card" style="background:${T.surface};border:2px solid ${T.line};border-radius:12px;padding:11px 12px;display:flex;flex-direction:column;gap:6px">
             <div style="display:flex;align-items:center;justify-content:space-between;margin:0 2px 2px">
-              <div><div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime}">Batting order &amp; field</div>
+              <div><div style="font-size:13.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime}">Batting order &amp; field</div>
                 <div style="font-size:11px;color:${T.sageDim};margin-top:1px">Drag &#9776; to reorder</div></div>
-              <button data-act="luauto" style="background:${T.surface2};border:1.5px solid ${T.line};color:${T.sage};border-radius:7px;padding:6px 10px;font-size:11px;font-weight:700">Auto-fill positions</button></div>
+              <button data-act="luauto" style="background:${T.surface2};border:2px solid ${T.line};color:${T.sage};border-radius:7px;padding:6px 10px;font-size:11px;font-weight:700">Auto-fill positions</button></div>
             <div id="lu-list" style="display:flex;flex-direction:column;gap:6px">${rows}</div></div>
-          <div class="frost-card" style="background:${T.surface};border:1.5px solid ${T.line};border-radius:12px;padding:11px 12px">
+          <div class="frost-card" style="background:${T.surface};border:2px solid ${T.line};border-radius:12px;padding:11px 12px">
             <div style="font-size:10px;color:${T.sageDim};letter-spacing:.6px;margin:0 2px 7px">BENCH &middot; ${n>=12?"max 12 batters":"tap to add to the order"}</div>
             <div style="display:flex;flex-wrap:wrap;gap:6px">${bench}</div></div>
           <div style="display:flex;gap:8px">
@@ -2732,12 +2732,12 @@ function actionArea(){
       const canMng=!(C&&C.enabled)||(window.cloudIsScorer&&window.cloudIsScorer(t));
       if(!canMng) return secWrap(`${secHdr("Team management")}<div style="font-size:13px;color:${T.sage};padding:8px">Only the team's owner or a scorer can manage these settings.</div>`);
       // Everything that configures the team — identity, rules, access — in one window.
-      const dLbl=`font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:${T.lime};flex:none;width:120px;padding-top:8px`;
+      const dLbl=`font-size:13.5px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:${T.lime};flex:none;width:120px;padding-top:8px`;
       const dRow=(label,inner,first)=>`<div style="display:flex;gap:12px;flex-wrap:wrap;padding:11px 2px;${first?"":`border-top:1.5px solid ${T.line}`}"><div style="${dLbl}">${label}</div><div style="flex:1;min-width:180px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">${inner}</div></div>`;
-      const logoCtl=`<div style="width:50px;height:50px;flex:none;border-radius:11px;border:1.5px solid ${T.line};background:${t.logo?"#fff":T.surface2}${t.logo?`;background-image:url('${t.logo}');background-size:contain;background-repeat:no-repeat;background-position:center`:""};display:flex;align-items:center;justify-content:center;color:${T.sageDim}">${t.logo?"":IC('flag',22)}</div>
-            <label style="display:inline-flex;align-items:center;gap:7px;background:${T.surface2};border:1.5px solid ${T.line};border-radius:10px;padding:9px 14px;cursor:pointer;font-size:13px;font-weight:700;color:${T.ink}">&#8593; ${t.logo?"Change":"Upload"}<input type="file" accept="image/*" onchange="window.uploadTeamLogo(this)" style="display:none"></label>${t.logo?`<button data-act="rmlogo" style="background:none;border:1.5px solid ${T.line};color:${T.out};border-radius:10px;padding:9px 12px;font-weight:700;font-size:12px">Remove</button>`:""}`;
-      const detailsBlock=`<div class="frost-card" style="background:${T.surface};border:1.5px solid ${T.line};border-radius:14px;padding:4px 14px 12px">
-          <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};padding:11px 2px 2px">Team details</div>
+      const logoCtl=`<div style="width:50px;height:50px;flex:none;border-radius:11px;border:2px solid ${T.line};background:${t.logo?"#fff":T.surface2}${t.logo?`;background-image:url('${t.logo}');background-size:contain;background-repeat:no-repeat;background-position:center`:""};display:flex;align-items:center;justify-content:center;color:${T.sageDim}">${t.logo?"":IC('flag',22)}</div>
+            <label style="display:inline-flex;align-items:center;gap:7px;background:${T.surface2};border:2px solid ${T.line};border-radius:10px;padding:9px 14px;cursor:pointer;font-size:13px;font-weight:700;color:${T.ink}">&#8593; ${t.logo?"Change":"Upload"}<input type="file" accept="image/*" onchange="window.uploadTeamLogo(this)" style="display:none"></label>${t.logo?`<button data-act="rmlogo" style="background:none;border:2px solid ${T.line};color:${T.out};border-radius:10px;padding:9px 12px;font-weight:700;font-size:12px">Remove</button>`:""}`;
+      const detailsBlock=`<div class="frost-card" style="background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:4px 14px 12px">
+          <div style="font-size:13.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};padding:11px 2px 2px">Team details</div>
           ${dRow("Team name",`<label title="Team color — tap to change" style="position:relative;width:16px;align-self:stretch;min-height:44px;flex:none;border-radius:6px;background:${t.color};box-shadow:0 0 0 1px ${T.line};cursor:pointer"><input type="color" value="${t.color}" onchange="window.edTeamColor(this.value)" style="position:absolute;left:0;top:0;width:100%;height:100%;opacity:0;cursor:pointer"></label><input value="${(t.name||"").replace(/"/g,"&quot;")}" oninput="edTeamName(this.value)" placeholder="Team name" style="${cell};flex:1;min-width:150px;font-family:${MONO};font-weight:800;font-size:16px">`,true)}
           ${dRow("Scoreboard abbr",`<input value="${(t.short||"").replace(/"/g,"&quot;")}" oninput="edTeamAbbr(this.value)" maxlength="6" placeholder="TIGERS" style="${cell};width:120px;text-align:center;font-family:${MONO};font-weight:800;letter-spacing:.5px;text-transform:uppercase"><span style="font-size:11px;color:${T.sageDim}">up to 6 chars &middot; tap the colour bar by the name to set the team colour</span>`)}
           ${dRow("Logo",logoCtl)}
@@ -2752,7 +2752,7 @@ function actionArea(){
       if(!g) return secWrap(`${secHdr("Game")}<div style="font-size:13px;color:${T.sage};padding:8px">Game not found.</div>`);
       const dt=(()=>{try{return new Date((g.date||"")+"T00:00").toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric"});}catch(e){return g.date||"";}})();
       const resCol=g.result==="W"?T.lime:(g.result==="L"?T.out:T.sage), resWord=g.result==="W"?"WIN":(g.result==="L"?"LOSS":"TIE");
-      const head=`<div class="frost-card" style="text-align:center;background:${T.surface};border:1.5px solid ${T.line};border-left:6px solid ${resCol};border-radius:14px;padding:14px 16px">
+      const head=`<div class="frost-card" style="text-align:center;background:${T.surface};border:2px solid ${T.line};border-left:6px solid ${resCol};border-radius:14px;padding:14px 16px">
           <div style="font-family:${MONO};font-size:17px;font-weight:800;letter-spacing:1.2px;color:${resCol}">FINAL &middot; ${resWord}</div>
           <div style="font-family:${MONO};font-size:30px;font-weight:800;color:${T.ink};margin-top:6px">${esc(t.name||"Us")} ${g.us} &ndash; ${g.them} ${esc(g.opp||"Opp")}</div>
           <div style="font-size:12px;color:${T.sage};margin-top:4px">${dt}</div></div>`;
@@ -2762,16 +2762,16 @@ function actionArea(){
       const delBtn = canDel ? `<div style="display:flex;justify-content:flex-end;margin-top:2px"><button data-act="delgame" data-arg="${g.id}" style="background:none;border:1px solid ${T.out};color:${T.out};border-radius:8px;padding:9px 14px;font-family:${MONO};font-size:12px;font-weight:700;letter-spacing:.5px;text-transform:uppercase">&#x1F5D1; Delete game</button></div>` : "";
       if(!g.bat){ return secWrap(`${secHdr("Game")}${head}<div style="font-size:12px;color:${T.sageDim};text-align:center;padding:14px;border:1px dashed ${T.line};border-radius:12px">Per-game stats weren't recorded for this game (it finished before by-game stat tracking). The final score is above.</div>${ytBtn}${delBtn}`); }
       const maxI=g.maxI||((g.line&&g.line.away&&g.line.away.length)||1);
-      const card=(inner)=>`<div class="frost-card" style="overflow-x:auto;background:${T.surface};border:1.5px solid ${T.line};border-radius:12px;padding:8px 10px">${inner}</div>`;
+      const card=(inner)=>`<div class="frost-card" style="overflow-x:auto;background:${T.surface};border:2px solid ${T.line};border-radius:12px;padding:8px 10px">${inner}</div>`;
       const vL=`border-right:1.5px solid ${T.line}`, totL=`border-left:2px solid ${T.line}`;
       let lh=`<th style="text-align:left;padding:4px 6px;${vL}">Team</th>`; for(let i=1;i<=maxI;i++)lh+=`<th style="padding:7px 6px;${vL}">${i}</th>`; lh+=`<th style="padding:7px 6px;${totL}">R</th><th>H</th><th>E</th>`;
       const lr=(side)=>{const sh=side==="away"?g.awayShort:g.homeShort;const arr=(g.line&&g.line[side])||[];const tot=(g.totals&&g.totals[side])||{r:0,h:0,e:0};let c=`<td style="text-align:left;padding:6px;font-weight:800;${vL}">${esc(sh)}</td>`;for(let i=0;i<maxI;i++)c+=`<td style="padding:9px 6px;${vL}">${arr[i]||0}</td>`;c+=`<td style="padding:9px 6px;font-weight:800;color:${T.ink};${totL}">${tot.r}</td><td style="padding:9px 6px">${tot.h}</td><td style="padding:9px 6px">${tot.e}</td>`;return `<tr style="border-top:1.5px solid ${T.line}">${c}</tr>`;};
       const lineTbl=card(`<table style="width:100%;border-collapse:collapse;font-family:${MONO};font-size:16px;text-align:center;color:${T.chalk}"><thead><tr style="color:${T.sageDim};font-size:12px">${lh}</tr></thead><tbody>${lr("away")}${lr("home")}</tbody></table>`);
       const sideName=(side)=> side==="away"?(g.ourSide==="away"?t.name:g.opp):(g.ourSide==="home"?t.name:g.opp);
       const batTbl=(side)=>{const rows=((g.bat&&g.bat[side])||[]).map(b=>`<tr style="border-top:1.5px solid ${T.line}"><td style="text-align:left;padding:6px;font-weight:700;white-space:nowrap">#${esc(b.num)} ${esc(b.name)}</td><td style="padding:9px 6px">${b.ab}</td><td>${b.r}</td><td>${b.h}</td><td>${b.rbi}</td><td>${b.bb}</td><td>${b.k}</td><td>${b.sb||0}</td><td>${b.cs||0}</td></tr>`).join("");
-        return card(`<div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin:0 0 8px">${esc(sideName(side))} &mdash; batting</div><table style="width:100%;border-collapse:collapse;font-family:${MONO};font-size:16px;text-align:center;color:${T.chalk}"><thead><tr style="color:${T.sageDim};font-size:12px"><th style="text-align:left;padding:4px 6px">Batter</th><th>AB</th><th>R</th><th>H</th><th>RBI</th><th>BB</th><th>K</th><th title="Stolen bases">SB</th><th title="Caught stealing">CS</th></tr></thead><tbody>${rows||`<tr><td colspan="9" style="padding:8px;color:${T.sageDim}">No at-bats</td></tr>`}</tbody></table>`);};
+        return card(`<div style="font-size:13.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin:0 0 8px">${esc(sideName(side))} &mdash; batting</div><table style="width:100%;border-collapse:collapse;font-family:${MONO};font-size:16px;text-align:center;color:${T.chalk}"><thead><tr style="color:${T.sageDim};font-size:12px"><th style="text-align:left;padding:4px 6px">Batter</th><th>AB</th><th>R</th><th>H</th><th>RBI</th><th>BB</th><th>K</th><th title="Stolen bases">SB</th><th title="Caught stealing">CS</th></tr></thead><tbody>${rows||`<tr><td colspan="9" style="padding:8px;color:${T.sageDim}">No at-bats</td></tr>`}</tbody></table>`);};
       const pitchTbl=(side)=>{const list=(g.pitch&&g.pitch[side])||[];if(!list.length)return "";const rows=list.map(x=>`<tr style="border-top:1.5px solid ${T.line}"><td style="text-align:left;padding:6px;font-weight:700;white-space:nowrap">${esc(x.name)}</td><td style="padding:9px 6px">${x.ip}</td><td>${x.pc}</td><td>${x.h}</td><td>${x.r}</td><td>${x.bb}</td><td>${x.k}</td></tr>`).join("");
-        return card(`<div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin:0 0 8px">${esc(sideName(side))} &mdash; pitching</div><table style="width:100%;border-collapse:collapse;font-family:${MONO};font-size:16px;text-align:center;color:${T.chalk}"><thead><tr style="color:${T.sageDim};font-size:12px"><th style="text-align:left;padding:4px 6px">Pitcher</th><th>IP</th><th>P</th><th>H</th><th>R</th><th>BB</th><th>K</th></tr></thead><tbody>${rows}</tbody></table>`);};
+        return card(`<div style="font-size:13.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin:0 0 8px">${esc(sideName(side))} &mdash; pitching</div><table style="width:100%;border-collapse:collapse;font-family:${MONO};font-size:16px;text-align:center;color:${T.chalk}"><thead><tr style="color:${T.sageDim};font-size:12px"><th style="text-align:left;padding:4px 6px">Pitcher</th><th>IP</th><th>P</th><th>H</th><th>R</th><th>BB</th><th>K</th></tr></thead><tbody>${rows}</tbody></table>`);};
       const scoreBtn=`<button data-act="storedcard" data-arg="${g.id}" style="${bigBtn(T.lime,'')};display:flex;align-items:center;justify-content:center;gap:9px">&#128196; Game scorecard (PDF)</button>`;
       return secWrap(`${secHdr("Game")}${head}${lineTbl}${batTbl("away")}${batTbl("home")}${pitchTbl("away")}${pitchTbl("home")}${scoreBtn}${ytBtn}${delBtn}`);
     }
@@ -2791,7 +2791,7 @@ function actionArea(){
       const grid = photoList===null
         ? `<div style="font-size:13px;color:${T.sageDim};text-align:center;padding:20px">Loading photos…</div>`
         : (photoList.length
-            ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(106px,1fr));gap:8px">${photoList.map(p=>`<button data-act="photozoom" data-arg="${p.id}" style="border:1.5px solid ${T.line};padding:0;background:${T.surface};cursor:pointer;aspect-ratio:1;border-radius:10px;overflow:hidden"><img src="${p.url||p.img}" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block"></button>`).join("")}</div>`
+            ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(106px,1fr));gap:8px">${photoList.map(p=>`<button data-act="photozoom" data-arg="${p.id}" style="border:2px solid ${T.line};padding:0;background:${T.surface};cursor:pointer;aspect-ratio:1;border-radius:10px;overflow:hidden"><img src="${p.url||p.img}" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block"></button>`).join("")}</div>`
             : `<div style="font-size:13px;color:${T.sageDim};text-align:center;padding:24px;border:1px dashed ${T.line};border-radius:12px">No photos yet. Tap “Add photos” to start the gallery.</div>`);
       let zoomOv="";
       const zp=photoList&&photoList.find(x=>x.id===photoZoom);
@@ -2800,17 +2800,17 @@ function actionArea(){
             <img src="${zp.url||zp.img}" onclick="event.stopPropagation()" style="max-width:100%;max-height:74%;object-fit:contain;border-radius:10px;box-shadow:0 12px 40px rgba(0,0,0,.6)">
             ${zp.caption?`<div style="color:${T.chalk};font-size:13px;max-width:90%;text-align:center">${(zp.caption||"").replace(/</g,"&lt;")}</div>`:""}
             <div style="font-size:11px;color:${T.sageDim}">${(zp.authorName||"").replace(/</g,"&lt;")}</div>
-            <div style="display:flex;gap:10px">${canDelZ?`<button data-act="delphoto" data-arg="${zp.id}" style="background:none;border:1px solid ${T.out};color:${T.out};border-radius:8px;padding:10px 16px;font-weight:700">${IC('trash',15)} Delete</button>`:""}<button data-act="photoclose" style="background:${T.surface2};border:1.5px solid ${T.line};color:${T.chalk};border-radius:8px;padding:10px 18px;font-weight:700">Close</button></div></div>`;
+            <div style="display:flex;gap:10px">${canDelZ?`<button data-act="delphoto" data-arg="${zp.id}" style="background:none;border:1px solid ${T.out};color:${T.out};border-radius:8px;padding:10px 16px;font-weight:700">${IC('trash',15)} Delete</button>`:""}<button data-act="photoclose" style="background:${T.surface2};border:2px solid ${T.line};color:${T.chalk};border-radius:8px;padding:10px 18px;font-weight:700">Close</button></div></div>`;
       }
       return secWrap(`${secHdr("Photos")}${addBtn}${grid}`)+zoomOv;
     }
     // ----- HUB: team header + grid of sections + primary actions -----
     const rec=(()=>{const R=teamRec(t);return `${R.w}-${R.l}${R.t?"-"+R.t:""}`;})();
-    const hb=(arg,icon,label)=>`<button data-act="teamtab" data-arg="${arg}" style="display:flex;flex-direction:row;align-items:center;justify-content:center;gap:10px;background:${T.surface};border:1.5px solid ${T.line};border-radius:13px;padding:13px 10px;min-height:0;cursor:pointer"><span style="font-size:22px;color:${T.lime};display:flex">${icon}</span><span style="font-weight:800;color:${T.ink};font-size:15px;text-align:center;line-height:1.15">${label}</span></button>`;
+    const hb=(arg,icon,label)=>`<button data-act="teamtab" data-arg="${arg}" style="display:flex;flex-direction:row;align-items:center;justify-content:center;gap:10px;background:${T.surface};border:2px solid ${T.line};border-radius:13px;padding:13px 10px;min-height:0;cursor:pointer"><span style="font-size:22px;color:${T.lime};display:flex">${icon}</span><span style="font-weight:800;color:${T.ink};font-size:15px;text-align:center;line-height:1.15">${label}</span></button>`;
     // Hub tile that fires a non-tab action (Share) — same look as hb() but its own data-act.
-    const hbAct=(act,icon,label)=>`<button data-act="${act}" style="display:flex;flex-direction:row;align-items:center;justify-content:center;gap:10px;background:${T.surface};border:1.5px solid ${T.line};border-radius:13px;padding:13px 10px;min-height:0;cursor:pointer"><span style="font-size:22px;color:${T.lime};display:flex">${icon}</span><span style="font-weight:800;color:${T.ink};font-size:15px;text-align:center;line-height:1.15">${label}</span></button>`;
+    const hbAct=(act,icon,label)=>`<button data-act="${act}" style="display:flex;flex-direction:row;align-items:center;justify-content:center;gap:10px;background:${T.surface};border:2px solid ${T.line};border-radius:13px;padding:13px 10px;min-height:0;cursor:pointer"><span style="font-size:22px;color:${T.lime};display:flex">${icon}</span><span style="font-weight:800;color:${T.ink};font-size:15px;text-align:center;line-height:1.15">${label}</span></button>`;
     return secWrap(`
-        <div class="frost-card" style="display:flex;align-items:center;gap:10px;background:${T.surface};border:1.5px solid ${T.line};border-radius:14px;padding:12px 14px">
+        <div class="frost-card" style="display:flex;align-items:center;gap:10px;background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:12px 14px">
           ${openTeamFrom==="home"?`<button data-act="gohome" style="${ghost};padding:9px 11px">&lsaquo; Home</button>`:`<button data-act="teamsback" style="${ghost};padding:9px 11px">&lsaquo; Teams</button>`}
           ${t.logo?`<img src="${t.logo}" alt="" style="width:44px;height:44px;flex:none;border-radius:9px;object-fit:contain;background:#fff;box-shadow:0 0 0 1px ${T.line}">`:""}
           <div style="flex:1;min-width:0;border-left:5px solid ${t.color};padding-left:10px">
@@ -2833,27 +2833,27 @@ function actionArea(){
   }
   if(mode==="pickteam"){
     const sortedTeams=DB.teams.slice().sort((a,b)=>((a.name||"").toLowerCase()<(b.name||"").toLowerCase()?-1:1));
-    const cards=sortedTeams.map(t=>{const R=teamRec(t),rec=R.w+"-"+R.l+(R.t?"-"+R.t:"");return `<button data-act="setteam" data-arg="${t.id}" data-tname="${(t.name||'').toLowerCase().replace(/"/g,'&quot;')}" style="display:flex;align-items:center;gap:12px;background:${T.surface};border:1.5px solid ${T.line};border-left:5px solid ${t.color};border-radius:10px;padding:12px 14px;text-align:left;width:100%">
+    const cards=sortedTeams.map(t=>{const R=teamRec(t),rec=R.w+"-"+R.l+(R.t?"-"+R.t:"");return `<button data-act="setteam" data-arg="${t.id}" data-tname="${(t.name||'').toLowerCase().replace(/"/g,'&quot;')}" style="display:flex;align-items:center;gap:12px;background:${T.surface};border:2px solid ${T.line};border-left:5px solid ${t.color};border-radius:10px;padding:12px 14px;text-align:left;width:100%">
         <div style="flex:1;min-width:0"><div style="font-family:${MONO};font-size:17px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.name}</div>
           <div style="font-family:${MONO};font-size:15px;font-weight:800;color:${t.color};margin-top:3px">${rec}</div></div>
         <span style="color:${t.color};font-weight:800;font-size:12px">PICK &rsaquo;</span></button>`;}).join("")
       ||`<div style="color:${T.sage};font-size:13px;text-align:center;padding:16px 8px;border:1px dashed ${T.line};border-radius:10px">No saved teams yet — create one below.</div>`;
     // Type-to-filter the saved-team list (alphabetical, live). Recent opponents = quick re-picks.
-    const filterInput = sortedTeams.length>3 ? `<input oninput="window._oppFilter(this.value)" placeholder="Type to filter teams…" autocomplete="off" style="background:${T.surface2};border:1.5px solid ${T.line};color:${T.ink};border-radius:8px;padding:10px 12px;font-size:14px;outline:none;width:100%;box-sizing:border-box">` : "";
+    const filterInput = sortedTeams.length>3 ? `<input oninput="window._oppFilter(this.value)" placeholder="Type to filter teams…" autocomplete="off" style="background:${T.surface2};border:2px solid ${T.line};color:${T.ink};border-radius:8px;padding:10px 12px;font-size:14px;outline:none;width:100%;box-sizing:border-box">` : "";
     const recent = (pickFor==="opp") ? getRecentOpps() : [];
     const recentBlock = recent.length ? `<div style="border-bottom:1.5px solid ${T.line};margin-bottom:4px;padding-bottom:10px">
-        <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin-bottom:6px">Recent opponents</div>
-        <div style="display:flex;flex-wrap:wrap;gap:6px">${recent.map((o,i)=>`<button data-act="setrecentopp" data-arg="${i}" style="background:${T.surface};border:1.5px solid ${T.line};border-left:4px solid ${o.color||T.out};color:${T.ink};border-radius:8px;padding:8px 12px;font-family:${MONO};font-weight:800;font-size:13px">${(o.name||'').replace(/</g,'&lt;')}</button>`).join("")}</div></div>` : "";
+        <div style="font-size:13.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin-bottom:6px">Recent opponents</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">${recent.map((o,i)=>`<button data-act="setrecentopp" data-arg="${i}" style="background:${T.surface};border:2px solid ${T.line};border-left:4px solid ${o.color||T.out};color:${T.ink};border-radius:8px;padding:8px 12px;font-family:${MONO};font-weight:800;font-size:13px">${(o.name||'').replace(/</g,'&lt;')}</button>`).join("")}</div></div>` : "";
     // Public team directory search (opponent only; needs sign-in). Find a public team by name and
     // use it as the opponent for this game.
     const C2=window.Cloud, canSearch=!!(C2&&C2.enabled&&C2.user);
-    const inpCss=`background:${T.surface2};border:1.5px solid ${T.line};color:${T.ink};border-radius:8px;padding:10px 12px;font-size:14px;outline:none`;
-    const resCard=(r,i)=>`<button data-act="setpubopp" data-arg="${i}" style="display:flex;align-items:center;gap:10px;width:100%;background:${T.surface};border:1.5px solid ${T.line};border-left:5px solid ${r.color};border-radius:10px;padding:10px 12px;margin-top:8px;text-align:left">
+    const inpCss=`background:${T.surface2};border:2px solid ${T.line};color:${T.ink};border-radius:8px;padding:10px 12px;font-size:14px;outline:none`;
+    const resCard=(r,i)=>`<button data-act="setpubopp" data-arg="${i}" style="display:flex;align-items:center;gap:10px;width:100%;background:${T.surface};border:2px solid ${T.line};border-left:5px solid ${r.color};border-radius:10px;padding:10px 12px;margin-top:8px;text-align:left">
         <div style="flex:1;min-width:0"><div style="font-family:${MONO};font-size:16px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${(r.name||'').replace(/</g,'')}</div>
           <div style="font-size:11px;color:${T.sage};margin-top:2px">${r.players} players${r.statsPublic?` &middot; ${r.record.w}-${r.record.l}${r.record.t?'-'+r.record.t:''}`:''}</div></div>
         <span style="color:${r.color};font-weight:800;font-size:12px">PICK &rsaquo;</span></button>`;
     const searchBlock = (pickFor==="opp" && canSearch) ? `<div style="border-top:1.5px solid ${T.line};margin-top:4px;padding-top:10px">
-        <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin-bottom:6px">Find a public team</div>
+        <div style="font-size:13.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin-bottom:6px">Find a public team</div>
         <div style="display:flex;gap:8px"><input id="finderQ" placeholder="Search team name" value="${(window._finderQ||'').replace(/"/g,'&quot;')}" style="${inpCss};flex:1;min-width:0"><button data-act="findteams" style="background:${T.lime};color:#fff;border:none;border-radius:8px;padding:9px 16px;font-weight:800;font-size:13px">Search</button></div>
         ${finderResults!==null?(finderResults.length?finderResults.map(resCard).join(""):`<div style="font-size:12px;color:${T.sageDim};margin-top:8px">No public teams match that name.</div>`):""}
       </div>` : "";
@@ -2864,8 +2864,8 @@ function actionArea(){
         ${searchBlock}</div>`,"ngback");
   }
   if(mode==="directory"){
-    const inpCss=`background:${T.surface2};border:1.5px solid ${T.line};color:${T.ink};border-radius:8px;padding:10px 12px;font-size:14px;outline:none`;
-    const dcard=(r)=>`<div style="display:flex;align-items:center;gap:10px;background:${T.surface};border:1.5px solid ${T.line};border-left:5px solid ${r.color};border-radius:10px;padding:10px 12px">
+    const inpCss=`background:${T.surface2};border:2px solid ${T.line};color:${T.ink};border-radius:8px;padding:10px 12px;font-size:14px;outline:none`;
+    const dcard=(r)=>`<div style="display:flex;align-items:center;gap:10px;background:${T.surface};border:2px solid ${T.line};border-left:5px solid ${r.color};border-radius:10px;padding:10px 12px">
         <div style="flex:1;min-width:0"><div style="font-family:${MONO};font-size:16px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${(r.name||'').replace(/</g,'&lt;')}</div>
           <div style="font-size:11px;color:${T.sage};margin-top:2px">${r.players} players${r.statsPublic?` &middot; ${r.record.w}-${r.record.l}${r.record.t?'-'+r.record.t:''}`:''}</div></div>
         <button data-act="viewteamstats" data-arg="${r.id}" style="background:${T.lime};color:#fff;border:none;border-radius:8px;padding:8px 13px;font-weight:800;font-size:12px">View &rsaquo;</button></div>`;
@@ -2882,17 +2882,17 @@ function actionArea(){
     if(!vt) return step("Team stats","",`<div style="font-size:13px;color:${T.sage};padding:8px">Couldn't load that team — it may no longer be public.</div>`,"opendirectory");
     const rec=vt.record||{w:0,l:0,t:0}, players=vt.players||[], season=vt.season||{}, sp=!!vt.statsPublic;
     const recLine=`${rec.w}-${rec.l}${rec.t?"-"+rec.t:""}`;
-    const head=`<div class="frost-card" style="background:${T.surface};border:1.5px solid ${T.line};border-left:6px solid ${vt.color||T.lime};border-radius:14px;padding:14px 16px">
+    const head=`<div class="frost-card" style="background:${T.surface};border:2px solid ${T.line};border-left:6px solid ${vt.color||T.lime};border-radius:14px;padding:14px 16px">
         <div style="font-family:${MONO};font-size:24px;font-weight:800;color:${T.ink}">${(vt.name||'Team').replace(/</g,'&lt;')}</div>
         <div style="font-family:${MONO};font-size:20px;font-weight:800;color:${vt.color||T.lime};margin-top:6px">${recLine}</div></div>`;
-    const roster=`<div style="background:${T.surface};border:1.5px solid ${T.line};border-radius:12px;padding:12px 14px">
-        <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin-bottom:8px">Roster</div>
-        ${players.length?`<div style="display:flex;flex-wrap:wrap;gap:6px">${players.map(p=>`<span style="background:${T.surface2};border:1.5px solid ${T.line};border-radius:8px;padding:6px 10px;font-family:${MONO};font-size:13px;font-weight:700;color:${T.chalk}">#${p.num||"–"} ${(p.name||'').replace(/</g,'&lt;')}</span>`).join("")}</div>`:`<div style="font-size:12px;color:${T.sageDim}">No roster shared.</div>`}</div>`;
+    const roster=`<div style="background:${T.surface};border:2px solid ${T.line};border-radius:12px;padding:12px 14px">
+        <div style="font-size:13.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin-bottom:8px">Roster</div>
+        ${players.length?`<div style="display:flex;flex-wrap:wrap;gap:6px">${players.map(p=>`<span style="background:${T.surface2};border:2px solid ${T.line};border-radius:8px;padding:6px 10px;font-family:${MONO};font-size:13px;font-weight:700;color:${T.chalk}">#${p.num||"–"} ${(p.name||'').replace(/</g,'&lt;')}</span>`).join("")}</div>`:`<div style="font-size:12px;color:${T.sageDim}">No roster shared.</div>`}</div>`;
     let statBlock;
     if(sp){
       const rows=players.map(p=>{const s=(season[p.id]||{}).bat||{};const ab=s.ab||0,h=s.h||0;const avg=ab?(h/ab).toFixed(3).replace(/^0/,""):"—";
         return `<tr style="border-top:1.5px solid ${T.line}"><td style="text-align:left;padding:9px 8px;font-weight:700;white-space:nowrap">#${p.num} ${(p.name||'').replace(/</g,'&lt;')}</td><td style="padding:9px 6px">${ab}</td><td style="padding:9px 6px">${s.r||0}</td><td style="padding:9px 6px">${h}</td><td style="padding:9px 6px">${s.rbi||0}</td><td style="padding:9px 6px">${s.bb||0}</td><td style="padding:9px 6px">${s.k||0}</td><td style="padding:9px 6px;font-weight:800">${avg}</td></tr>`;}).join("");
-      statBlock=`<div style="background:${T.surface};border:1.5px solid ${T.line};border-radius:12px;padding:12px 14px"><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-family:${MONO};font-size:15px;color:${T.chalk};text-align:center">
+      statBlock=`<div style="background:${T.surface};border:2px solid ${T.line};border-radius:12px;padding:12px 14px"><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-family:${MONO};font-size:15px;color:${T.chalk};text-align:center">
           <thead><tr style="color:${T.sageDim};font-size:12px;letter-spacing:.5px"><th style="text-align:left;padding:0 8px 6px">SEASON &middot; BATTING</th><th>AB</th><th>R</th><th>H</th><th>RBI</th><th>BB</th><th>K</th><th>AVG</th></tr></thead>
           <tbody>${rows||`<tr><td colspan="8" style="padding:8px;color:${T.sageDim}">No stats yet.</td></tr>`}</tbody></table></div></div>`;
     } else {
@@ -2906,22 +2906,22 @@ function actionArea(){
   }
   if(mode==="settings"){
     const C=window.Cloud, signedIn=!!(C&&C.enabled&&C.user);
-    const item=(act,icon,label,sub)=>`<button data-act="${act}" style="display:flex;align-items:center;gap:14px;background:${T.surface};border:1.5px solid ${T.line};border-radius:12px;padding:16px 18px;width:100%;text-align:left;cursor:pointer">
+    const item=(act,icon,label,sub)=>`<button data-act="${act}" style="display:flex;align-items:center;gap:14px;background:${T.surface};border:2px solid ${T.line};border-radius:12px;padding:16px 18px;width:100%;text-align:left;cursor:pointer">
         <span style="font-size:24px">${icon}</span>
         <div style="flex:1;min-width:0"><div style="font-weight:800;color:${T.ink};font-size:18px">${label}</div>${sub?`<div style="font-size:13px;color:${T.sage};margin-top:2px">${sub}</div>`:""}</div>
         <span style="color:${T.lime};font-weight:800;font-size:18px">&rsaquo;</span></button>`;
     return `<div style="display:flex;flex-direction:column;gap:14px">
-        <div class="frost-card" style="display:flex;align-items:center;gap:10px;background:${T.surface};border:1.5px solid ${T.line};border-radius:14px;padding:12px 14px">
+        <div class="frost-card" style="display:flex;align-items:center;gap:10px;background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:12px 14px">
           <button data-act="gohome" style="${ghost};padding:9px 11px">&lsaquo; Home</button>
           <div style="font-family:${MONO};font-size:23px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:${T.lime}">Settings</div></div>
         ${IS_APP?item("opencamera",IC('video',24),"Camera &amp; stream setup","Connect your camera and go live"):`<div style="font-size:13px;color:${T.sageDim};background:${T.surface};border:1px dashed ${T.line};border-radius:12px;padding:16px 18px;line-height:1.5">${IC('video',15)} Camera &amp; streaming is available in the All-Stars Live app (Android/iOS). This web view is for watching shared games.</div>`}
-        ${IS_APP?`<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;background:${T.surface};border:1.5px solid ${T.line};border-radius:12px;padding:16px 18px">
+        ${IS_APP?`<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;background:${T.surface};border:2px solid ${T.line};border-radius:12px;padding:16px 18px">
           <div style="min-width:0"><div style="font-weight:800;color:${T.ink};font-size:18px">Broadcast audio</div>
             <div style="font-size:13px;color:${T.sage};margin-top:2px">${bcastCamAudio?"Camera audio (beta) — falls back to mic if the camera sends none":"Tablet mic — the camera's own audio isn't used"}</div></div>
           <button data-act="togglecamaudio" style="background:${bcastCamAudio?T.lime:T.surface2};border:1px solid ${bcastCamAudio?T.lime:T.line};color:${bcastCamAudio?"#fff":T.sage};border-radius:999px;padding:10px 16px;font-family:${MONO};font-weight:800;font-size:14px;min-width:92px">${bcastCamAudio?"CAMERA":"MIC"}</button></div>`:""}
         ${item("apprefresh",IC('refresh',24),"Refresh app","Reload &amp; check for the latest version + sync teams")}
         ${item("opendebug",IC('alert',24),"Diagnostics","Camera, stream, network &amp; sync status — for field troubleshooting")}
-        ${signedIn?`<div style="background:${T.surface};border:1.5px solid ${T.line};border-radius:12px;padding:16px 18px">
+        ${signedIn?`<div style="background:${T.surface};border:2px solid ${T.line};border-radius:12px;padding:16px 18px">
             <div style="font-size:12px;color:${T.sage}">Signed in as</div>
             <div style="font-weight:800;color:${T.chalk};word-break:break-all;margin:2px 0 10px">${(C.user.email||"account").replace(/</g,"")}</div>
             <button data-act="signout" style="${ghost}">Sign out</button></div>`:""}
@@ -2940,7 +2940,7 @@ function actionArea(){
     const hasRelay=!!(window.LINK&&LINK.hasRelay&&LINK.hasRelay());
     const relayConn=!!(window.LINK&&LINK.connected&&LINK.connected());
     const dotC=(s)=>s===true?T.safe:s===false?T.out:s==="warn"?T.amber:T.sageDim;
-    const drow=(label,value,st,sub)=>`<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;background:${T.surface};border:1.5px solid ${T.line};border-radius:11px;padding:13px 15px">
+    const drow=(label,value,st,sub)=>`<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;background:${T.surface};border:2px solid ${T.line};border-radius:11px;padding:13px 15px">
         <div style="min-width:0"><div style="display:flex;align-items:center;gap:9px"><span style="width:10px;height:10px;border-radius:50%;flex:none;background:${dotC(st)};box-shadow:0 0 6px ${dotC(st)}"></span><span style="font-weight:800;color:${T.ink};font-size:14px">${label}</span></div>${sub?`<div style="font-size:11px;color:${T.sageDim};margin:2px 0 0 19px">${sub}</div>`:""}</div>
         <span style="font-family:${MONO};font-size:13px;font-weight:700;color:${T.sage};text-align:right;word-break:break-word;max-width:54%">${value}</span></div>`;
     const rows=[
@@ -2972,12 +2972,12 @@ function actionArea(){
     // Flip trace — every half-inning change with the action that triggered it (debugging the
     // "inning swapped unexpectedly" reports). Newest last. Included in Copy.
     const flips=(window._flipLog||[]);
-    const flipBlock=`<div style="background:${T.surface};border:1.5px solid ${T.line};border-radius:11px;padding:13px 15px">
+    const flipBlock=`<div style="background:${T.surface};border:2px solid ${T.line};border-radius:11px;padding:13px 15px">
         <div style="font-size:13px;font-weight:800;color:${T.ink};margin-bottom:8px">Inning-flip trace <span style="font-weight:600;color:${T.sageDim};font-size:11px">(what triggered each half-inning change)</span></div>
         ${flips.length?`<div style="font-family:${MONO};font-size:11px;color:${T.sage};line-height:1.7;max-height:210px;overflow:auto;white-space:pre-wrap">${flips.slice(-30).map(l=>l.replace(/</g,"&lt;")).join("\n")}</div>`:`<div style="font-size:12px;color:${T.sageDim}">No half-inning changes yet this session.</div>`}</div>`;
     window.__diagText += "\n\nInning-flip trace:\n"+(flips.length?flips.join("\n"):"(none)");
     return `<div style="display:flex;flex-direction:column;gap:12px">
-        <div class="frost-card" style="display:flex;align-items:center;gap:10px;background:${T.surface};border:1.5px solid ${T.line};border-radius:14px;padding:12px 14px">
+        <div class="frost-card" style="display:flex;align-items:center;gap:10px;background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:12px 14px">
           <button data-act="opensettings" style="${ghost};padding:9px 11px">&lsaquo; Settings</button>
           <div style="font-family:${MONO};font-size:23px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:${T.lime}">Diagnostics</div></div>
         <div style="font-size:12px;color:${T.sage};margin:0 2px">Live status for field troubleshooting.</div>
@@ -2996,7 +2996,7 @@ function actionArea(){
     const following=isFollowingPlayer(t.id,p.id);
     const s=((t.season&&t.season[p.id])||{}).bat||{}; const ab=s.ab||0,h=s.h||0,avg=ab?(h/ab).toFixed(3).replace(/^0/,""):"—";
     const ps=((t.season&&t.season[p.id])||{}).pitch||{};
-    const head=`<div class="frost-card" style="display:flex;align-items:center;gap:10px;background:${T.surface};border:1.5px solid ${T.line};border-radius:14px;padding:12px 14px">
+    const head=`<div class="frost-card" style="display:flex;align-items:center;gap:10px;background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:12px 14px">
         <button data-act="playerback" style="${ghost};padding:9px 13px;flex:none">&lsaquo; Back</button>
         <div style="flex:1;min-width:0;border-left:5px solid ${t.color};padding-left:10px">
           <div style="font-family:${MONO};font-size:20px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">#${p.num||"–"} ${(p.name||"").replace(/</g,"&lt;")}</div>
@@ -3008,10 +3008,10 @@ function actionArea(){
     if(playerTab==="schedule"){
       body=calendarHtml(t);
     } else {
-      const stat=(l,v)=>`<div style="flex:1;min-width:64px;background:${T.surface2};border:1.5px solid ${T.line};border-radius:10px;padding:10px 6px;text-align:center"><div style="font-family:${MONO};font-size:23px;font-weight:800;color:${T.ink}">${v}</div><div style="font-size:11px;font-weight:800;letter-spacing:.5px;color:${T.sageDim};margin-top:2px">${l}</div></div>`;
-      const pitchBlk=(ps.ip||ps.k||ps.bb||ps.h||ps.r)?`<div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin:14px 0 10px">Season &middot; Pitching</div><div style="display:flex;flex-wrap:wrap;gap:8px">${stat("IP",ps.ip||0)}${stat("K",ps.k||0)}${stat("BB",ps.bb||0)}${stat("H",ps.h||0)}${stat("R",ps.r||0)}</div>`:"";
-      body=`<div class="frost-card" style="background:${T.surface};border:1.5px solid ${T.line};border-radius:14px;padding:14px">
-          <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin-bottom:10px">Season &middot; Batting</div>
+      const stat=(l,v)=>`<div style="flex:1;min-width:64px;background:${T.surface2};border:2px solid ${T.line};border-radius:10px;padding:10px 6px;text-align:center"><div style="font-family:${MONO};font-size:23px;font-weight:800;color:${T.ink}">${v}</div><div style="font-size:11px;font-weight:800;letter-spacing:.5px;color:${T.sageDim};margin-top:2px">${l}</div></div>`;
+      const pitchBlk=(ps.ip||ps.k||ps.bb||ps.h||ps.r)?`<div style="font-size:13.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin:14px 0 10px">Season &middot; Pitching</div><div style="display:flex;flex-wrap:wrap;gap:8px">${stat("IP",ps.ip||0)}${stat("K",ps.k||0)}${stat("BB",ps.bb||0)}${stat("H",ps.h||0)}${stat("R",ps.r||0)}</div>`:"";
+      body=`<div class="frost-card" style="background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:14px">
+          <div style="font-size:13.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin-bottom:10px">Season &middot; Batting</div>
           <div style="display:flex;flex-wrap:wrap;gap:8px">${stat("AVG",avg)}${stat("AB",ab)}${stat("H",h)}${stat("R",s.r||0)}${stat("RBI",s.rbi||0)}${stat("BB",s.bb||0)}${stat("K",s.k||0)}</div>
           ${pitchBlk}
           <div style="font-size:12px;color:${T.sageDim};margin-top:12px">Season totals across ${(t.name||"the team").replace(/</g,"&lt;")}&#39;s scored games.</div></div>`;
@@ -3020,7 +3020,7 @@ function actionArea(){
   }
   if(mode==="followcal"){
     const fps=followedPlayers();
-    const head=`<div class="frost-card" style="display:flex;align-items:center;gap:10px;background:${T.surface};border:1.5px solid ${T.line};border-radius:14px;padding:12px 14px">
+    const head=`<div class="frost-card" style="display:flex;align-items:center;gap:10px;background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:12px 14px">
         <button data-act="gohome" style="${ghost};padding:9px 13px;flex:none">&lsaquo; Home</button>
         <div style="font-family:${MONO};font-size:20px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:${T.lime}">Players calendar</div></div>`;
     if(!fps.length) return `<div style="display:flex;flex-direction:column;gap:12px">${head}<div style="font-size:13px;color:${T.sage};text-align:center;padding:24px;border:1px dashed ${T.line};border-radius:12px">Follow a player first — open a team roster, tap a player (&rsaquo;), then the &#9733; star. Their games show up here on one calendar.</div></div>`;
@@ -3034,8 +3034,8 @@ function actionArea(){
   if(mode==="newgame"){
     const setMode=settingsMode;   // mid-game Game Setup (Done returns to play, no reset)
     const lbl=`font-size:13px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin:0 2px 8px`;
-    const inpSm=`width:98px;flex:none;background:${T.surface2};border:1.5px solid ${T.line};color:${T.ink};border-radius:10px;padding:14px 10px;font-family:${MONO};font-size:27px;font-weight:800;text-align:center;outline:none`;
-    const rowCard=`display:flex;align-items:center;justify-content:space-between;gap:12px;background:${T.surface};border:1.5px solid ${T.line};border-radius:12px;padding:18px 20px;box-shadow:0 2px 6px rgba(15,30,60,.07)`;
+    const inpSm=`width:98px;flex:none;background:${T.surface2};border:2px solid ${T.line};color:${T.ink};border-radius:10px;padding:14px 10px;font-family:${MONO};font-size:27px;font-weight:800;text-align:center;outline:none`;
+    const rowCard=`display:flex;align-items:center;justify-content:space-between;gap:12px;background:${T.surface};border:2px solid ${T.line};border-radius:12px;padding:18px 20px;box-shadow:0 2px 6px rgba(15,30,60,.07)`;
     const sideBtn=(s,lbl2)=>{const on=G.ourSide===s;return `<button data-act="ng-side" data-arg="${s}" style="flex:1;padding:18px;border-radius:11px;font-family:${MONO};font-weight:800;font-size:19px;text-transform:uppercase;letter-spacing:.5px;border:2px solid ${on?OUR.color:T.line};background:${on?OUR.color:T.surface};color:${on?"#FFFFFF":T.ink}">${lbl2}</button>`;};
     const teamRow=(who,name,short,color,act)=>`<button data-act="${act}" class="frost-card" style="display:flex;align-items:center;gap:14px;background:rgba(47,62,85,.82);border:2px solid ${color};border-left:11px solid ${color};border-radius:12px;padding:14px 16px;width:100%;text-align:left">
         <span style="width:54px;height:54px;flex:none;border-radius:12px;background:${color};color:${idealText(color)};display:flex;align-items:center;justify-content:center;font-family:${MONO};font-weight:800;font-size:18px;letter-spacing:.5px;box-shadow:0 0 0 1px rgba(255,255,255,.2)">${((short||name||"?").slice(0,4)).toUpperCase()}</span>
@@ -3044,20 +3044,20 @@ function actionArea(){
     // Opponent colour picker — so two same-ish team colours can be made distinct for the scoreboard.
     // Single "Opponent color" button → native colour picker (no swatch wall). Set it so a same-ish
     // opponent colour can be made distinct from your team on the scoreboard.
-    const oppColorRow=`<label title="Pick the opponent's colour" style="display:inline-flex;align-items:center;gap:10px;align-self:flex-start;background:${T.surface2};border:1.5px solid ${T.line};border-radius:11px;padding:11px 16px;cursor:pointer;position:relative">
+    const oppColorRow=`<label title="Pick the opponent's colour" style="display:inline-flex;align-items:center;gap:10px;align-self:flex-start;background:${T.surface2};border:2px solid ${T.line};border-radius:11px;padding:11px 16px;cursor:pointer;position:relative">
         <span style="width:26px;height:26px;border-radius:7px;background:${OPP.color};box-shadow:0 0 0 1px ${T.line}"></span>
         <span style="font-weight:800;color:${T.ink};font-size:14px">Opponent color</span>${ICN.palette}
         <input type="color" value="${OPP.color||"#E11D2E"}" onchange="window.setOppColor(this.value)" style="position:absolute;left:0;top:0;width:100%;height:100%;opacity:0;cursor:pointer"></label>`;
     // Actual new-game setup gets the Start button right in the header bar. Mid-game Game Settings
     // (setMode) does NOT — starting there would reset the live game; it keeps its Done button.
     const startTop=setMode?"":`<button data-act="ng-start" style="flex:none;background:${T.lime};border:none;color:#fff;border-radius:11px;padding:12px 20px;font-family:${MONO};font-weight:800;font-size:16px;letter-spacing:.5px;display:inline-flex;align-items:center;gap:7px;box-shadow:0 4px 14px rgba(225,29,46,.28)">Start game &rarr;</button>`;
-    const header=`<div class="frost-card" style="display:flex;align-items:center;gap:10px;flex:none;background:${T.surface};border:1.5px solid ${T.line};border-radius:14px;padding:12px 14px">
+    const header=`<div class="frost-card" style="display:flex;align-items:center;gap:10px;flex:none;background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:12px 14px">
           <button data-act="${setMode?"settingsdone":"gohome"}" style="${ghost};padding:9px 11px;flex:none">&lsaquo; ${setMode?"Done":"Home"}</button>
           <div style="flex:1;min-width:0;font-family:${MONO};font-size:23px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:${T.lime};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${setMode?"Game Settings":"New Game"}</div>${startTop}</div>`;
-    const sideSel=`<div class="frost-card" style="background:${T.surface};border:1.5px solid ${T.line};border-radius:12px;padding:16px 20px;display:flex;flex-direction:column;gap:11px;box-shadow:0 2px 6px rgba(15,30,60,.07)">
+    const sideSel=`<div class="frost-card" style="background:${T.surface};border:2px solid ${T.line};border-radius:12px;padding:16px 20px;display:flex;flex-direction:column;gap:11px;box-shadow:0 2px 6px rgba(15,30,60,.07)">
           <div style="font-weight:800;color:${T.ink};font-size:19px">Is ${OUR.name} home or away?</div>
           <div style="display:flex;gap:8px">${sideBtn("home","Home")}${sideBtn("away","Away")}</div></div>`;
-    const selStyle=`background:${T.surface2};border:1.5px solid ${T.line};color:${T.ink};border-radius:10px;padding:13px 12px;font-family:${MONO};font-size:16px;font-weight:800;outline:none;max-width:190px`;
+    const selStyle=`background:${T.surface2};border:2px solid ${T.line};color:${T.ink};border-radius:10px;padding:13px 12px;font-family:${MONO};font-size:16px;font-weight:800;outline:none;max-width:190px`;
     const curL=leagueById(G.league);
     const leagueCard=`<div style="${rowCard};flex-wrap:wrap">
           <div style="flex:1;min-width:150px"><div style="font-weight:800;color:${T.ink};font-size:19px">League</div>
@@ -3069,7 +3069,7 @@ function actionArea(){
           <div style="flex:1;min-width:150px"><div style="font-weight:800;color:${T.ink};font-size:19px">Rulebook</div>
             <div style="color:${T.sage};font-size:13px;margin-top:3px;line-height:1.35">Pulled into this game — tap View to settle a dispute.</div></div>
           <select onchange="ngRulebook(this.value)" style="${selStyle}">${allRulebooks().map(r=>`<option value="${r.id}"${grb===r.id?" selected":""}>${(r.name||'').replace(/</g,'&lt;')}</option>`).join("")}</select>
-          <button data-act="viewgamerulebook" style="width:100%;margin-top:8px;background:${T.surface2};color:${T.lime};border:1.5px solid ${T.line};border-radius:9px;padding:11px;font-family:${MONO};font-weight:800;font-size:14px;display:flex;align-items:center;justify-content:center;gap:8px">${ICN.doc} View rulebook</button></div>`;
+          <button data-act="viewgamerulebook" style="width:100%;margin-top:8px;background:${T.surface2};color:${T.lime};border:2px solid ${T.line};border-radius:9px;padding:11px;font-family:${MONO};font-weight:800;font-size:14px;display:flex;align-items:center;justify-content:center;gap:8px">${ICN.doc} View rulebook</button></div>`;
     const ac=alertsCfg();
     const aChip=(k,lbl)=>`<button data-act="alerttoggle" data-arg="${k}" style="background:${ac[k]?T.lime:T.surface2};border:1px solid ${ac[k]?T.lime:T.line};color:${ac[k]?"#fff":T.sage};border-radius:999px;padding:7px 13px;font-family:${MONO};font-weight:800;font-size:12px">${lbl}</button>`;
     const alertsCard=`<div style="${rowCard};flex-wrap:wrap">
@@ -3141,7 +3141,7 @@ function actionArea(){
       if(!G.oppLineup.some(e=>e&&e.pos))oppDefaultPositions();
       const L=oppList(), bench=oppBenchList(), n=L.length, pit=oppPitcher();
       const orows=L.map((e,i)=>{ const pos=(e.pos)||"—",isP=pos==="P"; const nm=((e.name||"").trim())||"Hitter";
-        if(narrow) return `<div data-opprow data-i="${i}" style="display:flex;align-items:center;gap:9px;background:${T.surface};border:1.5px solid ${T.line};border-radius:10px;padding:10px 9px">
+        if(narrow) return `<div data-opprow data-i="${i}" style="display:flex;align-items:center;gap:9px;background:${T.surface2};border:2px solid ${T.line};border-radius:10px;padding:10px 9px">
           <span data-oppdrag style="cursor:grab;color:${T.sageDim};display:flex;align-items:center;padding:6px 2px;touch-action:none">${IC('<path d="M4 7h16M4 12h16M4 17h16"/>')}</span>
           <span style="font-family:${MONO};font-size:18px;font-weight:800;color:${T.lime};width:20px;text-align:center;flex:none">${i+1}</span>
           <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:7px">
@@ -3150,18 +3150,18 @@ function actionArea(){
               <button data-act="opppickpos" data-arg="${i}" style="background:${isP?OPP.color:T.surface2};border:1px solid ${isP?OPP.color:T.line};color:${isP?"#FFFFFF":T.chalk};border-radius:7px;padding:7px 14px;font-family:${MONO};font-size:16px;font-weight:800;min-width:54px;flex:none">${pos}</button>
               <span style="font-size:12px;color:${T.sageDim}">${isP?"Pitcher":(pos==="—"?"Tap to set position":"Fielding "+pos)}</span>
             </div></div></div>`;
-        return `<div data-opprow data-i="${i}" style="display:flex;align-items:center;gap:6px;background:${T.surface};border:1.5px solid ${T.line};border-radius:9px;padding:8px 8px">
+        return `<div data-opprow data-i="${i}" style="display:flex;align-items:center;gap:6px;background:${T.surface2};border:2px solid ${T.line};border-radius:9px;padding:8px 8px">
           <span data-oppdrag style="cursor:grab;color:${T.sageDim};display:flex;align-items:center;padding:4px 2px;touch-action:none">${IC('<path d="M4 7h16M4 12h16M4 17h16"/>')}</span>
           <span style="font-family:${MONO};font-size:17px;font-weight:800;color:${T.lime};width:18px;text-align:center">${i+1}</span>
           <button data-act="oppedit" data-arg="${i}" style="flex:1;min-width:0;text-align:left;background:transparent;border:none;color:${T.chalk};font-size:18px;font-weight:700;display:flex;align-items:center;gap:8px;overflow:hidden"><span style="font-family:${MONO};color:${OPP.color};min-width:34px">#${(e.num||"").toString().replace(/</g,"")}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${nm.replace(/</g,"&lt;")}</span></button>
           <button data-act="opppickpos" data-arg="${i}" style="background:${isP?OPP.color:T.surface2};border:1px solid ${isP?OPP.color:T.line};color:${isP?"#FFFFFF":T.chalk};border-radius:7px;padding:8px 12px;font-family:${MONO};font-size:16px;font-weight:800;min-width:50px">${pos}</button></div>`;}).join("");
-      const benchHtml=bench.length?bench.map((e,j)=>`<button data-act="oppbenchin" data-arg="${j}" title="Pinch in" style="font-family:${MONO};font-size:14px;color:${T.chalk};background:${T.surface};border:1.5px solid ${T.line};border-radius:6px;padding:6px 10px;white-space:nowrap">#${(e.num||"").toString().replace(/</g,"")} ${((e.name||"").trim()||"sub").replace(/</g,"&lt;")} <span style="color:${T.lime};font-weight:800">+</span></button>`).join(" "):`<span style="font-size:12px;color:${T.sageDim}">No bench players</span>`;
-      return `<div class="frost-card" style="flex-shrink:0;display:flex;align-items:center;gap:10px;background:${T.surface};border:1.5px solid ${T.line};border-radius:14px;padding:10px 12px">
+      const benchHtml=bench.length?bench.map((e,j)=>`<button data-act="oppbenchin" data-arg="${j}" title="Pinch in" style="font-family:${MONO};font-size:14px;color:${T.chalk};background:${T.surface};border:2px solid ${T.line};border-radius:6px;padding:6px 10px;white-space:nowrap">#${(e.num||"").toString().replace(/</g,"")} ${((e.name||"").trim()||"sub").replace(/</g,"&lt;")} <span style="color:${T.lime};font-weight:800">+</span></button>`).join(" "):`<span style="font-size:12px;color:${T.sageDim}">No bench players</span>`;
+      return `<div class="frost-card" style="flex-shrink:0;display:flex;align-items:center;gap:10px;background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:10px 12px">
           <button data-act="lineupback" style="${ghost};padding:9px 13px;flex:none">&lsaquo; Back</button>
           <div style="flex:1;min-width:0"><div style="font-family:${MONO};font-size:20px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:${T.lime}">Lineups</div>
             <div style="font-size:11px;color:${T.sage};margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${OPP.name} &middot; batting ${n} &middot; drag to reorder</div></div></div>
         ${luToggle}
-        <div style="flex-shrink:0;display:flex;align-items:center;justify-content:space-between;background:${T.surface2};border:1.5px solid ${T.line};border-radius:9px;padding:9px 12px">
+        <div style="flex-shrink:0;display:flex;align-items:center;justify-content:space-between;background:${T.surface2};border:2px solid ${T.line};border-radius:9px;padding:9px 12px">
           <span style="font-size:14px;color:${T.sage}">Pitcher</span>
           <button data-act="opppickpitch" style="background:transparent;border:none;color:${T.chalk};font-size:18px;font-weight:700;display:flex;align-items:center;gap:8px">${pit?`<span style="font-family:${MONO};color:${OPP.color}">#${(pit.num||"").toString().replace(/</g,"")}</span>${((pit.name||"").trim()||"Pitcher").replace(/</g,"&lt;")}`:`<span style="color:${T.sageDim}">Set pitcher</span>`}<span style="font-size:12px;color:${OPP.color};font-weight:700;margin-left:4px">CHANGE</span></button></div>
         <div id="opp-list" style="flex:1 1 auto;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:6px">${orows}</div>
@@ -3173,7 +3173,7 @@ function actionArea(){
         <button data-act="lineupdone" style="${bigBtn(T.lime,"")}flex-shrink:0">Done</button>`;
     }
     const rows=G.lineup.order.map((ri,slot)=>{const p=ROSTER[ri],pos=posOfPlayer(ri)||"—",isP=pos==="P";
-      if(narrow) return `<div data-row data-ri="${ri}" style="display:flex;align-items:center;gap:9px;background:${T.surface};border:1.5px solid ${T.line};border-radius:10px;padding:10px 9px">
+      if(narrow) return `<div data-row data-ri="${ri}" style="display:flex;align-items:center;gap:9px;background:${T.surface2};border:2px solid ${T.line};border-radius:10px;padding:10px 9px">
         <span data-drag style="cursor:grab;color:${T.sageDim};display:flex;align-items:center;padding:6px 2px;touch-action:none">${IC('<path d="M4 7h16M4 12h16M4 17h16"/>')}</span>
         <span style="font-family:${MONO};font-size:18px;font-weight:800;color:${T.lime};width:20px;text-align:center;flex:none">${slot+1}</span>
         <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:7px">
@@ -3182,20 +3182,20 @@ function actionArea(){
             <button data-act="pickpos" data-arg="${slot}" style="background:${isP?OUR.color:T.surface2};border:1px solid ${isP?OUR.color:T.line};color:${isP?"#FFFFFF":T.chalk};border-radius:7px;padding:7px 14px;font-family:${MONO};font-size:16px;font-weight:800;min-width:54px;flex:none">${pos}</button>
             <span style="font-size:12px;color:${T.sageDim}">${isP?"Pitcher":(pos==="—"?"Tap to set position":"Fielding "+pos)}</span>
           </div></div></div>`;
-      return `<div data-row data-ri="${ri}" style="display:flex;align-items:center;gap:6px;background:${T.surface};border:1.5px solid ${T.line};border-radius:9px;padding:8px 8px">
+      return `<div data-row data-ri="${ri}" style="display:flex;align-items:center;gap:6px;background:${T.surface2};border:2px solid ${T.line};border-radius:9px;padding:8px 8px">
         <span data-drag style="cursor:grab;color:${T.sageDim};display:flex;align-items:center;padding:4px 2px;touch-action:none">${IC('<path d="M4 7h16M4 12h16M4 17h16"/>')}</span>
         <span style="font-family:${MONO};font-size:17px;font-weight:800;color:${T.lime};width:18px;text-align:center">${slot+1}</span>
         <button data-act="editplayer" data-arg="${slot}" style="flex:1;min-width:0;text-align:left;background:transparent;border:none;color:${T.chalk};font-size:18px;font-weight:700;display:flex;align-items:center;gap:8px;overflow:hidden"><span style="font-family:${MONO};color:${OUR.color};min-width:34px">#${p.num}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.name}</span></button>
         <button data-act="pickpos" data-arg="${slot}" style="background:${isP?OUR.color:T.surface2};border:1px solid ${isP?OUR.color:T.line};color:${isP?"#FFFFFF":T.chalk};border-radius:7px;padding:8px 12px;font-family:${MONO};font-size:16px;font-weight:800;min-width:50px">${pos}</button></div>`;}).join("");
-    const bench=benchIdx().map(ri=>`<span style="font-family:${MONO};font-size:14px;color:${T.sage};background:${T.surface};border:1.5px solid ${T.line};border-radius:6px;padding:5px 10px;white-space:nowrap">#${ROSTER[ri].num} ${ROSTER[ri].name}</span>`).join(" ");
+    const bench=benchIdx().map(ri=>`<span style="font-family:${MONO};font-size:14px;color:${T.sage};background:${T.surface};border:2px solid ${T.line};border-radius:6px;padding:5px 10px;white-space:nowrap">#${ROSTER[ri].num} ${ROSTER[ri].name}</span>`).join(" ");
     const pit=playerAtPos("P");
     const n=G.lineup.order.length;
-    return `<div class="frost-card" style="flex-shrink:0;display:flex;align-items:center;gap:10px;background:${T.surface};border:1.5px solid ${T.line};border-radius:14px;padding:10px 12px">
+    return `<div class="frost-card" style="flex-shrink:0;display:flex;align-items:center;gap:10px;background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:10px 12px">
         <button data-act="lineupback" style="${ghost};padding:9px 13px;flex:none">&lsaquo; Back</button>
         <div style="flex:1;min-width:0"><div style="font-family:${MONO};font-size:20px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:${T.lime}">Lineups</div>
           <div style="font-size:11px;color:${T.sage};margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${OUR.name} &middot; batting ${n}${n>9?" (continuous)":""} &middot; drag to reorder</div></div></div>
       ${luToggle}
-      <div style="flex-shrink:0;display:flex;align-items:center;justify-content:space-between;background:${T.surface2};border:1.5px solid ${T.line};border-radius:9px;padding:9px 12px">
+      <div style="flex-shrink:0;display:flex;align-items:center;justify-content:space-between;background:${T.surface2};border:2px solid ${T.line};border-radius:9px;padding:9px 12px">
         <span style="font-size:14px;color:${T.sage}">Pitcher</span>
         <button data-act="pickpitch" style="background:transparent;border:none;color:${T.chalk};font-size:18px;font-weight:700;display:flex;align-items:center;gap:8px"><span style="font-family:${MONO};color:${OUR.color}">#${pit.num}</span>${pit.name}<span style="font-size:12px;color:${OUR.color};font-weight:700;margin-left:4px">CHANGE</span></button></div>
       <div id="lineup-list" style="flex:1 1 auto;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:6px">${rows}</div>
@@ -3234,8 +3234,8 @@ function actionArea(){
   }
   if(mode==="editplayer"){
     const ri=G.lineup.order[editSlot],p=ROSTER[ri]||{num:"",first:"",last:""};
-    const fld=`background:${T.surface};border:1.5px solid ${T.line};color:${T.ink};border-radius:10px;padding:14px 16px;font-family:${SANS};font-size:16px;font-weight:700;outline:none;width:100%`;
-    const lb=`font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin:0 2px 6px`;
+    const fld=`background:${T.surface};border:2px solid ${T.line};color:${T.ink};border-radius:10px;padding:14px 16px;font-family:${SANS};font-size:16px;font-weight:700;outline:none;width:100%`;
+    const lb=`font-size:13.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin:0 2px 6px`;
     return step("Edit player",`Batting ${editSlot+1} &middot; set number, first &amp; last name.`,
       (`<div style="display:flex;flex-direction:column;gap:12px">
         <div style="display:flex;gap:10px">
@@ -3270,8 +3270,8 @@ function actionArea(){
   }
   if(mode==="oppeditplayer"){
     const e=oppList()[editSlot]||{num:"",name:""};
-    const fld=`background:${T.surface};border:1.5px solid ${T.line};color:${T.ink};border-radius:10px;padding:14px 16px;font-family:${SANS};font-size:16px;font-weight:700;outline:none;width:100%`;
-    const lb=`font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin:0 2px 6px`;
+    const fld=`background:${T.surface};border:2px solid ${T.line};color:${T.ink};border-radius:10px;padding:14px 16px;font-family:${SANS};font-size:16px;font-weight:700;outline:none;width:100%`;
+    const lb=`font-size:13.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin:0 2px 6px`;
     return step("Edit opponent hitter",`Batting ${editSlot+1} &middot; number &amp; name.`,
       (`<div style="display:flex;flex-direction:column;gap:12px">
         <div style="display:flex;gap:10px">
@@ -3306,7 +3306,7 @@ function actionArea(){
     }
     pitchers=pitchers.filter(x=>x.outs>0||x.pc>0).sort((a,b)=>b.outs-a.outs);
     const pp=pitchers.map(x=>`<tr style="border-top:1.5px solid ${T.line}"><td style="text-align:left;padding:5px 6px;font-weight:700;white-space:nowrap">${(x.name||'').replace(/</g,'')}</td><td style="padding:11px 6px">${x.ip}</td><td style="padding:11px 6px">${x.pc}</td><td style="padding:11px 6px">${x.h}</td><td style="padding:11px 6px">${x.r}</td><td style="padding:11px 6px">${x.bb}</td><td style="padding:11px 6px">${x.k}</td></tr>`).join("");
-    const pitchBlock=pitchers.length?`<div style="overflow-x:auto;background:${T.surface};border:1.5px solid ${T.line};border-radius:10px;padding:8px 8px 4px"><div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin:0 0 8px">${selName} &mdash; pitching</div><table style="width:100%;border-collapse:collapse;font-family:${MONO};font-size:17px;text-align:center;color:${T.chalk}"><thead><tr style="color:${T.sageDim};font-size:13px"><th style="text-align:left;padding:4px 6px">Pitcher</th><th title="Innings pitched">IP</th><th title="Pitches">P</th><th>H</th><th>R</th><th>BB</th><th>K</th></tr></thead><tbody>${pp}</tbody></table></div>`:"";
+    const pitchBlock=pitchers.length?`<div style="overflow-x:auto;background:${T.surface};border:2px solid ${T.line};border-radius:10px;padding:8px 8px 4px"><div style="font-size:13.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin:0 0 8px">${selName} &mdash; pitching</div><table style="width:100%;border-collapse:collapse;font-family:${MONO};font-size:17px;text-align:center;color:${T.chalk}"><thead><tr style="color:${T.sageDim};font-size:13px"><th style="text-align:left;padding:4px 6px">Pitcher</th><th title="Innings pitched">IP</th><th title="Pitches">P</th><th>H</th><th>R</th><th>BB</th><th>K</th></tr></thead><tbody>${pp}</tbody></table></div>`:"";
     const stBtn=(v,lbl)=>`<button data-act="sumteam" data-arg="${v}" style="flex:1;background:${summaryTeam===v?T.lime:T.surface2};color:${summaryTeam===v?"#fff":T.sage};border:1px solid ${summaryTeam===v?T.lime:T.line};border-radius:9px;padding:9px 0;font-family:${MONO};font-weight:800;font-size:13px;letter-spacing:.4px;text-transform:uppercase">${lbl}</button>`;
     const teamToggle=`<div style="display:flex;gap:6px">${stBtn("us",OUR.short||"Us")}${stBtn("opp",(OPP.short||"Opp"))}</div>`;
     return `<div style="display:flex;flex-direction:column;gap:14px">
@@ -3317,9 +3317,9 @@ function actionArea(){
             <div style="color:${T.sageDim};font-weight:800;font-size:22px;padding-bottom:6px">&ndash;</div>
             <div style="text-align:center"><div style="font-family:${MONO};font-size:14px;font-weight:700;color:${T.sage}">${TEAMS.home.short}</div><div style="font-family:${MONO};font-size:44px;font-weight:800;line-height:.9;color:${T.ink}">${G.home}</div></div>
           </div></div>
-        <div style="overflow-x:auto;background:${T.surface};border:1.5px solid ${T.line};border-radius:10px;padding:6px"><table style="width:100%;border-collapse:collapse;font-family:${MONO};font-size:17px;text-align:center;color:${T.chalk}"><thead><tr style="color:${T.sageDim};font-size:13px">${lineHead}</tr></thead><tbody>${lineRow("away")}${lineRow("home")}</tbody></table></div>
+        <div style="overflow-x:auto;background:${T.surface};border:2px solid ${T.line};border-radius:10px;padding:6px"><table style="width:100%;border-collapse:collapse;font-family:${MONO};font-size:17px;text-align:center;color:${T.chalk}"><thead><tr style="color:${T.sageDim};font-size:13px">${lineHead}</tr></thead><tbody>${lineRow("away")}${lineRow("home")}</tbody></table></div>
         ${teamToggle}
-        <div style="overflow-x:auto;background:${T.surface};border:1.5px solid ${T.line};border-radius:10px;padding:8px 8px 4px"><div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin:0 0 8px">${selName} &mdash; batting</div><table style="width:100%;border-collapse:collapse;font-family:${MONO};font-size:17px;text-align:center;color:${T.chalk}"><thead><tr style="color:${T.sageDim};font-size:13px"><th style="text-align:left;padding:4px 6px">Batter</th><th>AB</th><th>R</th><th>H</th><th>RBI</th><th>BB</th><th>K</th><th title="Stolen bases">SB</th><th title="Caught stealing">CS</th></tr></thead><tbody>${bb||`<tr><td colspan="9" style="padding:8px;color:${T.sageDim}">No at-bats recorded</td></tr>`}</tbody></table></div>
+        <div style="overflow-x:auto;background:${T.surface};border:2px solid ${T.line};border-radius:10px;padding:8px 8px 4px"><div style="font-size:13.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin:0 0 8px">${selName} &mdash; batting</div><table style="width:100%;border-collapse:collapse;font-family:${MONO};font-size:17px;text-align:center;color:${T.chalk}"><thead><tr style="color:${T.sageDim};font-size:13px"><th style="text-align:left;padding:4px 6px">Batter</th><th>AB</th><th>R</th><th>H</th><th>RBI</th><th>BB</th><th>K</th><th title="Stolen bases">SB</th><th title="Caught stealing">CS</th></tr></thead><tbody>${bb||`<tr><td colspan="9" style="padding:8px;color:${T.sageDim}">No at-bats recorded</td></tr>`}</tbody></table></div>
         ${pitchBlock}
         <button data-act="gamecard" style="${ghost};display:flex;align-items:center;justify-content:center;gap:9px">${ICN.doc} Scorecard (PDF)</button>
         <div style="display:flex;gap:10px">
@@ -3330,7 +3330,7 @@ function actionArea(){
   if(mode==="idle"){
     const halfLabel=`${G.half==="T"?"Top":"Bot"} ${ordinal(G.inning)}`;
     const flatBtn=`background:${T.surface};border:2px solid #3F6CA8;color:${T.chalk};border-radius:10px;padding:11px;font-size:14px;font-weight:800;display:flex;align-items:center;justify-content:center;gap:8px;letter-spacing:.3px;text-transform:uppercase`;
-    const miniBtn=`background:${T.surface};border:1.5px solid ${T.line};color:${T.sage};border-radius:9px;padding:9px;font-size:12px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;display:flex;align-items:center;justify-content:center;gap:6px`;
+    const miniBtn=`background:${T.surface};border:2px solid ${T.line};color:${T.sage};border-radius:9px;padding:9px;font-size:12px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;display:flex;align-items:center;justify-content:center;gap:6px`;
     // Advanced: a sticky pitch-type selector recorded with each pitch (shown only when on).
     const ptypeRow=advPitch?`<div style="display:grid;grid-template-columns:repeat(${PITCH_TYPES.length},1fr);gap:6px">
         ${PITCH_TYPES.map(pt=>{const on=pitchType===pt.k;return `<button data-act="ptype" data-arg="${pt.k}" title="${pt.n}" style="background:${on?T.amber:T.surface};border:1px solid ${on?T.amber:T.line};color:${on?T.field:T.chalk};border-radius:8px;padding:9px 2px;font-family:${MONO};font-size:13px;font-weight:800">${pt.k}</button>`;}).join("")}
@@ -3376,7 +3376,7 @@ function actionArea(){
   }
   if(mode==="outpos"){
     const order=["P","C","1B","2B","3B","SS","LF","CF","RF"];
-    const cells=order.map(p=>`<button data-act="outpos" data-arg="${p}" style="display:flex;flex-direction:column;align-items:center;gap:2px;background:${T.surface};border:1.5px solid ${T.line};color:${T.chalk};border-radius:9px;padding:13px 4px;font-size:15px;font-weight:800">${p}<span style="font-size:10px;color:${T.sage};font-weight:600">${POSNUM[p]}</span></button>`).join("");
+    const cells=order.map(p=>`<button data-act="outpos" data-arg="${p}" style="display:flex;flex-direction:column;align-items:center;gap:2px;background:${T.surface};border:2px solid ${T.line};color:${T.chalk};border-radius:9px;padding:13px 4px;font-size:15px;font-weight:800">${p}<span style="font-size:10px;color:${T.sage};font-weight:600">${POSNUM[p]}</span></button>`).join("");
     return step("Which fielder made the play?",(result?result.label+" — ":"")+"tap the position that fielded it.",
       `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">${cells}</div>
        <button data-act="back-result" style="${ghost};margin-top:10px;width:100%">Back</button>`);
@@ -3390,7 +3390,7 @@ function actionArea(){
       curResults=groups.flatMap(g=>g.items.map(r=>Object.assign({},r,{fielder:POSNUM[tap.pos]})));
       let idx=0,sections="";
       groups.forEach(g=>{
-        const cells=g.items.map(r=>{const i=idx++;return `<button data-act="result" data-arg="${i}" style="display:flex;justify-content:space-between;align-items:center;background:${T.surface};border:1.5px solid ${T.line};border-left:4px solid ${hitKind(r.kind)?T.safe:T.out};color:${T.chalk};border-radius:9px;padding:11px 12px;font-size:13px;font-weight:700">
+        const cells=g.items.map(r=>{const i=idx++;return `<button data-act="result" data-arg="${i}" style="display:flex;justify-content:space-between;align-items:center;background:${T.surface};border:2px solid ${T.line};border-left:4px solid ${hitKind(r.kind)?T.safe:T.out};color:${T.chalk};border-radius:9px;padding:11px 12px;font-size:13px;font-weight:700">
           <span>${r.label}</span><span style="font-family:${MONO};opacity:.8;font-size:11px">${r.note}</span></button>`;}).join("");
         sections+=`<div style="font-size:10px;color:${T.sage};font-weight:700;letter-spacing:.6px;margin:8px 2px 2px">${g.title.toUpperCase()}</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">${cells}</div>`;
@@ -3411,11 +3411,11 @@ function actionArea(){
     const dot=c=>`<span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${c};margin-right:6px;vertical-align:middle"></span>`;
     const roleTag=m=>m.isBatter
       ?`<span style="font-family:${MONO};font-size:10px;font-weight:800;letter-spacing:.8px;color:#0A0E14;background:${m.color};border-radius:4px;padding:1px 6px;margin-left:8px;vertical-align:middle">BATTER</span>`
-      :`<span style="font-family:${MONO};font-size:10px;font-weight:700;letter-spacing:.8px;color:${T.sage};border:1.5px solid ${T.line};border-radius:4px;padding:1px 6px;margin-left:8px;vertical-align:middle">RUNNER</span>`;
+      :`<span style="font-family:${MONO};font-size:10px;font-weight:700;letter-spacing:.8px;color:${T.sage};border:2px solid ${T.line};border-radius:4px;padding:1px 6px;margin-left:8px;vertical-align:middle">RUNNER</span>`;
     const rows=plan.length?plan.map((m,i)=>{
       const who=`${dot(m.color)}<b style="font-family:${MONO}">${m.label}</b>${m.name?" "+m.name:""}${roleTag(m)}`;
       if(m.out){
-        return `<div style="display:flex;align-items:center;justify-content:space-between;background:${T.surface};border:1.5px solid ${T.line};border-left:3px solid ${T.out};border-radius:9px;padding:6px 10px">
+        return `<div style="display:flex;align-items:center;justify-content:space-between;background:${T.surface};border:2px solid ${T.line};border-left:3px solid ${T.out};border-radius:9px;padding:6px 10px">
           <span style="font-size:13px">${who}</span><span style="font-size:11px;font-weight:800;color:${T.out};font-family:${MONO}">OUT ON PLAY</span></div>`;
       }
       const floor=m.start===0?1:m.start;
@@ -3462,7 +3462,7 @@ function actionArea(){
 }
 function step(title,hint,inner,backAct){
   return `<div style="display:flex;flex-direction:column;gap:8px">
-    <div class="frost-card" style="display:flex;align-items:center;gap:12px;background:${T.surface};border:1.5px solid ${T.line};border-radius:14px;padding:12px 14px">
+    <div class="frost-card" style="display:flex;align-items:center;gap:12px;background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:12px 14px">
       ${backAct?`<button data-act="${backAct}" title="Back" style="${ghost};padding:9px 13px;flex:none;font-size:15px">&lsaquo; Back</button>`:""}
       <div style="flex:1;min-width:0"><div style="font-family:${MONO};font-size:19px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;line-height:1.05">${title}</div>
       ${hint?`<div style="font-size:11px;color:${T.sage};margin-top:3px">${hint}</div>`:""}</div></div>${inner}</div>`;
@@ -3472,7 +3472,7 @@ function step(title,hint,inner,backAct){
 function confirmOverlay(){
   if(!confirmAct)return "";
   return `<div style="position:fixed;inset:0;background:rgba(8,12,20,.55);display:flex;align-items:center;justify-content:center;z-index:60;padding:24px">
-    <div class="screen-in" style="background:${T.surface};border:1.5px solid ${T.line};border-radius:14px;padding:20px;max-width:340px;width:100%;box-shadow:0 20px 50px rgba(15,30,60,.4)">
+    <div class="screen-in" style="background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:20px;max-width:340px;width:100%;box-shadow:0 20px 50px rgba(15,30,60,.4)">
       <div style="font-family:${MONO};font-size:20px;font-weight:800;color:${T.ink};text-transform:uppercase;letter-spacing:.4px">${confirmAct.title}</div>
       <div style="font-size:13px;color:${T.sage};margin-top:6px;line-height:1.4">${confirmAct.msg||""}</div>
       <div style="display:flex;gap:10px;margin-top:18px">
@@ -3579,11 +3579,11 @@ function render(){
     renderToolbar();
     const nm=(watchTeamName||"").replace(/</g,"");
     document.getElementById("content").innerHTML=`<div style="flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding:24px">
-        <div class="frost-card" style="max-width:440px;text-align:center;background:rgba(47,62,85,.82);border:1.5px solid ${T.line};border-radius:18px;padding:30px 26px">
+        <div class="frost-card" style="max-width:440px;text-align:center;background:rgba(47,62,85,.82);border:2px solid ${T.line};border-radius:18px;padding:30px 26px">
           <div style="line-height:1;margin-bottom:10px">${IC('ball',46)}</div>
           <div style="font-family:${MONO};font-size:22px;font-weight:800;color:#fff;letter-spacing:.4px">${nm?nm+" — ":""}No game in progress</div>
           <div style="font-size:14px;color:${T.sage};margin-top:10px;line-height:1.5">The game hasn't started yet. This page switches to the live game automatically the moment the scorer begins — keep it open.</div>
-          <div style="margin-top:18px;display:inline-flex;align-items:center;gap:6px;font-size:11px;letter-spacing:1.4px;color:${T.lime};font-weight:800;background:${T.surface};border:1.5px solid ${T.line};border-radius:999px;padding:6px 13px">${IC('eye',14)} WATCHING LIVE</div>
+          <div style="margin-top:18px;display:inline-flex;align-items:center;gap:6px;font-size:11px;letter-spacing:1.4px;color:${T.lime};font-weight:800;background:${T.surface};border:2px solid ${T.line};border-radius:999px;padding:6px 13px">${IC('eye',14)} WATCHING LIVE</div>
         </div></div>`;
     return;
   }
@@ -3633,7 +3633,7 @@ function render(){
   }
   maybeAlert();   // rule-reminder popups (run cap / run rule / pitch limit / final inning)
   const playing=!(mode==="idle"||mode==="locate");
-  const toastEl=toast?`<div style="position:absolute;bottom:12px;left:50%;transform:translateX(-50%);background:#0B0E13;color:${T.lime};border:1.5px solid ${T.lime};font-family:${MONO};font-weight:800;font-size:14px;letter-spacing:.5px;text-transform:uppercase;padding:7px 16px;border-radius:999px;white-space:nowrap;z-index:5;box-shadow:0 4px 16px rgba(0,0,0,.55)">${toast}</div>`:"";
+  const toastEl=toast?`<div style="position:absolute;bottom:12px;left:50%;transform:translateX(-50%);background:#0B0E13;color:${T.lime};border:2px solid ${T.line}${T.lime};font-family:${MONO};font-weight:800;font-size:14px;letter-spacing:.5px;text-transform:uppercase;padding:7px 16px;border-radius:999px;white-space:nowrap;z-index:5;box-shadow:0 4px 16px rgba(0,0,0,.55)">${toast}</div>`:"";
   // GameChanger model: the field stays the big hero, and the pick-an-event steps
   // appear as a bottom-sheet MODAL over it (no inline scrolling to choose).
   const pickerModal=(mode==="contact"||mode==="result"||mode==="errpos"||mode==="dppick"||mode==="outpos");
@@ -3655,7 +3655,7 @@ function render(){
   const sheetCard=wide
     ? `width:min(440px,46vw);height:100%;border:2px solid ${T.lime};border-right:none;border-radius:18px 0 0 18px;box-shadow:-16px 0 48px rgba(0,0,0,.6)`
     : `width:100%;max-width:420px;max-height:calc(var(--avh) * 78);border:2px solid ${T.lime};border-bottom:none;border-radius:18px 18px 0 0;box-shadow:0 -16px 48px rgba(0,0,0,.6)`;
-  const _fb=`flex:1 1 0;min-width:0;display:flex;align-items:center;justify-content:center;gap:5px;border:1.5px solid ${T.line};border-radius:8px;padding:9px 4px;font-size:12.5px;font-weight:700;white-space:nowrap;color:${T.chalk};background:${T.surface2}`;
+  const _fb=`flex:1 1 0;min-width:0;display:flex;align-items:center;justify-content:center;gap:5px;border:2px solid ${T.line};border-radius:8px;padding:9px 4px;font-size:12.5px;font-weight:700;white-space:nowrap;color:${T.chalk};background:${T.surface2}`;
   const footer=playing?"":`<div style="display:flex;align-items:stretch;gap:6px;flex-shrink:0">
       <button data-act="undo" style="${_fb};background:transparent;color:${hist.length?T.chalk:T.sageDim}">${ICN.undo} Undo</button>
       ${mode==="idle"?`<button data-act="home" style="${_fb};background:${T.surface}">${ICN.home} Home</button>
@@ -3672,7 +3672,7 @@ function render(){
   const actionEl=pickerModal?"":`<div id="action-area" style="display:flex;flex-direction:column;gap:8px;${actionStyle}">${actionArea()}</div>`;
   // Wide (tablet): a single compact row under a BIGGER monitor — instead of a full-width
   // Share button plus a separate controls row stacked beneath, which crowded the player.
-  const wideBtn=(act,label,extra)=>`<button data-act="${act}" style="background:${T.surface2};border:1.5px solid ${T.line};color:${T.chalk};border-radius:9px;padding:10px 13px;font-family:${SANS};font-size:14px;font-weight:700;white-space:nowrap;${extra||""}">${label}</button>`;
+  const wideBtn=(act,label,extra)=>`<button data-act="${act}" style="background:${T.surface2};border:2px solid ${T.line};color:${T.chalk};border-radius:9px;padding:10px 13px;font-family:${SANS};font-size:14px;font-weight:700;white-space:nowrap;${extra||""}">${label}</button>`;
   const wideBar=playing?"":`<div style="display:flex;gap:8px;align-items:center;justify-content:center;flex:none;flex-wrap:wrap">
       ${wideBtn("undo",ICN.undo+" Undo")}
       ${mode==="idle"?wideBtn("home",ICN.home+" Home")+wideBtn("lineup","Lineup")+wideBtn("ingamesettings",ICN.gear+" Setup")+wideBtn("endgame","End",`color:${T.out};border-color:${T.out}`):""}
@@ -3709,7 +3709,7 @@ function render(){
         ${miniCount()}${batterCard()}
         <div style="flex:1;min-height:0;display:flex;align-items:center;justify-content:center;position:relative">${diamondSVG()}${toastEl}</div></div>`;
     // Thumbnail field: pitch count sits in the empty space to the LEFT (out of the field box).
-    const pcSide=`<div style="flex:none;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(9,13,19,.6);border:1.5px solid ${T.line};border-radius:11px;padding:8px 14px;line-height:1">
+    const pcSide=`<div style="flex:none;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(9,13,19,.6);border:2px solid ${T.line};border-radius:11px;padding:8px 14px;line-height:1">
         <div style="font-family:${MONO};font-size:30px;font-weight:800;color:${T.amber}">${currentPitchCount()}</div>
         <div style="font-size:9px;font-weight:800;letter-spacing:1.4px;color:${T.sageDim};margin-top:3px">PITCHES</div>
         <div style="font-size:11px;font-weight:600;color:${T.sage};max-width:130px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${currentPitcherName()}</div></div>`;
@@ -3764,7 +3764,7 @@ function render(){
     // for locate/runners (focusPlay).
     const pitchTeam=fielding()?(OUR.short||"US"):(OPP.short||"OPP");
     const pitchClr=fielding()?OUR.color:OPP.color;
-    const pcLine=`<div style="flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px;background:${T.surface};border:1.5px solid ${T.line};border-radius:10px;padding:11px 16px">
+    const pcLine=`<div style="flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px;background:${T.surface};border:2px solid ${T.line};border-radius:10px;padding:11px 16px">
         <div style="display:flex;align-items:baseline;gap:9px;flex:none">
           <span style="font-family:${MONO};font-size:32px;font-weight:800;color:${T.amber};line-height:1">${currentPitchCount()}</span>
           <span style="font-size:14px;font-weight:800;letter-spacing:1.2px;color:${T.sageDim}">PITCHES</span></div>
@@ -4161,9 +4161,9 @@ function renderToolbar(){
   const scorerLocked=!canScoreNow();   // signed-in follower (not a scorer) → grey the Scorer tab
   const roleSeg=(r,lbl)=>{const lock=(r==="scorer"&&scorerLocked);return `<button data-act="role" data-arg="${r}" title="${lock?'Scorers only — ask the owner for access':''}" style="padding:${isWide()?'8px 14px':'7px 10px'};border:none;font-family:${MONO};font-weight:800;font-size:${isWide()?'13px':'12px'};letter-spacing:.5px;text-transform:uppercase;cursor:${lock?'not-allowed':'pointer'};background:${viewMode===r?T.lime:"transparent"};color:${viewMode===r?"#fff":T.sage};${lock?'opacity:.4':''};display:inline-flex;align-items:center;gap:5px">${lbl}${lock?IC('key',12):''}</button>`;};
   const chip=(playMode2&&viewerLocked)
-    ? `<div style="display:inline-flex;align-items:center;gap:8px"><span style="display:inline-flex;align-items:center;gap:5px;background:${T.surface};border:1.5px solid ${T.line};border-radius:999px;padding:5px 11px;font-family:${MONO};font-size:11px;font-weight:800;letter-spacing:1px;color:${T.lime}">${IC('eye',14)} WATCHING</span><span style="font-family:${MONO};font-weight:700;font-size:15px;color:${T.chalk}">${OUR.short||"US"} <span style="color:${T.sageDim};font-weight:600">vs</span> ${OPP.short||"OPP"}</span></div>`
+    ? `<div style="display:inline-flex;align-items:center;gap:8px"><span style="display:inline-flex;align-items:center;gap:5px;background:${T.surface};border:2px solid ${T.line};border-radius:999px;padding:5px 11px;font-family:${MONO};font-size:11px;font-weight:800;letter-spacing:1px;color:${T.lime}">${IC('eye',14)} WATCHING</span><span style="font-family:${MONO};font-weight:700;font-size:15px;color:${T.chalk}">${OUR.short||"US"} <span style="color:${T.sageDim};font-weight:600">vs</span> ${OPP.short||"OPP"}</span></div>`
     : playMode2
-    ? `<div style="display:inline-flex;background:${T.surface};border:1.5px solid ${T.line};border-radius:10px;overflow:hidden">${roleSeg("scorer","Scorer")}${roleSeg("viewer","Viewer")}</div>`
+    ? `<div style="display:inline-flex;background:${T.surface};border:2px solid ${T.line};border-radius:10px;overflow:hidden">${roleSeg("scorer","Scorer")}${roleSeg("viewer","Viewer")}</div>`
     : inGame
       ? `${OUR.short||"US"} <span style="color:${T.sageDim};font-weight:600">vs</span> ${OPP.short||"OPP"}`
       : `ALL-STARS <span style="color:${T.lime}">LIVE</span>`;
@@ -4175,20 +4175,20 @@ function renderToolbar(){
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>${monitorOn?"Hide video":"Show video"}</button>`:"";
   // Game controls back in the top bar, as compact ICONS (wide scorer, between plays). Phone keeps
   // its own bottom footer. The scoreboard above the field is just the score now.
-  const tbBtn=(act,label,extra)=>`<button data-act="${act}" style="background:${T.surface2};border:1.5px solid ${T.line};color:${T.chalk};border-radius:9px;padding:8px 12px;font-family:${SANS};font-size:13px;font-weight:700;white-space:nowrap;${extra||""}">${label}</button>`;
-  const tbIcon=(act,title,icon,extra)=>`<button data-act="${act}" title="${title}" aria-label="${title}" style="background:${T.surface2};border:1.5px solid ${T.line};color:${T.chalk};border-radius:9px;height:38px;flex:none;display:inline-flex;align-items:center;gap:6px;padding:0 12px;font-family:${SANS};font-size:13px;font-weight:700;white-space:nowrap;${extra||""}">${icon}<span>${title}</span></button>`;
+  const tbBtn=(act,label,extra)=>`<button data-act="${act}" style="background:${T.surface2};border:2px solid ${T.line};color:${T.chalk};border-radius:9px;padding:8px 12px;font-family:${SANS};font-size:13px;font-weight:700;white-space:nowrap;${extra||""}">${label}</button>`;
+  const tbIcon=(act,title,icon,extra)=>`<button data-act="${act}" title="${title}" aria-label="${title}" style="background:${T.surface2};border:2px solid ${T.line};color:${T.chalk};border-radius:9px;height:38px;flex:none;display:inline-flex;align-items:center;gap:6px;padding:0 12px;font-family:${SANS};font-size:13px;font-weight:700;white-space:nowrap;${extra||""}">${icon}<span>${title}</span></button>`;
   // Undo gets a labeled, accent-bordered button at the far RIGHT (easiest to see/reach while
   // scoring); the rest stay compact icons to its left.
   const gc=(isWide()&&mode==="idle"&&viewMode==="scorer")
-    ? `<div style="display:flex;gap:6px;flex:none;align-items:center;flex-wrap:wrap;justify-content:flex-end;margin-left:auto">${tbIcon("lineup","Lineup",IC('users',18))}${tbIcon("inninglog","Inning log",IC('doc',18))}${tbIcon("ingamesettings","Settings",IC('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>',16))}${tbIcon("home","Home",IC('home',18))}${tbIcon("endgame","End game",IC('<rect x="6" y="6" width="12" height="12" rx="1.5"/>',18),`color:${T.out};border-color:${T.out}`)}<button data-act="undo" title="Undo last action" style="display:flex;align-items:center;gap:7px;background:${T.surface2};border:1.5px solid ${T.lime};color:${T.chalk};border-radius:9px;height:38px;padding:0 16px;font-family:${SANS};font-size:14px;font-weight:800;flex:none">${IC('undo',18)} Undo</button></div>`
+    ? `<div style="display:flex;gap:6px;flex:none;align-items:center;flex-wrap:wrap;justify-content:flex-end;margin-left:auto">${tbIcon("lineup","Lineup",IC('users',18))}${tbIcon("inninglog","Inning log",IC('doc',18))}${tbIcon("ingamesettings","Settings",IC('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>',16))}${tbIcon("home","Home",IC('home',18))}${tbIcon("endgame","End game",IC('<rect x="6" y="6" width="12" height="12" rx="1.5"/>',18),`color:${T.out};border-color:${T.out}`)}<button data-act="undo" title="Undo last action" style="display:flex;align-items:center;gap:7px;background:${T.surface2};border:2px solid ${T.line}${T.lime};color:${T.chalk};border-radius:9px;height:38px;padding:0 16px;font-family:${SANS};font-size:14px;font-weight:800;flex:none">${IC('undo',18)} Undo</button></div>`
     : "";
   // Viewer (video on): the field/feed swap lives in the top bar, labeled with what you switch TO.
   const vsw=(isWide()&&viewMode==="viewer"&&monitorOn)
     ? tbBtn("swapviewer",`${ICN.swap} ${viewerRight==="field"?"Game feed":"Field view"}`)
     : "";
-  const shareBtnTop=`<button data-act="share" title="Share / QR" style="flex:none;display:flex;align-items:center;justify-content:center;gap:7px;background:${T.surface2};border:1.5px solid ${T.line};color:${T.chalk};border-radius:10px;${isWide()?"padding:9px 15px;font-size:15px":"width:42px;height:38px;padding:0"};font-weight:800">
+  const shareBtnTop=`<button data-act="share" title="Share / QR" style="flex:none;display:flex;align-items:center;justify-content:center;gap:7px;background:${T.surface2};border:2px solid ${T.line};color:${T.chalk};border-radius:10px;${isWide()?"padding:9px 15px;font-size:15px":"width:42px;height:38px;padding:0"};font-weight:800">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="${T.lime}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="19" r="2.6"/><path d="M8.3 10.8 15.7 6.4M8.3 13.2l7.4 4.4"/></svg>${isWide()?"Share":""}</button>`;
-  const liveDot=`<div title="${dot.l}" style="flex:none;display:flex;align-items:center;gap:5px;background:${T.surface};border:1.5px solid ${T.line};border-radius:999px;padding:5px 9px">
+  const liveDot=`<div title="${dot.l}" style="flex:none;display:flex;align-items:center;gap:5px;background:${T.surface};border:2px solid ${T.line};border-radius:999px;padding:5px 9px">
       <span class="${conn?'livedot':''}" style="width:8px;height:8px;border-radius:50%;background:${dot.c};${conn?`box-shadow:0 0 7px ${dot.c}`:""}"></span>
       <span style="font-family:${MONO};font-size:10px;font-weight:700;letter-spacing:1px;color:${dot.c}">${dot.l}</span></div>`;
   // YouTube/stream error — persistent pill right in the top bar so the operator sees it without
@@ -4197,7 +4197,7 @@ function renderToolbar(){
     ? `<button data-act="bcasterr" title="${(window.__bcastStatus||"").replace(/"/g,"&quot;")}" style="flex:none;display:flex;align-items:center;gap:6px;background:rgba(255,59,92,.15);border:1px solid ${T.live};color:${T.live};border-radius:999px;padding:6px 11px;font-family:${SANS};font-weight:800;font-size:12px;max-width:300px;min-width:0">&#9888;<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${window.__bcastStatus}</span></button>`
     : "";
   const sOn=Snd.isOn();
-  const soundBtn=`<button data-act="soundtoggle" title="${sOn?"Mute sounds":"Unmute sounds"}" style="flex:none;display:flex;align-items:center;justify-content:center;background:${T.surface2};border:1.5px solid ${T.line};color:${sOn?T.lime:T.sageDim};border-radius:10px;width:42px;height:38px">
+  const soundBtn=`<button data-act="soundtoggle" title="${sOn?"Mute sounds":"Unmute sounds"}" style="flex:none;display:flex;align-items:center;justify-content:center;background:${T.surface2};border:2px solid ${T.line};color:${sOn?T.lime:T.sageDim};border-radius:10px;width:42px;height:38px">
       <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4z"/>${sOn?'<path d="M15.5 8.5a5 5 0 0 1 0 7M18.8 6a9 9 0 0 1 0 12"/>':'<path d="M22 9l-6 6M16 9l6 6"/>'}</svg></button>`;
   // Current-batter box back in the top bar (wide scorer, live). It's flex:1 so it fills the middle
   // The current batter now lives in the larger AT-BAT card above the scoring buttons (batterCard),
@@ -4536,7 +4536,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v173";
+var APP_VERSION="v174";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
