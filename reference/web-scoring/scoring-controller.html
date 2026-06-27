@@ -304,6 +304,10 @@ function saveGame(){try{localStorage.setItem(GAME_KEY,JSON.stringify({G,curTeamI
 let DB=loadDB(), curTeamId=null, openTeamId=null, oppTeamId=null, pickFor="our", finderResults=null, openTeamFrom="teams";
 DB.teams.forEach(migrateTeam);   // split legacy single-name players into first/last
 const curTeam=()=>DB.teams.find(t=>t.id===curTeamId)||null;
+/* Today's date as a LOCAL YYYY-MM-DD (matches the date picker + schedule). NEVER use
+   new Date().toISOString() for this — that's UTC, so scoring in the evening (US zones) stamps
+   tomorrow and the finished game stops matching its scheduled date (shows "not played yet"). */
+function todayLocal(){const n=new Date(),p=x=>String(x).padStart(2,"0");return n.getFullYear()+"-"+p(n.getMonth()+1)+"-"+p(n.getDate());}
 const teamById=id=>DB.teams.find(t=>t.id===id)||null;
 function nextId(p){return p+(DB.seq++);}
 function newTeam(name){name=(name||"").trim()||"New Team";
@@ -806,7 +810,7 @@ function endGame(){snapshot();G.final=true;
     // Archive this game (final score, opponent, date) — the W-L-T record is DERIVED from this
     // log via teamRec(), so the record can never disagree with the games shown below it.
     if(!Array.isArray(t.games))t.games=[];
-    t.games.unshift(Object.assign({id:"g"+Date.now().toString(36),date:new Date().toISOString().slice(0,10),opp:(OPP.name||"Opponent"),oppShort:OPP.short||"OPP",us:o,them:p,result:(o>p?"W":o<p?"L":"T"),yt:(streamYt()||"")}, liveGameBox()));
+    t.games.unshift(Object.assign({id:"g"+Date.now().toString(36),date:(G.schedDate||todayLocal()),schedId:(G.schedId||undefined),opp:(OPP.name||"Opponent"),oppShort:OPP.short||"OPP",us:o,them:p,result:(o>p?"W":o<p?"L":"T"),yt:(streamYt()||"")}, liveGameBox()));
     if(t.games.length>60)t.games=t.games.slice(0,60);   // cap (each carries a compact box score)
     t.record=teamRec(t);          // keep the stored/synced record in lockstep with the log
     saveDB();G.rolledUp=true;}
@@ -2614,7 +2618,7 @@ function actionArea(){
           ${textBlock}${btns}</div>`;};
     // A scheduled GAME counts as played once a finished game exists for the same date (+ opponent if set),
     // so it moves to "Earlier" even if you scored it before its listed time.
-    const schedPlayed=(s)=>{ if(s.type==="practice")return false; return (t.games||[]).some(gm=>gm.date===s.date && (!s.opp || (gm.opp||"").toLowerCase()===(s.opp||"").toLowerCase())); };
+    const schedPlayed=(s)=>{ if(s.type==="practice")return false; return (t.games||[]).some(gm=> (gm.schedId&&gm.schedId===s.id) || (gm.date===s.date && (!s.opp || (gm.opp||"").toLowerCase()===(s.opp||"").toLowerCase()))); };
     const schedPast=(s)=>schedPlayed(s)||(schedWhen(s)+_grace<_now);
     // LIST view: drop PAST PRACTICES entirely (they stay on the Calendar view); past GAMES move to Earlier.
     const listItems=sched.filter(s=> s.type!=="practice" || !schedPast(s));
@@ -3984,6 +3988,7 @@ document.getElementById("app").addEventListener("click",e=>{
   if(act==="alertsilence"){ if(activeAlert)dismissedAlerts.add(activeAlert.key); activeAlert=null; render(); return; }
   if(act==="schedstart"){ const t=teamById(openTeamId); if(!t)return; const s=(t.schedule||[]).find(x=>x.id===arg);
     newgameFrom="team"; selectTeam(t.id); G=initGame(); loadTeamLineup(teamById(curTeamId)); hist=[]; resetUI();
+    if(s){ G.schedId=s.id; G.schedDate=s.date||null; }   // remember WHICH scheduled game this is, so end-game marks it played for sure
     if(s&&s.opp){ const m=(DB.teams||[]).find(x=>x.id!==t.id && (x.name||"").toLowerCase()===(s.opp||"").toLowerCase());
       if(m){ oppTeamId=m.id; OPP.name=m.name; OPP.short=m.short; OPP.color=m.color; OPP.logo=m.logo||null; }
       else { oppTeamId=null; OPP.name=s.opp; OPP.short=(s.opp||"OPP").slice(0,3).toUpperCase(); OPP.color="#E11D2E"; OPP.logo=null; }
@@ -4645,7 +4650,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v189";
+var APP_VERSION="v190";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;

@@ -44,8 +44,11 @@ Status: [ ] todo · [~] in progress · [x] done. Grouped by theme; recurring/met
 - [ ] D1. Send a link to the game from the schedule window.
 - [ ] D2. Adding a team in Schedule should make it selectable in the opponent picker at game start.
 - [ ] D3. Autopopulate the YouTube video name as "My Team vs Opponent."
-- [ ] D4. BUG: after End Game → "save stats this season?" → Yes, the team record/stats didn't update and
-      the game still shows as not-yet-played on the schedule.
+- [x] D4. BUG: after End Game → stats/record/schedule didn't update (v190). Root cause: finished game
+      stamped with UTC date (evening scoring → tomorrow) so it never matched the local scheduled date.
+      Fix: local date (todayLocal); plus games started from the schedule now carry the schedule's id+date
+      so they're marked played for sure, even with timezone/opponent-name mismatches. Save path itself
+      (games log, derived W-L-T record, season batting rollup) verified end-to-end.
 
 ## E. Pitch count
 - [ ] E1. Track the OPPONENT pitch count too, and expose it in the editor.
