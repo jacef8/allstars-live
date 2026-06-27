@@ -2496,6 +2496,11 @@ window._tpSync=function(idp){
   const cb=window["_tpcb_"+idp]; if(typeof cb==="function") try{cb(val);}catch(e){}
 };
 /* Recent opponents — remembered locally so the opponent picker can offer quick re-picks. */
+/* Notification preferences (delivered by the native app's push pipeline once it's wired; the panel +
+   storage exist now so people can pick what they want). Saved per device; will sync per-user later. */
+const NOTIF_DEFAULTS={ gameSoon:true, gameDay:false, live:"scores", practice:true, schedule:true, chat:true };
+function getNotifPrefs(){ try{ return Object.assign({},NOTIF_DEFAULTS,JSON.parse(localStorage.getItem("al-notif-prefs")||"{}")); }catch(e){ return Object.assign({},NOTIF_DEFAULTS); } }
+function setNotifPref(k,v){ try{ const p=getNotifPrefs(); p[k]=v; localStorage.setItem("al-notif-prefs",JSON.stringify(p)); }catch(e){} }
 function getRecentOpps(){ try{ return JSON.parse(localStorage.getItem("al-recent-opps")||"[]"); }catch(e){ return []; } }
 /* Per-device "last seen this team's chat" stamps → home unread badge (t.lastMsgAt is cloud-set). */
 function getSeenChat(){ try{ return JSON.parse(localStorage.getItem("al-chat-seen")||"{}"); }catch(e){ return {}; } }
@@ -3291,6 +3296,7 @@ function actionArea(){
           <div style="min-width:0"><div style="font-weight:800;color:${T.ink};font-size:18px">Broadcast audio</div>
             <div style="font-size:13px;color:${T.sage};margin-top:2px">${bcastCamAudio?"Camera audio (beta) — falls back to mic if the camera sends none":"Tablet mic — the camera's own audio isn't used"}</div></div>
           <button data-act="togglecamaudio" style="background:${bcastCamAudio?T.lime:T.surface2};border:2px solid ${bcastCamAudio?T.lime:T.line};color:${bcastCamAudio?"#fff":T.sage};border-radius:999px;padding:10px 16px;font-family:${MONO};font-weight:800;font-size:14px;min-width:92px">${bcastCamAudio?"CAMERA":"MIC"}</button></div>`:""}
+        ${item("opennotifs",IC('bell',24),"Notifications","Pick which alerts you get — game reminders, live scoring, chat &amp; more")}
         ${item("bugpreview",IC('eye',24),"Preview scorebug","See how the on-air score overlay looks — no camera needed")}
         ${item("apprefresh",IC('refresh',24),"Refresh app","Reload &amp; check for the latest version + sync teams")}
         ${item("opendebug",IC('alert',24),"Diagnostics","Camera, stream, network &amp; sync status — for field troubleshooting")}
@@ -3299,6 +3305,42 @@ function actionArea(){
             <div style="font-weight:800;color:${T.chalk};word-break:break-all;margin:2px 0 10px">${(C.user.email||"account").replace(/</g,"")}</div>
             <button data-act="signout" style="${ghost}">Sign out</button></div>`:""}
         <div style="font-size:12px;color:${T.sageDim};text-align:center;margin-top:6px">All-Stars Live &middot; ${(window.APP_VERSION||"")}</div>
+      </div>`;
+  }
+  if(mode==="notifs"){
+    const P=getNotifPrefs();
+    const tog=(k,label,sub)=>{const on=!!P[k];return `<button data-act="notiftoggle" data-arg="${k}" style="display:flex;align-items:center;gap:14px;background:${T.surface};border:2px solid ${T.line};border-radius:12px;padding:15px 16px;width:100%;text-align:left">
+        <div style="flex:1;min-width:0"><div style="font-weight:800;color:${T.ink};font-size:16px">${label}</div>${sub?`<div style="font-size:12.5px;color:${T.sage};margin-top:2px;line-height:1.35">${sub}</div>`:""}</div>
+        <span style="flex:none;width:50px;height:29px;border-radius:999px;background:${on?T.lime:T.surface2};border:2px solid ${on?T.lime:T.line};position:relative"><span style="position:absolute;top:1px;${on?"right:1px":"left:1px"};width:23px;height:23px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.4)"></span></span></button>`;};
+    const liveOpt=(v,label,sub)=>`<button data-act="notiflive" data-arg="${v}" style="display:flex;align-items:center;gap:12px;background:${P.live===v?"rgba(225,29,46,.10)":T.surface};border:2px solid ${P.live===v?T.lime:T.line};border-radius:11px;padding:13px 15px;width:100%;text-align:left">
+        <span style="flex:none;width:20px;height:20px;border-radius:50%;border:2px solid ${P.live===v?T.lime:T.sageDim};display:flex;align-items:center;justify-content:center">${P.live===v?`<span style="width:10px;height:10px;border-radius:50%;background:${T.lime}"></span>`:""}</span>
+        <div style="min-width:0"><div style="font-weight:800;color:${T.ink};font-size:15px">${label}</div><div style="font-size:12px;color:${T.sage};margin-top:1px">${sub}</div></div></button>`;
+    const sLbl=`font-size:12.5px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:${T.lime};margin:6px 2px 2px`;
+    return `<div style="display:flex;flex-direction:column;gap:12px">
+        <div class="frost-card" style="display:flex;align-items:center;gap:10px;background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:12px 14px">
+          <button data-act="notifsback" style="${ghost};padding:9px 11px">&lsaquo; Settings</button>
+          <div style="font-family:${MONO};font-size:23px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:${T.lime}">Notifications</div></div>
+        <div style="font-size:12.5px;color:${T.sage};background:${T.surface};border:1px dashed ${T.line};border-radius:12px;padding:13px 15px;line-height:1.5">${IC('bell',15)} Alerts are delivered by the All-Stars Live app (Android/iOS). Set what you want here and it applies on the app. ${IS_APP?"":"<b style=\"color:"+T.chalk+"\">This web view can't send background notifications.</b>"}</div>
+
+        <div style="${sLbl}">Before the game</div>
+        ${tog("gameSoon","Game starting soon","A heads-up ~15 minutes before first pitch.")}
+        ${tog("gameDay","Game day","A reminder the morning of a scheduled game.")}
+
+        <div style="${sLbl}">Live game updates</div>
+        <div style="font-size:12px;color:${T.sageDim};margin:-2px 2px 2px">How often to ping you while a team you follow is playing.</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          ${liveOpt("scores","Every score","Ping on every run that crosses.")}
+          ${liveOpt("big","Lead changes &amp; big plays","Only lead changes, home runs &amp; the final — less noisy.")}
+          ${liveOpt("final","Final only","Just the final score when the game ends.")}
+          ${liveOpt("off","Off","No live in-game pings.")}
+        </div>
+
+        <div style="${sLbl}">Team</div>
+        ${tog("practice","Practice reminders","Before a scheduled practice.")}
+        ${tog("schedule","Schedule changes","When a game or practice is added, moved, or canceled.")}
+        ${tog("chat","Team chat messages","When someone posts in a team's chat.")}
+
+        <div style="font-size:11px;color:${T.sageDim};text-align:center;margin-top:4px;line-height:1.5">Saved on this device. Per-team controls and delivery arrive with the app's push system.</div>
       </div>`;
   }
   if(mode==="debug"){
@@ -4033,7 +4075,7 @@ function render(){
   // canScoreNow() is permissive during sync, so this never strands a real scorer in Viewer.
   if(viewMode==="scorer" && !canScoreNow()) viewMode="viewer";
   renderToolbar();
-  const menu=(mode==="home"||mode==="teams"||mode==="team"||mode==="pickteam"||mode==="newgame"||mode==="lineup"||mode==="pickplayer"||mode==="pickpos"||mode==="editplayer"||mode==="opppickpos"||mode==="opppickpitch"||mode==="oppeditplayer"||mode==="summary"||mode==="settings"||mode==="directory"||mode==="teamstats"||mode==="debug"||mode==="player"||mode==="followcal");
+  const menu=(mode==="home"||mode==="teams"||mode==="team"||mode==="pickteam"||mode==="newgame"||mode==="lineup"||mode==="pickplayer"||mode==="pickpos"||mode==="editplayer"||mode==="opppickpos"||mode==="opppickpitch"||mode==="oppeditplayer"||mode==="summary"||mode==="settings"||mode==="notifs"||mode==="directory"||mode==="teamstats"||mode==="debug"||mode==="player"||mode==="followcal");
   if(IS_APP&&window.AllStars.setInGame){ try{ AllStars.setInGame(!menu); }catch(e){} }   // hide native tabs during a game
   // Push the live score to the native compositor so it's burned into the broadcast.
   if(IS_APP&&!menu&&window.AllStars.setScore){ try{
@@ -4557,6 +4599,10 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="newgame"){mode="newgame";render();}
   else if(act==="gohome"){mode="home";teamTab="hub";render();}   // reset sub-tab so the next team opens clean
   else if(act==="opendebug"){mode="debug";render();}
+  else if(act==="opennotifs"){mode="notifs";render();}
+  else if(act==="notifsback"){mode="settings";render();}
+  else if(act==="notiftoggle"){ const p=getNotifPrefs(); setNotifPref(arg,!p[arg]); render(); }
+  else if(act==="notiflive"){ setNotifPref("live",arg); render(); }
   else if(act==="syncnow"){ try{ if(window.cloudSyncNow){ window.cloudSyncNow(); flash("Syncing…"); setTimeout(function(){ try{ render(); }catch(e){} },1200); } else flash("Sign in first"); }catch(e){} }
   else if(act==="opensettings"){mode="settings";render();}
   else if(act==="copydiag"){ const u=window.__diagText||""; const done=()=>flash("Diagnostics copied"); if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(u).then(done).catch(done);}else{done();} }
@@ -4919,6 +4965,7 @@ window.appBack=function(){
     if(mode==="teamstats"){ mode="directory"; render(); return true; }   // public team view → back to search
     if(mode==="directory"){ mode="teams"; render(); return true; }       // browse teams → back to Teams
     if(mode==="debug"){ mode="settings"; render(); return true; }
+    if(mode==="notifs"){ mode="settings"; render(); return true; }
     if(mode==="player"){ mode=(openPlayerFrom==="team"?"team":"home"); if(mode==="team")teamTab="roster"; render(); return true; }
     if(mode==="followcal"){ mode="home"; render(); return true; }
     if(mode==="settings"){ mode="home"; render(); return true; }
@@ -5128,7 +5175,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v225";
+var APP_VERSION="v226";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
