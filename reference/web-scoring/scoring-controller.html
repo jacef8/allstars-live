@@ -706,7 +706,7 @@ const initGame=()=>({inning:1,half:"T",away:0,home:0,outs:0,balls:0,strikes:0,
   startedAt:null,  // wall-clock ms when the game ACTUALLY started (auto-set at first pitch / game start; editable in Game Setup) — drives the game timer
   lineup:{ order:[0,1,2,3,4,5,6,7,8],   // batting order: 9-12 entries (slots 10+ = extra hitters)
            pos:{P:0,C:1,"1B":2,"2B":3,"3B":4,SS:5,LF:6,CF:7,RF:8} }});
-let G=initGame(),hist=[],mode="home",tap=null,contact=null,result=null,plan=null,toast=null,toastTimer=null,curResults=[],showAll=false,showZones=false,editSlot=null,confirmAct=null,gameActive=false,lineupTab="us",newgameFrom="home",brSheet=false,correctOpen=false,correctOpenAt=0,lineupView="list",fieldAssign=null,fieldHold=null,fieldDisplaced=null,lineEditSlot=null,luFromSetup=false,koPick=null,oppFieldSel=null,gcArrange=false;
+let G=initGame(),hist=[],mode="home",tap=null,contact=null,result=null,plan=null,toast=null,toastTimer=null,curResults=[],showAll=false,showZones=false,editSlot=null,confirmAct=null,gameActive=false,lineupTab="us",newgameFrom="home",brSheet=false,correctOpen=false,correctOpenAt=0,lineupView="list",fieldAssign=null,fieldHold=null,fieldDisplaced=null,lineEditSlot=null,luFromSetup=false,koPick=null,oppFieldSel=null,gcArrange=false,bugPreview=false;
 // Resume the last in-progress game (saved by saveGame) across reloads/app updates, so the
 // lineup/score is never lost. Stays on the home screen → shows "Resume". Re-links ROSTER
 // to the saved team so the lineup's player indices resolve correctly.
@@ -1892,40 +1892,73 @@ function statusBar(){
   // and the count/outs/bases sit in labelled cells so it's obvious what's what. Animation hooks
   // (sb-score-*, sb-balls/strikes/outs, sb-base-*) are preserved so the pops/rolls still fire.
   const col=t=>TEAMS[t].color;
-  // One team row: color band · logo · abbr · (at-bat dot) · score. Animation hooks kept (sb-score-*, .digit).
-  const tabRow=(t,val,act)=>{const c=col(t),lg=TEAMS[t].logo;return `<div style="position:relative;display:flex;align-items:center;gap:8px;height:31px;padding:0 11px 0 0;background:${act?`linear-gradient(90deg,${c}40,${c}10 60%,transparent)`:"transparent"}">
-      <span style="width:5px;align-self:stretch;background:${c};flex:none"></span>
-      ${lg?`<img src="${lg}" alt="" style="width:21px;height:21px;object-fit:contain;border-radius:5px;background:#fff;flex:none;${act?"":"opacity:.5"}">`:`<span style="width:21px;height:21px;border-radius:5px;flex:none;background:${c};display:inline-flex;align-items:center;justify-content:center;font-family:${MONO};font-size:11px;font-weight:800;color:${idealText(c)}">${(TEAMS[t].short||"?").slice(0,1)}</span>`}
-      <span style="font-family:${MONO};font-weight:800;font-size:15px;letter-spacing:.5px;color:${act?"#fff":T.sage};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-shadow:${act?"0 1px 2px rgba(0,0,0,.5)":"none"}">${TEAMS[t].short}</span>
-      ${act?`<span title="at bat" style="width:6px;height:6px;border-radius:50%;background:${c};box-shadow:0 0 7px ${c};flex:none"></span>`:`<span style="width:6px;flex:none"></span>`}
-      <span class="sb-score num" id="sb-score-${t}" style="margin-left:auto;padding-left:8px;font-weight:800;font-size:24px;line-height:1;color:${act?"#fff":T.sage}"><span class="digit">${val}</span></span>
+  // ESPN-modeled MLB scorebug: near-black horizontal bar, two stacked team rows (logo · ABBR · score,
+  // away over home, batting team brightened) on the LEFT, then the game situation (inning · count/outs ·
+  // bases) on the RIGHT. Animation hooks kept (sb-score-*/.digit, sb-balls/strikes/outs, sb-base-*).
+  const tabRow=(t,val,act)=>{const c=col(t),lg=TEAMS[t].logo;return `<div style="position:relative;display:flex;align-items:center;gap:9px;height:30px;padding:0 12px 0 0;background:${act?`linear-gradient(90deg,${c}33,transparent 75%)`:"transparent"}">
+      <span style="width:4px;align-self:stretch;background:${c};flex:none"></span>
+      ${lg?`<img src="${lg}" alt="" style="width:20px;height:20px;object-fit:contain;border-radius:4px;background:#fff;flex:none;${act?"":"opacity:.55"}">`:`<span style="width:20px;height:20px;border-radius:4px;flex:none;background:${c};display:inline-flex;align-items:center;justify-content:center;font-family:${MONO};font-size:11px;font-weight:800;color:${idealText(c)}">${(TEAMS[t].short||"?").slice(0,1)}</span>`}
+      <span style="font-family:${MONO};font-weight:800;font-size:15px;letter-spacing:.6px;color:${act?"#fff":"#9AA6B8"};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${TEAMS[t].short}</span>
+      ${act?`<span title="at bat" style="width:5px;height:5px;border-radius:50%;background:${c};box-shadow:0 0 6px ${c};flex:none"></span>`:`<span style="width:5px;flex:none"></span>`}
+      <span class="sb-score num" id="sb-score-${t}" style="margin-left:auto;padding-left:10px;font-weight:800;font-size:25px;line-height:1;color:${act?"#fff":"#C2CBD8"}"><span class="digit">${val}</span></span>
     </div>`;};
-  const b=G.bases,base=(x,y,on,id)=>`<rect id="${id}" class="sb-base" x="${x-6.5}" y="${y-6.5}" width="13" height="13" rx="2" transform="rotate(45 ${x} ${y})" fill="${on?T.clay:"none"}" stroke="${on?T.clay:T.sageDim}" stroke-width="2"/>`;
-  const diamond=`<svg width="40" height="35" viewBox="0 0 48 44" style="overflow:visible">${base(24,11,b[2],"sb-base-2")}${base(37,24,b[1],"sb-base-1")}${base(11,24,b[3],"sb-base-3")}</svg>`;
-  const pipRow=(label,cls,n,max,id)=>`<div class="bso-row" id="${id}" style="display:flex;align-items:center;gap:4px;height:13px">
-      <span style="font-family:${MONO};font-size:10px;font-weight:800;color:${T.sageDim};width:9px">${label}</span>
+  const b=G.bases,base=(x,y,on,id)=>`<rect id="${id}" class="sb-base" x="${x-6.5}" y="${y-6.5}" width="13" height="13" rx="2" transform="rotate(45 ${x} ${y})" fill="${on?T.clay:"none"}" stroke="${on?T.clay:"#5C6675"}" stroke-width="2"/>`;
+  const diamond=`<svg width="38" height="34" viewBox="0 0 48 44" style="overflow:visible">${base(24,11,b[2],"sb-base-2")}${base(37,24,b[1],"sb-base-1")}${base(11,24,b[3],"sb-base-3")}</svg>`;
+  const pipRow=(label,cls,n,max,id)=>`<div class="bso-row" id="${id}" style="display:flex;align-items:center;gap:4px;height:12px">
+      <span style="font-family:${MONO};font-size:9px;font-weight:800;color:#6B7686;width:8px">${label}</span>
       ${Array.from({length:max},(_,i)=>`<span class="bso-pip ${cls}${i<n?" on":""}"></span>`).join("")}</div>`;
-  // Compact broadcast bug: gradient body, team-colour top accent split away|home, glossy edge, soft shadow.
-  // inline-flex + align-self:flex-start so it sits as a content-sized BUG (no full-width dead space / vertical stretch).
-  return `<div id="statusbar" data-longpress="correct" title="Tap the pencil (or hold) to correct the count / outs / score" style="position:relative;display:inline-flex;align-self:flex-start;max-width:100%;align-items:stretch;background:linear-gradient(180deg,#19212f 0%,#0c121d 100%);border:1.5px solid rgba(255,255,255,.12);border-radius:12px;overflow:hidden;flex-shrink:0;box-shadow:0 8px 22px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.08);user-select:none;-webkit-user-select:none;-webkit-touch-callout:none">
-    <div style="position:absolute;top:0;left:0;right:0;height:3px;display:flex;z-index:3"><span style="flex:1;background:${col("away")}"></span><span style="flex:1;background:${col("home")}"></span></div>
-    <div style="display:flex;flex-direction:column;justify-content:center;min-width:124px;max-width:210px;padding:4px 0 0">
+  // inline-flex + align-self:flex-start → content-sized BUG (no full-width dead space / vertical stretch).
+  return `<div id="statusbar" data-longpress="correct" title="Tap the pencil (or hold) to correct the count / outs / score" style="position:relative;display:inline-flex;align-self:flex-start;max-width:100%;align-items:stretch;background:linear-gradient(180deg,#11151c 0%,#070a0e 100%);border:1px solid rgba(255,255,255,.13);border-radius:9px;overflow:hidden;flex-shrink:0;box-shadow:0 10px 26px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.06);user-select:none;-webkit-user-select:none;-webkit-touch-callout:none">
+    <div style="position:absolute;top:0;left:0;right:0;height:2.5px;display:flex;z-index:3"><span style="flex:1;background:${col("away")}"></span><span style="flex:1;background:${col("home")}"></span></div>
+    <div style="display:flex;flex-direction:column;justify-content:center;min-width:128px;max-width:215px;padding:3px 0 0">
       ${tabRow("away",G.away,G.half==="T")}
-      <div style="height:1px;background:rgba(255,255,255,.10);margin:0 0 0 5px"></div>
+      <div style="height:1px;background:rgba(255,255,255,.08);margin:0 0 0 4px"></div>
       ${tabRow("home",G.home,G.half==="B")}</div>
-    <div style="width:1px;background:rgba(255,255,255,.12)"></div>
-    <div style="display:flex;align-items:center;gap:14px;padding:0 15px">
+    <div style="width:1px;background:rgba(255,255,255,.13)"></div>
+    <div style="display:flex;align-items:center;gap:13px;padding:0 14px;background:rgba(0,0,0,.25)">
       <div style="display:flex;flex-direction:column;align-items:center;gap:1px">
-        <div style="font-family:${MONO};font-size:19px;font-weight:800;color:#fff;line-height:1">${G.half==="T"?"▲":"▼"}${G.inning}</div>
-        <div style="font-family:${MONO};font-size:8px;font-weight:800;letter-spacing:1px;color:${T.sageDim}">${G.half==="T"?"TOP":"BOT"}</div></div>
+        <div style="font-family:${MONO};font-size:18px;font-weight:800;color:#fff;line-height:1">${G.half==="T"?"▲":"▼"}${G.inning}</div>
+        <div style="font-family:${MONO};font-size:7.5px;font-weight:800;letter-spacing:1px;color:#6B7686">${G.half==="T"?"TOP":"BOT"}</div></div>
       <div style="display:flex;flex-direction:column;gap:3px">${pipRow("B","b",G.balls,3,"sb-balls")}${pipRow("S","s",G.strikes,2,"sb-strikes")}${pipRow("O","o",G.outs,3,"sb-outs")}</div>
-      <div style="display:flex;flex-direction:column;align-items:center;gap:2px">${diamond}<div style="font-family:${MONO};font-size:8px;font-weight:800;letter-spacing:1px;color:${T.sageDim}">BASES</div></div>
-      ${G.startedAt?`<div style="font-family:${MONO};font-size:11px;font-weight:700;color:${T.sage};white-space:nowrap"><span class="game-clock">${gameClockStr()}</span></div>`:""}
+      <div style="display:flex;flex-direction:column;align-items:center;gap:2px">${diamond}<div style="font-family:${MONO};font-size:7.5px;font-weight:800;letter-spacing:1px;color:#6B7686">BASES</div></div>
+      ${G.startedAt?`<div style="font-family:${MONO};font-size:11px;font-weight:700;color:#9AA6B8;white-space:nowrap"><span class="game-clock">${gameClockStr()}</span></div>`:""}
     </div>
-    <button data-act="correctopen" title="Correct the count, outs, score &amp; inning" style="flex:none;width:34px;align-self:stretch;border:none;border-left:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);color:${T.lime};display:flex;align-items:center;justify-content:center;font-size:15px;padding:0;cursor:pointer">&#9998;</button>
+    <button data-act="correctopen" title="Correct the count, outs, score &amp; inning" style="flex:none;width:32px;align-self:stretch;border:none;border-left:1px solid rgba(255,255,255,.10);background:rgba(255,255,255,.04);color:${T.lime};display:flex;align-items:center;justify-content:center;font-size:14px;padding:0;cursor:pointer">&#9998;</button>
   </div>`;
 }
 
+/* Preview the broadcast scorebug WITHOUT a camera/stream. Renders statusBar() over a faux video frame
+   so the operator can see (and we can iterate on) the on-air look anytime. Uses the live game if one's
+   running, otherwise sample data — restored immediately so nothing real is touched. */
+function bugPreviewHtml(){
+  if(gameActive) return statusBar();
+  const snapG={away:G.away,home:G.home,inning:G.inning,half:G.half,balls:G.balls,strikes:G.strikes,outs:G.outs,bases:G.bases,startedAt:G.startedAt};
+  const snapT={aS:TEAMS.away.short,aC:TEAMS.away.color,hS:TEAMS.home.short,hC:TEAMS.home.color};
+  try{
+    G.away=2;G.home=3;G.inning=4;G.half="T";G.balls=2;G.strikes=1;G.outs=1;G.bases={1:{},2:null,3:{}};G.startedAt=Date.now()-2730000;
+    if(!TEAMS.away.short){TEAMS.away.short="AWAY";} if(!TEAMS.away.color){TEAMS.away.color="#E11D2E";}
+    if(!TEAMS.home.short){TEAMS.home.short="HOME";} if(!TEAMS.home.color){TEAMS.home.color="#2E6BE6";}
+    return statusBar();
+  } finally {
+    Object.assign(G,snapG);
+    TEAMS.away.short=snapT.aS;TEAMS.away.color=snapT.aC;TEAMS.home.short=snapT.hS;TEAMS.home.color=snapT.hC;
+  }
+}
+function bugPreviewOverlay(){
+  return `<div data-act="closebugpreview" style="position:fixed;inset:0;z-index:140;display:flex;align-items:center;justify-content:center;background:rgba(6,9,13,.88);padding:20px">
+    <div data-act="noop" style="width:100%;max-width:760px;display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+        <div style="font-family:${MONO};font-size:18px;font-weight:800;letter-spacing:.4px;color:${T.chalk}">Scorebug preview</div>
+        <button data-act="closebugpreview" style="background:${T.surface2};border:2px solid ${T.line};color:${T.chalk};border-radius:9px;padding:9px 16px;font-weight:800;font-size:14px">Done</button></div>
+      <div style="font-size:12.5px;color:${T.sage};line-height:1.45">This is exactly how the scorebug looks burned into your broadcast. ${gameActive?"Showing your live game.":"Showing sample data — start a game to see your real teams &amp; score."}</div>
+      <div style="position:relative;width:100%;aspect-ratio:16/9;background:radial-gradient(120% 90% at 50% 18%, #2c7d4e 0%, #1f5c3a 42%, #123a26 100%);border:2px solid ${T.line};border-radius:14px;overflow:hidden;box-shadow:0 14px 40px rgba(0,0,0,.55)">
+        <div style="position:absolute;inset:0;background:repeating-linear-gradient(90deg, rgba(255,255,255,.05) 0 2px, transparent 2px 64px)"></div>
+        <div style="position:absolute;top:12px;left:14px;display:flex;align-items:center;gap:6px;background:rgba(8,11,16,.55);border-radius:999px;padding:4px 11px"><span style="width:8px;height:8px;border-radius:50%;background:${T.live};box-shadow:0 0 8px ${T.live}"></span><span style="font-family:${MONO};font-weight:800;font-size:11px;letter-spacing:1.6px;color:#fff">PREVIEW</span></div>
+        <div style="position:absolute;left:16px;bottom:16px;display:flex">${bugPreviewHtml()}</div>
+      </div>
+      <div style="font-size:11px;color:${T.sageDim};text-align:center">Tip: also reachable from Settings → Preview scorebug.</div>
+    </div></div>`;
+}
 function batterCard(){
   const b=batter(),k=battingKey(),c=TEAMS[k].color;
   const lp=batterLineParts();
@@ -3233,6 +3266,7 @@ function actionArea(){
           <div style="min-width:0"><div style="font-weight:800;color:${T.ink};font-size:18px">Broadcast audio</div>
             <div style="font-size:13px;color:${T.sage};margin-top:2px">${bcastCamAudio?"Camera audio (beta) — falls back to mic if the camera sends none":"Tablet mic — the camera's own audio isn't used"}</div></div>
           <button data-act="togglecamaudio" style="background:${bcastCamAudio?T.lime:T.surface2};border:2px solid ${bcastCamAudio?T.lime:T.line};color:${bcastCamAudio?"#fff":T.sage};border-radius:999px;padding:10px 16px;font-family:${MONO};font-weight:800;font-size:14px;min-width:92px">${bcastCamAudio?"CAMERA":"MIC"}</button></div>`:""}
+        ${item("bugpreview",IC('eye',24),"Preview scorebug","See how the on-air score overlay looks — no camera needed")}
         ${item("apprefresh",IC('refresh',24),"Refresh app","Reload &amp; check for the latest version + sync teams")}
         ${item("opendebug",IC('alert',24),"Diagnostics","Camera, stream, network &amp; sync status — for field troubleshooting")}
         ${signedIn?`<div style="background:${T.surface};border:2px solid ${T.line};border-radius:12px;padding:16px 18px">
@@ -4005,7 +4039,7 @@ function render(){
     // transition reads as a jarring "flash" when you're just popping a quick chooser open.
     const stepModes=["pickplayer","pickpos","editplayer","opppickpos","opppickpitch","oppeditplayer"];
     const cls=`${(mode!==_lastMode&&!stepModes.includes(mode))?"screen-in ":""}${(scroll&&!building)?"page-zoom":""}`;
-    paintContent(`<div class="${cls}" style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px;${scroll?"overflow-y:auto;-webkit-overflow-scrolling:touch":""}">${actionArea()}</div>${confirmOverlay()}`);
+    paintContent(`<div class="${cls}" style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px;${scroll?"overflow-y:auto;-webkit-overflow-scrolling:touch":""}">${actionArea()}</div>${confirmOverlay()}${bugPreview?bugPreviewOverlay():""}`);
     _lastMode=mode; _lastSubTab=subTab;
     try{ const _sk=mode+"|"+subTab; if(scroll&&_scrollMem[_sk]!=null){ const c=document.querySelector("#content > div"); if(c)c.scrollTop=_scrollMem[_sk]; }
          if(mode==="lineup"&&_scrollMem["__lineup"]!=null){ const l=document.getElementById("lineup-list"); if(l)l.scrollTop=_scrollMem["__lineup"]; } }catch(e){}
@@ -4334,6 +4368,8 @@ document.getElementById("app").addEventListener("click",e=>{
   if(act==="viewerphone"){ viewerPhone=(arg==="field"||arg==="feed")?arg:"both"; try{localStorage.setItem("al-viewer-phone",viewerPhone);}catch(e){} render(); return; }
   if(act==="soundtoggle"){ Snd.setOn(!Snd.isOn()); if(Snd.isOn())Snd.crack(); renderToolbar(); return; }
   if(act==="gcarrange"){ gcArrange=!gcArrange; renderToolbar(); if(!gcArrange)flash("Toolbar order saved"); return; }
+  if(act==="bugpreview"){ bugPreview=true; render(); return; }
+  if(act==="closebugpreview"){ bugPreview=false; render(); return; }
   if(act==="inviteadd"){ const e=document.getElementById("inviteWho"); if(!e)return; const v=(e.value||"").trim(); if(!v){flash("Enter an email or phone number");return;}
     const url=appBaseUrl()+"?invite="+encodeURIComponent(openTeamId); const t=teamById(openTeamId);
     const team=(t&&t.name)?t.name:"our team"; const isEmail=v.indexOf("@")>=0;
@@ -4803,6 +4839,7 @@ window.appBack=function(){
   try{
     // An open overlay/modal swallows Back first — dismiss it instead of leaving the app.
     const dov=document.getElementById("docOverlay"); if(dov){ dov.remove(); return true; }   // lineup card / scorecard viewer
+    if(bugPreview){ bugPreview=false; render(); return true; }
     if(photoZoom){ photoZoom=null; render(); return true; }
     const rmod=document.getElementById("rulesmodal"); if(rmod&&rmod.style.display==="flex"){ closeRules(); return true; }
     const cm=document.getElementById("chatmodal"); if(cm&&cm.style.display==="flex"){ closeChat(); return true; }
@@ -5032,7 +5069,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v217";
+var APP_VERSION="v218";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
