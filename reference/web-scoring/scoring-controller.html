@@ -2366,18 +2366,23 @@ function actionArea(){
           <span style="font-size:14px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:${T.lime}">${label}</span>
           <span style="color:${T.lime};font-size:18px;display:inline-block;transition:transform .2s;transform:rotate(${open?90:0}deg)">&rsaquo;</span></button>
         ${open?`<div style="padding:0 14px 14px">${content}</div>`:""}</div>`;
-    const teamsBlock = DB.teams.length
-      ? drawer("toggleteams","My teams ("+DB.teams.length+")",teamsOpen,`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;align-content:start">${list.map(card).join("")}</div>`)
+    // Split: teams you OWN/manage (your kids' teams) vs teams you only WATCH (external — competitors
+    // you followed from the public directory). They were mixed into one list, which felt lost.
+    const ownedTeams=list.filter(t=>!t.external), watchedTeams=list.filter(t=>t.external);
+    const teamsBlock = ownedTeams.length
+      ? drawer("toggleteams","My teams ("+ownedTeams.length+")",teamsOpen,`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;align-content:start">${ownedTeams.map(card).join("")}</div>`)
       : "";
-    // Followed-players drawer (only shows once you follow someone) + the combined calendar.
+    // "Following" = watch-only teams (e.g. the competition) + individual players you follow.
     const _fps=followedPlayers();
     const followCard=f=>`<button data-act="openplayer" data-arg="${f.key}" style="display:flex;align-items:center;gap:11px;width:100%;text-align:left;background:${T.surface};border:2px solid ${T.line};border-left:5px solid ${playerHue(f.key)};border-radius:11px;padding:11px 13px;cursor:pointer">
         <span style="width:34px;height:34px;flex:none;border-radius:8px;background:${f.team.color};color:#fff;display:flex;align-items:center;justify-content:center;font-family:${MONO};font-weight:800;font-size:15px">${(f.player.num||"–")}</span>
         <div style="flex:1;min-width:0"><div style="font-weight:800;color:${T.ink};font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${(f.player.name||"Player").replace(/</g,"&lt;")}</div>
           <div style="font-size:12px;color:${T.sage}">${(f.team.name||"").replace(/</g,"&lt;")}</div></div>
         <span style="color:${T.lime};font-weight:800;font-size:16px">&rsaquo;</span></button>`;
-    const followingBlock = _fps.length
-      ? drawer("togglefollow","Following ("+_fps.length+")",followOpen,`<div style="display:flex;flex-direction:column;gap:8px">${_fps.map(followCard).join("")}<button data-act="openfollowcal" style="${ghost};display:flex;align-items:center;justify-content:center;gap:9px;margin-top:2px">${IC('calendar',18)} Players calendar</button></div>`)
+    const _followCount=watchedTeams.length+_fps.length;
+    const _followContent=`${watchedTeams.length?`<div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.sageDim};margin:0 2px 7px">Teams I'm watching</div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;align-content:start;margin-bottom:${_fps.length?12:0}px">${watchedTeams.map(card).join("")}</div>`:""}${_fps.length?`<div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.sageDim};margin:0 2px 7px">Players I'm following</div><div style="display:flex;flex-direction:column;gap:8px">${_fps.map(followCard).join("")}<button data-act="openfollowcal" style="${ghost};display:flex;align-items:center;justify-content:center;gap:9px;margin-top:2px">${IC('calendar',18)} Players calendar</button></div>`:""}`;
+    const followingBlock = _followCount
+      ? drawer("togglefollow","Following ("+_followCount+")",followOpen,_followContent)
       : "";
 
     // Home header = the transparent "A" logo floating over the turf (no banner box).
@@ -4569,7 +4574,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v178";
+var APP_VERSION="v179";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
