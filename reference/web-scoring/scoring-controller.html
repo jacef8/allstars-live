@@ -27,7 +27,7 @@
 <style>
   :root{
     /* GroundLink-style dark theme: charcoal base, navy + lime-green accents. */
-    --field:#10141A; --ink:#F2F5FA; --surface:#212A38; --surface2:#324056; --line:#94A7CE;
+    --field:#10141A; --ink:#F2F5FA; --surface:#212A38; --surface2:#324056; --line:#FFFFFF;
     --clay:#E0974F; --chalk:#F2F5FA; --grass:#1F5C3A; --grassLt:#2C7D4E;
     --safe:#2E6BE6; --out:#FF6B52; --sage:#FFFFFF; --sageDim:#DDE5F1; --amber:#F0B43E;
     --live:#FF3B5C; --navy:#1D3A66; --lime:#E11D2E;
@@ -227,7 +227,7 @@
 /* ----------------------------------------------------------------------
    Field-as-input baseball scoring controller — interaction prototype
 ---------------------------------------------------------------------- */
-const T={field:"#10141A",ink:"#F2F5FA",surface:"#212A38",surface2:"#324056",line:"#94A7CE",
+const T={field:"#10141A",ink:"#F2F5FA",surface:"#212A38",surface2:"#324056",line:"#FFFFFF",
   clay:"#E0974F",chalk:"#F2F5FA",grass:"#1F5C3A",grassLt:"#2C7D4E",safe:"#2E6BE6",
   out:"#FF6B52",sage:"#FFFFFF",sageDim:"#DDE5F1",amber:"#F0B43E",live:"#FF3B5C",
   navy:"#1D3A66",lime:"#E11D2E"};
@@ -247,7 +247,7 @@ const MARKERID=c=>"ah"+c.replace("#","");
 const BASE={H:[150,250],1:[214,186],2:[150,122],3:[86,186]};
 /* ===== our team + opponent (our team can be home or away; see G.ourSide) ===== */
 const OUR={short:"HOME",name:"Your Team",color:"#2E6BE6"};   // generic; set in New Game
-const OPP={short:"OPP",name:"Opponent",color:"#E2574C"};
+const OPP={short:"OPP",name:"Opponent",color:"#E11D2E"};
 function teamData(side){return side===G.ourSide?OUR:OPP;}
 const TEAMS={get away(){return teamData("away");},get home(){return teamData("home");}};
 
@@ -1083,7 +1083,7 @@ function brWPApply(type){   // type: "ball" | "strike"
 /* The base-running sheet (opened by the "Runners" button when anyone's on base). */
 function baseRunModal(){
   const occ=[3,2,1].filter(b=>G.bases&&G.bases[b]);
-  const chip=(act,base,lbl,bg,fg,bd)=>`<button data-act="${act}" data-arg="${base}" style="flex:1 1 auto;min-width:0;background:${bg};border:1px solid ${bd||bg};color:${fg};border-radius:8px;padding:9px 6px;font-family:${SANS};font-size:13px;font-weight:800;white-space:nowrap">${lbl}</button>`;
+  const chip=(act,base,lbl,bg,fg,bd)=>`<button data-act="${act}" data-arg="${base}" style="flex:1 1 auto;min-width:0;background:${bg};border:2px solid ${bd||bg};color:${fg};border-radius:8px;padding:9px 6px;font-family:${SANS};font-size:13px;font-weight:800;white-space:nowrap">${lbl}</button>`;
   const runnerRows=occ.map(b=>{ const r=G.bases[b];
     return `<div style="background:${T.surface2};border:2px solid ${T.line};border-radius:11px;padding:10px 11px;display:flex;flex-direction:column;gap:8px">
         <div style="display:flex;align-items:center;gap:9px"><span style="font-family:${MONO};font-size:15px;font-weight:800;color:${r.color||T.clay}">${b}B</span>
@@ -1750,7 +1750,7 @@ function batterCard(){
   const sub=b.ours
     ? `${TEAMS[k].short}${b.pos?` · ${b.pos}`:""} &middot; ${ord} in order`
     : `${TEAMS[k].short||"OPP"} &middot; ${ord} batter`;   // include the team so it's unmistakable
-  return `<div data-act="reviewbatter" data-arg="${batterKeyOf(b)}" class="frost-card" style="display:flex;align-items:center;gap:13px;background:rgba(13,19,32,.82);border:1px solid ${c}66;border-left:5px solid ${c};border-radius:10px;padding:9px 14px;flex-shrink:0;cursor:pointer">
+  return `<div data-act="reviewbatter" data-arg="${batterKeyOf(b)}" class="frost-card" style="display:flex;align-items:center;gap:13px;background:rgba(13,19,32,.82);border:2px solid ${c}66;border-left:5px solid ${c};border-radius:10px;padding:9px 14px;flex-shrink:0;cursor:pointer">
     <span style="font-family:${MONO};font-size:34px;font-weight:700;color:${c};line-height:1;min-width:46px;text-align:center">${big}</span>
     <div style="flex:1;min-width:0">
       <div style="display:inline-flex;align-items:center;gap:6px;background:${c};color:#fff;border-radius:999px;padding:2px 9px;font-family:${MONO};font-size:10px;font-weight:800;letter-spacing:1px;margin-bottom:4px">&#9678; AT BAT</div>
@@ -1780,7 +1780,7 @@ function batterStrip(){
   const nm=b.ours?pBug(b):(b.name||"").trim();
   const nameLine=nm||(b.num?("#"+b.num):"—");
   const abp=(G.ab&&G.ab.pitches)?G.ab.pitches.length:0;   // pitches to this batter this at-bat
-  return `<button data-act="reviewbatter" data-arg="${batterKeyOf(b)}" class="frost-card" style="flex:1 1 auto;width:100%;display:flex;align-items:center;gap:14px;background:rgba(13,19,32,.72);border:1px solid ${c}66;border-left:6px solid ${c};border-radius:10px;padding:8px 16px;cursor:pointer;max-width:100%;min-width:0">
+  return `<button data-act="reviewbatter" data-arg="${batterKeyOf(b)}" class="frost-card" style="flex:1 1 auto;width:100%;display:flex;align-items:center;gap:14px;background:rgba(13,19,32,.72);border:2px solid ${c}66;border-left:6px solid ${c};border-radius:10px;padding:8px 16px;cursor:pointer;max-width:100%;min-width:0">
     <span title="Lineup spot" style="font-family:${MONO};font-size:30px;font-weight:800;color:${c};line-height:1;flex:none">${ord}</span>
     <div style="flex:1;min-width:0;text-align:left;display:flex;flex-direction:column;gap:3px">
       <div style="font-size:10px;letter-spacing:1.5px;font-weight:800;color:${T.sageDim};line-height:1">BATTING ${ordinal(ord)}</div>
@@ -1804,7 +1804,7 @@ function loadCloudFloat(){ try{ if(!window.cloudLoadPrefs)return; window.cloudLo
 function floatGeo(id,def){ const g=FLOAT[id]||{}; return {x:g.x!=null?g.x:def.x, y:g.y!=null?g.y:def.y, w:g.w!=null?g.w:def.w, h:g.h!=null?g.h:def.h}; }
 function floatWindow(id,title,inner,def){
   const g=floatGeo(id,def);
-  return `<div data-floatwin="${id}" style="position:absolute;left:${g.x}px;top:${g.y}px;width:${g.w}px;height:${g.h}px;z-index:40;pointer-events:auto;display:flex;flex-direction:column;background:rgba(13,19,32,.97);border:1px solid ${T.lime};border-radius:12px;box-shadow:0 14px 44px rgba(0,0,0,.6);overflow:hidden">
+  return `<div data-floatwin="${id}" style="position:absolute;left:${g.x}px;top:${g.y}px;width:${g.w}px;height:${g.h}px;z-index:40;pointer-events:auto;display:flex;flex-direction:column;background:rgba(13,19,32,.97);border:2px solid ${T.lime};border-radius:12px;box-shadow:0 14px 44px rgba(0,0,0,.6);overflow:hidden">
     <div data-floatdrag="${id}" style="flex:none;display:flex;align-items:center;gap:8px;padding:6px 10px;background:${T.surface2};border-bottom:1.5px solid ${T.line};cursor:move;touch-action:none;user-select:none">
       <span style="font-size:14px;color:${T.sageDim};line-height:1">&#9783;</span>
       <span style="flex:1;font-size:12.5px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:${T.lime};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${title}</span>
@@ -2061,7 +2061,7 @@ function pitchBadge(p){
   const map={ball:{c:T.amber,l:"B"},strike:{c:T.out,l:"S"},foul:{c:T.amber,l:"F"},inplay:{c:T.safe,l:"•"},hbp:{c:T.clay,l:"H"}};
   const m=map[p.res]||{c:T.sage,l:"?"};
   return `<span style="display:inline-flex;flex-direction:column;align-items:center;gap:2px;margin:2px 4px 2px 0">
-      <span style="width:22px;height:22px;border-radius:6px;background:${m.c}26;border:1px solid ${m.c};color:${m.c};font-family:${MONO};font-size:12px;font-weight:800;display:inline-flex;align-items:center;justify-content:center">${m.l}</span>
+      <span style="width:22px;height:22px;border-radius:6px;background:${m.c}26;border:2px solid ${m.c};color:${m.c};font-family:${MONO};font-size:12px;font-weight:800;display:inline-flex;align-items:center;justify-content:center">${m.l}</span>
       ${p.type?`<span style="font-family:${MONO};font-size:8px;font-weight:700;color:${T.sageDim}">${p.type}</span>`:""}</span>`;
 }
 /* one plate appearance row (newest flagged LAST) */
@@ -2069,7 +2069,7 @@ function paRowHtml(pa,idx,total){
   const last=idx===total-1;
   const badges=(pa.pitches||[]).map(pitchBadge).join("");
   const loc=(pa.loc&&pa.loc.zone)?` ${pa.loc.zone}`:"";
-  return `<div style="background:${last?T.surface2:T.surface};border:1px solid ${last?T.lime:T.line};border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:6px">
+  return `<div style="background:${last?T.surface2:T.surface};border:2px solid ${last?T.lime:T.line};border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:6px">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
         <span style="font-family:${MONO};font-size:12px;font-weight:800;color:${T.sage}">${pa.half==="T"?"▲":"▼"}${pa.inning} · PA ${idx+1}${last?` <span style="color:${T.lime}">· LAST</span>`:""}</span>
         <span style="font-family:${MONO};font-size:12px;color:${T.sage}">${pa.n} pitch${pa.n===1?"":"es"} · count ${pa.balls}-${pa.strikes}</span></div>
@@ -2108,7 +2108,7 @@ function inningLogModal(){
 function feedPanel(){
   const items=gameFeed.filter(e=> feedView==="pitch" ? true : e.type!=="pitch");
   const rows=items.slice(-70).reverse().map(e=>{ const pit=e.type==="pitch";
-    return `<div style="display:flex;align-items:baseline;gap:12px;padding:${pit?"6px 15px":"11px 15px"};border-bottom:1.5px solid ${T.line}${pit?";background:rgba(255,255,255,.02)":""}">
+    return `<div style="display:flex;align-items:baseline;gap:12px;padding:${pit?"6px 15px":"11px 15px"};border-bottom:1.5px solid ${pit?";background:rgba(255,255,255,.02)":""}">
       <span style="font-family:${MONO};font-size:${pit?"13px":"15px"};font-weight:800;color:${pit?T.sageDim:T.lime};min-width:38px">${e.half==="T"?"▲":"▼"}${e.inn}</span>
       <span style="flex:1;min-width:0;color:${pit?T.sage:T.chalk};font-size:${pit?"14px":"17px"};font-weight:${pit?"600":"700"}">${e.head}${e.sub?` <span style="color:${T.sageDim};font-weight:600">— ${e.sub}</span>`:""}</span>
       <span style="font-family:${MONO};font-size:${pit?"13px":"15px"};color:${T.sage};white-space:nowrap">${TEAMS.away.short} ${e.away}-${e.home} ${TEAMS.home.short}</span>
@@ -2181,7 +2181,7 @@ function pitchBtn(act,label,icon,accent){
   return `<button data-act="${act}" style="background:${bg};border:none;border-radius:0;color:${txt};padding:11px 4px;display:flex;flex-direction:column;align-items:center;gap:5px;font-family:${SANS};font-size:12.5px;font-weight:800;line-height:1.05;text-align:center;letter-spacing:.2px">
     <span style="width:34px;height:34px;border-radius:50%;background:${circ};display:flex;align-items:center;justify-content:center;color:${ic}">${icon}</span>${label}</button>`;
 }
-function chip(c){const a=contact===c;return `<button data-act="contact" data-arg="${c}" style="background:${a?T.clay:T.surface};border:1px solid ${a?T.clay:T.line};color:${a?"#FFFFFF":T.chalk};border-radius:8px;padding:12px 6px;font-family:${MONO};font-size:14px;font-weight:800;letter-spacing:.5px;text-transform:uppercase">${c}</button>`;}
+function chip(c){const a=contact===c;return `<button data-act="contact" data-arg="${c}" style="background:${a?T.clay:T.surface};border:2px solid ${a?T.clay:T.line};color:${a?"#FFFFFF":T.chalk};border-radius:8px;padding:12px 6px;font-family:${MONO};font-size:14px;font-weight:800;letter-spacing:.5px;text-transform:uppercase">${c}</button>`;}
 
 /* Custom time picker — the native <input type=time> popup renders its OK/Cancel off-screen in
    this WebView, so use plain Hour:Min:AM/PM selects. Renders the 3 selects + a hidden input
@@ -2214,7 +2214,7 @@ function getRecentOpps(){ try{ return JSON.parse(localStorage.getItem("al-recent
 function getSeenChat(){ try{ return JSON.parse(localStorage.getItem("al-chat-seen")||"{}"); }catch(e){ return {}; } }
 function markSeenChat(id){ if(!id)return; try{ const s=getSeenChat(); s[id]=Date.now(); localStorage.setItem("al-chat-seen",JSON.stringify(s)); }catch(e){} }
 function teamHasUnread(t){ try{ if(!t||!t.lastMsgAt)return false; return (getSeenChat()[t.id]||0) < (t.lastMsgAt-4000); }catch(e){ return false; } }  // 4s grace: never badge your own just-sent message (same-device clock skew)
-function recordRecentOpp(o){ if(!o||!o.name||o.name==="Opponent")return; try{ let r=getRecentOpps().filter(x=>x.name!==o.name); r.unshift({name:o.name,short:o.short||"",color:o.color||"#E2574C"}); localStorage.setItem("al-recent-opps",JSON.stringify(r.slice(0,12))); }catch(e){} }
+function recordRecentOpp(o){ if(!o||!o.name||o.name==="Opponent")return; try{ let r=getRecentOpps().filter(x=>x.name!==o.name); r.unshift({name:o.name,short:o.short||"",color:o.color||"#E11D2E"}); localStorage.setItem("al-recent-opps",JSON.stringify(r.slice(0,12))); }catch(e){} }
 /* Reusable list of places you've scheduled at (for the schedule form's location autocomplete). */
 function getRecentLocs(){ try{ return JSON.parse(localStorage.getItem("al-recent-locs")||"[]"); }catch(e){ return []; } }
 function recordRecentLoc(loc){ loc=(loc||"").trim(); if(!loc)return; try{ let r=getRecentLocs().filter(x=>x.toLowerCase()!==loc.toLowerCase()); r.unshift(loc); localStorage.setItem("al-recent-locs",JSON.stringify(r.slice(0,15))); }catch(e){} }
@@ -2270,7 +2270,7 @@ function calendarHtml(t){
     const sel=inM&&calSelDay===ds, isToday=inM&&ds===todayStr;
     const dots=evs.length?`<div style="display:flex;gap:3px;flex-wrap:wrap;justify-content:center;max-width:100%">${evs.slice(0,4).map(s=>`<span style="width:8px;height:8px;border-radius:50%;background:${s.type==="practice"?T.sage:t.color}"></span>`).join("")}</div>`:`<div style="height:8px"></div>`;
     cells+=inM
-      ? `<button data-act="calday" data-arg="${ds}" style="min-height:62px;border:2px solid ${T.line}${sel?t.color:(isToday?T.lime:T.line)};border-radius:9px;padding:5px 2px;background:${sel?T.surface:T.surface2};display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:5px;cursor:pointer">
+      ? `<button data-act="calday" data-arg="${ds}" style="min-height:62px;border:2px solid ${sel?t.color:(isToday?T.lime:T.line)};border-radius:9px;padding:5px 2px;background:${sel?T.surface:T.surface2};display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:5px;cursor:pointer">
           <div style="font-family:${MONO};font-size:17px;font-weight:800;color:${sel?t.color:(isToday?T.lime:T.ink)}">${dn}</div>${dots}</button>`
       : `<div style="min-height:62px;opacity:.18;border:2px solid ${T.line};border-radius:9px"></div>`; }
   const dow=["Su","Mo","Tu","We","Th","Fr","Sa"].map(d=>`<div style="text-align:center;font-family:${MONO};font-size:12px;font-weight:800;color:${T.sageDim};padding:2px 0">${d}</div>`).join("");
@@ -2313,7 +2313,7 @@ function multiCalendarHtml(fps){
     const sel=inM&&calSelDay===ds, isToday=inM&&ds===todayStr;
     const dots=evs.length?`<div style="display:flex;gap:3px;flex-wrap:wrap;justify-content:center;max-width:100%">${evs.slice(0,4).map(s=>`<span style="width:8px;height:8px;border-radius:50%;background:${s.__col}"></span>`).join("")}</div>`:`<div style="height:8px"></div>`;
     cells+=inM
-      ? `<button data-act="calday" data-arg="${ds}" style="min-height:62px;border:2px solid ${T.line}${sel?T.lime:(isToday?T.lime:T.line)};border-radius:9px;padding:5px 2px;background:${sel?T.surface:T.surface2};display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:5px;cursor:pointer">
+      ? `<button data-act="calday" data-arg="${ds}" style="min-height:62px;border:2px solid ${sel?T.lime:(isToday?T.lime:T.line)};border-radius:9px;padding:5px 2px;background:${sel?T.surface:T.surface2};display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:5px;cursor:pointer">
           <div style="font-family:${MONO};font-size:17px;font-weight:800;color:${sel||isToday?T.lime:T.ink}">${dn}</div>${dots}</button>`
       : `<div style="min-height:62px;opacity:.18;border:2px solid ${T.line};border-radius:9px"></div>`; }
   const dow=["Su","Mo","Tu","We","Th","Fr","Sa"].map(d=>`<div style="text-align:center;font-family:${MONO};font-size:12px;font-weight:800;color:${T.sageDim};padding:2px 0">${d}</div>`).join("");
@@ -2398,7 +2398,7 @@ function actionArea(){
     // Games live on ANOTHER device for a team I score → "in progress · take over" (cross-device handoff).
     const _esc=x=>String(x==null?"":x).replace(/</g,"&lt;");
     const liveRows = otherLiveGames().map(function(o){ const s=o.live.summary||{}; const who=o.live.activeName?(" &middot; "+_esc(o.live.activeName)):"";
-      return `<button data-act="takeoverlive" data-arg="${o.team.id}" style="background:${T.surface};border:1px solid ${T.lime};color:${T.ink};border-radius:13px;padding:15px 18px;display:flex;align-items:center;justify-content:space-between;gap:10px;text-align:left;cursor:pointer">
+      return `<button data-act="takeoverlive" data-arg="${o.team.id}" style="background:${T.surface};border:2px solid ${T.lime};color:${T.ink};border-radius:13px;padding:15px 18px;display:flex;align-items:center;justify-content:space-between;gap:10px;text-align:left;cursor:pointer">
         <span style="display:flex;align-items:center;gap:10px;min-width:0"><span style="width:10px;height:10px;border-radius:50%;flex:none;background:#E11D2E;box-shadow:0 0 7px #E11D2E"></span><span style="min-width:0"><span style="font-size:18px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block">${_esc(s.a||"")} ${s.as|0}–${s.hs|0} ${_esc(s.h||"")}</span><span style="font-size:13.5px;color:${T.sage}">In progress${who} · tap to take over scoring</span></span></span>
         <span style="font-family:${MONO};font-size:15px;font-weight:800;color:${T.lime};white-space:nowrap">Take over &rsaquo;</span></button>`; }).join("");
     const newGameBtn = `<button data-act="newgamestart" style="${bigBtn(T.lime,"font-size:21px;padding:17px;border:2px solid rgba(255,255,255,.92);box-shadow:0 8px 22px rgba(225,29,46,.34)")}">${IC(PLAY)} New Game</button>`;
@@ -2523,7 +2523,7 @@ function actionArea(){
         <input value="${(p.last||"").replace(/"/g,"&quot;")}" oninput="teamPLast('${p.id}',this.value)" placeholder="Last" style="${cell};flex:1 1 130px;max-width:250px;min-width:0;font-size:18px">
         <div style="flex:1;min-width:0"></div>
         <button data-act="openplayer" data-arg="${t.id}:${p.id}" title="View / follow player" style="background:${T.surface2};border:2px solid ${T.line};color:${isFollowingPlayer(t.id,p.id)?T.amber:T.lime};border-radius:9px;min-width:48px;height:46px;display:inline-flex;align-items:center;justify-content:center;font-size:24px;font-weight:800;flex:none;line-height:1">${isFollowingPlayer(t.id,p.id)?IC('starFill',22):"&rsaquo;"}</button>
-        <button data-act="rmteamp" data-arg="${p.id}" title="Remove player" style="background:none;border:1px solid ${T.out}66;color:${T.out};border-radius:9px;min-width:48px;height:46px;display:inline-flex;align-items:center;justify-content:center;font-size:26px;font-weight:800;flex:none;line-height:1"${t.players.length<=9?" disabled":""}>&times;</button></div>`).join("");
+        <button data-act="rmteamp" data-arg="${p.id}" title="Remove player" style="background:none;border:2px solid ${T.out}66;color:${T.out};border-radius:9px;min-width:48px;height:46px;display:inline-flex;align-items:center;justify-content:center;font-size:26px;font-weight:800;flex:none;line-height:1"${t.players.length<=9?" disabled":""}>&times;</button></div>`).join("");
     const sRows=t.players.map(p=>{const s=(t.season[p.id]||{}).bat||{};const ab=s.ab||0,h=s.h||0;const avg=ab?(h/ab).toFixed(3).replace(/^0/,""):"—";
       return `<tr style="border-top:1.5px solid ${T.line}"><td style="text-align:left;padding:10px 8px;font-weight:700;white-space:nowrap">#${p.num} ${p.name}</td><td style="padding:10px 6px">${ab}</td><td style="padding:10px 6px">${s.r||0}</td><td style="padding:10px 6px">${h}</td><td style="padding:10px 6px">${s.rbi||0}</td><td style="padding:10px 6px">${s.bb||0}</td><td style="padding:10px 6px">${s.k||0}</td><td style="padding:10px 6px;font-weight:800">${avg}</td></tr>`;}).join("");
     const statTable=`<div class="frost-card" style="background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:14px 18px;overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-family:${MONO};font-size:18px;color:${T.chalk};text-align:center">
@@ -2565,8 +2565,8 @@ function actionArea(){
             <div style="font-weight:800;color:${T.ink};font-size:${wide?21:20}px;${wide?"white-space:nowrap;overflow:hidden;text-overflow:ellipsis":"line-height:1.25"}">${title}</div>
             <div style="font-size:${wide?17:16}px;color:${T.sage};margin-top:5px;${wide?"white-space:nowrap;overflow:hidden;text-overflow:ellipsis":"line-height:1.4"}">${sub}</div></div>`;
       const btns=`<div style="display:flex;gap:8px;flex:none;align-items:center${wide?"":";justify-content:flex-end"}">
-          ${isG?`<button data-act="schedstart" data-arg="${s.id}" title="Start this game now" style="background:${T.lime};border:1px solid ${T.lime};color:#fff;border-radius:8px;padding:9px 15px;font-weight:800;font-size:13px;letter-spacing:.4px;display:inline-flex;align-items:center;gap:6px;box-shadow:0 3px 10px rgba(225,29,46,.28)">&#9654; Start</button>`:""}
-          <button data-act="schededit" data-arg="${s.id}" title="Edit" style="background:${schedEditId===s.id?T.lime:"none"};border:1px solid ${schedEditId===s.id?T.lime:T.line};color:${schedEditId===s.id?"#fff":T.lime};border-radius:8px;padding:9px 14px;font-weight:800;font-size:13px">Edit</button>
+          ${isG?`<button data-act="schedstart" data-arg="${s.id}" title="Start this game now" style="background:${T.lime};border:2px solid ${T.lime};color:#fff;border-radius:8px;padding:9px 15px;font-weight:800;font-size:13px;letter-spacing:.4px;display:inline-flex;align-items:center;gap:6px;box-shadow:0 3px 10px rgba(225,29,46,.28)">&#9654; Start</button>`:""}
+          <button data-act="schededit" data-arg="${s.id}" title="Edit" style="background:${schedEditId===s.id?T.lime:"none"};border:2px solid ${schedEditId===s.id?T.lime:T.line};color:${schedEditId===s.id?"#fff":T.lime};border-radius:8px;padding:9px 14px;font-weight:800;font-size:13px">Edit</button>
           <button data-act="schedrm" data-arg="${s.id}" title="Remove" style="background:none;border:2px solid ${T.line};color:${T.out};border-radius:8px;padding:9px 13px;font-weight:800;font-size:18px">&times;</button></div>`;
       return `<div style="display:flex;${wide?"flex-direction:row;align-items:center":"flex-direction:column;align-items:stretch"};gap:10px;background:${T.surface2};border:2px solid ${T.line};border-left:6px solid ${isG?OUR.color:T.sage};border-radius:11px;padding:14px 15px${past?";opacity:.6":""}">
           ${textBlock}${btns}</div>`;};
@@ -2583,7 +2583,7 @@ function actionArea(){
     const fLbl=`font-size:12px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:${T.sageDim};margin:0 2px 5px`;
     const cellL=cell+";font-size:17px;padding:12px 12px";   // larger inputs for the schedule form
     const fld=(lbl,inner)=>`<div style="flex:1;min-width:150px;display:flex;flex-direction:column">${lbl?`<div style="${fLbl}">${lbl}</div>`:""}${inner}</div>`;
-    const svBtn=(v,lbl)=>`<button data-act="schview" data-arg="${v}" style="flex:1;background:${scheduleView===v?T.lime:T.surface2};color:${scheduleView===v?"#fff":T.sage};border:1px solid ${scheduleView===v?T.lime:T.line};border-radius:8px;padding:8px 0;font-weight:800;font-size:12px;letter-spacing:.4px">${lbl}</button>`;
+    const svBtn=(v,lbl)=>`<button data-act="schview" data-arg="${v}" style="flex:1;background:${scheduleView===v?T.lime:T.surface2};color:${scheduleView===v?"#fff":T.sage};border:2px solid ${scheduleView===v?T.lime:T.line};border-radius:8px;padding:8px 0;font-weight:800;font-size:12px;letter-spacing:.4px">${lbl}</button>`;
     const scheduleViewCard=`<div class="frost-card" style="background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:16px 18px;display:flex;flex-direction:column;gap:11px">
         <div style="font-size:14px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime}">Upcoming — games &amp; practices</div>
         <div style="display:flex;gap:6px">${svBtn("list",IC('list',15)+" List")}${svBtn("calendar",IC('grid',15)+" Calendar")}</div>
@@ -2594,7 +2594,7 @@ function actionArea(){
     const dbOpps=(DB.teams||[]).filter(x=>x.id!==t.id);
     const recentOpps=getRecentOpps().filter(o=>o.name && !dbOpps.some(x=>x.name===o.name));   // saved-for-reuse opponent names
     const oppNewSel = !!(editing && eOpp && !dbOpps.some(x=>x.name===eOpp) && !recentOpps.some(o=>o.name===eOpp));
-    const scheduleEditCard=`<div class="frost-card" style="background:${T.surface};border:1px solid ${editing?T.lime:T.line};border-radius:14px;padding:16px 18px;display:flex;flex-direction:column;gap:11px">
+    const scheduleEditCard=`<div class="frost-card" style="background:${T.surface};border:2px solid ${editing?T.lime:T.line};border-radius:14px;padding:16px 18px;display:flex;flex-direction:column;gap:11px">
         <div style="font-size:14px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime}">${editing?"Edit game or practice":"Add a game or practice"}</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           ${fld("Type",`<select id="schType" style="${cellL}"><option value="game"${editing&&editing.type!=="practice"?" selected":""}>Game</option><option value="practice"${editing&&editing.type==="practice"?" selected":""}>Practice</option></select>`)}
@@ -2688,7 +2688,7 @@ function actionArea(){
       const LUs=teamLineups(t), actId=t.activeLineupId||(LUs[0]&&LUs[0].id);
       const sBtn=(act,id,label,col)=>`<button data-act="${act}" data-arg="${id}" style="flex:1;background:${T.surface};border:2px solid ${T.line};color:${col||T.sage};border-radius:7px;padding:7px 4px;font-size:11px;font-weight:700;letter-spacing:.3px">${label}</button>`;
       const luRow=lu=>{ const idx=lineupToIdx(t,lu),cnt=idx?idx.order.length:0,isDef=lu.id===actId;
-        return `<div style="background:${T.surface2};border:1px solid ${isDef?T.lime:T.line};border-radius:11px;padding:10px 11px;display:flex;flex-direction:column;gap:8px">
+        return `<div style="background:${T.surface2};border:2px solid ${isDef?T.lime:T.line};border-radius:11px;padding:10px 11px;display:flex;flex-direction:column;gap:8px">
           <button data-act="luedit" data-arg="${lu.id}" style="text-align:left;background:transparent;border:none;color:${T.ink};display:flex;align-items:center;gap:8px;padding:0">
             <span style="flex:1;min-width:0"><span style="font-family:${MONO};font-weight:800;font-size:15px">${esc(lu.name)}</span>
               <span style="display:block;font-size:11px;color:${T.sage};margin-top:1px">${cnt} batter${cnt===1?"":"s"}${cnt<9?` &middot; needs 9+`:""} &middot; tap to edit</span></span>
@@ -2789,7 +2789,7 @@ function actionArea(){
       // Actions: scorecard PDF, rewatch on YouTube (if streamed), delete (owner/co-owner only).
       const canDel = !(window.Cloud&&window.Cloud.enabled&&window.Cloud.user) || (window.cloudCanManage&&window.cloudCanManage(t));
       const ytBtn = g.yt ? `<button data-act="rewatchgame" data-arg="${g.yt}" style="${ghost};display:flex;align-items:center;justify-content:center;gap:9px;border:1px solid #FF3B5C;color:#FF6B6B">&#9654; Rewatch on YouTube</button>` : "";
-      const delBtn = canDel ? `<div style="display:flex;justify-content:flex-end;margin-top:2px"><button data-act="delgame" data-arg="${g.id}" style="background:none;border:1px solid ${T.out};color:${T.out};border-radius:8px;padding:9px 14px;font-family:${MONO};font-size:12px;font-weight:700;letter-spacing:.5px;text-transform:uppercase">&#x1F5D1; Delete game</button></div>` : "";
+      const delBtn = canDel ? `<div style="display:flex;justify-content:flex-end;margin-top:2px"><button data-act="delgame" data-arg="${g.id}" style="background:none;border:2px solid ${T.out};color:${T.out};border-radius:8px;padding:9px 14px;font-family:${MONO};font-size:12px;font-weight:700;letter-spacing:.5px;text-transform:uppercase">&#x1F5D1; Delete game</button></div>` : "";
       if(!g.bat){ return secWrap(`${secHdr("Game")}${head}<div style="font-size:12px;color:${T.sageDim};text-align:center;padding:14px;border:1px dashed ${T.line};border-radius:12px">Per-game stats weren't recorded for this game (it finished before by-game stat tracking). The final score is above.</div>${ytBtn}${delBtn}`); }
       const maxI=g.maxI||((g.line&&g.line.away&&g.line.away.length)||1);
       const card=(inner)=>`<div class="frost-card" style="overflow-x:auto;background:${T.surface};border:2px solid ${T.line};border-radius:12px;padding:8px 10px">${inner}</div>`;
@@ -2830,7 +2830,7 @@ function actionArea(){
             <img src="${zp.url||zp.img}" onclick="event.stopPropagation()" style="max-width:100%;max-height:74%;object-fit:contain;border-radius:10px;box-shadow:0 12px 40px rgba(0,0,0,.6)">
             ${zp.caption?`<div style="color:${T.chalk};font-size:13px;max-width:90%;text-align:center">${(zp.caption||"").replace(/</g,"&lt;")}</div>`:""}
             <div style="font-size:11px;color:${T.sageDim}">${(zp.authorName||"").replace(/</g,"&lt;")}</div>
-            <div style="display:flex;gap:10px">${canDelZ?`<button data-act="delphoto" data-arg="${zp.id}" style="background:none;border:1px solid ${T.out};color:${T.out};border-radius:8px;padding:10px 16px;font-weight:700">${IC('trash',15)} Delete</button>`:""}<button data-act="photoclose" style="background:${T.surface2};border:2px solid ${T.line};color:${T.chalk};border-radius:8px;padding:10px 18px;font-weight:700">Close</button></div></div>`;
+            <div style="display:flex;gap:10px">${canDelZ?`<button data-act="delphoto" data-arg="${zp.id}" style="background:none;border:2px solid ${T.out};color:${T.out};border-radius:8px;padding:10px 16px;font-weight:700">${IC('trash',15)} Delete</button>`:""}<button data-act="photoclose" style="background:${T.surface2};border:2px solid ${T.line};color:${T.chalk};border-radius:8px;padding:10px 18px;font-weight:700">Close</button></div></div>`;
       }
       return secWrap(`${secHdr("Photos")}${addBtn}${grid}`)+zoomOv;
     }
@@ -2858,7 +2858,7 @@ function actionArea(){
         <button data-act="startteam" style="${bigBtn(t.color)}">${IC('<path d="M8 5l11 7-11 7z" fill="currentColor" stroke="none"/>')} Start game with ${t.short}</button>
         <button data-act="lineupcard" style="${ghost};display:flex;align-items:center;justify-content:center;gap:9px">${ICN.doc} Lineup card (PDF)</button>
         <div style="display:flex;justify-content:flex-end;margin-top:2px">
-          <button data-act="deleteteam" style="background:none;border:1px solid ${T.out};color:${T.out};border-radius:8px;padding:9px 14px;font-family:${MONO};font-size:12px;font-weight:700;letter-spacing:.5px;text-transform:uppercase">${IC('trash',14)} Delete team</button></div>
+          <button data-act="deleteteam" style="background:none;border:2px solid ${T.out};color:${T.out};border-radius:8px;padding:9px 14px;font-family:${MONO};font-size:12px;font-weight:700;letter-spacing:.5px;text-transform:uppercase">${IC('trash',14)} Delete team</button></div>
       `);
   }
   if(mode==="pickteam"){
@@ -2948,7 +2948,7 @@ function actionArea(){
         ${IS_APP?`<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;background:${T.surface};border:2px solid ${T.line};border-radius:12px;padding:16px 18px">
           <div style="min-width:0"><div style="font-weight:800;color:${T.ink};font-size:18px">Broadcast audio</div>
             <div style="font-size:13px;color:${T.sage};margin-top:2px">${bcastCamAudio?"Camera audio (beta) — falls back to mic if the camera sends none":"Tablet mic — the camera's own audio isn't used"}</div></div>
-          <button data-act="togglecamaudio" style="background:${bcastCamAudio?T.lime:T.surface2};border:1px solid ${bcastCamAudio?T.lime:T.line};color:${bcastCamAudio?"#fff":T.sage};border-radius:999px;padding:10px 16px;font-family:${MONO};font-weight:800;font-size:14px;min-width:92px">${bcastCamAudio?"CAMERA":"MIC"}</button></div>`:""}
+          <button data-act="togglecamaudio" style="background:${bcastCamAudio?T.lime:T.surface2};border:2px solid ${bcastCamAudio?T.lime:T.line};color:${bcastCamAudio?"#fff":T.sage};border-radius:999px;padding:10px 16px;font-family:${MONO};font-weight:800;font-size:14px;min-width:92px">${bcastCamAudio?"CAMERA":"MIC"}</button></div>`:""}
         ${item("apprefresh",IC('refresh',24),"Refresh app","Reload &amp; check for the latest version + sync teams")}
         ${item("opendebug",IC('alert',24),"Diagnostics","Camera, stream, network &amp; sync status — for field troubleshooting")}
         ${signedIn?`<div style="background:${T.surface};border:2px solid ${T.line};border-radius:12px;padding:16px 18px">
@@ -3032,7 +3032,7 @@ function actionArea(){
           <div style="font-family:${MONO};font-size:20px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">#${p.num||"–"} ${(p.name||"").replace(/</g,"&lt;")}</div>
           <div style="font-size:12px;color:${T.sage}">${(t.name||"").replace(/</g,"&lt;")}</div></div>
         <button data-act="followplayer" data-arg="${t.id}:${p.id}" title="${following?"Following":"Follow this player"}" style="background:none;border:none;color:${following?T.amber:T.sageDim};line-height:1;padding:4px;cursor:pointer">${following?IC('starFill',26):IC('star',26)}</button></div>`;
-    const tab=(id,lbl)=>`<button data-act="playertab" data-arg="${id}" style="flex:1;background:${playerTab===id?T.lime:T.surface2};color:${playerTab===id?"#fff":T.sage};border:1px solid ${playerTab===id?T.lime:T.line};border-radius:9px;padding:10px;font-family:${MONO};font-weight:800;font-size:14px;letter-spacing:.4px;text-transform:uppercase">${lbl}</button>`;
+    const tab=(id,lbl)=>`<button data-act="playertab" data-arg="${id}" style="flex:1;background:${playerTab===id?T.lime:T.surface2};color:${playerTab===id?"#fff":T.sage};border:2px solid ${playerTab===id?T.lime:T.line};border-radius:9px;padding:10px;font-family:${MONO};font-weight:800;font-size:14px;letter-spacing:.4px;text-transform:uppercase">${lbl}</button>`;
     const tabs=`<div style="display:flex;gap:8px">${tab("stats","Stats")}${tab("schedule","Schedule")}</div>`;
     let body;
     if(playerTab==="schedule"){
@@ -3055,7 +3055,7 @@ function actionArea(){
         <div style="font-family:${MONO};font-size:20px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:${T.lime}">Players calendar</div></div>`;
     if(!fps.length) return `<div style="display:flex;flex-direction:column;gap:12px">${head}<div style="font-size:13px;color:${T.sage};text-align:center;padding:24px;border:1px dashed ${T.line};border-radius:12px">Follow a player first — open a team roster, tap a player (&rsaquo;), then the &#9733; star. Their games show up here on one calendar.</div></div>`;
     const chips=fps.map(f=>{const hid=followHidden[f.key],col=playerHue(f.key);
-      return `<button data-act="calfollowtog" data-arg="${f.key}" style="display:flex;align-items:center;gap:7px;background:${hid?T.surface2:col};border:1px solid ${hid?T.line:col};color:${hid?T.sage:"#fff"};border-radius:999px;padding:7px 12px;font-weight:800;font-size:12px"><span style="width:9px;height:9px;border-radius:50%;background:${hid?T.sageDim:"#fff"}"></span>#${f.player.num||"–"} ${(f.player.name||"").replace(/</g,"&lt;")}</button>`;}).join("");
+      return `<button data-act="calfollowtog" data-arg="${f.key}" style="display:flex;align-items:center;gap:7px;background:${hid?T.surface2:col};border:2px solid ${hid?T.line:col};color:${hid?T.sage:"#fff"};border-radius:999px;padding:7px 12px;font-weight:800;font-size:12px"><span style="width:9px;height:9px;border-radius:50%;background:${hid?T.sageDim:"#fff"}"></span>#${f.player.num||"–"} ${(f.player.name||"").replace(/</g,"&lt;")}</button>`;}).join("");
     return `<div style="display:flex;flex-direction:column;gap:12px">${head}
         <div style="font-size:12px;color:${T.sage};margin:0 2px">Tap a name to show/hide that player&#39;s games.</div>
         <div style="display:flex;flex-wrap:wrap;gap:7px">${chips}</div>
@@ -3101,16 +3101,16 @@ function actionArea(){
           <select onchange="ngRulebook(this.value)" style="${selStyle}">${allRulebooks().map(r=>`<option value="${r.id}"${grb===r.id?" selected":""}>${(r.name||'').replace(/</g,'&lt;')}</option>`).join("")}</select>
           <button data-act="viewgamerulebook" style="width:100%;margin-top:8px;background:${T.surface2};color:${T.lime};border:2px solid ${T.line};border-radius:9px;padding:11px;font-family:${MONO};font-weight:800;font-size:14px;display:flex;align-items:center;justify-content:center;gap:8px">${ICN.doc} View rulebook</button></div>`;
     const ac=alertsCfg();
-    const aChip=(k,lbl)=>`<button data-act="alerttoggle" data-arg="${k}" style="background:${ac[k]?T.lime:T.surface2};border:1px solid ${ac[k]?T.lime:T.line};color:${ac[k]?"#fff":T.sage};border-radius:999px;padding:7px 13px;font-family:${MONO};font-weight:800;font-size:12px">${lbl}</button>`;
+    const aChip=(k,lbl)=>`<button data-act="alerttoggle" data-arg="${k}" style="background:${ac[k]?T.lime:T.surface2};border:2px solid ${ac[k]?T.lime:T.line};color:${ac[k]?"#fff":T.sage};border-radius:999px;padding:7px 13px;font-family:${MONO};font-weight:800;font-size:12px">${lbl}</button>`;
     const alertsCard=`<div style="${rowCard};flex-wrap:wrap">
           <div style="flex:1;min-width:150px"><div style="font-weight:800;color:${T.ink};font-size:19px">Rule alerts</div>
             <div style="color:${T.sage};font-size:13px;margin-top:3px">Pop-up reminders during the game</div></div>
-          <button data-act="alerttoggle" data-arg="on" style="background:${ac.on?T.lime:T.surface2};border:1px solid ${ac.on?T.lime:T.line};color:${ac.on?"#fff":T.sage};border-radius:999px;padding:10px 20px;font-family:${MONO};font-weight:800;font-size:15px;min-width:66px">${ac.on?"ON":"OFF"}</button>
+          <button data-act="alerttoggle" data-arg="on" style="background:${ac.on?T.lime:T.surface2};border:2px solid ${ac.on?T.lime:T.line};color:${ac.on?"#fff":T.sage};border-radius:999px;padding:10px 20px;font-family:${MONO};font-weight:800;font-size:15px;min-width:66px">${ac.on?"ON":"OFF"}</button>
           ${ac.on?`<div style="width:100%;display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">${aChip("runRule","Run rule")}${aChip("runCap","Run cap")}${aChip("pitch","Pitch limit")}${aChip("inning","Final inning")}</div>`:""}</div>`;
     const pitchCatchCard=`<div style="${rowCard};flex-wrap:wrap">
           <div style="flex:1;min-width:150px"><div style="font-weight:800;color:${T.ink};font-size:19px">Pitch &amp; catch rule alerts</div>
             <div style="color:${T.sage};font-size:13px;margin-top:3px;line-height:1.4">Tournament limits — pops a warning as a pitcher nears the catch cutoff (28/30/31), the 48-hr line (66) and the 85 daily max, and when a catcher hits 3 / 4 innings caught. Uses the counts you're already keeping.</div></div>
-          <button data-act="alerttoggle" data-arg="pcRules" style="background:${ac.pcRules?T.lime:T.surface2};border:1px solid ${ac.pcRules?T.lime:T.line};color:${ac.pcRules?"#fff":T.sage};border-radius:999px;padding:10px 20px;font-family:${MONO};font-weight:800;font-size:15px;min-width:66px">${ac.pcRules?"ON":"OFF"}</button></div>`;
+          <button data-act="alerttoggle" data-arg="pcRules" style="background:${ac.pcRules?T.lime:T.surface2};border:2px solid ${ac.pcRules?T.lime:T.line};color:${ac.pcRules?"#fff":T.sage};border-radius:999px;padding:10px 20px;font-family:${MONO};font-weight:800;font-size:15px;min-width:66px">${ac.pcRules?"ON":"OFF"}</button></div>`;
     const runCapCard=`<div style="${rowCard}">
           <div><div style="font-weight:800;color:${T.ink};font-size:19px">Run cap</div>
             <div style="color:${T.sage};font-size:14px;margin-top:3px">Per half-inning · 0 = no cap</div></div>
@@ -3127,11 +3127,11 @@ function actionArea(){
     const pitchTypeCard=`<div style="${rowCard}">
           <div><div style="font-weight:800;color:${T.ink};font-size:19px">Track pitch types</div>
             <div style="color:${T.sage};font-size:14px;margin-top:3px">Adds FB/CB/CH/SL/OTH per pitch while scoring</div></div>
-          <button data-act="advtoggle" style="background:${advPitch?T.lime:T.surface2};border:1px solid ${advPitch?T.lime:T.line};color:${advPitch?"#fff":T.sage};border-radius:999px;padding:10px 20px;font-family:${MONO};font-weight:800;font-size:15px;min-width:66px">${advPitch?"ON":"OFF"}</button></div>`;
+          <button data-act="advtoggle" style="background:${advPitch?T.lime:T.surface2};border:2px solid ${advPitch?T.lime:T.line};color:${advPitch?"#fff":T.sage};border-radius:999px;padding:10px 20px;font-family:${MONO};font-weight:800;font-size:15px;min-width:66px">${advPitch?"ON":"OFF"}</button></div>`;
     const detailedCard=`<div style="${rowCard}">
           <div><div style="font-weight:800;color:${T.ink};font-size:19px">Detailed events</div>
             <div style="color:${T.sage};font-size:14px;margin-top:3px">Adds catcher's interference, runner-out &amp; advance-on-error to the Base-running sheet</div></div>
-          <button data-act="adveventstoggle" style="background:${advEvents?T.lime:T.surface2};border:1px solid ${advEvents?T.lime:T.line};color:${advEvents?"#fff":T.sage};border-radius:999px;padding:10px 20px;font-family:${MONO};font-weight:800;font-size:15px;min-width:66px">${advEvents?"ON":"OFF"}</button></div>`;
+          <button data-act="adveventstoggle" style="background:${advEvents?T.lime:T.surface2};border:2px solid ${advEvents?T.lime:T.line};color:${advEvents?"#fff":T.sage};border-radius:999px;padding:10px 20px;font-family:${MONO};font-weight:800;font-size:15px;min-width:66px">${advEvents?"ON":"OFF"}</button></div>`;
     // Print a lineup card pre-filled with the opponent + date/time from this game setup.
     const lineupCardBtn=`<button data-act="nglineupcard" style="${ghost};display:flex;align-items:center;justify-content:center;gap:9px;width:100%;flex:none">${ICN.doc} Print lineup card</button>`;
     // In settings mode (mid-game) we show ONLY the rule cards + Done — no team/side pickers,
@@ -3164,7 +3164,7 @@ function actionArea(){
   }
   if(mode==="lineup"){
     const narrow=!isWide();   // phone → give each player two rows (name on top, position below) so nothing is cramped
-    const tabBtn=(id,lbl,col)=>`<button data-act="lutab" data-arg="${id}" style="flex:1;min-width:0;padding:10px;border-radius:9px;font-family:${MONO};font-weight:800;font-size:14px;text-transform:uppercase;letter-spacing:.3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border:1px solid ${lineupTab===id?col:T.line};background:${lineupTab===id?col:T.surface};color:${lineupTab===id?"#fff":T.ink}">${lbl}</button>`;
+    const tabBtn=(id,lbl,col)=>`<button data-act="lutab" data-arg="${id}" style="flex:1;min-width:0;padding:10px;border-radius:9px;font-family:${MONO};font-weight:800;font-size:14px;text-transform:uppercase;letter-spacing:.3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border:2px solid ${lineupTab===id?col:T.line};background:${lineupTab===id?col:T.surface};color:${lineupTab===id?"#fff":T.ink}">${lbl}</button>`;
     const luToggle=`<div style="display:flex;gap:8px;flex-shrink:0">${tabBtn("us",OUR.name,OUR.color)}${tabBtn("opp",OPP.name,OPP.color)}</div>`;
     if(lineupTab==="opp"){
       if(!G.oppLineup)G.oppLineup=Array.from({length:Math.max(1,G.oppBatters)},(_,i)=>({num:String(i+1),name:""}));
@@ -3177,14 +3177,14 @@ function actionArea(){
           <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:7px">
             <button data-act="oppedit" data-arg="${i}" style="text-align:left;background:transparent;border:none;color:${T.chalk};font-size:20px;font-weight:700;display:flex;align-items:center;gap:9px;padding:0;min-width:0"><span style="font-family:${MONO};color:${OPP.color};flex:none">#${(e.num||"").toString().replace(/</g,"")}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${nm.replace(/</g,"&lt;")}</span></button>
             <div style="display:flex;align-items:center;gap:9px">
-              <button data-act="opppickpos" data-arg="${i}" style="background:${isP?OPP.color:T.surface2};border:1px solid ${isP?OPP.color:T.line};color:${isP?"#FFFFFF":T.chalk};border-radius:7px;padding:7px 14px;font-family:${MONO};font-size:16px;font-weight:800;min-width:54px;flex:none">${pos}</button>
+              <button data-act="opppickpos" data-arg="${i}" style="background:${isP?OPP.color:T.surface2};border:2px solid ${isP?OPP.color:T.line};color:${isP?"#FFFFFF":T.chalk};border-radius:7px;padding:7px 14px;font-family:${MONO};font-size:16px;font-weight:800;min-width:54px;flex:none">${pos}</button>
               <span style="font-size:12px;color:${T.sageDim}">${isP?"Pitcher":(pos==="—"?"Tap to set position":"Fielding "+pos)}</span>
             </div></div></div>`;
         return `<div data-opprow data-i="${i}" style="display:flex;align-items:center;gap:6px;background:${T.surface2};border:2px solid ${T.line};border-radius:9px;padding:8px 8px">
           <span data-oppdrag style="cursor:grab;color:${T.sageDim};display:flex;align-items:center;padding:4px 2px;touch-action:none">${IC('<path d="M4 7h16M4 12h16M4 17h16"/>')}</span>
           <span style="font-family:${MONO};font-size:17px;font-weight:800;color:${T.lime};width:18px;text-align:center">${i+1}</span>
           <button data-act="oppedit" data-arg="${i}" style="flex:1;min-width:0;text-align:left;background:transparent;border:none;color:${T.chalk};font-size:18px;font-weight:700;display:flex;align-items:center;gap:8px;overflow:hidden"><span style="font-family:${MONO};color:${OPP.color};min-width:34px">#${(e.num||"").toString().replace(/</g,"")}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${nm.replace(/</g,"&lt;")}</span></button>
-          <button data-act="opppickpos" data-arg="${i}" style="background:${isP?OPP.color:T.surface2};border:1px solid ${isP?OPP.color:T.line};color:${isP?"#FFFFFF":T.chalk};border-radius:7px;padding:8px 12px;font-family:${MONO};font-size:16px;font-weight:800;min-width:50px">${pos}</button></div>`;}).join("");
+          <button data-act="opppickpos" data-arg="${i}" style="background:${isP?OPP.color:T.surface2};border:2px solid ${isP?OPP.color:T.line};color:${isP?"#FFFFFF":T.chalk};border-radius:7px;padding:8px 12px;font-family:${MONO};font-size:16px;font-weight:800;min-width:50px">${pos}</button></div>`;}).join("");
       const benchHtml=bench.length?bench.map((e,j)=>`<button data-act="oppbenchin" data-arg="${j}" title="Pinch in" style="font-family:${MONO};font-size:14px;color:${T.chalk};background:${T.surface};border:2px solid ${T.line};border-radius:6px;padding:6px 10px;white-space:nowrap">#${(e.num||"").toString().replace(/</g,"")} ${((e.name||"").trim()||"sub").replace(/</g,"&lt;")} <span style="color:${T.lime};font-weight:800">+</span></button>`).join(" "):`<span style="font-size:12px;color:${T.sageDim}">No bench players</span>`;
       return `<div class="frost-card" style="flex-shrink:0;display:flex;align-items:center;gap:10px;background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:10px 12px">
           <button data-act="lineupback" style="${ghost};padding:9px 13px;flex:none">&lsaquo; Back</button>
@@ -3209,14 +3209,14 @@ function actionArea(){
         <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:7px">
           <button data-act="editplayer" data-arg="${slot}" style="text-align:left;background:transparent;border:none;color:${T.chalk};font-size:20px;font-weight:700;display:flex;align-items:center;gap:9px;padding:0;min-width:0"><span style="font-family:${MONO};color:${OUR.color};flex:none">#${p.num}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.name}</span></button>
           <div style="display:flex;align-items:center;gap:9px">
-            <button data-act="pickpos" data-arg="${slot}" style="background:${isP?OUR.color:T.surface2};border:1px solid ${isP?OUR.color:T.line};color:${isP?"#FFFFFF":T.chalk};border-radius:7px;padding:7px 14px;font-family:${MONO};font-size:16px;font-weight:800;min-width:54px;flex:none">${pos}</button>
+            <button data-act="pickpos" data-arg="${slot}" style="background:${isP?OUR.color:T.surface2};border:2px solid ${isP?OUR.color:T.line};color:${isP?"#FFFFFF":T.chalk};border-radius:7px;padding:7px 14px;font-family:${MONO};font-size:16px;font-weight:800;min-width:54px;flex:none">${pos}</button>
             <span style="font-size:12px;color:${T.sageDim}">${isP?"Pitcher":(pos==="—"?"Tap to set position":"Fielding "+pos)}</span>
           </div></div></div>`;
       return `<div data-row data-ri="${ri}" style="display:flex;align-items:center;gap:6px;background:${T.surface2};border:2px solid ${T.line};border-radius:9px;padding:8px 8px">
         <span data-drag style="cursor:grab;color:${T.sageDim};display:flex;align-items:center;padding:4px 2px;touch-action:none">${IC('<path d="M4 7h16M4 12h16M4 17h16"/>')}</span>
         <span style="font-family:${MONO};font-size:17px;font-weight:800;color:${T.lime};width:18px;text-align:center">${slot+1}</span>
         <button data-act="editplayer" data-arg="${slot}" style="flex:1;min-width:0;text-align:left;background:transparent;border:none;color:${T.chalk};font-size:18px;font-weight:700;display:flex;align-items:center;gap:8px;overflow:hidden"><span style="font-family:${MONO};color:${OUR.color};min-width:34px">#${p.num}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.name}</span></button>
-        <button data-act="pickpos" data-arg="${slot}" style="background:${isP?OUR.color:T.surface2};border:1px solid ${isP?OUR.color:T.line};color:${isP?"#FFFFFF":T.chalk};border-radius:7px;padding:8px 12px;font-family:${MONO};font-size:16px;font-weight:800;min-width:50px">${pos}</button></div>`;}).join("");
+        <button data-act="pickpos" data-arg="${slot}" style="background:${isP?OUR.color:T.surface2};border:2px solid ${isP?OUR.color:T.line};color:${isP?"#FFFFFF":T.chalk};border-radius:7px;padding:8px 12px;font-family:${MONO};font-size:16px;font-weight:800;min-width:50px">${pos}</button></div>`;}).join("");
     const bench=benchIdx().map(ri=>`<span style="font-family:${MONO};font-size:14px;color:${T.sage};background:${T.surface};border:2px solid ${T.line};border-radius:6px;padding:5px 10px;white-space:nowrap">#${ROSTER[ri].num} ${ROSTER[ri].name}</span>`).join(" ");
     const pit=playerAtPos("P");
     const n=G.lineup.order.length;
@@ -3244,7 +3244,7 @@ function actionArea(){
     const pitcherPick=editSlot===-1, cur=pitcherPick?G.lineup.pos.P:G.lineup.order[editSlot];
     const list=ROSTER.map((p,ri)=>{const inL=G.lineup.order.indexOf(ri),pos=posOfPlayer(ri),here=ri===cur;
       const tag=inL>=0?`bats ${inL+1}${pos?` · ${pos}`:""}`:"bench";
-      return `<button data-act="setplayer" data-arg="${ri}" style="display:flex;justify-content:space-between;align-items:center;background:${here?T.surface2:T.surface};border:1px solid ${here?OUR.color:T.line};color:${T.chalk};border-radius:9px;padding:11px 13px;font-size:14px;font-weight:700">
+      return `<button data-act="setplayer" data-arg="${ri}" style="display:flex;justify-content:space-between;align-items:center;background:${here?T.surface2:T.surface};border:2px solid ${here?OUR.color:T.line};color:${T.chalk};border-radius:9px;padding:11px 13px;font-size:14px;font-weight:700">
         <span style="display:flex;gap:9px;align-items:center"><span style="font-family:${MONO};color:${OUR.color};min-width:32px">#${p.num}</span>${p.name}</span>
         <span style="font-family:${MONO};font-size:11px;color:${T.sage}">${tag}</span></button>`;}).join("");
     return step(pitcherPick?"Pitching change":`Batting ${editSlot+1} — choose player`,
@@ -3254,7 +3254,7 @@ function actionArea(){
   if(mode==="pickpos"){
     const ri=G.lineup.order[editSlot],cur=posOfPlayer(ri);
     const cell=p=>{const who=playerAtPos(p),sel=p===cur;
-      return `<button data-act="setpos" data-arg="${p}" style="display:flex;flex-direction:column;gap:4px;align-items:center;background:${sel?OUR.color:T.surface};border:1px solid ${sel?OUR.color:T.line};color:${sel?"#08111f":T.chalk};border-radius:9px;padding:16px 6px;font-family:${MONO};font-weight:800;font-size:23px">${p}<span style="font-size:13px;font-weight:600;color:${sel?"#08111f":T.sage};max-width:96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${who?who.name:"—"}</span></button>`;};
+      return `<button data-act="setpos" data-arg="${p}" style="display:flex;flex-direction:column;gap:4px;align-items:center;background:${sel?OUR.color:T.surface};border:2px solid ${sel?OUR.color:T.line};color:${sel?"#08111f":T.chalk};border-radius:9px;padding:16px 6px;font-family:${MONO};font-weight:800;font-size:23px">${p}<span style="font-size:13px;font-weight:600;color:${sel?"#08111f":T.sage};max-width:96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${who?who.name:"—"}</span></button>`;};
     const takenByOther=p=>{const h=G.lineup.pos[p];return h!=null&&h!==ri;};
     const open=POSLIST.filter(p=>!takenByOther(p)), used=POSLIST.filter(takenByOther);
     const grid=arr=>`<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">${arr.map(cell).join("")}</div>`;
@@ -3281,7 +3281,7 @@ function actionArea(){
   if(mode==="opppickpos"){
     const e=oppList()[editSlot]||{}, cur=e.pos||null;
     const cell=p=>{const oi=oppAtPos(p),who=oi>=0?oppList()[oi]:null,sel=p===cur;const wn=who?(((who.name||"").trim())||("#"+(who.num||""))):"—";
-      return `<button data-act="oppsetpos" data-arg="${p}" style="display:flex;flex-direction:column;gap:4px;align-items:center;background:${sel?OPP.color:T.surface};border:1px solid ${sel?OPP.color:T.line};color:${sel?"#08111f":T.chalk};border-radius:9px;padding:16px 6px;font-family:${MONO};font-weight:800;font-size:23px">${p}<span style="font-size:13px;font-weight:600;color:${sel?"#08111f":T.sage};max-width:96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${wn.replace(/</g,"&lt;")}</span></button>`;};
+      return `<button data-act="oppsetpos" data-arg="${p}" style="display:flex;flex-direction:column;gap:4px;align-items:center;background:${sel?OPP.color:T.surface};border:2px solid ${sel?OPP.color:T.line};color:${sel?"#08111f":T.chalk};border-radius:9px;padding:16px 6px;font-family:${MONO};font-weight:800;font-size:23px">${p}<span style="font-size:13px;font-weight:600;color:${sel?"#08111f":T.sage};max-width:96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${wn.replace(/</g,"&lt;")}</span></button>`;};
     const takenByOther=p=>{const oi=oppAtPos(p);return oi>=0&&oi!==editSlot;};
     const open=POSLIST.filter(p=>!takenByOther(p)), used=POSLIST.filter(takenByOther);
     const grid=arr=>`<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">${arr.map(cell).join("")}</div>`;
@@ -3292,7 +3292,7 @@ function actionArea(){
   if(mode==="opppickpitch"){
     const L=oppList(),curP=oppAtPos("P");
     const list=L.map((e,i)=>{const here=i===curP,nm=(((e.name||"").trim())||("#"+(e.num||(i+1))));
-      return `<button data-act="oppsetpitch" data-arg="${i}" style="display:flex;justify-content:space-between;align-items:center;background:${here?T.surface2:T.surface};border:1px solid ${here?OPP.color:T.line};color:${T.chalk};border-radius:9px;padding:11px 13px;font-size:14px;font-weight:700">
+      return `<button data-act="oppsetpitch" data-arg="${i}" style="display:flex;justify-content:space-between;align-items:center;background:${here?T.surface2:T.surface};border:2px solid ${here?OPP.color:T.line};color:${T.chalk};border-radius:9px;padding:11px 13px;font-size:14px;font-weight:700">
         <span style="display:flex;gap:9px;align-items:center"><span style="font-family:${MONO};color:${OPP.color};min-width:32px">#${(e.num||"").toString().replace(/</g,"")}</span>${nm.replace(/</g,"&lt;")}</span>
         <span style="font-family:${MONO};font-size:11px;color:${T.sage}">${here?"PITCHING":(e.pos||"")}</span></button>`;}).join("");
     return step("Who's pitching?","Pick the opponent's pitcher — they take the P spot.",
@@ -3337,7 +3337,7 @@ function actionArea(){
     pitchers=pitchers.filter(x=>x.outs>0||x.pc>0).sort((a,b)=>b.outs-a.outs);
     const pp=pitchers.map(x=>`<tr style="border-top:1.5px solid ${T.line}"><td style="text-align:left;padding:5px 6px;font-weight:700;white-space:nowrap">${(x.name||'').replace(/</g,'')}</td><td style="padding:11px 6px">${x.ip}</td><td style="padding:11px 6px">${x.pc}</td><td style="padding:11px 6px">${x.h}</td><td style="padding:11px 6px">${x.r}</td><td style="padding:11px 6px">${x.bb}</td><td style="padding:11px 6px">${x.k}</td></tr>`).join("");
     const pitchBlock=pitchers.length?`<div style="overflow-x:auto;background:${T.surface};border:2px solid ${T.line};border-radius:10px;padding:8px 8px 4px"><div style="font-size:13.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin:0 0 8px">${selName} &mdash; pitching</div><table style="width:100%;border-collapse:collapse;font-family:${MONO};font-size:17px;text-align:center;color:${T.chalk}"><thead><tr style="color:${T.sageDim};font-size:13px"><th style="text-align:left;padding:4px 6px">Pitcher</th><th title="Innings pitched">IP</th><th title="Pitches">P</th><th>H</th><th>R</th><th>BB</th><th>K</th></tr></thead><tbody>${pp}</tbody></table></div>`:"";
-    const stBtn=(v,lbl)=>`<button data-act="sumteam" data-arg="${v}" style="flex:1;background:${summaryTeam===v?T.lime:T.surface2};color:${summaryTeam===v?"#fff":T.sage};border:1px solid ${summaryTeam===v?T.lime:T.line};border-radius:9px;padding:9px 0;font-family:${MONO};font-weight:800;font-size:13px;letter-spacing:.4px;text-transform:uppercase">${lbl}</button>`;
+    const stBtn=(v,lbl)=>`<button data-act="sumteam" data-arg="${v}" style="flex:1;background:${summaryTeam===v?T.lime:T.surface2};color:${summaryTeam===v?"#fff":T.sage};border:2px solid ${summaryTeam===v?T.lime:T.line};border-radius:9px;padding:9px 0;font-family:${MONO};font-weight:800;font-size:13px;letter-spacing:.4px;text-transform:uppercase">${lbl}</button>`;
     const teamToggle=`<div style="display:flex;gap:6px">${stBtn("us",OUR.short||"Us")}${stBtn("opp",(OPP.short||"Opp"))}</div>`;
     return `<div style="display:flex;flex-direction:column;gap:14px">
         <div style="text-align:center">
@@ -3376,7 +3376,7 @@ function actionArea(){
   if(mode==="locate"){
     // Outcomes where the ball was NOT put in play (no field location needed) — shown up front so
     // you don't have to fake a hit location just to record them. Catcher's interference for now.
-    const noPlay=advEvents?`<button data-act="ci" style="${ghost};width:100%;margin-bottom:8px;border:1px solid ${T.amber};color:${T.amber}">&#9758; Ball NOT put in play &middot; Catcher's interference</button>`:"";
+    const noPlay=advEvents?`<button data-act="ci" style="${ghost};width:100%;margin-bottom:8px;border:2px solid ${T.amber};color:${T.amber}">&#9758; Ball NOT put in play &middot; Catcher's interference</button>`:"";
     return step("Where did it go?","Tap the field above — the fielder is set automatically.",
       `${noPlay}<button data-act="cancel" style="${ghost};width:100%">Cancel</button>`);
   }
@@ -3390,7 +3390,7 @@ function actionArea(){
     const BN={1:"1st",2:"2nd",3:"3rd"};
     const lead=G.bases[1]?1:G.bases[2]?2:3;
     const opts=[1,2,3].filter(b=>G.bases[b]).map(b=>{const r=G.bases[b],sel=b===lead;
-      return `<button data-act="dpout" data-arg="${b}" style="display:flex;align-items:center;justify-content:space-between;background:${sel?T.surface2:T.surface};border:1px solid ${sel?T.clay:T.line};border-left:4px solid ${r.color};color:${T.chalk};border-radius:10px;padding:13px 14px;font-size:14px;font-weight:700">
+      return `<button data-act="dpout" data-arg="${b}" style="display:flex;align-items:center;justify-content:space-between;background:${sel?T.surface2:T.surface};border:2px solid ${sel?T.clay:T.line};border-left:4px solid ${r.color};color:${T.chalk};border-radius:10px;padding:13px 14px;font-size:14px;font-weight:700">
         <span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${r.color};margin-right:8px;vertical-align:middle"></span>${r.label}${r.name?" "+r.name:""}</span>
         <span style="font-family:${MONO};color:${T.sage};font-size:12px">on ${BN[b]}</span></button>`;}).join("");
     return step("Who was doubled off?","Batter is out at first — tap the runner who was the second out. Defaults to the lead runner.",
@@ -3399,7 +3399,7 @@ function actionArea(){
   }
   if(mode==="errpos"){
     const order=["P","C","1B","2B","3B","SS","LF","CF","RF"];
-    const cells=order.map(p=>{const sel=p===tap.pos;return `<button data-act="errpos" data-arg="${p}" style="display:flex;flex-direction:column;align-items:center;gap:2px;background:${sel?T.surface2:T.surface};border:1px solid ${sel?T.clay:T.line};color:${T.chalk};border-radius:9px;padding:13px 4px;font-size:15px;font-weight:800">${p}<span style="font-size:10px;color:${T.sage};font-weight:600">${POSNUM[p]}</span></button>`;}).join("");
+    const cells=order.map(p=>{const sel=p===tap.pos;return `<button data-act="errpos" data-arg="${p}" style="display:flex;flex-direction:column;align-items:center;gap:2px;background:${sel?T.surface2:T.surface};border:2px solid ${sel?T.clay:T.line};color:${T.chalk};border-radius:9px;padding:13px 4px;font-size:15px;font-weight:800">${p}<span style="font-size:10px;color:${T.sage};font-weight:600">${POSNUM[p]}</span></button>`;}).join("");
     return step("Error charged to which fielder?","Defaults to where the ball went — tap another fielder if the error was elsewhere.",
       `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">${cells}</div>
        <button data-act="back-result" style="${ghost};margin-top:10px;width:100%">Back</button>`);
@@ -3427,7 +3427,7 @@ function actionArea(){
       });
       body=`${sections}<button data-act="showall" style="${ghost};margin-top:10px">&larr; Back to suggested</button>`;
     }else{
-      const btns=curResults.map((r,i)=>`<button data-act="result" data-arg="${i}" style="display:flex;justify-content:space-between;align-items:center;background:${i===0?T.surface2:T.surface};border:1px solid ${i===0?T.clay:T.line};border-left:4px solid ${hitKind(r.kind)?T.safe:T.out};color:${T.chalk};border-radius:10px;padding:13px 14px;font-size:14px;font-weight:700">
+      const btns=curResults.map((r,i)=>`<button data-act="result" data-arg="${i}" style="display:flex;justify-content:space-between;align-items:center;background:${i===0?T.surface2:T.surface};border:2px solid ${i===0?T.clay:T.line};border-left:4px solid ${hitKind(r.kind)?T.safe:T.out};color:${T.chalk};border-radius:10px;padding:13px 14px;font-size:14px;font-weight:700">
         <span>${r.label}</span><span style="font-family:${MONO};opacity:.85">${r.note}</span></button>`).join("");
       body=`<div style="display:flex;flex-direction:column;gap:6px">${btns}
         <button data-act="showall" style="${ghost};border-style:dashed;color:${T.amber}">Something else happened &mdash; more outcomes</button>
@@ -3464,7 +3464,7 @@ function actionArea(){
           style="flex:1;height:32px;border-radius:6px;font-size:12px;font-weight:800;border:${origin?"1.5px dashed":"1px solid"} ${bord};background:${bg};color:${color};opacity:${disabled?.3:1}">${BN[c]}</button>`;
       }).join("");
       const rowBg=m.isBatter?"linear-gradient(90deg,rgba(59,232,90,.16),rgba(59,232,90,.03))":T.surface;
-      return `<div style="background:${rowBg};border:1px solid ${m.isBatter?"rgba(59,232,90,.45)":T.line};border-left:4px solid ${m.color};border-radius:9px;padding:7px 10px;display:flex;flex-direction:column;gap:6px">
+      return `<div style="background:${rowBg};border:2px solid ${m.isBatter?"rgba(59,232,90,.45)":T.line};border-left:4px solid ${m.color};border-radius:9px;padding:7px 10px;display:flex;flex-direction:column;gap:6px">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
           <span style="font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${who}</span>
           <span style="white-space:nowrap">${journey}</span></div>
@@ -3663,7 +3663,7 @@ function render(){
   }
   maybeAlert();   // rule-reminder popups (run cap / run rule / pitch limit / final inning)
   const playing=!(mode==="idle"||mode==="locate");
-  const toastEl=toast?`<div style="position:absolute;bottom:12px;left:50%;transform:translateX(-50%);background:#0B0E13;color:${T.lime};border:2px solid ${T.line}${T.lime};font-family:${MONO};font-weight:800;font-size:14px;letter-spacing:.5px;text-transform:uppercase;padding:7px 16px;border-radius:999px;white-space:nowrap;z-index:5;box-shadow:0 4px 16px rgba(0,0,0,.55)">${toast}</div>`:"";
+  const toastEl=toast?`<div style="position:absolute;bottom:12px;left:50%;transform:translateX(-50%);background:#0B0E13;color:${T.lime};border:2px solid ${T.lime};font-family:${MONO};font-weight:800;font-size:14px;letter-spacing:.5px;text-transform:uppercase;padding:7px 16px;border-radius:999px;white-space:nowrap;z-index:5;box-shadow:0 4px 16px rgba(0,0,0,.55)">${toast}</div>`:"";
   // GameChanger model: the field stays the big hero, and the pick-an-event steps
   // appear as a bottom-sheet MODAL over it (no inline scrolling to choose).
   const pickerModal=(mode==="contact"||mode==="result"||mode==="errpos"||mode==="dppick"||mode==="outpos");
@@ -3805,7 +3805,7 @@ function render(){
     const pane=phonePane==="video"
       ? `<div style="flex:1;min-height:0;display:flex;flex-direction:column;justify-content:center;gap:11px">${monitorPane()}</div>`
       : isView
-        ? (function(){var vp=viewerPhone;var vseg=(id,l)=>`<button data-act="viewerphone" data-arg="${id}" style="flex:1;background:${vp===id?T.lime:T.surface2};color:${vp===id?"#fff":T.sage};border:1px solid ${vp===id?T.lime:T.line};border-radius:9px;padding:8px;font-family:${MONO};font-weight:800;font-size:12.5px;letter-spacing:.4px;text-transform:uppercase">${l}</button>`;
+        ? (function(){var vp=viewerPhone;var vseg=(id,l)=>`<button data-act="viewerphone" data-arg="${id}" style="flex:1;background:${vp===id?T.lime:T.surface2};color:${vp===id?"#fff":T.sage};border:2px solid ${vp===id?T.lime:T.line};border-radius:9px;padding:8px;font-family:${MONO};font-weight:800;font-size:12.5px;letter-spacing:.4px;text-transform:uppercase">${l}</button>`;
           return `<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px">${statusBar()}${batterCard()}<div style="display:flex;gap:8px;flex:none">${vseg("both","Both")}${vseg("field","Field")}${vseg("feed","Feed")}</div>${vp==="feed"?"":fieldEl}${vp==="field"?"":feedPanel()}</div>`;})()
         : `<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px">${focusPlay?"":statusBar()}${floatActive?"":batterCard()}${focusPlay?fieldEl:pcLine+'<div style="flex:1;min-height:0"></div>'}${actionEl}${controls}</div>`;
     body=`<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:9px">
@@ -3911,7 +3911,7 @@ document.getElementById("app").addEventListener("click",e=>{
     newgameFrom="team"; selectTeam(t.id); G=initGame(); loadTeamLineup(teamById(curTeamId)); hist=[]; resetUI();
     if(s&&s.opp){ const m=(DB.teams||[]).find(x=>x.id!==t.id && (x.name||"").toLowerCase()===(s.opp||"").toLowerCase());
       if(m){ oppTeamId=m.id; OPP.name=m.name; OPP.short=m.short; OPP.color=m.color; OPP.logo=m.logo||null; }
-      else { oppTeamId=null; OPP.name=s.opp; OPP.short=(s.opp||"OPP").slice(0,3).toUpperCase(); OPP.color="#E2574C"; OPP.logo=null; }
+      else { oppTeamId=null; OPP.name=s.opp; OPP.short=(s.opp||"OPP").slice(0,3).toUpperCase(); OPP.color="#E11D2E"; OPP.logo=null; }
       try{ recordRecentOpp(OPP); }catch(e){} }
     mode="newgame"; render(); broadcast(); return; }
   if(act==="ngdatetoggle"){ ngDateOpen=!ngDateOpen; if(ngDateOpen)ngDateYM=null; render(); return; }
@@ -4160,10 +4160,10 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="viewteamstats"){ if(!window.cloudGetTeam){flash("Sign in to view");return;} flash("Loading…"); window.cloudGetTeam(arg).then(function(t){ viewTeam=t; mode="teamstats"; render(); }); }
   else if(act==="favpublicteam"){ if(!viewTeam)return; const ex=DB.teams.find(x=>x.id===viewTeam.id); if(ex){ DB.teams=DB.teams.filter(x=>x.id!==viewTeam.id); saveDB(); flash("Removed from your home"); } else { const copy=JSON.parse(JSON.stringify(viewTeam)); copy.fav=true; copy.external=true; if(!Array.isArray(copy.players))copy.players=[]; DB.teams.push(copy); saveDB(); flash("Added to your home — watch them from the Home screen"); } render(); }
   else if(act==="setpubopp"){ const r=finderResults&&finderResults[+arg]; if(r){ oppTeamId=r.id; OPP.name=r.name; OPP.short=r.short||(r.name||"OPP").slice(0,3).toUpperCase(); OPP.color=r.color; OPP.logo=r.logo||null; recordRecentOpp(OPP); } finderResults=null; mode="newgame"; render(); broadcast(); }
-  else if(act==="setrecentopp"){ const o=getRecentOpps()[+arg]; if(o){ oppTeamId=null; OPP.name=o.name; OPP.short=o.short||(o.name||"OPP").slice(0,3).toUpperCase(); OPP.color=o.color||"#E2574C"; recordRecentOpp(OPP); } mode="newgame"; render(); broadcast(); }
+  else if(act==="setrecentopp"){ const o=getRecentOpps()[+arg]; if(o){ oppTeamId=null; OPP.name=o.name; OPP.short=o.short||(o.name||"OPP").slice(0,3).toUpperCase(); OPP.color=o.color||"#E11D2E"; recordRecentOpp(OPP); } mode="newgame"; render(); broadcast(); }
   else if(act==="setteam"){const id=arg;if(pickFor==="our"){selectTeam(id);}else{const t=teamById(id);oppTeamId=id;if(t){OPP.name=t.name;OPP.short=t.short;OPP.color=t.color;OPP.logo=t.logo||null;recordRecentOpp(OPP);}}mode="newgame";render();broadcast();}
   else if(act==="newteampick"){const t=newTeam("");if(pickFor==="our"){selectTeam(t.id);}else{oppTeamId=t.id;OPP.name=t.name;OPP.short=t.short;OPP.color=t.color;OPP.logo=null;}mode="newgame";render();broadcast();}
-  else if(act==="oppnoroster"){oppTeamId=null;OPP.name="Opponent";OPP.short="OPP";OPP.color="#E2574C";mode="newgame";render();broadcast();}
+  else if(act==="oppnoroster"){oppTeamId=null;OPP.name="Opponent";OPP.short="OPP";OPP.color="#E11D2E";mode="newgame";render();broadcast();}
   else if(act==="ngback"){mode="newgame";render();}
   else if(act==="ng-side"){G.ourSide=arg;render();broadcast();}
   else if(act==="ng-start")startNewGame();
@@ -4204,7 +4204,7 @@ function renderToolbar(){
   const dot = !hasRelay ? {c:T.sageDim,l:"LOCAL"} : conn ? {c:T.live,l:"LIVE"} : {c:T.out,l:"OFFLINE"};
   // Wide-only: slide the video monitor in/out for distraction-free scoring.
   const playMode=!menuModes.includes(mode);
-  const vidToggle=(isWide()&&playMode)?`<button data-act="togglevideo" title="${monitorOn?"Hide video":"Show video"}" style="display:flex;align-items:center;gap:7px;background:${monitorOn?T.surface2:T.lime};border:1px solid ${monitorOn?T.line:T.lime};color:${monitorOn?T.chalk:"#fff"};border-radius:10px;padding:9px 13px;font-size:14px;font-weight:800">
+  const vidToggle=(isWide()&&playMode)?`<button data-act="togglevideo" title="${monitorOn?"Hide video":"Show video"}" style="display:flex;align-items:center;gap:7px;background:${monitorOn?T.surface2:T.lime};border:2px solid ${monitorOn?T.line:T.lime};color:${monitorOn?T.chalk:"#fff"};border-radius:10px;padding:9px 13px;font-size:14px;font-weight:800">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>${monitorOn?"Hide video":"Show video"}</button>`:"";
   // Game controls back in the top bar, as compact ICONS (wide scorer, between plays). Phone keeps
   // its own bottom footer. The scoreboard above the field is just the score now.
@@ -4213,7 +4213,7 @@ function renderToolbar(){
   // Undo gets a labeled, accent-bordered button at the far RIGHT (easiest to see/reach while
   // scoring); the rest stay compact icons to its left.
   const gc=(isWide()&&mode==="idle"&&viewMode==="scorer")
-    ? `<div style="display:flex;gap:6px;flex:none;align-items:center;flex-wrap:wrap;justify-content:flex-end;margin-left:auto">${tbIcon("lineup","Lineup",IC('users',18))}${tbIcon("inninglog","Inning log",IC('doc',18))}${tbIcon("ingamesettings","Settings",IC('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>',16))}${tbIcon("home","Home",IC('home',18))}${tbIcon("endgame","End game",IC('<rect x="6" y="6" width="12" height="12" rx="1.5"/>',18),`color:${T.out};border-color:${T.out}`)}<button data-act="undo" title="Undo last action" style="display:flex;align-items:center;gap:7px;background:${T.surface2};border:2px solid ${T.line}${T.lime};color:${T.chalk};border-radius:9px;height:38px;padding:0 16px;font-family:${SANS};font-size:14px;font-weight:800;flex:none">${IC('undo',18)} Undo</button></div>`
+    ? `<div style="display:flex;gap:6px;flex:none;align-items:center;flex-wrap:wrap;justify-content:flex-end;margin-left:auto">${tbIcon("lineup","Lineup",IC('users',18))}${tbIcon("inninglog","Inning log",IC('doc',18))}${tbIcon("ingamesettings","Settings",IC('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>',16))}${tbIcon("home","Home",IC('home',18))}${tbIcon("endgame","End game",IC('<rect x="6" y="6" width="12" height="12" rx="1.5"/>',18),`color:${T.out};border-color:${T.out}`)}<button data-act="undo" title="Undo last action" style="display:flex;align-items:center;gap:7px;background:${T.surface2};border:2px solid ${T.lime};color:${T.chalk};border-radius:9px;height:38px;padding:0 16px;font-family:${SANS};font-size:14px;font-weight:800;flex:none">${IC('undo',18)} Undo</button></div>`
     : "";
   // Viewer (video on): the field/feed swap lives in the top bar, labeled with what you switch TO.
   const vsw=(isWide()&&viewMode==="viewer"&&monitorOn)
@@ -4227,7 +4227,7 @@ function renderToolbar(){
   // YouTube/stream error — persistent pill right in the top bar so the operator sees it without
   // opening Camera setup. Tap re-shows the full message; it clears when the broadcast recovers.
   const bErr=(IS_APP&&(window.__bcastPhase==="ERROR")&&window.__bcastStatus)
-    ? `<button data-act="bcasterr" title="${(window.__bcastStatus||"").replace(/"/g,"&quot;")}" style="flex:none;display:flex;align-items:center;gap:6px;background:rgba(255,59,92,.15);border:1px solid ${T.live};color:${T.live};border-radius:999px;padding:6px 11px;font-family:${SANS};font-weight:800;font-size:12px;max-width:300px;min-width:0">&#9888;<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${window.__bcastStatus}</span></button>`
+    ? `<button data-act="bcasterr" title="${(window.__bcastStatus||"").replace(/"/g,"&quot;")}" style="flex:none;display:flex;align-items:center;gap:6px;background:rgba(255,59,92,.15);border:2px solid ${T.live};color:${T.live};border-radius:999px;padding:6px 11px;font-family:${SANS};font-weight:800;font-size:12px;max-width:300px;min-width:0">&#9888;<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${window.__bcastStatus}</span></button>`
     : "";
   const sOn=Snd.isOn();
   const soundBtn=`<button data-act="soundtoggle" title="${sOn?"Mute sounds":"Unmute sounds"}" style="flex:none;display:flex;align-items:center;justify-content:center;background:${T.surface2};border:2px solid ${T.line};color:${sOn?T.lime:T.sageDim};border-radius:10px;width:42px;height:38px">
@@ -4237,7 +4237,7 @@ function renderToolbar(){
   // so the top row just keeps a flexible spacer here — pushes the game controls to the far right.
   const batterTop=`<div style="flex:1"></div>`;
   // Free-layout (BETA) toggle lives in the toolbar now — a corner-fixed button covered scoring controls.
-  const floatTb = (viewMode!=="viewer") ? `<button data-act="togglefloat" title="Free-layout windows (beta) — pop the AT BAT card out as a draggable window" style="flex:none;display:flex;align-items:center;justify-content:center;background:${floatOn?T.lime:T.surface2};border:1px solid ${floatOn?T.lime:T.line};color:${floatOn?"#fff":T.sageDim};border-radius:10px;width:42px;height:38px;font-size:17px;line-height:1">&#8862;</button>` : "";
+  const floatTb = (viewMode!=="viewer") ? `<button data-act="togglefloat" title="Free-layout windows (beta) — pop the AT BAT card out as a draggable window" style="flex:none;display:flex;align-items:center;justify-content:center;background:${floatOn?T.lime:T.surface2};border:2px solid ${floatOn?T.lime:T.line};color:${floatOn?"#fff":T.sageDim};border-radius:10px;width:42px;height:38px;font-size:17px;line-height:1">&#8862;</button>` : "";
   // LEFT = broadcast/meta (Scorer-Viewer, video, share, sound, LIVE). RIGHT = game info + controls
   // (batter box + Lineup/Log/Home/End/Undo) sitting over the scoring buttons.
   tb.innerHTML=`<div style="display:flex;align-items:center;gap:${isWide()?"8px":"6px"};padding:4px 2px 2px;flex-wrap:wrap;row-gap:6px">
@@ -4270,8 +4270,8 @@ function renderChatList(){
   if(!chatMsgs.length){ box.innerHTML=`<div style="color:#6B7890;font-size:13px;text-align:center;margin:auto">No messages yet. Say hi! 👋</div>`; return; }
   box.innerHTML=chatMsgs.map(m=>{ const mine=m.authorUid===myUid; const canDel=mine||owner;
     const when=(()=>{try{return new Date(m.ts).toLocaleString(undefined,{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"});}catch(e){return "";}})();
-    return `<div style="align-self:${mine?"flex-end":"flex-start"};max-width:84%;background:${mine?"#1E2C16":"#1A2233"};border:1px solid ${mine?"#3A5A1E":"#2A3650"};border-radius:12px;padding:8px 11px">
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:3px"><span style="font-size:11px;color:${mine?"#E11D2E":"#8FA0BD"};font-weight:800;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${(m.authorName||"Someone").replace(/</g,"&lt;")}</span>${canDel?`<button data-act="delmsg" data-arg="${m.id}" title="Delete this message" style="background:rgba(226,87,76,.16);border:1px solid #E2574C66;color:#E2574C;font-size:11px;font-weight:800;cursor:pointer;border-radius:7px;padding:3px 9px;flex:none">&#128465; Delete</button>`:""}</div>
+    return `<div style="align-self:${mine?"flex-end":"flex-start"};max-width:84%;background:${mine?"#1E2C16":"#1A2233"};border:2px solid ${mine?"#3A5A1E":"#2A3650"};border-radius:12px;padding:8px 11px">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:3px"><span style="font-size:11px;color:${mine?"#E11D2E":"#8FA0BD"};font-weight:800;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${(m.authorName||"Someone").replace(/</g,"&lt;")}</span>${canDel?`<button data-act="delmsg" data-arg="${m.id}" title="Delete this message" style="background:rgba(225,29,46,.16);border:1px solid #E11D2E66;color:#E11D2E;font-size:11px;font-weight:800;cursor:pointer;border-radius:7px;padding:3px 9px;flex:none">&#128465; Delete</button>`:""}</div>
         <div style="font-size:14px;color:#EAEDF2;line-height:1.4;white-space:pre-wrap;word-break:break-word">${(m.text||"").replace(/</g,"&lt;")}</div>
         <div style="font-size:10px;color:#5B6880;margin-top:3px">${when}</div></div>`;}).join("");
   box.scrollTop=box.scrollHeight;
@@ -4288,7 +4288,7 @@ function openChat(teamId){
   renderChatList();
   if(chatUnsub){try{chatUnsub();}catch(e){}}
   chatUnsub=window.cloudSubscribeMessages(teamId,function(msgs,err){
-    if(err){ const b=document.getElementById("chatList"); if(b)b.innerHTML=`<div style="color:#E2574C;font-size:13px;text-align:center;margin:auto;line-height:1.5">Couldn't load chat.<br>The team owner may still need to publish the chat rules.</div>`; return; }
+    if(err){ const b=document.getElementById("chatList"); if(b)b.innerHTML=`<div style="color:#E11D2E;font-size:13px;text-align:center;margin:auto;line-height:1.5">Couldn't load chat.<br>The team owner may still need to publish the chat rules.</div>`; return; }
     chatMsgs=msgs||[]; renderChatList();
     if(chatTeamId===teamId) markSeenChat(teamId);   // chat is open → keep "seen" current (incl. own sends)
   });
@@ -4569,7 +4569,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v177";
+var APP_VERSION="v178";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
