@@ -704,7 +704,7 @@ const initGame=()=>({inning:1,half:"T",away:0,home:0,outs:0,balls:0,strikes:0,
   startedAt:null,  // wall-clock ms when the game ACTUALLY started (auto-set at first pitch / game start; editable in Game Setup) — drives the game timer
   lineup:{ order:[0,1,2,3,4,5,6,7,8],   // batting order: 9-12 entries (slots 10+ = extra hitters)
            pos:{P:0,C:1,"1B":2,"2B":3,"3B":4,SS:5,LF:6,CF:7,RF:8} }});
-let G=initGame(),hist=[],mode="home",tap=null,contact=null,result=null,plan=null,toast=null,toastTimer=null,curResults=[],showAll=false,showZones=false,editSlot=null,confirmAct=null,gameActive=false,lineupTab="us",newgameFrom="home",brSheet=false,correctOpen=false,correctOpenAt=0;
+let G=initGame(),hist=[],mode="home",tap=null,contact=null,result=null,plan=null,toast=null,toastTimer=null,curResults=[],showAll=false,showZones=false,editSlot=null,confirmAct=null,gameActive=false,lineupTab="us",newgameFrom="home",brSheet=false,correctOpen=false,correctOpenAt=0,lineupView="list",fieldAssign=null;
 // Resume the last in-progress game (saved by saveGame) across reloads/app updates, so the
 // lineup/score is never lost. Stays on the home screen → shows "Resume". Re-links ROSTER
 // to the saved team so the lineup's player indices resolve correctly.
@@ -771,6 +771,31 @@ function assignPos(ri,pos){
 function makePitcher(ri){
   if(G.lineup.order.indexOf(ri)<0){const slot=G.lineup.order.indexOf(G.lineup.pos.P);if(slot>=0)G.lineup.order[slot]=ri;}
   assignPos(ri,"P");
+}
+/* Field-map position editor (C2): a diamond with all 9 defensive spots. Tap a spot, then tap a
+   player to place him there — assignPos does a clean 2-player swap, all visible on the field at once,
+   so you never have to chase a cascade through the list. */
+function fieldMapHtml(){
+  // %-of-viewBox (300x280) coordinates for each spot on the diamond.
+  const FXY={P:[50,64],C:[50,92],"1B":[71,63],"2B":[61,51],SS:[39,51],"3B":[29,63],LF:[24,30],CF:[50,19],RF:[76,30]};
+  const spot=(P)=>{ const ri=G.lineup.pos[P], pl=(ri!=null)?ROSTER[ri]:null, sel=(fieldAssign===P), xy=FXY[P];
+    return `<button data-act="fieldpos" data-arg="${P}" style="position:absolute;left:${xy[0]}%;top:${xy[1]}%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:1px;background:${sel?OUR.color:"rgba(13,19,32,.92)"};border:2px solid ${sel?"#fff":(pl?OUR.color:T.line)};border-radius:9px;padding:5px 7px;min-width:46px;cursor:pointer;box-shadow:0 2px 9px rgba(0,0,0,.55);z-index:2">
+        <span style="font-family:${MONO};font-size:14px;font-weight:800;color:${sel?"#fff":T.lime};line-height:1">${P}</span>
+        <span style="font-size:11px;font-weight:700;color:${sel?"#fff":(pl?T.chalk:T.sageDim)};max-width:74px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.1">${pl?("#"+pl.num+" "+(pl.name||"").split(" ")[0]):"—"}</span></button>`; };
+  const diamond=`<svg viewBox="0 0 300 280" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" style="display:block;position:absolute;inset:0">
+      <path d="M150,250 L292,108 Q150,-12 8,108 Z" fill="${T.grass}"/>
+      <path d="M150,250 L246,154 Q150,70 54,154 Z" fill="${T.grassLt}" opacity="0.45"/>
+      <polygon points="150,256 218,186 150,116 82,186" fill="${T.clay}" opacity="0.92"/>
+      <polygon points="150,250 214,186 150,122 86,186" fill="${T.grassLt}" opacity="0.7"/></svg>`;
+  const picker = fieldAssign ? (function(){
+    const chips=G.lineup.order.map(ri=>{ const pl=ROSTER[ri], atP=posOfPlayer(ri), here=(G.lineup.pos[fieldAssign]===ri);
+      return `<button data-act="fieldassign" data-arg="${ri}" style="background:${here?OUR.color:T.surface2};border:2px solid ${here?OUR.color:T.line};color:${here?"#fff":T.chalk};border-radius:8px;padding:7px 10px;font-family:${MONO};font-size:13px;font-weight:700;white-space:nowrap">#${pl.num} ${(pl.name||"").split(" ")[0]}${atP?` <span style="color:${here?"#fff":T.sageDim};font-size:11px">(${atP})</span>`:""}</button>`; }).join("");
+    return `<div style="flex:none"><div style="font-size:13px;font-weight:800;color:${T.lime};margin:0 2px 6px">Place at ${fieldAssign} — tap a player <span data-act="fieldcancel" style="color:${T.sageDim};font-weight:600;margin-left:6px;cursor:pointer">(cancel)</span></div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;max-height:20vh;overflow-y:auto">${chips}</div></div>`;
+  })() : `<div style="flex:none;font-size:12.5px;color:${T.sageDim};text-align:center;padding:6px 8px;border:1px dashed ${T.line};border-radius:9px">Tap a position, then tap a player to put him there. Whoever was there trades spots — no chasing the rest of the lineup.</div>`;
+  return `<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px">
+      <div style="position:relative;width:100%;aspect-ratio:300/280;max-height:46vh;margin:0 auto;border:2px solid ${T.line};border-radius:10px;overflow:hidden;flex:none">${diamond}${POSLIST.map(spot).join("")}</div>
+      ${picker}</div>`;
 }
 /* ---- continuous batting order: 9 fielders + extra hitters (bat only), up to 12 ---- */
 function addBatter(){const b=benchIdx();if(!b.length){flash("No bench players to add");return;}
@@ -3325,13 +3350,17 @@ function actionArea(){
         <div style="flex:1;min-width:0"><div style="font-family:${MONO};font-size:20px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:${T.lime}">Lineups</div>
           <div style="font-size:11px;color:${T.sage};margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${OUR.name} &middot; batting ${n}${n>9?" (continuous)":""} &middot; drag to reorder</div></div></div>
       ${luToggle}
+      <div style="flex-shrink:0;display:flex;gap:2px;background:${T.line};border:2px solid ${T.line};border-radius:9px;overflow:hidden">
+        <button data-act="luview" data-arg="list" style="flex:1;background:${lineupView==="list"?T.lime:T.surface2};color:${lineupView==="list"?"#fff":T.sage};border:none;border-radius:0;padding:9px;font-family:${MONO};font-weight:800;font-size:13px;letter-spacing:.4px">${IC('list',15)} Batting order</button>
+        <button data-act="luview" data-arg="field" style="flex:1;background:${lineupView==="field"?T.lime:T.surface2};color:${lineupView==="field"?"#fff":T.sage};border:none;border-radius:0;padding:9px;font-family:${MONO};font-weight:800;font-size:13px;letter-spacing:.4px">&#9651; Field map</button></div>
+      ${lineupView==="field" ? fieldMapHtml() : `
       <div style="flex-shrink:0;display:flex;align-items:center;justify-content:space-between;background:${T.surface2};border:2px solid ${T.line};border-radius:9px;padding:9px 12px">
         <span style="font-size:14px;color:${T.sage}">Pitcher</span>
         <button data-act="pickpitch" style="background:transparent;border:none;color:${T.chalk};font-size:18px;font-weight:700;display:flex;align-items:center;gap:8px"><span style="font-family:${MONO};color:${OUR.color}">#${pit.num}</span>${pit.name}<span style="font-size:12px;color:${OUR.color};font-weight:700;margin-left:4px">CHANGE</span></button></div>
       <div id="lineup-list" style="flex:1 1 auto;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:6px">${rows}</div>
       <div style="flex-shrink:0;display:flex;gap:8px">
         <button data-act="addbatter" style="${ghost};flex:1" ${n>=12?"disabled":""}>+ Add batter (EH)</button>
-        <button data-act="rembatter" style="${ghost};flex:1" ${n<=9?"disabled":""}>&minus; Remove last</button></div>
+        <button data-act="rembatter" style="${ghost};flex:1" ${n<=9?"disabled":""}>&minus; Remove last</button></div>`}
       <div style="flex-shrink:0"><div style="font-size:10px;color:${T.sageDim};letter-spacing:.6px;margin:0 2px 5px">BENCH</div>
         <div style="display:flex;flex-wrap:wrap;gap:5px">${bench||`<span style="font-size:12px;color:${T.sageDim}">No bench players</span>`}</div></div>
       ${(function(){ const ct=curTeam(); if(!ct)return ""; const sl=teamLineups(ct);
@@ -4173,6 +4202,10 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="lineup"){mode="lineup";render();}
   else if(act==="lineupdone"){ gameActive=true;mode="idle";render();broadcast(); }   // timer starts on first pitch (see recordPitch)
   else if(act==="lutab"){lineupTab=arg;render();}
+  else if(act==="luview"){ lineupView=arg; fieldAssign=null; render(); }                 // batting-order list ↔ field map (C2)
+  else if(act==="fieldpos"){ fieldAssign=(fieldAssign===arg?null:arg); render(); }        // tap a position on the field map
+  else if(act==="fieldcancel"){ fieldAssign=null; render(); }
+  else if(act==="fieldassign"){ if(fieldAssign){ assignPos(+arg,fieldAssign); fieldAssign=null; render(); broadcast(); } }   // place the picked player at that spot (clean swap)
   else if(act==="oppadd"){const L=oppList();if(L.length<12){L.push({num:String(L.length+1),name:""});G.oppBatters=L.length;}render();}
   else if(act==="opprem"){if(oppList().length>1){oppList().splice(+arg,1);G.oppBatters=oppList().length;render();broadcast();}}
   // ---- opponent lineup editor (full mirror): positions, pitcher, bench/pinch, edit ----
@@ -4717,7 +4750,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v201";
+var APP_VERSION="v202";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;

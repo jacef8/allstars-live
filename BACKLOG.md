@@ -46,8 +46,10 @@ Status: [ ] todo · [~] in progress · [x] done. Grouped by theme; recurring/met
 ## C. Lineup / roster / positions
 - [ ] C1. In-game lineup edit: don't require a second window to edit a player; first/last name boxes
       inconsistent vs elsewhere.
-- [ ] C2. Better position changes: a single swap shouldn't cascade-reassign others. Offer a field-map
-      view on the lineup page to place players (drag-and-drop), or a simple single swap.
+- [x] C2. Field-map position editor (v202): the lineup page has a "Batting order / Field map" toggle.
+      Field map = a diamond with all 9 spots; tap a position, tap a player, and assignPos does a clean
+      2-player swap (displaced player takes the picked players old spot) — all visible at once, no
+      cascade. Verified the swap touches only the two involved. (Drag-drop could come later; tap works.)
 - [ ] C3. Skip a batter in the batting order.
 - [x] C4. Current batter highlighted on the in-game lineup edit (v199): our up-batter slot gets a lime
       border + tint + an "AT BAT" badge, so the row most likely to need editing is easy to find.
@@ -89,6 +91,14 @@ Status: [ ] todo · [~] in progress · [x] done. Grouped by theme; recurring/met
       (cellular) + registerDefaultNetworkCallback fire, "cellular available" logged, no crash; warning
       correctly hidden on validated cellular. FIELD test owed: on the Mevo Wi-Fi confirm the warning
       shows + Go Live succeeds over cellular. NOTE: tablet USB dropped repeatedly today (check cable).
+
+## H. Remote scorebug overlay (NEW 2026-06-27)
+- [ ] H1. Burn the live scorebug into a YouTube stream the user is NOT the source of (scores from home,
+      someone else films). Build a TRANSPARENT overlay URL (scorebug-only, transparent bg) that
+      subscribes to the user's live game (?watch=<gameId>) — usable as an OBS/Streamlabs/vMix BROWSER
+      SOURCE so the encoder burns it in. App already broadcasts state continuously. Gated on knowing the
+      filming person's streaming setup (OBS = works; phone-direct-to-YouTube = needs OBS or the app).
+      Fallback today: share the live-score link beside the YouTube video (not burned in).
 
 ## G. Small / polish
 - [x] G1. Short, light haptic vibrate on pitch-button input (v189).
