@@ -20,6 +20,15 @@ service cloud.firestore {
       // Co-owners get full management access (like a second owner) but can't change ownerUid or
       // the coOwners list themselves. Guard the field existence — older docs have no coOwners.
       function isCoOwner()  { return request.auth != null && ('coOwners' in resource.data) && (request.auth.token.email in resource.data.coOwners); }
+      // STALE-WRITE GUARD: never let an update move updatedAt backwards. A device holding older data
+      // carries that data's older updatedAt (the client no longer regenerates it to "now" on push),
+      // so this rejects its write and the newer copy survives — the authoritative protection against
+      // an out-of-date device clobbering fresh data. Writes that don't touch updatedAt pass (the
+      // post-write value equals the stored one); all our writes include a numeric updatedAt.
+      function updatedAtOk() {
+        return request.resource.data.updatedAt is number
+          && (!('updatedAt' in resource.data) || request.resource.data.updatedAt >= resource.data.updatedAt);
+      }
 
       // Public teams (owner set public:true) are readable by anyone — powers the searchable
       // team directory. The `where('public','==',true)` query authorizes against this clause.
@@ -28,9 +37,9 @@ service cloud.firestore {
       // Create: must stamp yourself as the owner.
       allow create: if request.auth != null && request.resource.data.ownerUid == request.auth.uid;
 
-      allow update:
+      allow update: if updatedAtOk() && (
         // Owner = anything.
-        if isOwner()
+        isOwner()
         // Co-owner = anything EXCEPT changing the owner or the co-owners list.
         || (
           isCoOwner() &&
@@ -64,7 +73,8 @@ service cloud.firestore {
         || (
           (isOwner() || isCoOwner() || isScorer() || isFollower()) &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastMsgAt', 'updatedAt'])
-        );
+        )
+      );
 
       allow delete: if isOwner();
 

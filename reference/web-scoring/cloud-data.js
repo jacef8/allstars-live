@@ -17,6 +17,10 @@
   window.cloudStopSync = function () { _unsub.forEach(function (f) { try { f(); } catch (e) {} }); _unsub = []; };
 
   // Whitelist the fields we persist (drop any runtime junk).
+  // updatedAt is the content's REAL last-changed time, carried through verbatim — NOT regenerated to
+  // "now" on every push. That, plus the server rule that rejects an update whose updatedAt is older
+  // than the stored one (firestore.rules), is what stops a device holding STALE data from clobbering
+  // a device with newer data: stale content keeps its old timestamp and the write is rejected.
   function teamDoc(t) {
     return {
       id: t.id, name: t.name || "", short: t.short || "", color: t.color || "#2E6BE6",
@@ -25,13 +29,35 @@
       lineups: t.lineups || [], activeLineupId: t.activeLineupId || null,   // saved batting orders
       rulebookId: t.rulebookId || null,
       ownerUid: t.ownerUid || myUid(), ownerEmail: t.ownerEmail || myEmail(),
-      scorers: t.scorers || [], followers: t.followers || [], coOwners: t.coOwners || [], updatedAt: Date.now(),
+      scorers: t.scorers || [], followers: t.followers || [], coOwners: t.coOwners || [],
+      updatedAt: t.updatedAt || Date.now(),
       public: !!t.public, statsPublic: !!t.statsPublic,   // owner-controlled discoverability
       lastMsgAt: t.lastMsgAt || 0,                        // newest chat ts → powers home unread badge
       games: t.games || [],                               // finished-game log (Recent games list)
       logo: t.logo || "",                                 // team logo data URL (downscaled ≤240px)
     };
   }
+
+  // ===== Content-change tracking — so updatedAt only advances on a REAL edit, never just because a
+  // team was open or re-saved. _sig[id] holds the last known-synced CONTENT signature (the doc minus
+  // its updatedAt). We only bump updatedAt → "now" when the current content differs from that
+  // baseline, and we only push changed teams. Unchanged/stale content keeps its old timestamp, so it
+  // can't win the merge or the server's updatedAt guard. =====
+  var _sig = {};
+  function teamSig(t) { try { var d = teamDoc(t); delete d.updatedAt; return JSON.stringify(d); } catch (e) { return ""; } }
+  function markClean(t) { if (t && t.id) _sig[t.id] = teamSig(t); }   // baseline = current content
+  // Called from saveDB (NOT while applying an inbound snapshot): bump updatedAt for any team whose
+  // content actually changed vs its synced baseline. Teams with no baseline yet (never synced this
+  // session) are left alone — we don't know they changed, so we must not stamp them "now" and risk
+  // clobbering a newer cloud copy on first sign-in.
+  window.cloudTouchChanged = function () {
+    try {
+      (DB.teams || []).forEach(function (t) {
+        if (!t || !t.id) return;
+        if (_sig[t.id] !== undefined && _sig[t.id] !== teamSig(t)) t.updatedAt = Date.now();
+      });
+    } catch (e) {}
+  };
 
   // Search the public team directory. Returns lightweight cards (no full season detail).
   // Firestore can't substring-search, so we pull public teams and filter by name client-side.
@@ -91,20 +117,25 @@
     });
   };
 
-  // Push one team up (claims ownership if it has none / is mine).
-  window.cloudSaveTeam = function (t) {
+  // Push one team up (claims ownership if it has none / is mine). `force` skips the unchanged-content
+  // short-circuit (used by Sync now + sign-in, so a team the cloud doesn't have yet still uploads even
+  // when its content matches our baseline).
+  window.cloudSaveTeam = function (t, force) {
     var d = fdb(), u = myUid();
     if (!d || !u || !t || !t.id) return;
     if (t.ownerUid && t.ownerUid !== u && (t.scorers || []).indexOf(myEmail()) < 0 && (t.coOwners || []).indexOf(myEmail()) < 0) return; // not mine
+    if (!force && _sig[t.id] !== undefined && _sig[t.id] === teamSig(t)) return;   // nothing changed → don't re-stamp/re-push
     d.collection("teams").doc(t.id).set(teamDoc(t), { merge: true })
-      .then(function () { window._lastCloudPush = Date.now(); })
+      .then(function () { window._lastCloudPush = Date.now(); markClean(t); })
       .catch(function (e) { console.warn("cloudSaveTeam:", e.message); });
   };
 
   // Force an immediate push of every team I can write (bypasses the debounce) — wired to the
-  // "Sync now" button on the Diagnostics page.
+  // "Sync now" button on the Diagnostics page. Bump-changed-then-force so genuinely edited teams carry
+  // a fresh updatedAt while unchanged ones still carry their real (older) one (server arbitrates).
   window.cloudSyncNow = function () {
-    try { (DB.teams || []).forEach(window.cloudSaveTeam); } catch (e) {}
+    try { window.cloudTouchChanged(); } catch (e) {}
+    try { (DB.teams || []).forEach(function (t) { window.cloudSaveTeam(t, true); }); } catch (e) {}
     try { window.cloudRefreshFollowed(); } catch (e) {}
   };
 
@@ -132,7 +163,7 @@
     if (!fdb() || !myUid()) return;
     if (window._cloudApplying) return;   // we're applying an inbound snapshot — don't echo it back (no write-loop)
     clearTimeout(_pt);
-    _pt = setTimeout(function () { try { (DB.teams || []).forEach(window.cloudSaveTeam); } catch (e) {} }, 800);
+    _pt = setTimeout(function () { try { (DB.teams || []).forEach(function (t) { window.cloudSaveTeam(t); }); } catch (e) {} }, 800);
   };
 
   // Owner adds/removes an authorized scorer by email.
@@ -179,14 +210,30 @@
       .catch(function (e) { console.warn("cloudRemoveCoOwner:", e.message); });
   };
 
-  // On sign-in: claim + push local teams, then live-subscribe to my owned + scorer teams.
+  // On sign-in: claim ownership of un-owned local teams, seed content baselines, then live-subscribe.
+  // We do NOT blanket-push every local team here — a device that loaded STALE data must not overwrite
+  // newer cloud copies on sign-in. Instead we wait for the first owned-teams snapshot and upload only
+  // the teams the cloud is genuinely MISSING (see uploadMissing). Changed teams sync normally after.
   window.cloudSyncTeams = function () {
     var d = fdb(), u = myUid(), em = myEmail();
     if (!d || !u) return;
+    var _didInitialUpload = false;
     try {
-      (DB.teams || []).forEach(function (t) { if (!t.ownerUid) { t.ownerUid = u; t.ownerEmail = em; } window.cloudSaveTeam(t); });
+      (DB.teams || []).forEach(function (t) { if (!t.ownerUid) { t.ownerUid = u; t.ownerEmail = em; t.updatedAt = Date.now(); } });
       saveDB();
+      (DB.teams || []).forEach(markClean);   // baseline = current content; existing data isn't a fresh "edit"
     } catch (e) {}
+    // After the cloud tells us which of my teams it already has, push up only the ones it's missing.
+    function uploadMissing(cloudIds) {
+      if (_didInitialUpload) return; _didInitialUpload = true;
+      try {
+        (DB.teams || []).forEach(function (t) {
+          if (!t || !t.id) return;
+          var mine = (!t.ownerUid || t.ownerUid === u);
+          if (mine && cloudIds.indexOf(t.id) < 0) { if (!t.updatedAt) t.updatedAt = Date.now(); window.cloudSaveTeam(t, true); }
+        });
+      } catch (e) {}
+    }
 
     _unsub.forEach(function (f) { try { f(); } catch (e) {} });
     _unsub = [];
@@ -208,7 +255,7 @@
         var c = doc.data(); if (!c || !c.id) return;
         if (dead.indexOf(c.id) >= 0) return;   // user deleted this team — never re-add it
         var i = (DB.teams || []).findIndex(function (x) { return x.id === c.id; });
-        if (i < 0) { DB.teams.push(c); changed = true; }
+        if (i < 0) { DB.teams.push(c); markClean(c); changed = true; }
         else {
           // Only take the cloud copy when it's actually NEWER than ours. A stale snapshot (e.g.
           // arriving before our own just-edited push commits) must NOT clobber local edits — that's
@@ -218,7 +265,11 @@
           if (cTs > lTs) {
             var merged = Object.assign({}, DB.teams[i], c);
             if (sansTimestamp(merged) !== sansTimestamp(DB.teams[i])) { DB.teams[i] = merged; changed = true; }
+            markClean(DB.teams[i]);                 // we're now in sync with cloud → don't echo it back
+          } else if (cTs === lTs) {
+            markClean(DB.teams[i]);                 // already in sync → baseline = current (no needless re-push)
           }
+          // cTs < lTs: we hold a newer un-pushed local edit — leave the baseline so cloudPushSoon uploads it.
         }
       });
       // A just-accepted texted invite: jump to that team's management page + favorite it (follow).
@@ -240,7 +291,8 @@
       cloudRenderSoon();               // deferred + interaction-aware (won't kill an open dropdown)
     }
     _unsub.push(d.collection("teams").where("ownerUid", "==", u)
-      .onSnapshot(function (s) { merge(s.docs); }, function (e) { console.warn("teams(owned):", e.message); }));
+      .onSnapshot(function (s) { merge(s.docs); uploadMissing(s.docs.map(function (x) { return x.id; })); },
+                  function (e) { console.warn("teams(owned):", e.message); }));
     if (em) _unsub.push(d.collection("teams").where("scorers", "array-contains", em)
       .onSnapshot(function (s) { merge(s.docs); }, function (e) { console.warn("teams(scorer):", e.message); }));
     if (em) _unsub.push(d.collection("teams").where("followers", "array-contains", em)

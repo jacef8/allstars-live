@@ -288,15 +288,13 @@ function migrateTeam(t){ if(t&&t.players)t.players.forEach(ensureName); if(t&&!A
 const DB_KEY="allstars-scorer-db";
 function loadDB(){try{const r=localStorage.getItem(DB_KEY);if(r){const d=JSON.parse(r);if(d&&d.teams)return d;}}catch(e){}return {teams:[],seq:1};}
 function saveDB(){
-  // Stamp the team(s) being edited as freshly-changed so the cloud merge keeps OUR copy until it's
-  // pushed (a stale inbound snapshot can't silently wipe a just-added schedule game any more).
-  // CRUCIAL: skip this while APPLYING an inbound cloud snapshot — otherwise saveDB would bump the
-  // just-merged team's updatedAt to our local "now", making our copy look newer than the cloud, so
-  // the next remote edit's `cTs > lTs` guard fails and we silently stop receiving that team's
-  // changes (the "edits on one device never reach the other while both have it open" bug).
-  if(!window._cloudApplying){
-    try{ [typeof openTeamId!=="undefined"?openTeamId:null, typeof curTeamId!=="undefined"?curTeamId:null].forEach(function(id){ if(id){ var _t=(DB.teams||[]).find(function(x){return x.id===id;}); if(_t)_t.updatedAt=Date.now(); } }); }catch(e){}
-  }
+  // Stamp updatedAt="now" ONLY on teams whose CONTENT actually changed since the last synced baseline
+  // (cloudTouchChanged, in cloud-data.js) — not just because a team was open. That keeps updatedAt a
+  // true "last edited" time: unchanged/stale content keeps its old timestamp, so it can't win the
+  // cloud merge or the server's updatedAt guard and clobber a device with newer data.
+  // Skip entirely while APPLYING an inbound snapshot, or we'd bump the just-merged team and stop
+  // receiving its future changes (the "edits never reach the other device" bug).
+  if(!window._cloudApplying){ try{ if(window.cloudTouchChanged) window.cloudTouchChanged(); }catch(e){} }
   try{localStorage.setItem(DB_KEY,JSON.stringify(DB));}catch(e){} try{ if(window.cloudPushSoon)window.cloudPushSoon(); }catch(e){}}
 // Persist the in-progress game (lineup, positions, score, everything in G) so it survives
 // reloads and app updates — the operator never re-enters a lineup. Teams/roster persist in
@@ -4627,7 +4625,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v187";
+var APP_VERSION="v188";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
