@@ -1804,12 +1804,14 @@ function loadCloudFloat(){ try{ if(!window.cloudLoadPrefs)return; window.cloudLo
 function floatGeo(id,def){ const g=FLOAT[id]||{}; return {x:g.x!=null?g.x:def.x, y:g.y!=null?g.y:def.y, w:g.w!=null?g.w:def.w, h:g.h!=null?g.h:def.h}; }
 function floatWindow(id,title,inner,def){
   const g=floatGeo(id,def);
+  const natW=def.w;   // the content's natural width; it's scaled to fit the window's width so nothing is cut off
   return `<div data-floatwin="${id}" style="position:absolute;left:${g.x}px;top:${g.y}px;width:${g.w}px;height:${g.h}px;z-index:40;pointer-events:auto;display:flex;flex-direction:column;background:rgba(13,19,32,.97);border:2px solid ${T.lime};border-radius:12px;box-shadow:0 14px 44px rgba(0,0,0,.6);overflow:hidden">
     <div data-floatdrag="${id}" style="flex:none;display:flex;align-items:center;gap:8px;padding:6px 10px;background:${T.surface2};border-bottom:1.5px solid ${T.line};cursor:move;touch-action:none;user-select:none">
       <span style="font-size:14px;color:${T.sageDim};line-height:1">&#9783;</span>
       <span style="flex:1;font-size:12.5px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:${T.lime};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${title}</span>
       <span style="font-size:9px;font-weight:700;letter-spacing:.5px;color:${T.sageDim}">drag</span></div>
-    <div style="flex:1;min-height:0;overflow:auto;padding:8px;display:flex;flex-direction:column">${inner}</div>
+    <div data-floatbody style="flex:1;min-height:0;overflow:hidden;position:relative">
+      <div data-floatcontent data-natw="${natW}" style="position:absolute;top:0;left:0;width:${natW}px;transform-origin:top left;padding:8px;box-sizing:border-box;display:flex;flex-direction:column;gap:8px">${inner}</div></div>
     <div data-floatresize="${id}" title="Drag to resize" style="position:absolute;right:0;bottom:0;width:46px;height:46px;z-index:2;cursor:nwse-resize;touch-action:none;display:flex;align-items:flex-end;justify-content:flex-end;padding:5px">
       <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="${T.lime}" stroke-width="2.2" stroke-linecap="round"><path d="M18 8 8 18M18 13l-5 5M18 18l-1 1"/></svg></div>
   </div>`;
@@ -1823,8 +1825,16 @@ function setupFloatWins(){
     x=Math.max(0,Math.min(x,Math.max(0,window.innerWidth-Math.min(w,80))));
     y=Math.max(0,Math.min(y,Math.max(0,window.innerHeight-44)));
     win.style.left=x+"px"; win.style.top=y+"px"; };
+  // Scale a window's content to fit its current width, then size the window's height to the scaled
+  // content — so resizing shrinks/grows everything proportionally and never cuts information off.
+  const fitContent=(win)=>{ const body=win.querySelector("[data-floatbody]"), content=win.querySelector("[data-floatcontent]"); if(!body||!content)return;
+    const natW=parseFloat(content.getAttribute("data-natw"))||content.offsetWidth||1;
+    const scale=Math.max(.2, body.clientWidth/natW);
+    content.style.transform="scale("+scale+")";
+    const head=win.querySelector("[data-floatdrag]"), headH=head?head.offsetHeight:0;
+    win.style.height=Math.round(headH + content.scrollHeight*scale + 6)+"px"; };
   layer.querySelectorAll("[data-floatwin]").forEach(win=>{
-    const id=win.getAttribute("data-floatwin"); clampInto(win);
+    const id=win.getAttribute("data-floatwin"); clampInto(win); fitContent(win);
     const handle=win.querySelector("[data-floatdrag]"), rez=win.querySelector("[data-floatresize]");
     let act=null,sx=0,sy=0,ox=0,oy=0,ow=0,oh=0;
     // Fine-tune snapping: glide on a small grid, with stronger magnetism to screen edges + center.
@@ -1835,9 +1845,9 @@ function setupFloatWins(){
       if(act==="drag"){ const w=win.offsetWidth, h=win.offsetHeight;
         win.style.left=snap(ox+dx,[0, vw-w], (vw-w)/2)+"px";
         win.style.top =snap(oy+dy,[0, vh-h], (vh-h)/2)+"px"; }
-      else { const x=parseFloat(win.style.left)||0, y=parseFloat(win.style.top)||0;
-        win.style.width =Math.max(230,snap(ow+dx,[vw-x]))+"px";
-        win.style.height=Math.max(96, snap(oh+dy,[vh-y]))+"px"; }
+      else { const x=parseFloat(win.style.left)||0;
+        win.style.width=Math.max(170,snap(ow+dx,[vw-x]))+"px";
+        fitContent(win); }   // height auto-fits the scaled content (resize = width; content never clips)
       e.preventDefault(); };
     const up=()=>{ if(!act) return; clampInto(win);
       FLOAT[id]={x:parseFloat(win.style.left)||0,y:parseFloat(win.style.top)||0,w:win.offsetWidth,h:win.offsetHeight};
@@ -3769,7 +3779,7 @@ function render(){
           ${monitorPane()}
         </div>
         <div style="flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;gap:8px">
-          ${focusPlay?"":scoreBar()}${fieldEl}${floatActive?"":batterCard()}${actionEl}
+          ${(focusPlay||floatActive)?"":scoreBar()}${fieldEl}${floatActive?"":batterCard()}${actionEl}
         </div>
       </div>`;
   } else if(wide){
@@ -3777,7 +3787,7 @@ function render(){
     // decisions get the rest of the width — more room, less scrolling.
     body=`<div id="console-row" class="video-off" style="flex:1;min-height:0;display:flex;flex-direction:row;gap:12px">
         <div style="flex:0 0 46%;max-width:46%;min-width:0;min-height:0;display:flex;flex-direction:column;gap:8px">
-          ${focusPlay?"":scoreBar()}<div style="flex:1;min-height:0;display:flex;align-items:center;justify-content:center;position:relative">${diamondSVG()}${toastEl}</div>
+          ${(focusPlay||floatActive)?"":scoreBar()}<div style="flex:1;min-height:0;display:flex;align-items:center;justify-content:center;position:relative">${diamondSVG()}${toastEl}</div>
         </div>
         <div style="flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;gap:8px">
           ${floatActive?"":batterCard()}${actionEl}${feedPanel()}
@@ -3812,7 +3822,7 @@ function render(){
       : isView
         ? (function(){var vp=viewerPhone;var vseg=(id,l)=>`<button data-act="viewerphone" data-arg="${id}" style="flex:1;background:${vp===id?T.lime:T.surface2};color:${vp===id?"#fff":T.sage};border:2px solid ${vp===id?T.lime:T.line};border-radius:9px;padding:8px;font-family:${MONO};font-weight:800;font-size:12.5px;letter-spacing:.4px;text-transform:uppercase">${l}</button>`;
           return `<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px">${statusBar()}${batterCard()}<div style="display:flex;gap:8px;flex:none">${vseg("both","Both")}${vseg("field","Field")}${vseg("feed","Feed")}</div>${vp==="feed"?"":fieldEl}${vp==="field"?"":feedPanel()}</div>`;})()
-        : `<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px">${focusPlay?"":statusBar()}${floatActive?"":batterCard()}${focusPlay?fieldEl:pcLine+'<div style="flex:1;min-height:0"></div>'}${actionEl}${controls}</div>`;
+        : `<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px">${(focusPlay||floatActive)?"":statusBar()}${floatActive?"":batterCard()}${focusPlay?fieldEl:pcLine+'<div style="flex:1;min-height:0"></div>'}${actionEl}${controls}</div>`;
     body=`<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:9px">
         ${focusPlay?"":`<div style="display:flex;gap:8px;flex:none">${tab("score",isView?ICN.inplay+" Field":ICN.dot+" Scoring")}${tab("video",ICN.play+" Video")}</div>`}
         ${pane}
@@ -3821,7 +3831,7 @@ function render(){
   // Free-layout (BETA): a "⊞ Windows" toggle on the wide scorer view, and — when on — a fixed
   // overlay holding the draggable/resizable AT BAT window (prototype panel).
   const floatToggleBtn = "";   // toggle moved into the toolbar (renderToolbar) so it can't cover scoring controls
-  const floatLayer = floatActive ? `<div id="float-layer" style="position:fixed;inset:0;z-index:35;pointer-events:none">${floatWindow("batter","At Bat",batterCard(),{x:24,y:96,w:340,h:168})}</div>` : "";
+  const floatLayer = floatActive ? `<div id="float-layer" style="position:fixed;inset:0;z-index:35;pointer-events:none">${floatWindow("score","Scoreboard",statusBar(),{x:20,y:8,w:360,h:130})}${floatWindow("batter","At Bat",batterCard(),{x:24,y:150,w:340,h:168})}</div>` : "";
   document.getElementById("content").innerHTML=`
     ${body}${confirmOverlay()}${alertOverlay()}
     ${reviewBatter?batterReviewModal():""}
@@ -4574,7 +4584,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v179";
+var APP_VERSION="v180";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
