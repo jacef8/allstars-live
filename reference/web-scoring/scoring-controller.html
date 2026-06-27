@@ -706,7 +706,7 @@ const initGame=()=>({inning:1,half:"T",away:0,home:0,outs:0,balls:0,strikes:0,
   startedAt:null,  // wall-clock ms when the game ACTUALLY started (auto-set at first pitch / game start; editable in Game Setup) — drives the game timer
   lineup:{ order:[0,1,2,3,4,5,6,7,8],   // batting order: 9-12 entries (slots 10+ = extra hitters)
            pos:{P:0,C:1,"1B":2,"2B":3,"3B":4,SS:5,LF:6,CF:7,RF:8} }});
-let G=initGame(),hist=[],mode="home",tap=null,contact=null,result=null,plan=null,toast=null,toastTimer=null,curResults=[],showAll=false,showZones=false,editSlot=null,confirmAct=null,gameActive=false,lineupTab="us",newgameFrom="home",brSheet=false,correctOpen=false,correctOpenAt=0,lineupView="list",fieldAssign=null,fieldHold=null,fieldDisplaced=null,lineEditSlot=null,luFromSetup=false,koPick=null,oppFieldSel=null,gcArrange=false,bugPreview=false;
+let G=initGame(),hist=[],mode="home",tap=null,contact=null,result=null,plan=null,toast=null,toastTimer=null,curResults=[],showAll=false,showZones=false,editSlot=null,confirmAct=null,gameActive=false,lineupTab="us",newgameFrom="home",brSheet=false,correctOpen=false,correctOpenAt=0,lineupView="list",fieldAssign=null,fieldHold=null,fieldDisplaced=null,lineEditSlot=null,luFromSetup=false,koPick=null,oppFieldSel=null,gcArrange=false,bugPreview=false,barEdit=false;
 // Resume the last in-progress game (saved by saveGame) across reloads/app updates, so the
 // lineup/score is never lost. Stays on the home screen → shows "Resume". Re-links ROSTER
 // to the saved team so the lineup's player indices resolve correctly.
@@ -4269,6 +4269,9 @@ document.getElementById("app").addEventListener("click",e=>{
     onFieldTap(loc.x,loc.y);
     return;
   }
+  // While editing the toolbar layout, a tap on a draggable bar button must NOT fire its action — it's
+  // being moved. (The Done toggle isn't inside a [data-baritem], so it still works to exit.)
+  if(barEdit && e.target.closest("[data-baritem]")) return;
   const el=e.target.closest("[data-act]"); if(!el)return;
   const act=el.dataset.act,arg=el.dataset.arg;
   window._lastAct=act;                                       // flip-trace: remember the last tapped action
@@ -4380,6 +4383,7 @@ document.getElementById("app").addEventListener("click",e=>{
   if(act==="viewerphone"){ viewerPhone=(arg==="field"||arg==="feed")?arg:"both"; try{localStorage.setItem("al-viewer-phone",viewerPhone);}catch(e){} render(); return; }
   if(act==="soundtoggle"){ Snd.setOn(!Snd.isOn()); if(Snd.isOn())Snd.crack(); renderToolbar(); return; }
   if(act==="gcarrange"){ gcArrange=!gcArrange; renderToolbar(); if(!gcArrange)flash("Toolbar order saved"); return; }
+  if(act==="togglebaredit"){ barEdit=!barEdit; renderToolbar(); flash(barEdit?"Drag the buttons to rearrange them":"Toolbar layout saved"); return; }
   if(act==="bugpreview"){ bugPreview=true; render(); return; }
   if(act==="closebugpreview"){ bugPreview=false; render(); return; }
   if(act==="inviteadd"){ const e=document.getElementById("inviteWho"); if(!e)return; const v=(e.value||"").trim(); if(!v){flash("Enter an email or phone number");return;}
@@ -4654,6 +4658,29 @@ function setupGcDrag(){
     });
   });
 }
+/* Top-bar button layout (jford): the window button toggles "edit" mode, in which EVERY top-bar button
+   can be dragged left/right to reorder it. Order persists per device (al-bar-order). The scoreboard and
+   game feed are NOT touched — only the buttons move. */
+const BAR_DEFAULT=["videotoggle","share","sound","live","swap","lineup","inninglog","ingamesettings","home","endgame","undo"];
+function barOrder(){ let s=[]; try{ s=JSON.parse(localStorage.getItem("al-bar-order")||"[]"); }catch(e){}
+  if(!Array.isArray(s))s=[]; const known=s.filter(k=>BAR_DEFAULT.includes(k));
+  return known.concat(BAR_DEFAULT.filter(k=>!known.includes(k))); }
+function saveBarOrder(a){ try{ localStorage.setItem("al-bar-order",JSON.stringify(a)); }catch(e){} }
+function setupBarDrag(){
+  const bar=document.getElementById("toolbar"); if(!bar)return; const row=bar.firstElementChild; if(!row)return;
+  row.querySelectorAll('[data-baritem]').forEach(chip=>{
+    chip.addEventListener('pointerdown',e=>{
+      e.preventDefault(); chip.style.opacity='0.55'; document.body.style.userSelect='none';
+      const move=ev=>{ const chips=[...row.querySelectorAll('[data-baritem]')].filter(c=>c!==chip); let placed=false;
+        for(const c of chips){ const b=c.getBoundingClientRect(); if(ev.clientX < b.left+b.width/2){ row.insertBefore(chip,c); placed=true; break; } }
+        if(!placed){ const lastC=chips[chips.length-1]; if(lastC) lastC.after(chip); } };
+      const up=()=>{ window.removeEventListener('pointermove',move); window.removeEventListener('pointerup',up);
+        document.body.style.userSelect=''; chip.style.opacity='';
+        saveBarOrder([...row.querySelectorAll('[data-baritem]')].map(c=>c.getAttribute('data-baritem'))); };
+      window.addEventListener('pointermove',move); window.addEventListener('pointerup',up);
+    });
+  });
+}
 function renderToolbar(){
   const tb=document.getElementById("toolbar"); if(!tb)return;
   const inGame=!["home","teams","team","pickteam"].includes(mode);
@@ -4731,23 +4758,26 @@ function renderToolbar(){
   // Current-batter box back in the top bar (wide scorer, live). It's flex:1 so it fills the middle
   // The current batter now lives in the larger AT-BAT card above the scoring buttons (batterCard),
   // so the top row just keeps a flexible spacer here — pushes the game controls to the far right.
-  const batterTop=`<div style="flex:1"></div>`;
-  // Free-layout (BETA) toggle lives in the toolbar now — a corner-fixed button covered scoring controls.
-  const floatTb = (viewMode!=="viewer") ? `<button data-act="togglefloat" title="Free-layout windows (beta) — pop the AT BAT card out as a draggable window" style="flex:none;display:flex;align-items:center;justify-content:center;background:${floatOn?T.lime:T.surface2};border:2px solid ${floatOn?T.lime:T.line};color:${floatOn?"#fff":T.sageDim};border-radius:10px;width:42px;height:38px;font-size:17px;line-height:1">&#8862;</button>` : "";
-  // LEFT = broadcast/meta (Scorer-Viewer, video, share, sound, LIVE). RIGHT = game info + controls
-  // (batter box + Lineup/Log/Home/End/Undo) sitting over the scoring buttons.
+  // The window button now toggles BUTTON-EDIT mode: drag any top-bar button to reorder it (saved).
+  const editToggle = `<button data-act="togglebaredit" title="${barEdit?"Done — lock the toolbar":"Move the top-bar buttons — drag to rearrange, saved for every game"}" aria-label="Edit toolbar layout" style="flex:none;display:inline-flex;align-items:center;justify-content:center;gap:6px;background:${barEdit?T.lime:T.surface2};border:2px solid ${barEdit?T.lime:T.line};color:${barEdit?"#fff":T.sageDim};border-radius:10px;${barEdit?"padding:0 12px":"width:42px"};height:38px;font-size:16px;font-weight:800;line-height:1">${barEdit?"&#10003; Done":"&#8862;"}</button>`;
+  // Every reorderable button, keyed. gc controls only exist while actively scoring (wide).
+  const inCtl=(isWide()&&mode==="idle"&&viewMode==="scorer");
+  const barPieces={ videotoggle:vidToggle, share:shareBtnTop, sound:soundBtn, live:liveDot, swap:vsw,
+    lineup:inCtl?gcBtn("lineup"):"", inninglog:inCtl?gcBtn("inninglog"):"", ingamesettings:inCtl?gcBtn("ingamesettings"):"",
+    home:inCtl?gcBtn("home"):"", endgame:inCtl?gcBtn("endgame"):"", undo:inCtl?gcBtn("undo"):"" };
+  const wrap=k=>{ const html=barPieces[k]; if(!html)return"";
+    return `<span data-baritem="${k}" style="display:inline-flex;align-items:center;flex:none;${barEdit?`outline:2px dashed ${T.lime};outline-offset:2px;border-radius:11px;cursor:grab;touch-action:none`:""}">${html}</span>`; };
+  const barHtml = barOrder().map(wrap).join("");
+  const editHint = barEdit?`<span style="flex:none;font-family:${SANS};font-size:11px;font-weight:700;color:${T.lime};white-space:nowrap;margin-left:4px">&#9776; drag to move</span>`:"";
   tb.innerHTML=`<div style="display:flex;align-items:center;gap:${isWide()?"8px":"6px"};padding:4px 2px 2px;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none">
     <div style="flex:none;min-width:0;font-family:${MONO};font-weight:700;font-size:16px;letter-spacing:.5px;color:${T.chalk};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${chip}</div>
-    ${vidToggle}
-    ${shareBtnTop}
-    ${soundBtn}
-    ${floatTb}
-    ${liveDot}
+    ${barHtml}
     ${bErr}
-    ${vsw}
-    ${gc}
+    <div style="flex:1;min-width:8px"></div>
+    ${editHint}
+    ${editToggle}
   </div>`;
-  if(gcArrange) setupGcDrag();   // wire horizontal drag-reorder once the toolbar is in the DOM (D)
+  if(barEdit) setupBarDrag();   // wire drag-to-reorder once the toolbar is in the DOM
 }
 window.onLinkChange=renderToolbar;   // relay open/close → repaint the dot
 window.cloudMyName=function(){ const u=window.Cloud&&window.Cloud.user; if(!u)return ""; return u.displayName||(u.email||"").split("@")[0]||"Someone"; };
@@ -5080,7 +5110,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v222";
+var APP_VERSION="v223";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
