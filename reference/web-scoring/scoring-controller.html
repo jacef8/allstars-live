@@ -1186,7 +1186,7 @@ function brAdvance(base){ const d=brName(base)+" to "+ordBase(base+1); brApply({
 function brScore(base){ const d=brName(base)+" scores"; brApply({[base]:{dest:4}},0,"Run scores",d); }
 function brCaught(base){ const k=brRunner(base)&&brRunner(base).key; const d=brName(base)+" caught stealing"; brApply({[base]:{out:true}},1,"Caught stealing",d,()=>{ if(k)statFor(k).cs++; }); }
 function brPickoff(base){ const d=brName(base)+" picked off"; brApply({[base]:{out:true}},1,"Picked off",d); }
-function brAdvanceAll(label){ const ov={}; [3,2,1].forEach(b=>{ if(G.bases[b])ov[b]={dest:b+1}; }); brApply(ov,0,label,label); }
+function brAdvanceAll(label){ const ov={}; [3,2,1].forEach(b=>{ if(G.bases[b])ov[b]={dest:b+1}; }); const sc=brMovers(ov).filter(m=>m.dest===4).map(m=>(m.name||m.label||"Runner")+" scores"); brApply(ov,0,label,"runners advance"+(sc.length?" · "+sc.join(", "):"")); }
 function brOnError(base){ const d=brName(base)+" advances on error"; brApply({[base]:{dest:Math.min(4,base+1)}},0,"Advances on error",d,()=>{ const fs=battingKey()==="away"?"home":"away"; if(G.errors)G.errors[fs]=(G.errors[fs]||0)+1; }); }
 function brOut(base){ const d=brName(base)+" out"; brApply({[base]:{out:true}},1,"Runner out",d); }
 // Wild pitch / passed ball that IS a pitch: record one ball/strike (count + pitch count), then advance
@@ -2263,7 +2263,6 @@ function scoreBar(){
     <div style="display:flex;align-items:center;gap:16px;padding:0 17px;background:rgba(0,0,0,.25)">
       ${labeled(G.half==="T"?"TOP":"BOT",`<div style="font-family:${MONO};font-size:22px;font-weight:800;color:#fff;line-height:1">${G.half==="T"?"▲":"▼"}${G.inning}</div>`)}
       <div style="display:flex;flex-direction:column;gap:4px">${pipRow("B",G.balls,3,T.amber)}${pipRow("S",G.strikes,2,T.out)}${pipRow("O",G.outs,3,"#C2CBD8")}</div>
-      ${labeled("BASES",diamond)}
       ${G.startedAt?labeled("TIME",`<div style="font-family:${MONO};font-size:13px;font-weight:700;color:#9AA6B8;white-space:nowrap"><span class="game-clock">${gameClockStr()}</span></div>`):""}
     </div>
     <button data-act="correctopen" title="Correct the count, outs, score &amp; inning" style="flex:none;display:inline-flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;width:58px;align-self:stretch;border:none;border-left:1px solid rgba(255,255,255,.10);background:rgba(255,255,255,.04);color:${T.lime};font-family:${SANS};font-size:12px;font-weight:800;cursor:pointer"><span style="font-size:17px;line-height:1">&#9998;</span>Edit</button>
@@ -4301,8 +4300,8 @@ document.getElementById("app").addEventListener("click",e=>{
   if(act==="brscore"){ brScore(+arg); return; }
   if(act==="brcaught"){ brCaught(+arg); return; }
   if(act==="brpick"){ brPickoff(+arg); return; }
-  if(act==="brwp"){ brPitchPick="Wild pitch"; render(); return; }
-  if(act==="brpb"){ brPitchPick="Passed ball"; render(); return; }
+  if(act==="brwp"){ brAdvanceAll("Wild pitch"); return; }   // just advance runners — no forced ball/strike pick (you record the pitch separately)
+  if(act==="brpb"){ brAdvanceAll("Passed ball"); return; }
   if(act==="brwpkind"){ brWPApply(arg==="strike"?"strike":"ball"); return; }
   if(act==="brwpback"){ brPitchPick=null; render(); return; }
   if(act==="brbalk"){ brAdvanceAll("Balk"); return; }   // a balk is not a pitch — no count change
@@ -5086,7 +5085,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v220";
+var APP_VERSION="v221";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;

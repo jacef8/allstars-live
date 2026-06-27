@@ -205,17 +205,26 @@ class YouTubeStreamer(
             mic?.runCatching { startRecording() }
             Log.i(TAG, if (mic != null) "audio: mic" else "audio: silence")
 
+            // Audio PTS MUST advance by SAMPLE COUNT, not wall clock. Per-chunk wall-clock timestamps
+            // (the old "shared a/v clock" approach) pick up thread-scheduling jitter, so consecutive
+            // 23ms AAC frames get unevenly spaced PTS — the decoder time-warps them into garbled,
+            // "screaming-in-a-bucket" noise, worst on quiet audio. Instead: anchor the FIRST frame to the
+            // shared a/v clock once (keeps audio/video in sync), then advance strictly by samples written.
+            var samplesWritten = 0L
+            var firstPtsUs = -1L
             try {
                 while (streaming) {
-                    // Wall-clock PTS from the SHARED a/v base → stays in lock-step with the video.
-                    val ptsUs = (System.nanoTime() - avBaseNs) / 1000
+                    if (firstPtsUs < 0L) firstPtsUs = (System.nanoTime() - avBaseNs) / 1000
+                    val ptsUs = firstPtsUs + samplesWritten * 1_000_000L / sampleRate
                     if (mic != null && !muted) {
                         val n = mic.read(pcm, 0, chunkBytes)
                         if (n <= 0) { Thread.sleep(5); continue }
                         feedAudio(pcm, n, ptsUs)
+                        samplesWritten += (n / 2).toLong()        // 16-bit mono → 2 bytes per sample
                     } else {                          // muted, or no mic → silent AAC (keeps the track alive)
                         java.util.Arrays.fill(pcm, 0)
                         feedAudio(pcm, chunkBytes, ptsUs)
+                        samplesWritten += chunkSamples.toLong()
                         Thread.sleep(20)               // pace silence ~real-time
                     }
                     drainAudio()
