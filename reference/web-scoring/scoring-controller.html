@@ -686,7 +686,7 @@ const initGame=()=>({inning:1,half:"T",away:0,home:0,outs:0,balls:0,strikes:0,
   startedAt:null,  // wall-clock ms when the game ACTUALLY started (auto-set at first pitch / game start; editable in Game Setup) — drives the game timer
   lineup:{ order:[0,1,2,3,4,5,6,7,8],   // batting order: 9-12 entries (slots 10+ = extra hitters)
            pos:{P:0,C:1,"1B":2,"2B":3,"3B":4,SS:5,LF:6,CF:7,RF:8} }});
-let G=initGame(),hist=[],mode="home",tap=null,contact=null,result=null,plan=null,toast=null,toastTimer=null,curResults=[],showAll=false,showZones=false,editSlot=null,confirmAct=null,gameActive=false,lineupTab="us",newgameFrom="home",brSheet=false,correctOpen=false;
+let G=initGame(),hist=[],mode="home",tap=null,contact=null,result=null,plan=null,toast=null,toastTimer=null,curResults=[],showAll=false,showZones=false,editSlot=null,confirmAct=null,gameActive=false,lineupTab="us",newgameFrom="home",brSheet=false,correctOpen=false,correctOpenAt=0;
 // Resume the last in-progress game (saved by saveGame) across reloads/app updates, so the
 // lineup/score is never lost. Stays on the home screen → shows "Resume". Re-links ROSTER
 // to the saved team so the lineup's player indices resolve correctly.
@@ -1158,7 +1158,7 @@ function correctModal(){
 function setupLongPress(){
   document.querySelectorAll("[data-longpress]").forEach(el=>{
     let timer=null,sx=0,sy=0;
-    const fire=()=>{ timer=null; const what=el.getAttribute("data-longpress"); try{ if(navigator.vibrate)navigator.vibrate(15); }catch(_){} if(what==="correct"){ correctOpen=true; render(); } };
+    const fire=()=>{ timer=null; const what=el.getAttribute("data-longpress"); try{ if(navigator.vibrate)navigator.vibrate(15); }catch(_){} if(what==="correct"){ correctOpen=true; correctOpenAt=Date.now(); render(); } };
     const start=(e)=>{ const p=e.touches?e.touches[0]:e; sx=p.clientX; sy=p.clientY; if(timer)clearTimeout(timer); timer=setTimeout(fire,480); };
     const cancel=()=>{ if(timer){ clearTimeout(timer); timer=null; } };
     const moveCancel=(e)=>{ const p=e.touches?e.touches[0]:e; if(Math.abs(p.clientX-sx)>18||Math.abs(p.clientY-sy)>18)cancel(); };   // forgive small finger jitter
@@ -3891,8 +3891,11 @@ document.getElementById("app").addEventListener("click",e=>{
   if(act==="reviewbatter"){ reviewBatter=arg; render(); return; }
   if(act==="brsheet"){ brSheet=true; brPitchPick=null; render(); return; }
   if(act==="brclose"){ brSheet=false; brPitchPick=null; render(); return; }
-  if(act==="correctopen"){ correctOpen=true; render(); return; }
-  if(act==="correctclose"){ correctOpen=false; render(); return; }
+  if(act==="correctopen"){ correctOpen=true; correctOpenAt=Date.now(); render(); return; }
+  // Ignore the backdrop "click" that rides in on the same long-press gesture that just opened the
+  // sheet (mobile ghost-click) — otherwise the modal flashes open and shuts. The Done button and a
+  // deliberate later backdrop tap still close it.
+  if(act==="correctclose"){ if(Date.now()-correctOpenAt<450) return; correctOpen=false; render(); return; }
   if(act==="corr"){ const i=arg.indexOf(":"),f=arg.slice(0,i),d=+arg.slice(i+1); snapshot();
     if(f==="balls") G.balls=Math.max(0,Math.min(3,G.balls+d));
     else if(f==="strikes") G.strikes=Math.max(0,Math.min(2,G.strikes+d));
@@ -4584,7 +4587,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v184";
+var APP_VERSION="v185";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
