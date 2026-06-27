@@ -697,6 +697,7 @@ const initGame=()=>({inning:1,half:"T",away:0,home:0,outs:0,balls:0,strikes:0,
   pa:{},           // per-batter plate-appearance log (pitch sequence, count, outcome, location)
   ab:{pitches:[],loc:null},   // the in-progress at-bat's pitch sequence
   innLog:[],       // completed half-inning summaries (pitches/runs/hits) for review
+  lineupLog:[],    // in-game lineup/position changes for the historical record (C5)
   halfPitches:0,   // pitches thrown so far in the current half-inning
   halfHits:0,      // hits so far in the current half-inning
   line:{away:{},home:{}},   // runs per inning, e.g. line.away[3]=2  (drives the R-H-E line score)
@@ -760,13 +761,19 @@ function openMapLoc(loc){ loc=(loc||"").trim(); if(!loc)return;
 }
 function fielderLabel(pos){const nm=fielderName(pos);return nm?`${nm} (${pos})`:`${pos} (${POSNUM[pos]})`;}
 /* ---- lineup edits ---- */
+// Record an in-game lineup/position change for the historical record (C5). No-ops before the game is
+// live (so the initial lineup setup isn't logged) and skips no-op moves.
+const _pname=ri=>{const p=ROSTER[ri];return p?("#"+(p.num||"?")+" "+(p.name||"").trim()):"a player";};
+function logLineup(text){ try{ if(gameActive&&G&&text){ if(!G.lineupLog)G.lineupLog=[]; G.lineupLog.push({inn:G.inning,half:G.half,t:text}); } }catch(e){} }
 function assignSlot(slot,ri){
   const old=G.lineup.order[slot],at=G.lineup.order.indexOf(ri);
   if(at>=0){G.lineup.order[at]=old;G.lineup.order[slot]=ri;}          // swap two batters (each keeps his glove)
   else{G.lineup.order[slot]=ri;const p=posOfPlayer(old);if(p)G.lineup.pos[p]=ri;}  // sub in for 'old', take his position
+  logLineup(_pname(ri)+" → batting "+(slot+1));
 }
 function assignPos(ri,pos){
   const cur=posOfPlayer(ri),occ=G.lineup.pos[pos];
+  if(cur!==pos) logLineup(_pname(ri)+" → "+pos);
   G.lineup.pos[pos]=ri; if(cur&&cur!==pos)G.lineup.pos[cur]=occ;      // swap positions with whoever had it
 }
 function makePitcher(ri){
@@ -782,6 +789,7 @@ function fieldPlace(ri,pos){ ri=+ri;
   const myOld=posOfPlayer(ri);
   if(myOld&&myOld!==pos) delete G.lineup.pos[myOld];   // open up the spot I'm leaving
   G.lineup.pos[pos]=ri;
+  logLineup(_pname(ri)+" → "+pos);
   return (occ!=null)?{ri:occ, openPos:(myOld&&myOld!==pos)?myOld:null}:null;
 }
 /* Field-map position editor (C2): a diamond with all 9 spots. Tap a spot → tap a player to place him.
@@ -1480,7 +1488,8 @@ function liveGameBox(){
     awayShort:TEAMS.away.short, homeShort:TEAMS.home.short, awayName:TEAMS.away.name, homeName:TEAMS.home.name,
     awayColor:TEAMS.away.color, homeColor:TEAMS.home.color,
     line:{away:lineArr("away"),home:lineArr("home")}, totals:box.totals,
-    bat:{away:box.away,home:box.home}, pitch:{away:pitchersForSide("away"),home:pitchersForSide("home")} };
+    bat:{away:box.away,home:box.home}, pitch:{away:pitchersForSide("away"),home:pitchersForSide("home")},
+    lineupLog:(G.lineupLog||[]).slice() };
 }
 function broadcast(){
   if(viewMode==="viewer") return;   // viewers are read-only — they receive state, never send it
@@ -2247,7 +2256,16 @@ function inningLogModal(){
         <span style="font-family:${MONO};font-size:14px;font-weight:800;color:${T.chalk}">${e.half==="T"?"Top":"Bot"} ${e.inning}<span style="color:${T.sage};font-weight:600;font-size:12px"> · ${TEAMS[e.batteam].short} batting</span></span>
         <span style="font-family:${MONO};font-size:13px;color:${T.sage}">${e.runs} R · ${e.hits} H · ${e.pitches} P${e.lob?` · ${e.lob} LOB`:""}</span></div>`).join("")
     :`<div style="color:${T.sageDim};padding:14px;text-align:center">No completed innings yet.</div>`;
-  return modalWrap("Inning log","Totals by half-inning",`${cur}${rows}`,"closeinnlog");
+  // C5: in-game lineup/position changes recorded for the historical record.
+  const esc=s=>(s==null?"":String(s)).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  const ll=G.lineupLog||[];
+  const luSec=ll.length?`
+      <div style="margin-top:14px;font-family:${MONO};font-size:12px;font-weight:800;letter-spacing:.05em;color:${T.sage}">LINEUP CHANGES</div>
+      ${ll.slice().reverse().map(c=>`
+        <div style="display:flex;align-items:center;gap:8px;background:${T.surface};border:1px solid ${T.line};border-radius:9px;padding:8px 11px;margin-top:6px">
+          <span style="font-family:${MONO};font-size:11px;font-weight:800;color:${T.lime};white-space:nowrap">${c.half==="T"?"Top":"Bot"} ${c.inn}</span>
+          <span style="font-size:13px;color:${T.chalk}">${esc(c.t)}</span></div>`).join("")}`:"";
+  return modalWrap("Inning log","Totals by half-inning",`${cur}${rows}${luSec}`,"closeinnlog");
 }
 
 /* Live feed (viewer + scorer). Most recent on top. Toggle: "play" = one line per at-bat;
@@ -4425,7 +4443,7 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="luedit"){ const t=teamById(openTeamId); if(t&&lineupById(t,arg)){ editLineupId=arg; teamTab="lineupedit"; render(); } }
   else if(act==="ludefault"){ const t=teamById(openTeamId); if(t){ t.activeLineupId=arg; saveDB(); render(); } }
   else if(act==="ludup"){ const t=teamById(openTeamId); const lu=t&&lineupById(t,arg); if(lu){ const c={id:nextId("lu"),name:lu.name+" (copy)",order:(lu.order||[]).slice(),pos:Object.assign({},lu.pos||{})}; teamLineups(t).push(c); saveDB(); render(); } }
-  else if(act==="ludel"){ const t=teamById(openTeamId); const lu=t&&lineupById(t,arg); if(lu){ let ok=true; try{ok=confirm('Delete lineup "'+lu.name+'"?');}catch(e){} if(ok){ t.lineups=teamLineups(t).filter(l=>l.id!==arg); if(t.activeLineupId===arg)t.activeLineupId=(t.lineups[0]&&t.lineups[0].id)||null; saveDB(); render(); } } }
+  else if(act==="ludel"){ const t=teamById(openTeamId); const lu=t&&lineupById(t,arg); if(lu){ const lid=arg; confirmAct={title:'Delete lineup "'+lu.name+'"?',msg:"This removes the saved lineup. It won't affect any game already played.",yes:"Delete",danger:true,run:function(){ t.lineups=teamLineups(t).filter(l=>l.id!==lid); if(t.activeLineupId===lid)t.activeLineupId=(t.lineups[0]&&t.lineups[0].id)||null; saveDB(); render(); }}; render(); } }
   else if(act==="luprintcard"){ const t=teamById(openTeamId); const lu=t&&lineupById(t,arg); if(t&&lu){ printLineupCard(t,{lineup:lineupToIdx(t,lu)}); } }
   else if(act==="luremove"){ const t=teamById(openTeamId); const lu=t&&lineupById(t,editLineupId); if(lu&&lu.order.length>9){ lu.order=lu.order.filter(id=>id!==arg); Object.keys(lu.pos||{}).forEach(P=>{if(lu.pos[P]===arg)delete lu.pos[P];}); saveDB(); render(); } }
   else if(act==="luadd"){ const t=teamById(openTeamId); const lu=t&&lineupById(t,editLineupId); if(lu&&lu.order.length<12&&lu.order.indexOf(arg)<0){ lu.order.push(arg); saveDB(); render(); } }
@@ -4553,7 +4571,7 @@ window.onCloudAuth=function(u){
   try{ if(window.cloudSyncTeams)window.cloudSyncTeams(); }catch(e){} try{ if(window.cloudClaimInvite)window.cloudClaimInvite(); }catch(e){} try{ if(window.cloudClaimFollow)window.cloudClaimFollow(); }catch(e){} try{ loadCloudFloat(); }catch(e){} try{ setupLiveHomeWatch(); }catch(e){} try{ if(["home","settings","teams","pickteam"].includes(mode)) mode="home"; }catch(e){} try{ render(); }catch(e){} };   // after sign-in, land on Home
 
 /* ===== Team chat (modal) — real-time messages; owner/scorers/followers can post, owner can delete ===== */
-let chatTeamId=null, chatUnsub=null, chatMsgs=[];
+let chatTeamId=null, chatUnsub=null, chatMsgs=[], chatDelArm=null;
 function chatCanPost(){ const C=window.Cloud; if(!(C&&C.enabled&&C.user))return false; const t=teamById(chatTeamId); return !!(t&&window.cloudIsMember&&window.cloudIsMember(t)); }
 function renderChatList(){
   const box=document.getElementById("chatList"); if(!box)return;
@@ -4563,7 +4581,9 @@ function renderChatList(){
   box.innerHTML=chatMsgs.map(m=>{ const mine=m.authorUid===myUid; const canDel=mine||owner;
     const when=(()=>{try{return new Date(m.ts).toLocaleString(undefined,{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"});}catch(e){return "";}})();
     return `<div style="align-self:${mine?"flex-end":"flex-start"};max-width:84%;background:${mine?"#1E2C16":"#1A2233"};border:2px solid ${mine?"#3A5A1E":"#2A3650"};border-radius:12px;padding:8px 11px">
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:3px"><span style="font-size:11px;color:${mine?"#E11D2E":"#8FA0BD"};font-weight:800;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${(m.authorName||"Someone").replace(/</g,"&lt;")}</span>${canDel?`<button data-act="delmsg" data-arg="${m.id}" title="Delete this message" style="background:rgba(225,29,46,.16);border:1px solid #E11D2E66;color:#E11D2E;font-size:11px;font-weight:800;cursor:pointer;border-radius:7px;padding:3px 9px;flex:none">&#128465; Delete</button>`:""}</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:3px"><span style="font-size:11px;color:${mine?"#E11D2E":"#8FA0BD"};font-weight:800;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${(m.authorName||"Someone").replace(/</g,"&lt;")}</span>${canDel?(chatDelArm===m.id
+          ? `<button data-act="delmsg" data-arg="${m.id}" title="Tap again to delete" style="background:#E11D2E;border:1px solid #E11D2E;color:#fff;font-size:11px;font-weight:800;cursor:pointer;border-radius:7px;padding:3px 9px;flex:none">Confirm delete?</button>`
+          : `<button data-act="delmsg" data-arg="${m.id}" title="Delete this message" style="background:rgba(225,29,46,.16);border:1px solid #E11D2E66;color:#E11D2E;font-size:11px;font-weight:800;cursor:pointer;border-radius:7px;padding:3px 9px;flex:none">&#128465; Delete</button>`):""}</div>
         <div style="font-size:14px;color:#EAEDF2;line-height:1.4;white-space:pre-wrap;word-break:break-word">${(m.text||"").replace(/</g,"&lt;")}</div>
         <div style="font-size:10px;color:#5B6880;margin-top:3px">${when}</div></div>`;}).join("");
   box.scrollTop=box.scrollHeight;
@@ -4587,7 +4607,7 @@ function openChat(teamId){
   const inp=document.getElementById("chatInput"); const can=chatCanPost();
   if(inp){ inp.disabled=!can; inp.placeholder=can?"Message…":"Read-only — follow this team to post"; }   // no auto-focus → keyboard stays down until you tap the box
 }
-function closeChat(){ if(chatUnsub){try{chatUnsub();}catch(e){}chatUnsub=null;} const m=document.getElementById("chatmodal"); if(m)m.style.display="none"; chatTeamId=null; try{render();}catch(e){} }   // re-render so the "NEW" badge (home card + chat button) clears now that it's seen
+function closeChat(){ if(chatUnsub){try{chatUnsub();}catch(e){}chatUnsub=null;} const m=document.getElementById("chatmodal"); if(m)m.style.display="none"; chatTeamId=null; chatDelArm=null; try{render();}catch(e){} }   // re-render so the "NEW" badge (home card + chat button) clears now that it's seen
 function sendChat(){ const inp=document.getElementById("chatInput"); if(!inp)return; const v=(inp.value||"").trim(); if(!v)return; if(!chatCanPost()){flash("You can't post here");return;} window.cloudSendMessage(chatTeamId,v); inp.value=""; }
 
 /* ===== Searchable rulebook (loads the league rules text on demand, filters/highlights) ===== */
@@ -4627,7 +4647,13 @@ window.rulesSearch=function(q){
     if(el){ const act=el.getAttribute("data-act"), arg=el.getAttribute("data-arg");
       if(act==="closechat"){ closeChat(); return; }
       if(act==="sendmsg"){ sendChat(); return; }
-      if(act==="delmsg"){ try{ if(!confirm("Delete this message for everyone?"))return; }catch(e){} if(window.cloudDeleteMessage&&chatTeamId)window.cloudDeleteMessage(chatTeamId,arg); return; }
+      if(act==="delmsg"){
+        // WebView-safe confirm: native window.confirm() returns false in the Android WebView (no
+        // WebChromeClient.onJsConfirm), which silently cancelled every delete. Use a two-tap arm instead.
+        if(chatDelArm!==arg){ chatDelArm=arg; renderChatList(); return; }
+        chatDelArm=null;
+        if(window.cloudDeleteMessage&&chatTeamId)window.cloudDeleteMessage(chatTeamId,arg);
+        renderChatList(); return; }
     }
     if(e.target.id==="chatmodal")closeChat(); });
   const ci=document.getElementById("chatInput"); if(ci)ci.addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); sendChat(); } }); })();   // sign-in → sync teams, claim texted invite, repaint
@@ -4866,7 +4892,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v210";
+var APP_VERSION="v211";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
