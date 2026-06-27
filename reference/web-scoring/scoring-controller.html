@@ -287,7 +287,7 @@ function saveDB(){
 // DB above; this also stores the selected team so the lineup's roster re-links on restore.
 const GAME_KEY="al-game";
 function saveGame(){try{localStorage.setItem(GAME_KEY,JSON.stringify({G,curTeamId,oppTeamId,gameActive,OUR,OPP}));}catch(e){}}
-let DB=loadDB(), curTeamId=null, openTeamId=null, oppTeamId=null, pickFor="our", finderResults=null;
+let DB=loadDB(), curTeamId=null, openTeamId=null, oppTeamId=null, pickFor="our", finderResults=null, openTeamFrom="teams";
 DB.teams.forEach(migrateTeam);   // split legacy single-name players into first/last
 const curTeam=()=>DB.teams.find(t=>t.id===curTeamId)||null;
 const teamById=id=>DB.teams.find(t=>t.id===id)||null;
@@ -2807,7 +2807,7 @@ function actionArea(){
     const hbAct=(act,icon,label)=>`<button data-act="${act}" style="display:flex;flex-direction:row;align-items:center;justify-content:center;gap:10px;background:${T.surface};border:1.5px solid ${T.line};border-radius:13px;padding:13px 10px;min-height:0;cursor:pointer"><span style="font-size:22px;color:${T.lime};display:flex">${icon}</span><span style="font-weight:800;color:${T.ink};font-size:15px;text-align:center;line-height:1.15">${label}</span></button>`;
     return secWrap(`
         <div class="frost-card" style="display:flex;align-items:center;gap:10px;background:${T.surface};border:1.5px solid ${T.line};border-radius:14px;padding:12px 14px">
-          <button data-act="teamsback" style="${ghost};padding:9px 11px">&lsaquo; Teams</button>
+          ${openTeamFrom==="home"?`<button data-act="gohome" style="${ghost};padding:9px 11px">&lsaquo; Home</button>`:`<button data-act="teamsback" style="${ghost};padding:9px 11px">&lsaquo; Teams</button>`}
           ${t.logo?`<img src="${t.logo}" alt="" style="width:44px;height:44px;flex:none;border-radius:9px;object-fit:contain;background:#fff;box-shadow:0 0 0 1px ${T.line}">`:""}
           <div style="flex:1;min-width:0;border-left:5px solid ${t.color};padding-left:10px">
             <div style="font-family:${MONO};font-size:22px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${(t.name||"Team").replace(/</g,"")}</div>
@@ -4072,7 +4072,7 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="opencamera"){ try{ if(window.AllStars&&window.AllStars.openVideo)AllStars.openVideo(); }catch(e){} }
   else if(act==="newgamestart"){newgameFrom="home";mode="newgame";render();}
   else if(act==="gototeams"){mode="teams";render();}
-  else if(act==="opent"){openTeamId=arg;teamTab="hub";mode="team";render();}
+  else if(act==="opent"){openTeamId=arg;teamTab="hub";openTeamFrom=(mode==="home"?"home":"teams");mode="team";render();}
   else if(act==="teamtab"){teamTab=arg;render();}
   else if(act==="teamhub"){teamTab="hub";render();}
   else if(act==="favteam"){const t=teamById(arg);if(t){t.fav=!t.fav;saveDB();}render();}
@@ -4321,7 +4321,7 @@ window.appBack=function(){
     if(mode==="lineup"){ mode=gameActive?"idle":"home"; render(); return true; }
     if(mode==="team"&&teamTab==="lineupedit"){ teamTab="roster"; render(); return true; }
     if(mode==="team"&&teamTab&&teamTab!=="hub"){ teamTab="hub"; render(); return true; }
-    if(mode==="team"){ mode="teams"; render(); return true; }
+    if(mode==="team"){ mode=(openTeamFrom==="home"?"home":"teams"); render(); return true; }
     if(mode==="teamstats"){ mode="directory"; render(); return true; }   // public team view → back to search
     if(mode==="directory"){ mode="teams"; render(); return true; }       // browse teams → back to Teams
     if(mode==="debug"){ mode="settings"; render(); return true; }
@@ -4529,7 +4529,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v171";
+var APP_VERSION="v172";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
