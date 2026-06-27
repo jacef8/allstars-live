@@ -668,7 +668,8 @@ const initGame=()=>({inning:1,half:"T",away:0,home:0,outs:0,balls:0,strikes:0,
   league:"custom", // selected league preset (drives default rules + the rule-alert popups)
   mercy:null,      // {r15:innings,r10:innings} run-rule thresholds from the league; null = off
   pitchMax:0,      // per-pitcher daily pitch limit from the league; 0 = no pitch-limit alert
-  alerts:{on:true,runRule:true,runCap:true,pitch:true,inning:true}, // rule-reminder popups
+  alerts:{on:true,runRule:true,runCap:true,pitch:true,inning:true,pcRules:pcRulesPref()}, // rule-reminder popups (pcRules = tournament pitch/catch limits)
+  caught:{},       // innings caught per OUR catcher this game, keyed "o"+rosterIdx (feeds the pitch/catch rule alerts)
   halfRuns:0,      // runs scored so far in the current half-inning
   oppBatters:9,    // opponent's batting-order size (continuous order support)
   stats:{},        // per-batter box-score stats, keyed "o"+rosterIdx (ours) / "p"+spot (opp)
@@ -775,6 +776,8 @@ function doFlip(){
   G.innLog.push({inning:G.inning, half:G.half, batteam:battingKey(),
     pitches:G.halfPitches||0, runs:G.halfRuns||0, hits:G.halfHits||0,
     lob:[1,2,3].filter(x=>G.bases[x]).length});
+  // The half-inning that just ended: if WE were on defense, our catcher caught it (feeds the pitch/catch rule alerts).
+  try{ if(fielding()){ const ci=(G.lineup&&G.lineup.pos)?G.lineup.pos.C:null; if(ci!=null){ if(!G.caught)G.caught={}; const ck="o"+ci; G.caught[ck]=(G.caught[ck]||0)+1; } } }catch(e){}
   const nh=G.half==="T"?"B":"T";G.half=nh;if(nh==="T")G.inning++;
   G.outs=0;G.balls=0;G.strikes=0;G.bases={1:null,2:null,3:null};
   G.halfRuns=0;G.halfPitches=0;G.halfHits=0;G.ab={pitches:[],loc:null};}
@@ -868,11 +871,40 @@ let photoList=null, photoListTeam=null, photoZoom=null;   // team photo gallery 
 /* ===== rule-reminder popups (run cap / run rule / pitch limit / final inning) ===== */
 let activeAlert=null, firedAlerts=new Set(), dismissedAlerts=new Set();
 function resetAlerts(){ activeAlert=null; firedAlerts=new Set(); dismissedAlerts=new Set(); }
-function alertsCfg(){ if(!G.alerts)G.alerts={on:true,runRule:true,runCap:true,pitch:true,inning:true}; return G.alerts; }
-function fireAlert(key,title,msg,tone){ const c=alertsCfg(); if(!c.on)return; if(firedAlerts.has(key)||dismissedAlerts.has(key))return; firedAlerts.add(key); activeAlert={key,title,msg,tone:tone||"info"}; }
+function pcRulesPref(){ try{ return localStorage.getItem("al-pc-rules")==="1"; }catch(e){ return false; } }  // sticky default for the pitch/catch rule alerts
+function alertsCfg(){ if(!G.alerts)G.alerts={on:true,runRule:true,runCap:true,pitch:true,inning:true,pcRules:pcRulesPref()}; if(G.alerts.pcRules===undefined)G.alerts.pcRules=pcRulesPref(); return G.alerts; }
+// force=true bypasses the master "Rule alerts" switch — used by the pitch/catch alerts, which have their own toggle.
+function fireAlert(key,title,msg,tone,force){ const c=alertsCfg(); if(!c.on&&!force)return; if(firedAlerts.has(key)||dismissedAlerts.has(key))return; firedAlerts.add(key); activeAlert={key,title,msg,tone:tone||"info"}; }
+// Tournament pitch/catch rule alerts — evaluates OUR pitcher's running pitch count and OUR catcher's
+// innings caught (both already tracked while scoring) and pops a warning at each rule threshold.
+// Mirrors the standalone pitching-plan tool; gated by its own toggle (G.alerts.pcRules), so it works
+// even with the master "Rule alerts" switch off.
+function checkPitchCatchRules(){
+  // Pitcher: only OUR pitcher on the mound (key starts "o"), and only while we're fielding.
+  if(fielding()){
+    const pk=currentPitcherKey();
+    if(pk && pk.charAt(0)==="o"){
+      const pc=currentPitchCount()|0, nm=currentPitcherName()||"The pitcher";
+      if(pc>=85)      fireAlert("pc85-"+pk,"Daily pitch limit (85)",`${nm} has thrown ${pc} pitches — the 85 daily max. He must come out after this batter.`,"warn",true);
+      else if(pc>=66) fireAlert("pc66-"+pk,"48-hour rest reached (66)",`${nm} is at ${pc} pitches. 66+ means 48 hours of rest before he can pitch again — likely done for the tournament.`,"warn",true);
+      else if(pc>=31) fireAlert("pc31-"+pk,"Can no longer catch (31)",`${nm} is at ${pc} pitches. 31+ means he CANNOT catch the rest of this game, and needs rest before his next outing.`,"warn",true);
+      else if(pc>=30) fireAlert("pc30-"+pk,"Last catch-eligible pitch (30)",`${nm} is at 30 pitches — one more and he loses catch eligibility for this game. Pull him now if you need him behind the plate.`,"warn",true);
+      else if(pc>=28) fireAlert("pc28-"+pk,"Nearing catch cutoff (28)",`${nm} is at ${pc} pitches — 2 from the 30-pitch catch cutoff.`,"info",true);
+    }
+  }
+  // Catcher: OUR catcher's innings caught this game.
+  const ci=(G.lineup&&G.lineup.pos)?G.lineup.pos.C:null;
+  if(ci!=null){
+    const ck="o"+ci, caught=(G.caught&&G.caught[ck])|0, cp=playerAtPos("C"), cn=(cp&&cp.name)||"The catcher";
+    if(caught>=4)      fireAlert("cc4-"+ck,"Catcher can't pitch this game",`${cn} has caught ${caught} innings — he CANNOT pitch in this game (he's fine to pitch the next one).`,"warn",true);
+    else if(caught>=3) fireAlert("cc3-"+ck,"Catcher nearing pitch lockout",`${cn} has caught 3 innings — one more and he can't pitch this game. Pull him from catching now to keep the pitching option.`,"warn",true);
+  }
+}
 function maybeAlert(){
   if(!gameActive||G.final||mode==="summary"||mode==="newgame") return;
-  const c=alertsCfg(); if(!c.on) return;
+  const c=alertsCfg();
+  if(c.pcRules) checkPitchCatchRules();   // independent of the master switch below
+  if(!c.on) return;
   if(c.runCap && G.runCap>0 && (G.halfRuns||0)>=G.runCap)
     fireAlert("cap-"+G.inning+G.half,"Run cap reached",`${G.runCap} runs scored this half-inning — that's the cap. Retire the side.`,"warn");
   if(c.runRule && G.mercy){
@@ -3041,6 +3073,10 @@ function actionArea(){
             <div style="color:${T.sage};font-size:13px;margin-top:3px">Pop-up reminders during the game</div></div>
           <button data-act="alerttoggle" data-arg="on" style="background:${ac.on?T.lime:T.surface2};border:1px solid ${ac.on?T.lime:T.line};color:${ac.on?"#fff":T.sage};border-radius:999px;padding:10px 20px;font-family:${MONO};font-weight:800;font-size:15px;min-width:66px">${ac.on?"ON":"OFF"}</button>
           ${ac.on?`<div style="width:100%;display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">${aChip("runRule","Run rule")}${aChip("runCap","Run cap")}${aChip("pitch","Pitch limit")}${aChip("inning","Final inning")}</div>`:""}</div>`;
+    const pitchCatchCard=`<div style="${rowCard};flex-wrap:wrap">
+          <div style="flex:1;min-width:150px"><div style="font-weight:800;color:${T.ink};font-size:19px">Pitch &amp; catch rule alerts</div>
+            <div style="color:${T.sage};font-size:13px;margin-top:3px;line-height:1.4">Tournament limits — pops a warning as a pitcher nears the catch cutoff (28/30/31), the 48-hr line (66) and the 85 daily max, and when a catcher hits 3 / 4 innings caught. Uses the counts you're already keeping.</div></div>
+          <button data-act="alerttoggle" data-arg="pcRules" style="background:${ac.pcRules?T.lime:T.surface2};border:1px solid ${ac.pcRules?T.lime:T.line};color:${ac.pcRules?"#fff":T.sage};border-radius:999px;padding:10px 20px;font-family:${MONO};font-weight:800;font-size:15px;min-width:66px">${ac.pcRules?"ON":"OFF"}</button></div>`;
     const runCapCard=`<div style="${rowCard}">
           <div><div style="font-weight:800;color:${T.ink};font-size:19px">Run cap</div>
             <div style="color:${T.sage};font-size:14px;margin-top:3px">Per half-inning · 0 = no cap</div></div>
@@ -3066,7 +3102,7 @@ function actionArea(){
     const lineupCardBtn=`<button data-act="nglineupcard" style="${ghost};display:flex;align-items:center;justify-content:center;gap:9px;width:100%;flex:none">${ICN.doc} Print lineup card</button>`;
     // In settings mode (mid-game) we show ONLY the rule cards + Done — no team/side pickers,
     // and no "Start game" (that would reset the live game).
-    const ruleCards=`${leagueCard}${rulebookCard}${runCapCard}${hittersCard}${pitchTypeCard}${detailedCard}${alertsCard}${startCard}`;
+    const ruleCards=`${leagueCard}${rulebookCard}${runCapCard}${hittersCard}${pitchTypeCard}${detailedCard}${alertsCard}${pitchCatchCard}${startCard}`;
     const doneBtn=`<button data-act="settingsdone" style="${bigBtn(T.lime,"width:100%;font-size:22px;padding:20px")};flex:none;margin-top:2px">Done &#10003;</button>`;
     if(isWide()){
       if(setMode) return `<div style="min-height:100%;display:flex;flex-direction:column;gap:16px;justify-content:safe center">
@@ -3079,7 +3115,7 @@ function actionArea(){
           ${header}
           <div style="width:100%;max-width:1180px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start">
             <div style="display:flex;flex-direction:column;gap:12px">${teamRow("Your team",OUR.name,OUR.short,OUR.color,"pickour")}${teamRow("Opponent",OPP.name,OPP.short,OPP.color,"pickopp")}${sideSel}<div style="display:flex;gap:12px"><div style="flex:1;min-width:0">${runCapCard}</div><div style="flex:1;min-width:0">${hittersCard}</div></div></div>
-            <div style="display:flex;flex-direction:column;gap:12px">${leagueCard}${alertsCard}${pitchTypeCard}${detailedCard}${startCard}</div>
+            <div style="display:flex;flex-direction:column;gap:12px">${leagueCard}${alertsCard}${pitchCatchCard}${pitchTypeCard}${detailedCard}${startCard}</div>
           </div>
           <div style="width:100%;max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:10px">${lineupCardBtn}</div>
         </div>`;
@@ -3831,7 +3867,7 @@ document.getElementById("app").addEventListener("click",e=>{
   if(act==="closeinnlog"){ reviewInn=false; render(); return; }
   if(act==="advtoggle"){ advPitch=!advPitch; try{localStorage.setItem("al-adv-pitch",advPitch?"1":"0");}catch(e){} render(); return; }
   if(act==="adveventstoggle"){ advEvents=!advEvents; try{localStorage.setItem("al-adv-events",advEvents?"1":"0");}catch(e){} render(); return; }
-  if(act==="alerttoggle"){ const c=alertsCfg(); c[arg]=!c[arg]; render(); return; }
+  if(act==="alerttoggle"){ const c=alertsCfg(); c[arg]=!c[arg]; if(arg==="pcRules"){try{localStorage.setItem("al-pc-rules",c.pcRules?"1":"0");}catch(e){}} render(); return; }
   if(act==="alertdismiss"||act==="alertbackdrop"){ activeAlert=null; render(); return; }
   if(act==="alertsilence"){ if(activeAlert)dismissedAlerts.add(activeAlert.key); activeAlert=null; render(); return; }
   if(act==="schedstart"){ const t=teamById(openTeamId); if(!t)return; const s=(t.schedule||[]).find(x=>x.id===arg);
@@ -4493,7 +4529,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v169";
+var APP_VERSION="v170";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
