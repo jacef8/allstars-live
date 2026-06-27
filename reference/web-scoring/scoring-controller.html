@@ -1900,7 +1900,7 @@ function statusBar(){
   // ESPN-modeled MLB scorebug: near-black horizontal bar, two stacked team rows (logo · ABBR · score,
   // away over home, batting team brightened) on the LEFT, then the game situation (inning · count/outs ·
   // bases) on the RIGHT. Animation hooks kept (sb-score-*/.digit, sb-balls/strikes/outs, sb-base-*).
-  const tabRow=(t,val,act)=>{const c=col(t),lg=TEAMS[t].logo;return `<div style="position:relative;display:flex;align-items:center;gap:9px;height:30px;padding:0 12px 0 0;background:${act?`linear-gradient(90deg,${c}33,transparent 75%)`:"transparent"}">
+  const tabRow=(t,val,act)=>{const c=col(t),lg=(TEAMS.away.logo&&TEAMS.home.logo)?TEAMS[t].logo:null;return `<div style="position:relative;display:flex;align-items:center;gap:9px;height:30px;padding:0 12px 0 0;background:${act?`linear-gradient(90deg,${c}33,transparent 75%)`:"transparent"}">
       <span style="width:4px;align-self:stretch;background:${c};flex:none"></span>
       ${lg?`<img src="${lg}" alt="" style="width:20px;height:20px;object-fit:contain;border-radius:4px;background:#fff;flex:none;${act?"":"opacity:.55"}">`:`<span style="width:20px;height:20px;border-radius:4px;flex:none;background:${c};display:inline-flex;align-items:center;justify-content:center;font-family:${MONO};font-size:11px;font-weight:800;color:${idealText(c)}">${(TEAMS[t].short||"?").slice(0,1)}</span>`}
       <span style="font-family:${MONO};font-weight:800;font-size:15px;letter-spacing:.6px;color:${act?"#fff":"#9AA6B8"};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${TEAMS[t].short}</span>
@@ -1928,7 +1928,6 @@ function statusBar(){
       <div style="display:flex;flex-direction:column;align-items:center;gap:2px">${diamond}<div style="font-family:${MONO};font-size:7.5px;font-weight:800;letter-spacing:1px;color:#6B7686">BASES</div></div>
       ${G.startedAt?`<div style="font-family:${MONO};font-size:11px;font-weight:700;color:#9AA6B8;white-space:nowrap"><span class="game-clock">${gameClockStr()}</span></div>`:""}
     </div>
-    <button data-act="correctopen" title="Correct the count, outs, score &amp; inning" style="flex:none;width:32px;align-self:stretch;border:none;border-left:1px solid rgba(255,255,255,.10);background:rgba(255,255,255,.04);color:${T.lime};display:flex;align-items:center;justify-content:center;font-size:14px;padding:0;cursor:pointer">&#9998;</button>
   </div>`;
 }
 
@@ -2242,7 +2241,7 @@ function scoreBar(){
   // monitor overlay) owns the animation hooks, and both can be on screen at once on the wide console
   // (duplicate IDs would break the score-pop). This bar reflects state; the broadcast bug is what animates.
   const col=t=>TEAMS[t].color;
-  const tabRow=(t,val,act)=>{const c=col(t),lg=TEAMS[t].logo;return `<div style="position:relative;display:flex;align-items:center;gap:10px;height:37px;padding:0 14px 0 0;background:${act?`linear-gradient(90deg,${c}33,transparent 75%)`:"transparent"}">
+  const tabRow=(t,val,act)=>{const c=col(t),lg=(TEAMS.away.logo&&TEAMS.home.logo)?TEAMS[t].logo:null;return `<div style="position:relative;display:flex;align-items:center;gap:10px;height:37px;padding:0 14px 0 0;background:${act?`linear-gradient(90deg,${c}33,transparent 75%)`:"transparent"}">
       <span style="width:5px;align-self:stretch;background:${c};flex:none"></span>
       ${lg?`<img src="${lg}" alt="" style="width:24px;height:24px;object-fit:contain;border-radius:5px;background:#fff;flex:none;${act?"":"opacity:.55"}">`:`<span style="width:24px;height:24px;border-radius:5px;flex:none;background:${c};display:inline-flex;align-items:center;justify-content:center;font-family:${MONO};font-size:13px;font-weight:800;color:${idealText(c)}">${(TEAMS[t].short||"?").slice(0,1)}</span>`}
       <span style="font-family:${MONO};font-weight:800;font-size:18px;letter-spacing:.5px;color:${act?"#fff":"#9AA6B8"};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${TEAMS[t].short}</span>
@@ -2253,9 +2252,8 @@ function scoreBar(){
   const pip=(on,c)=>`<span style="width:12px;height:12px;border-radius:50%;background:${on?c:"transparent"};border:2px solid ${on?c:"#5C6675"};display:inline-block"></span>`;
   const pipRow=(label,n,max,c)=>`<div style="display:flex;align-items:center;gap:5px"><span style="font-family:${MONO};font-size:11px;font-weight:800;color:#6B7686;width:10px">${label}</span>${Array.from({length:max},(_,i)=>pip(i<n,c)).join("")}</div>`;
   const labeled=(label,inner)=>`<div style="display:flex;flex-direction:column;align-items:center;gap:3px"><div style="font-family:${MONO};font-size:8px;font-weight:800;letter-spacing:1px;color:#6B7686">${label}</div>${inner}</div>`;
-  return `<div id="scorebar" data-longpress="correct" title="Tap the pencil (or hold) to correct the count / outs / score" style="position:relative;display:inline-flex;align-self:flex-start;max-width:100%;align-items:stretch;background:linear-gradient(180deg,#11151c 0%,#070a0e 100%);border:1px solid rgba(255,255,255,.13);border-radius:11px;overflow:hidden;flex-shrink:0;box-shadow:0 10px 26px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.06);user-select:none;-webkit-user-select:none;-webkit-touch-callout:none">
-    <div style="position:absolute;top:0;left:0;right:0;height:3px;display:flex;z-index:3"><span style="flex:1;background:${col("away")}"></span><span style="flex:1;background:${col("home")}"></span></div>
-    <div style="display:flex;flex-direction:column;justify-content:center;min-width:158px;max-width:240px;padding:3px 0 0">
+  return `<div id="scorebar" data-longpress="correct" title="Tap the pencil (or hold) to correct the count / outs / score" style="position:relative;display:inline-flex;align-self:flex-start;max-width:100%;align-items:stretch;background:linear-gradient(180deg,#11151c 0%,#070a0e 100%);border:1.5px solid rgba(255,255,255,.16);border-radius:11px;overflow:hidden;flex-shrink:0;box-shadow:0 10px 26px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.06);user-select:none;-webkit-user-select:none;-webkit-touch-callout:none">
+    <div style="display:flex;flex-direction:column;justify-content:center;min-width:158px;max-width:240px;padding:0">
       ${tabRow("away",G.away,G.half==="T")}
       <div style="height:1px;background:rgba(255,255,255,.08);margin:0 0 0 5px"></div>
       ${tabRow("home",G.home,G.half==="B")}</div>
@@ -2265,7 +2263,6 @@ function scoreBar(){
       <div style="display:flex;flex-direction:column;gap:4px">${pipRow("B",G.balls,3,T.amber)}${pipRow("S",G.strikes,2,T.out)}${pipRow("O",G.outs,3,"#C2CBD8")}</div>
       ${G.startedAt?labeled("TIME",`<div style="font-family:${MONO};font-size:13px;font-weight:700;color:#9AA6B8;white-space:nowrap"><span class="game-clock">${gameClockStr()}</span></div>`):""}
     </div>
-    <button data-act="correctopen" title="Correct the count, outs, score &amp; inning" style="flex:none;display:inline-flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;width:58px;align-self:stretch;border:none;border-left:1px solid rgba(255,255,255,.10);background:rgba(255,255,255,.04);color:${T.lime};font-family:${SANS};font-size:12px;font-weight:800;cursor:pointer"><span style="font-size:17px;line-height:1">&#9998;</span>Edit</button>
   </div>`;
 }
 
@@ -2289,11 +2286,10 @@ function fieldOverlays(){
   const hdr=t=>`<th style="padding:0 8px;font-family:${MONO};font-size:10px;font-weight:700;letter-spacing:.5px;color:${T.sageDim}">${t}</th>`;
   const nm=(t,act)=>`<td style="text-align:left;padding:1px 9px 1px 2px;font-family:${MONO};font-size:12px;font-weight:800;color:${act?T.chalk:T.sage}">${t}</td>`;
   const cell=(v,act)=>`<td style="text-align:center;padding:1px 8px;font-family:${MONO};font-size:16px;font-weight:800;color:${act?T.chalk:T.sage}">${v}</td>`;
-  const rheChip=`<div style="${box};top:9px;right:9px;padding:6px 9px">
-      <table style="border-collapse:collapse"><tr><th></th>${hdr("R")}${hdr("H")}${hdr("E")}</tr>
-      <tr>${nm(TEAMS.away.short,G.half==="T")}${cell(G.away,G.half==="T")}${cell(aH,G.half==="T")}${cell(aE,G.half==="T")}</tr>
-      <tr>${nm(TEAMS.home.short,G.half==="B")}${cell(G.home,G.half==="B")}${cell(hH,G.half==="B")}${cell(hE,G.half==="B")}</tr></table></div>`;
-  return pcChip;  // R/H/E box removed — the scorebug/top strip is the single scoreboard
+  // Edit/correct lives in the field's empty top-right corner (the fan-shaped field leaves it blank),
+  // the same way the pitch count uses the bottom-left — keeps it off the scoreboard.
+  const editChip=`<button data-act="correctopen" title="Correct the count, outs, score &amp; inning" style="position:absolute;z-index:5;top:8px;right:8px;background:rgba(9,13,19,.74);border:2px solid ${T.lime};border-radius:11px;box-shadow:0 3px 12px rgba(0,0,0,.45);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;padding:6px 12px;color:${T.lime};cursor:pointer;pointer-events:auto;font-family:${SANS}"><span style="font-size:20px;line-height:1">&#9998;</span><span style="font-size:9px;font-weight:800;letter-spacing:1px;color:${T.sageDim}">EDIT</span></button>`;
+  return pcChip+editChip;  // R/H/E box removed — the scorebug/top strip is the single scoreboard
 }
 
 /* ===== tap-to-review modals (batter at-bats, inning log) ===== */
@@ -4687,7 +4683,7 @@ function renderToolbar(){
   const dot = !hasRelay ? {c:T.sageDim,l:"LOCAL"} : conn ? {c:T.live,l:"LIVE"} : {c:T.out,l:"OFFLINE"};
   // Wide-only: slide the video monitor in/out for distraction-free scoring.
   const playMode=!menuModes.includes(mode);
-  const vidToggle=(isWide()&&playMode)?`<button data-act="togglevideo" title="${monitorOn?"Hide video":"Show video"}" style="display:flex;align-items:center;gap:7px;background:${monitorOn?T.surface2:T.lime};border:2px solid ${monitorOn?T.line:T.lime};color:${monitorOn?T.chalk:"#fff"};border-radius:10px;padding:9px 13px;font-size:14px;font-weight:800">
+  const vidToggle=(isWide()&&playMode)?`<button data-act="togglevideo" title="${monitorOn?"Hide video":"Show video"}" style="flex:none;white-space:nowrap;display:inline-flex;align-items:center;gap:7px;background:${monitorOn?T.surface2:T.lime};border:2px solid ${monitorOn?T.line:T.lime};color:${monitorOn?T.chalk:"#fff"};border-radius:10px;padding:9px 13px;font-size:14px;font-weight:800;height:40px">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>${monitorOn?"Hide video":"Show video"}</button>`:"";
   // Game controls back in the top bar, as compact ICONS (wide scorer, between plays). Phone keeps
   // its own bottom footer. The scoreboard above the field is just the score now.
@@ -4707,14 +4703,13 @@ function renderToolbar(){
     endgame:{t:"End",i:IC('<rect x="6" y="6" width="12" height="12" rx="1.5"/>',17),ex:`color:${T.out};border-color:${T.out}`},
     undo:{t:"Undo",i:IC('undo',18),ex:`border-color:${T.lime};font-weight:800`}
   };
-  const grip=IC('<path d="M4 7h16M4 12h16M4 17h16"/>',15);
-  const gcBtn=k=>{ const d=gcDefs[k]; if(!d)return"";
-    const base=`display:inline-flex;align-items:center;gap:7px;background:${T.surface2};border-radius:10px;height:42px;padding:0 14px;font-family:${SANS};font-size:14px;font-weight:700;white-space:nowrap;flex:none;color:${T.chalk}`;
-    if(gcArrange) return `<div data-gc="${k}" style="${base};border:2px dashed ${T.lime};cursor:grab;touch-action:none;${d.ex||""}"><span style="color:${T.sageDim}">${grip}</span>${d.i}<span>${d.t}</span></div>`;
-    return `<button data-act="${k}" title="${d.t}" aria-label="${d.t}" style="${base};border:2px solid ${T.line};${d.ex||""}">${d.i}<span>${d.t}</span></button>`; };
-  const arrangeToggle=`<button data-act="gcarrange" title="${gcArrange?"Done — save this order":"Rearrange these buttons (saved for every game)"}" aria-label="Rearrange buttons" style="flex:none;display:inline-flex;align-items:center;justify-content:center;gap:6px;background:${gcArrange?T.lime:T.surface2};border:2px solid ${gcArrange?T.lime:T.line};color:${gcArrange?"#fff":T.sageDim};border-radius:10px;height:42px;padding:0 13px;font-family:${SANS};font-size:13px;font-weight:800">${gcArrange?"&#10003; Done":grip}</button>`;
+  // Compact game controls: ICON-ONLY (44px) so all of them + the meta buttons fit on ONE row without
+  // running off the edge. Undo keeps its label (most-used). Tooltips/aria-labels carry the names.
+  const gcBtn=k=>{ const d=gcDefs[k]; if(!d)return""; const lab=(k==="undo");
+    const base=`display:inline-flex;align-items:center;justify-content:center;gap:6px;background:${T.surface2};border-radius:10px;height:40px;${lab?"padding:0 14px":"width:44px"};flex:none;color:${T.chalk};font-family:${SANS};font-size:14px;font-weight:800;white-space:nowrap`;
+    return `<button data-act="${k}" title="${d.t}" aria-label="${d.t}" style="${base};border:2px solid ${T.line};${d.ex||""}">${d.i}${lab?`<span>${d.t}</span>`:""}</button>`; };
   const gc=(isWide()&&mode==="idle"&&viewMode==="scorer")
-    ? `<div id="gc-row" style="display:flex;gap:7px;flex:none;align-items:center;justify-content:flex-end;margin-left:auto">${gcOrder().map(gcBtn).join("")}${arrangeToggle}</div>`
+    ? `<div id="gc-row" style="display:flex;gap:6px;flex:none;align-items:center;justify-content:flex-end;margin-left:auto">${gcOrder().map(gcBtn).join("")}</div>`
     : "";
   // Viewer (video on): the field/feed swap lives in the top bar, labeled with what you switch TO.
   const vsw=(isWide()&&viewMode==="viewer"&&monitorOn)
@@ -5085,7 +5080,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v221";
+var APP_VERSION="v222";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;

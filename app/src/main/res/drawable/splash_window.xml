@@ -1,12 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Window background shown only briefly while the WebView loads (the Android 12+ OS splash with
-     the star icon runs BEFORE this). Just the blue turf + a slight dark veil — no logo, so the
-     launch isn't a chain of separate logo splashes. -->
-<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item>
-        <bitmap android:src="@drawable/splash_turf" android:gravity="fill" />
-    </item>
-    <item>
-        <color android:color="#66070B13" />
-    </item>
-</layer-list>
+<!-- Window background shown only briefly while the WebView loads (the Android 12+ OS splash with the
+     star icon runs BEFORE this). Solid navy = the SAME colour as the OS splash background
+     (windowSplashScreenBackground #11203A), so the launch is one seamless navy field — no blue striped
+     turf flash between the star splash and the app. -->
+<color xmlns:android="http://schemas.android.com/apk/res/android"
+       android:color="#11203A" />
