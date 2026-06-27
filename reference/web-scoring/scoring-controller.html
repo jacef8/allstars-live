@@ -794,6 +794,15 @@ function doFlip(){
   G.innLog.push({inning:G.inning, half:G.half, batteam:battingKey(),
     pitches:G.halfPitches||0, runs:G.halfRuns||0, hits:G.halfHits||0,
     lob:[1,2,3].filter(x=>G.bases[x]).length});
+  // End-of-inning marker in the live feed, so the feed clearly calls the half ending right after the
+  // last out (B7). Reason reflects HOW it ended (3 outs vs. run-cap/mercy), with the half's R-H line.
+  try{ const _bt=TEAMS[battingKey()], _r=G.halfRuns||0, _h=G.halfHits||0, _3=(G.outs>=3);
+    gameFeed.push({id:++_eventId, inn:G.inning, half:G.half, type:"play", kind:"inningend",
+      head:"End of "+(G.half==="T"?"Top":"Bottom")+" "+G.inning,
+      sub:(_3?"3 outs":"run cap")+" · "+(_bt?(_bt.short||"")+" ":"")+_r+" run"+(_r===1?"":"s")+", "+_h+" hit"+(_h===1?"":"s"),
+      away:G.away, home:G.home});
+    if(gameFeed.length>220)gameFeed.shift();
+  }catch(e){}
   // The half-inning that just ended: if WE were on defense, our catcher caught it (feeds the pitch/catch rule alerts).
   try{ if(fielding()){ const ci=(G.lineup&&G.lineup.pos)?G.lineup.pos.C:null; if(ci!=null){ if(!G.caught)G.caught={}; const ck="o"+ci; G.caught[ck]=(G.caught[ck]||0)+1; } } }catch(e){}
   const nh=G.half==="T"?"B":"T";G.half=nh;if(nh==="T")G.inning++;
@@ -2150,7 +2159,15 @@ function inningLogModal(){
    "pitch" = every pitch + the result. */
 function feedPanel(){
   const items=gameFeed.filter(e=> feedView==="pitch" ? true : e.type!=="pitch");
-  const rows=items.slice(-70).reverse().map(e=>{ const pit=e.type==="pitch";
+  const rows=items.slice(-70).reverse().map(e=>{
+    // End-of-inning marker: a centered divider line so it visibly breaks the feed between innings.
+    if(e.kind==="inningend"){
+      return `<div style="display:flex;align-items:center;gap:10px;padding:8px 15px;background:rgba(225,29,46,.07)">
+        <div style="flex:1;height:1px;background:${T.line};opacity:.22"></div>
+        <span style="font-family:${MONO};font-size:12.5px;font-weight:800;letter-spacing:.5px;color:${T.lime};white-space:nowrap;text-transform:uppercase">${e.head} &middot; ${e.sub}</span>
+        <div style="flex:1;height:1px;background:${T.line};opacity:.22"></div></div>`;
+    }
+    const pit=e.type==="pitch";
     return `<div style="display:flex;align-items:baseline;gap:12px;padding:${pit?"6px 15px":"11px 15px"};border-bottom:1.5px solid ${pit?";background:rgba(255,255,255,.02)":""}">
       <span style="font-family:${MONO};font-size:${pit?"13px":"15px"};font-weight:800;color:${pit?T.sageDim:T.lime};min-width:38px">${e.half==="T"?"▲":"▼"}${e.inn}</span>
       <span style="flex:1;min-width:0;color:${pit?T.sage:T.chalk};font-size:${pit?"14px":"17px"};font-weight:${pit?"600":"700"}">${e.head}${e.sub?` <span style="color:${T.sageDim};font-weight:600">— ${e.sub}</span>`:""}</span>
@@ -4674,7 +4691,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v192";
+var APP_VERSION="v193";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;

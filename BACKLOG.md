@@ -24,7 +24,8 @@ Status: [ ] todo · [~] in progress · [x] done. Grouped by theme; recurring/met
 - [ ] B4. Strikeouts need a looking vs swinging option.
 - [ ] B5. RBI feed detail, e.g. "Double — Caden Schaefer; Jones scores from 3rd."
 - [ ] B6. Caught stealing: add HOW (picked off / catcher threw them out).
-- [ ] B7. End-of-inning notification/result in the feed (e.g. after the 3rd out: "3 outs — end of T3").
+- [x] B7. End-of-inning notification in the feed (v193): doFlip adds a centered divider line
+      "End of Top 3 · 3 outs · TEAM 2 runs, 3 hits" (reason = 3 outs vs run cap). Verified.
 - [ ] B8. Update the batter display after his at-bat completes.
 - [ ] B9. Pitch controls: dark bg behind red B/S/F icons is hard to read — use a light/white background;
       explore baseball graphics (white ball + red stitching), B/S/F over a baseball emblem.
