@@ -2851,9 +2851,9 @@ function actionArea(){
     }
     // ----- HUB: team header + grid of sections + primary actions -----
     const rec=(()=>{const R=teamRec(t);return `${R.w}-${R.l}${R.t?"-"+R.t:""}`;})();
-    const hb=(arg,icon,label)=>`<button data-act="teamtab" data-arg="${arg}" style="display:flex;flex-direction:row;align-items:center;justify-content:center;gap:10px;background:${T.surface};border:2px solid ${T.line};border-radius:13px;padding:13px 10px;min-height:0;cursor:pointer"><span style="font-size:22px;color:${T.lime};display:flex">${icon}</span><span style="font-weight:800;color:${T.ink};font-size:15px;text-align:center;line-height:1.15">${label}</span></button>`;
+    const hb=(arg,icon,label,extra)=>`<button data-act="teamtab" data-arg="${arg}" style="display:flex;flex-direction:row;align-items:center;justify-content:center;gap:10px;background:${T.surface};border:none;border-radius:0;padding:16px 10px;min-height:0;cursor:pointer;${extra||""}"><span style="font-size:22px;color:${T.lime};display:flex">${icon}</span><span style="font-weight:800;color:${T.ink};font-size:15px;text-align:center;line-height:1.15">${label}</span></button>`;
     // Hub tile that fires a non-tab action (Share) — same look as hb() but its own data-act.
-    const hbAct=(act,icon,label)=>`<button data-act="${act}" style="display:flex;flex-direction:row;align-items:center;justify-content:center;gap:10px;background:${T.surface};border:2px solid ${T.line};border-radius:13px;padding:13px 10px;min-height:0;cursor:pointer"><span style="font-size:22px;color:${T.lime};display:flex">${icon}</span><span style="font-weight:800;color:${T.ink};font-size:15px;text-align:center;line-height:1.15">${label}</span></button>`;
+    const hbAct=(act,icon,label,extra)=>`<button data-act="${act}" style="display:flex;flex-direction:row;align-items:center;justify-content:center;gap:10px;background:${T.surface};border:none;border-radius:0;padding:16px 10px;min-height:0;cursor:pointer;${extra||""}"><span style="font-size:22px;color:${T.lime};display:flex">${icon}</span><span style="font-weight:800;color:${T.ink};font-size:15px;text-align:center;line-height:1.15">${label}</span></button>`;
     return secWrap(`
         <div class="frost-card" style="display:flex;align-items:center;gap:10px;background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:12px 14px">
           ${openTeamFrom==="home"?`<button data-act="gohome" style="${ghost};padding:9px 11px">&lsaquo; Home</button>`:`<button data-act="teamsback" style="${ghost};padding:9px 11px">&lsaquo; Teams</button>`}
@@ -2862,14 +2862,14 @@ function actionArea(){
             <div style="font-family:${MONO};font-size:22px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${(t.name||"Team").replace(/</g,"")}</div>
             <div style="font-family:${MONO};font-size:20px;font-weight:800;color:${t.color};margin-top:4px">${rec}</div></div></div>
         <button data-act="teamchat" style="${bigBtn(T.lime,'')};font-size:17px;position:relative">${ICN.chat} Team chat${teamHasUnread(t)?`<span style="background:${T.amber};color:${T.field};border-radius:999px;padding:2px 10px;font-family:${MONO};font-weight:800;font-size:12px;letter-spacing:.5px;margin-left:9px">&#9679; NEW</span>`:""}</button>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        ${(()=>{const showManage=(!(C&&C.enabled)||(window.cloudIsScorer&&window.cloudIsScorer(t)));return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:2px;background:${T.line};border:2px solid ${T.line};border-radius:13px;overflow:hidden">
           ${hb("roster",IC('users',26),"Roster &amp; lineup")}
           ${hb("schedule",IC('calendar',26),"Schedule")}
-          ${hb("stats",IC('chart',26),"Stats &amp; games")}
+          ${hb("stats",IC('chart',26),"Stats &amp; games",(!showManage&&!PHOTOS_ENABLED)?"grid-column:1/-1":"")}
           ${PHOTOS_ENABLED?hb("photos",IC('camera',26),"Photos"):""}
-          ${(!(C&&C.enabled)||(window.cloudIsScorer&&window.cloudIsScorer(t)))?hb("manage",IC('gear',26),"Team management"):""}
-          ${hbAct("shareteam",IC('share',26),"Share &amp; invite")}
-        </div>
+          ${showManage?hb("manage",IC('gear',26),"Team management"):""}
+          ${hbAct("shareteam",IC('share',26),"Share &amp; invite","grid-column:1/-1")}
+        </div>`;})()}
         <button data-act="startteam" style="${bigBtn(t.color)}">${IC('<path d="M8 5l11 7-11 7z" fill="currentColor" stroke="none"/>')} Start game with ${t.short}</button>
         <button data-act="lineupcard" style="${ghost};display:flex;align-items:center;justify-content:center;gap:9px">${ICN.doc} Lineup card (PDF)</button>
         <div style="display:flex;justify-content:flex-end;margin-top:2px">
@@ -4584,7 +4584,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v180";
+var APP_VERSION="v181";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
