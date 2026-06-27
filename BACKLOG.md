@@ -11,7 +11,9 @@ Status: [ ] todo · [~] in progress · [x] done. Grouped by theme; recurring/met
 - [x] A3. Editing a number: tapping the number box should select it so I can type a new value WITHOUT
       deleting the old one first (v189: global select-on-focus).
 - [x] A4. Background is too dark — brighten the page background a little (v189: lightened turf scrim).
-- [ ] A5. A play is animating TWICE — is that intentional? (investigate / fix)
+- [~] A5. A play is animating TWICE — animations are de-duped by anim id (triggerAnim guards
+      a.id===_lastAnimId), so a same-play double shouldn't happen. Needs on-device repro: which play
+      type? (e.g. a hit that's then thrown out plays ball-flight + throw — that's two arcs by design.)
 - [x] A6. Window borders: consistent thick white, no stray red/thin (done v185–v188 sweep).
 
 ## B. Scoreboard + game feed
@@ -26,9 +28,11 @@ Status: [ ] todo · [~] in progress · [x] done. Grouped by theme; recurring/met
 - [ ] B8. Update the batter display after his at-bat completes.
 - [ ] B9. Pitch controls: dark bg behind red B/S/F icons is hard to read — use a light/white background;
       explore baseball graphics (white ball + red stitching), B/S/F over a baseball emblem.
-- [ ] B10. Viewer page feed is EMPTY during the game (bug).
-- [ ] B11. Shared game link → recipient's Home shows no "resume/enter game," even signed in with our team
-      listed; no way into the live game.
+- [x] B10/B11. (v191) Followers can now WATCH a live game from inside the app. Home subscribes to live
+      docs for ALL my teams (not just scorable); a follower sees the in-progress row with "Watch live"
+      (scorers still get "Take over"). Tapping it streams the game + FEED from the cloud live doc in
+      read-only viewer mode — so the feed is no longer empty and there's a real way into the live game.
+      (Same-device scorer→viewer feed already worked; the gap was the remote/follower path.)
 
 ## C. Lineup / roster / positions
 - [ ] C1. In-game lineup edit: don't require a second window to edit a player; first/last name boxes

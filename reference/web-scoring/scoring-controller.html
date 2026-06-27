@@ -1262,6 +1262,7 @@ function applyRemote(raw){
 let amActiveScorer=true;             // is THIS device the active scorer for the current game?
 let _myClaimAt=0;                    // when I last claimed scoring (vs another device's claim)
 let _takeoverUnsub=null,_takeoverTeam=null;
+let _watchLiveUnsub=null;   // follower watching a live game from Home (read-only cloud subscription)
 let _liveGames={},_liveHomeSubs={};  // teamId → {summary,activeUid,activeName} for the Home "in progress" row
 function myCloudUid(){ return (window.Cloud&&window.Cloud.user&&window.Cloud.user.uid)||""; }
 function myCloudName(){ try{ return window.cloudMyName?window.cloudMyName():""; }catch(e){ return ""; } }
@@ -1284,11 +1285,12 @@ function watchLiveTakeover(teamId){
     }
   });
 }
-// Subscribe to live docs for all teams I can score, so Home can show "game in progress · take over".
+// Subscribe to live docs for ALL my teams (owned, scorer, AND followed), so Home can show a live game
+// "in progress" — scorers get "take over", followers get "watch live". Live game docs are publicly
+// readable (see firestore.rules), so a follower subscription is allowed.
 function setupLiveHomeWatch(){
   if(!(window.Cloud&&window.Cloud.user&&window.cloudSubscribeGameDoc)) return;
   (DB.teams||[]).forEach(function(t){
-    if(!(window.cloudIsScorer&&window.cloudIsScorer(t))) return;
     if(_liveHomeSubs[t.id]) return;
     _liveHomeSubs[t.id]=window.cloudSubscribeGameDoc(t.id+"-live",function(doc){
       if(doc&&!doc.final&&doc.summary&&doc.activeUid) _liveGames[t.id]={summary:doc.summary,activeUid:doc.activeUid,activeName:doc.activeName||"",activeAt:doc.activeAt||0};
@@ -2444,9 +2446,14 @@ function actionArea(){
     // Games live on ANOTHER device for a team I score → "in progress · take over" (cross-device handoff).
     const _esc=x=>String(x==null?"":x).replace(/</g,"&lt;");
     const liveRows = otherLiveGames().map(function(o){ const s=o.live.summary||{}; const who=o.live.activeName?(" &middot; "+_esc(o.live.activeName)):"";
-      return `<button data-act="takeoverlive" data-arg="${o.team.id}" style="background:${T.surface};border:2px solid ${T.lime};color:${T.ink};border-radius:13px;padding:15px 18px;display:flex;align-items:center;justify-content:space-between;gap:10px;text-align:left;cursor:pointer">
-        <span style="display:flex;align-items:center;gap:10px;min-width:0"><span style="width:10px;height:10px;border-radius:50%;flex:none;background:#E11D2E;box-shadow:0 0 7px #E11D2E"></span><span style="min-width:0"><span style="font-size:18px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block">${_esc(s.a||"")} ${s.as|0}–${s.hs|0} ${_esc(s.h||"")}</span><span style="font-size:13.5px;color:${T.sage}">In progress${who} · tap to take over scoring</span></span></span>
-        <span style="font-family:${MONO};font-size:15px;font-weight:800;color:${T.lime};white-space:nowrap">Take over &rsaquo;</span></button>`; }).join("");
+      // A scorer can take over scoring; a follower (read-only) watches the live game + feed instead.
+      const canScore=!!(window.cloudIsScorer&&window.cloudIsScorer(o.team));
+      const act=canScore?"takeoverlive":"watchlive";
+      const cta=canScore?"Take over &rsaquo;":"Watch live &rsaquo;";
+      const sub=canScore?("In progress"+who+" · tap to take over scoring"):("In progress"+who+" · tap to watch live");
+      return `<button data-act="${act}" data-arg="${o.team.id}" style="background:${T.surface};border:2px solid ${T.lime};color:${T.ink};border-radius:13px;padding:15px 18px;display:flex;align-items:center;justify-content:space-between;gap:10px;text-align:left;cursor:pointer">
+        <span style="display:flex;align-items:center;gap:10px;min-width:0"><span style="width:10px;height:10px;border-radius:50%;flex:none;background:#E11D2E;box-shadow:0 0 7px #E11D2E"></span><span style="min-width:0"><span style="font-size:18px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block">${_esc(s.a||"")} ${s.as|0}–${s.hs|0} ${_esc(s.h||"")}</span><span style="font-size:13.5px;color:${T.sage}">${sub}</span></span></span>
+        <span style="font-family:${MONO};font-size:15px;font-weight:800;color:${T.lime};white-space:nowrap">${cta}</span></button>`; }).join("");
     const newGameBtn = `<button data-act="newgamestart" style="${bigBtn(T.lime,"font-size:21px;padding:17px;border:2px solid rgba(255,255,255,.92);box-shadow:0 8px 22px rgba(225,29,46,.34)")}">${IC(PLAY)} New Game</button>`;
     const manageBtn = DB.teams.length
       ? `<button data-act="gototeams" style="${ghost};padding:17px;font-size:17px;border:2px solid rgba(255,255,255,.55);color:${T.ink};display:flex;align-items:center;justify-content:center;gap:9px">${IC('<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>')} Manage teams &amp; rosters</button>`
@@ -4141,7 +4148,24 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="oppbenchadd"){oppBenchList().push({num:"",name:""});render();}
   else if(act==="oppbenchin"){const b=oppBenchList();const e=b.splice(+arg,1)[0];if(e&&oppList().length<12){oppList().push(e);G.oppBatters=oppList().length;}render();broadcast();}
   else if(act==="oppbenchout"){const i=editSlot;const e=oppList().splice(i,1)[0];if(e){delete e.pos;oppBenchList().push(e);}G.oppBatters=oppList().length;mode="lineup";render();broadcast();}
-  else if(act==="home"){mode="home";render();}
+  else if(act==="home"){ if(_watchLiveUnsub){ try{_watchLiveUnsub();}catch(e){} _watchLiveUnsub=null; gameActive=false; _remoteLive=false; G=initGame(); }   // leaving a watch session → drop the borrowed game
+    mode="home";render();}
+  else if(act==="watchlive"){ const teamId=arg;
+    if(!window.cloudSubscribeGameDoc){ flash("Sign in to watch the live game"); return; }
+    flash("Loading game…");
+    amActiveScorer=false; viewMode="viewer";
+    if(_watchLiveUnsub){ try{_watchLiveUnsub();}catch(e){} _watchLiveUnsub=null; }
+    _watchLiveUnsub=window.cloudSubscribeGameDoc(teamId+"-live",function(doc){
+      if(!doc||!doc.state) return;                       // no live game yet — keep waiting
+      try{ const st=doc.state;
+        G=st.G; if(Array.isArray(st.ROSTER))ROSTER=st.ROSTER; if(st.OUR)Object.assign(OUR,st.OUR); if(st.OPP)Object.assign(OPP,st.OPP);
+        if(Array.isArray(st.gameFeed))gameFeed=st.gameFeed; if(st.curTeamId)curTeamId=st.curTeamId; if(st.oppTeamId!=null)oppTeamId=st.oppTeamId;
+        gameActive=true; _remoteLive=true; viewMode="viewer";   // read-only: the scorer stays the source of truth
+        if(["home","teams","team","pickteam","newgame","lineup","pickplayer","pickpos","editplayer","summary","settings"].includes(mode)) mode="idle";
+        render(); try{ triggerAnim(G.anim); }catch(e){}
+      }catch(e){}
+    });
+    mode="idle"; render(); return; }
   else if(act==="resume"){ amActiveScorer=true; _myClaimAt=Date.now(); mode="idle"; render(); broadcast(); }
   else if(act==="takeoverlive"){ const teamId=arg;
     if(!(window.cloudSubscribeGameDoc&&window.Cloud&&window.Cloud.user)){ flash("Sign in to take over scoring"); return; }
@@ -4650,7 +4674,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v190";
+var APP_VERSION="v191";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
