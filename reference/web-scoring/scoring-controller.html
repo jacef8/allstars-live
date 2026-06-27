@@ -704,7 +704,7 @@ const initGame=()=>({inning:1,half:"T",away:0,home:0,outs:0,balls:0,strikes:0,
   startedAt:null,  // wall-clock ms when the game ACTUALLY started (auto-set at first pitch / game start; editable in Game Setup) — drives the game timer
   lineup:{ order:[0,1,2,3,4,5,6,7,8],   // batting order: 9-12 entries (slots 10+ = extra hitters)
            pos:{P:0,C:1,"1B":2,"2B":3,"3B":4,SS:5,LF:6,CF:7,RF:8} }});
-let G=initGame(),hist=[],mode="home",tap=null,contact=null,result=null,plan=null,toast=null,toastTimer=null,curResults=[],showAll=false,showZones=false,editSlot=null,confirmAct=null,gameActive=false,lineupTab="us",newgameFrom="home",brSheet=false,correctOpen=false,correctOpenAt=0,lineupView="list",fieldAssign=null,fieldHold=null,fieldDisplaced=null,lineEditSlot=null,luFromSetup=false;
+let G=initGame(),hist=[],mode="home",tap=null,contact=null,result=null,plan=null,toast=null,toastTimer=null,curResults=[],showAll=false,showZones=false,editSlot=null,confirmAct=null,gameActive=false,lineupTab="us",newgameFrom="home",brSheet=false,correctOpen=false,correctOpenAt=0,lineupView="list",fieldAssign=null,fieldHold=null,fieldDisplaced=null,lineEditSlot=null,luFromSetup=false,koPick=null;
 // Resume the last in-progress game (saved by saveGame) across reloads/app updates, so the
 // lineup/score is never lost. Stays on the home screen → shows "Resume". Re-links ROSTER
 // to the saved team so the lineup's player indices resolve correctly.
@@ -1378,6 +1378,17 @@ function otherLiveGames(){ return (DB.teams||[]).filter(function(t){
   if(gameActive&&curTeamId===t.id&&amActiveScorer&&_liveGames[t.id].activeUid===myCloudUid()) return false;  // it's mine, here
   return true; }).map(function(t){ return {team:t, live:_liveGames[t.id]}; }); }
 let _seq=0,_event=null,_eventId=0,_pitch=null;
+// B4: after a strikeout, a quick (skippable) prompt to tag it looking vs swinging. koPick holds the
+// feed entry id to update; any next pitch clears it, so it never slows scoring down.
+function koPrompt(){
+  const btn=`background:${T.surface2};border:2px solid ${T.line};color:${T.chalk};border-radius:999px;padding:8px 14px;font-family:${SANS};font-size:13px;font-weight:800;white-space:nowrap`;
+  return `<div style="position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 86px);transform:translateX(-50%);z-index:30;display:flex;align-items:center;gap:7px;background:#0B0E13;border:2px solid ${T.lime};border-radius:999px;padding:6px 7px 6px 13px;box-shadow:0 8px 26px rgba(0,0,0,.6)">
+      <span style="font-family:${MONO};font-size:11px;font-weight:800;letter-spacing:.6px;color:${T.lime}">STRIKEOUT —</span>
+      <button data-act="kotype" data-arg="looking" style="${btn}">Looking</button>
+      <button data-act="kotype" data-arg="swinging" style="${btn}">Swinging</button>
+      <button data-act="koskip" title="skip" style="background:transparent;border:none;color:${T.sageDim};font-size:20px;font-weight:800;padding:2px 9px;line-height:1;cursor:pointer">&times;</button>
+    </div>`;
+}
 let phonePane="score";   // phone-only paging: "score" | "video" (large screens show both)
 let summaryTeam="us";    // end-game box score: which team's batting/pitching to show ("us" | "opp")
 let monitorOn=(()=>{try{ const p=new URLSearchParams(location.search); if(p.get("feed")==="1") return false; if(p.get("yt")) return true; return localStorage.getItem("al-monitor-on")!=="0";}catch(e){return true;}})();  // wide: video shown/hidden; shared ?feed=1 opens feed-only
@@ -1494,10 +1505,11 @@ function broadcast(){
 
 function pitch(type){
   try{ if(navigator.vibrate) navigator.vibrate(12); }catch(e){}   // short, light haptic confirm on each pitch tap
+  koPick=null;   // a new pitch dismisses any pending "looking / swinging?" prompt (skippable, B4)
   snapshot();const k0=battingKey(),b0=batter(),bn=b0.name,bnum=b0.num;_pitch=type;recordPitch(type);
   const pt=(advPitch&&pitchType)?" "+pitchType:"";   // pitch type tag (if advanced tracking on)
   if(type==="ball"){G.balls++;try{Snd.pip("ball");}catch(e){}feedPitch("Ball"+pt,"#"+bnum+" · "+G.balls+"-"+G.strikes);if(G.balls>=4){applyPlanInline("walk");flash("Walk");bcastEvent("walk","Ball four · "+bn,k0);}}
-  else if(type==="strike"){G.strikes++;feedPitch("Strike"+pt,"#"+bnum+" · "+G.balls+"-"+G.strikes);if(G.strikes>=3){G.outs++;creditBatter("strikeout",0);nextBatter();flipIfNeeded();flash("Strikeout");bcastEvent("strikeout",bn,k0);G.anim={id:((G.anim&&G.anim.id)||0)+1,ts:Date.now(),sfx:"whiff"};}else{try{Snd.pip("strike");}catch(e){}}}
+  else if(type==="strike"){G.strikes++;feedPitch("Strike"+pt,"#"+bnum+" · "+G.balls+"-"+G.strikes);if(G.strikes>=3){G.outs++;creditBatter("strikeout",0);nextBatter();flipIfNeeded();flash("Strikeout");bcastEvent("strikeout",bn,k0);koPick=_eventId;G.anim={id:((G.anim&&G.anim.id)||0)+1,ts:Date.now(),sfx:"whiff"};}else{try{Snd.pip("strike");}catch(e){}}}
   else if(type==="foul"){if(G.strikes<2)G.strikes++;try{Snd.pip("foul");}catch(e){}feedPitch("Foul"+pt,"#"+bnum+" · "+G.balls+"-"+G.strikes);}
   render();broadcast();try{triggerAnim(G.anim);}catch(e){}
 }
@@ -4021,6 +4033,7 @@ function render(){
     ${correctOpen?correctModal():""}
     ${(pickerModal&&wide)?`<div style="${sheetWrap}">
         <div id="action-area" style="${sheetCard};overflow-y:auto;-webkit-overflow-scrolling:touch;background:${T.surface};padding:16px;display:flex;flex-direction:column;gap:8px">${actionArea()}</div></div>`:""}
+    ${(koPick!=null&&viewMode==="scorer"&&gameActive&&mode==="idle")?koPrompt():""}
     ${floatLayer}${floatToggleBtn}`);
   try{ setupFloatWins(); }catch(e){}
   try{ setupLongPress(); }catch(e){}
@@ -4099,6 +4112,8 @@ document.getElementById("app").addEventListener("click",e=>{
   if(act==="brbalk"){ brAdvanceAll("Balk"); return; }   // a balk is not a pitch — no count change
   if(act==="bronerror"){ brOnError(+arg); return; }
   if(act==="brout"){ brOut(+arg); return; }
+  if(act==="kotype"){ if(koPick!=null){ var _ke=(gameFeed||[]).find(function(x){return x.id===koPick;}); if(_ke){ _ke.koType=arg; _ke.sub=(_ke.sub?_ke.sub+" · ":"")+(arg==="looking"?"looking":"swinging"); } koPick=null; render(); broadcast(); } return; }   // B4: tag the strikeout
+  if(act==="koskip"){ koPick=null; render(); return; }
   if(act==="closereview"){ reviewBatter=null; render(); return; }
   if(act==="inninglog"){ reviewInn=true; render(); return; }
   if(act==="closeinnlog"){ reviewInn=false; render(); return; }
@@ -4804,7 +4819,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v207";
+var APP_VERSION="v208";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;

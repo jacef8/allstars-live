@@ -30,7 +30,9 @@ Status: [ ] todo · [~] in progress · [x] done. Grouped by theme; recurring/met
       show the running score (only play lines do). The "remove pitch-count increment from wild pitch/
       passed ball" part is NOT done — WP/PB is genuinely a pitch (ball/strike) so counting it is correct,
       and the sheet flow already records it once; need to clarify the exact double-count scenario.
-- [ ] B4. Strikeouts need a looking vs swinging option.
+- [x] B4. Strikeout looking vs swinging (v208): after a K, a small skippable prompt ("STRIKEOUT —
+      Looking / Swinging / x") appears; tapping tags the feed line ("STRIKEOUT — Caden Schaefer · looking")
+      and broadcasts to viewers. Any next pitch dismisses it. Verified set/tag/clear.
 - [x] B5. RBI feed detail (v197): hit feed lines now name the scorers, e.g. "DOUBLE — Caden Schaefer;
       Jones scores from 3rd, Smith scores from 2nd · 2 RBI" (built from the play movers). Covers B2 runs.
 - [x] B6. Caught-stealing HOW (v196): the base-running sheet already had separate actions; relabeled to
