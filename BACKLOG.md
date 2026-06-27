@@ -44,8 +44,9 @@ Status: [ ] todo · [~] in progress · [x] done. Grouped by theme; recurring/met
       (Same-device scorer→viewer feed already worked; the gap was the remote/follower path.)
 
 ## C. Lineup / roster / positions
-- [ ] C1. In-game lineup edit: don't require a second window to edit a player; first/last name boxes
-      inconsistent vs elsewhere.
+- [x] C1. In-game lineup edits IN THE ROW now (v204): tapping a player turns his row into number /
+      First / Last fields (same boxes as the team roster, via ensureName split) with a Done button —
+      no second window. mode stays 'lineup'. Verified inline render + edit + name split.
 - [x] C2. Field-map position editor (v202): the lineup page has a "Batting order / Field map" toggle.
       Field map = a diamond with all 9 spots; tap a position, tap a player, and assignPos does a clean
       2-player swap (displaced player takes the picked players old spot) — all visible at once, no

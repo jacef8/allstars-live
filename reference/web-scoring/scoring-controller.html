@@ -704,7 +704,7 @@ const initGame=()=>({inning:1,half:"T",away:0,home:0,outs:0,balls:0,strikes:0,
   startedAt:null,  // wall-clock ms when the game ACTUALLY started (auto-set at first pitch / game start; editable in Game Setup) — drives the game timer
   lineup:{ order:[0,1,2,3,4,5,6,7,8],   // batting order: 9-12 entries (slots 10+ = extra hitters)
            pos:{P:0,C:1,"1B":2,"2B":3,"3B":4,SS:5,LF:6,CF:7,RF:8} }});
-let G=initGame(),hist=[],mode="home",tap=null,contact=null,result=null,plan=null,toast=null,toastTimer=null,curResults=[],showAll=false,showZones=false,editSlot=null,confirmAct=null,gameActive=false,lineupTab="us",newgameFrom="home",brSheet=false,correctOpen=false,correctOpenAt=0,lineupView="list",fieldAssign=null,fieldHold=null,fieldDisplaced=null;
+let G=initGame(),hist=[],mode="home",tap=null,contact=null,result=null,plan=null,toast=null,toastTimer=null,curResults=[],showAll=false,showZones=false,editSlot=null,confirmAct=null,gameActive=false,lineupTab="us",newgameFrom="home",brSheet=false,correctOpen=false,correctOpenAt=0,lineupView="list",fieldAssign=null,fieldHold=null,fieldDisplaced=null,lineEditSlot=null;
 // Resume the last in-progress game (saved by saveGame) across reloads/app updates, so the
 // lineup/score is never lost. Stays on the home screen → shows "Resume". Re-links ROSTER
 // to the saved team so the lineup's player indices resolve correctly.
@@ -906,6 +906,11 @@ window.ngOurName=function(v){const s=(v||"").trim(); OUR.name=s||"Your Team"; OU
 window.edFirst=function(v){const ri=G.lineup.order[editSlot]; if(ROSTER[ri]){ROSTER[ri].first=v; ensureName(ROSTER[ri]); saveDB();}};
 window.edLast=function(v){const ri=G.lineup.order[editSlot]; if(ROSTER[ri]){ROSTER[ri].last=v; ensureName(ROSTER[ri]); saveDB();}};
 window.edNum=function(v){const ri=G.lineup.order[editSlot]; if(ROSTER[ri]){ROSTER[ri].num=v; saveDB();}};
+// In-line lineup editing (C1): edit a player right in his row (no second window), slot passed
+// explicitly. Same first/last/number fields the team roster uses, so it's consistent everywhere.
+window.luPNum=function(slot,v){const ri=G.lineup.order[+slot]; if(ROSTER[ri]){ROSTER[ri].num=v; saveDB();}};
+window.luPFirst=function(slot,v){const ri=G.lineup.order[+slot]; if(ROSTER[ri]){ROSTER[ri].first=v; ensureName(ROSTER[ri]); saveDB();}};
+window.luPLast=function(slot,v){const ri=G.lineup.order[+slot]; if(ROSTER[ri]){ROSTER[ri].last=v; ensureName(ROSTER[ri]); saveDB();}};
 window.ngOppName=function(v){const s=(v||"").trim(); OPP.name=s||"Opponent"; OPP.short=(s||"OPP").slice(0,3).toUpperCase();};
 window.ngRunCap=function(v){const n=parseInt(v,10); G.runCap=(isNaN(n)||n<0)?0:Math.min(n,30);};        // 0 = no cap
 window.ngOppBatters=function(v){const n=parseInt(v,10); G.oppBatters=(isNaN(n)||n<1)?9:Math.min(n,15);};
@@ -3355,7 +3360,17 @@ function actionArea(){
     // soon is easy to find. Our pointer is the away/home pointer for whichever side we are.
     const ourSlot = gameActive ? ((G[G.ourSide==="away"?"awayPtr":"homePtr"]||0) % Math.max(1,G.lineup.order.length)) : -1;
     const curBadge = `<span style="font-family:${MONO};font-size:9px;font-weight:800;letter-spacing:.5px;color:#fff;background:${T.lime};border-radius:4px;padding:2px 5px;flex:none">AT BAT</span>`;
-    const rows=G.lineup.order.map((ri,slot)=>{const p=ROSTER[ri],pos=posOfPlayer(ri)||"—",isP=pos==="P";const _cur=(slot===ourSlot);
+    const eCell=`background:${T.surface};border:2px solid ${T.line};color:${T.ink};border-radius:8px;padding:10px 11px;font-size:16px;font-weight:700;outline:none`;
+    const rows=G.lineup.order.map((ri,slot)=>{const p=ROSTER[ri];ensureName(p);const pos=posOfPlayer(ri)||"—",isP=pos==="P";const _cur=(slot===ourSlot);
+      // In-line edit (C1): the row itself becomes number/first/last fields — no second window, same
+      // boxes as the team roster. Tap the name to open; tap Done (or another name) to close.
+      if(lineEditSlot===slot) return `<div data-row data-ri="${ri}" style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;background:rgba(225,29,46,.10);border:2px solid ${T.lime};border-radius:10px;padding:9px 9px">
+        <span style="font-family:${MONO};font-size:17px;font-weight:800;color:${T.lime};width:18px;text-align:center;flex:none">${slot+1}</span>
+        <input value="${(p.num||"").replace(/"/g,"&quot;")}" oninput="luPNum(${slot},this.value)" inputmode="numeric" maxlength="3" style="${eCell};width:52px;text-align:center;font-family:${MONO};font-weight:800;flex:none">
+        <input value="${(p.first||"").replace(/"/g,"&quot;")}" oninput="luPFirst(${slot},this.value)" placeholder="First" style="${eCell};flex:1 1 90px;min-width:0">
+        <input value="${(p.last||"").replace(/"/g,"&quot;")}" oninput="luPLast(${slot},this.value)" placeholder="Last" style="${eCell};flex:1 1 90px;min-width:0">
+        <button data-act="pickpos" data-arg="${slot}" style="background:${isP?OUR.color:T.surface2};border:2px solid ${isP?OUR.color:T.line};color:${isP?"#FFFFFF":T.chalk};border-radius:7px;padding:8px 12px;font-family:${MONO};font-size:15px;font-weight:800;flex:none">${pos}</button>
+        <button data-act="editplayer" data-arg="${slot}" style="background:${T.lime};border:2px solid ${T.lime};color:#fff;border-radius:8px;padding:9px 15px;font-family:${SANS};font-size:14px;font-weight:800;flex:none">Done</button></div>`;
       if(narrow) return `<div data-row data-ri="${ri}" style="display:flex;align-items:center;gap:9px;background:${_cur?"rgba(225,29,46,.12)":T.surface2};border:2px solid ${_cur?T.lime:T.line};border-radius:10px;padding:10px 9px">
         <span data-drag style="cursor:grab;color:${T.sageDim};display:flex;align-items:center;padding:6px 2px;touch-action:none">${IC('<path d="M4 7h16M4 12h16M4 17h16"/>')}</span>
         <span style="font-family:${MONO};font-size:18px;font-weight:800;color:${T.lime};width:20px;text-align:center;flex:none">${slot+1}</span>${_cur?curBadge:""}
@@ -4229,8 +4244,8 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="confirm")commit(result,plan);
   else if(act==="lineup"){mode="lineup";render();}
   else if(act==="lineupdone"){ gameActive=true;mode="idle";render();broadcast(); }   // timer starts on first pitch (see recordPitch)
-  else if(act==="lutab"){lineupTab=arg;render();}
-  else if(act==="luview"){ lineupView=arg; fieldAssign=null; fieldHold=null; fieldDisplaced=null; render(); }   // batting-order list ↔ field map (C2)
+  else if(act==="lutab"){lineupTab=arg;lineEditSlot=null;render();}
+  else if(act==="luview"){ lineupView=arg; fieldAssign=null; fieldHold=null; fieldDisplaced=null; lineEditSlot=null; render(); }   // batting-order list ↔ field map (C2)
   else if(act==="fieldpos"){ fieldAssign=(fieldAssign===arg?null:arg); render(); }        // tap a position → choose who plays it
   else if(act==="fieldcancel"){ fieldAssign=null; fieldHold=null; render(); }
   else if(act==="fieldassign"){ if(fieldAssign){ const disp=fieldPlace(+arg,fieldAssign); fieldAssign=null; fieldDisplaced=disp; render(); broadcast(); } }   // place the picked player; ask about any bumped player
@@ -4289,7 +4304,7 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="summary-done"){gameActive=false;mode="teams";render();broadcast();}
   else if(act==="pickplayer"){editSlot=+arg;mode="pickplayer";render();}
   else if(act==="pickpos"){editSlot=+arg;mode="pickpos";render();}
-  else if(act==="editplayer"){editSlot=+arg;mode="editplayer";render();}
+  else if(act==="editplayer"){ lineEditSlot=(lineEditSlot===+arg?null:+arg); render(); }   // C1: toggle in-row edit (no second window)
   else if(act==="pickpitch"){editSlot=-1;mode="pickplayer";render();}
   else if(act==="setplayer"){const ri=+arg;if(editSlot===-1)makePitcher(ri);else assignSlot(editSlot,ri);mode="lineup";render();broadcast();}
   else if(act==="setpos"){assignPos(G.lineup.order[editSlot],arg);mode="lineup";render();broadcast();}
@@ -4782,7 +4797,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v203";
+var APP_VERSION="v204";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
