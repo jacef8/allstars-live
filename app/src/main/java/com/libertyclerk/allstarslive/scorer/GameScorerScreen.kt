@@ -122,6 +122,19 @@ private class ScorerBridge(private val appContext: Context) {
     @JavascriptInterface
     fun isApp(): Boolean = true
 
+    /** Push topics (FCM): the web computes them from the user's notification prefs + followed teams
+     *  and (un)subscribes here. Topic-based so it needs no per-device token and works signed-out. */
+    @JavascriptInterface
+    fun subscribeTopic(topic: String?) { if (!topic.isNullOrBlank()) try { com.libertyclerk.allstarslive.push.Push.subscribe(appContext, topic) } catch (e: Throwable) {} }
+
+    @JavascriptInterface
+    fun unsubscribeTopic(topic: String?) { if (!topic.isNullOrBlank()) try { com.libertyclerk.allstarslive.push.Push.unsubscribe(appContext, topic) } catch (e: Throwable) {} }
+
+    /** Web opened the Notifications panel — make sure the channel/Firebase are ready. The runtime
+     *  POST_NOTIFICATIONS prompt is already raised at launch in MainActivity. */
+    @JavascriptInterface
+    fun requestNotifPermission() { try { com.libertyclerk.allstarslive.push.Push.ensureInit(appContext) } catch (e: Throwable) {} }
+
     /** "Start game stream" → raise the native name/privacy dialog (same as the Video tab). */
     @JavascriptInterface
     fun requestGoLive() { main.post { Broadcast.requestDialog() } }

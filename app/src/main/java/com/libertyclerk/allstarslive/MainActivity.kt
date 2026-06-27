@@ -133,6 +133,8 @@ class MainActivity : ComponentActivity() {
             if (needNotif) add("android.permission.POST_NOTIFICATIONS")
         }
         if (ask.isNotEmpty()) requestPermissions(ask.toTypedArray(), 1)
+        // Push notifications: create the channel + init Firebase so the web's topic subscriptions work.
+        com.libertyclerk.allstarslive.push.Push.ensureInit(applicationContext)
         // Immersive: hide the status bar + nav/taskbar so the broadcast app is full-bleed.
         // Swipe from an edge to reveal them transiently; onWindowFocusChanged re-hides.
         hideSystemBars()
@@ -256,19 +258,13 @@ class MainActivity : ComponentActivity() {
                     // Branded splash overlay — turf background, a near-full-screen A, wordmark at
                     // the bottom; fades out into the app.
                     AnimatedVisibility(visible = showSplash, exit = fadeOut(animationSpec = tween(450))) {
-                        Box(Modifier.fillMaxSize().background(Color(0xFF0B0E13))) {
-                            Image(
-                                painter = painterResource(R.drawable.splash_turf),
-                                contentDescription = null,
-                                modifier = Modifier.fillMaxSize(),
-                                contentScale = ContentScale.Crop,
-                            )
-                            // Subtle scrim so the logo + wordmark stay crisp over the turf.
-                            Box(Modifier.fillMaxSize().background(Color(0x4D070B13)))
+                        // Solid navy (same as the OS splash #11203A) — NOT the old blue striped turf, which
+                        // read as a jarring second splash on launch. Just the logo + wordmark on navy.
+                        Box(Modifier.fillMaxSize().background(Color(0xFF11203A))) {
                             Image(
                                 painter = painterResource(R.drawable.splash_logo),
                                 contentDescription = "All-Stars Live",
-                                modifier = Modifier.fillMaxWidth(0.82f).align(Alignment.Center),
+                                modifier = Modifier.fillMaxWidth(0.7f).align(Alignment.Center),
                                 contentScale = ContentScale.Fit,
                             )
                             Row(

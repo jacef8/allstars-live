@@ -98,6 +98,12 @@ dependencies {
     implementation("com.google.zxing:core:3.5.3")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
+
+    // Push notifications (FCM). NOTE: reliable registration also needs google-services.json + the
+    // com.google.gms.google-services plugin (register an Android app in the Firebase console). Until
+    // then Push.kt initializes Firebase manually from the known config so this compiles and runs.
+    implementation(platform("com.google.firebase:firebase-bom:33.1.2"))
+    implementation("com.google.firebase:firebase-messaging-ktx")
 }
 
 // M4: bundle the web scorer into the app so the Game tab can show it offline.
