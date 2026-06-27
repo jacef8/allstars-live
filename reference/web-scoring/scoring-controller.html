@@ -1083,12 +1083,12 @@ function brWPApply(type){   // type: "ball" | "strike"
 /* The base-running sheet (opened by the "Runners" button when anyone's on base). */
 function baseRunModal(){
   const occ=[3,2,1].filter(b=>G.bases&&G.bases[b]);
-  const chip=(act,base,lbl,bg,fg,bd)=>`<button data-act="${act}" data-arg="${base}" style="flex:1 1 auto;min-width:0;background:${bg};border:2px solid ${bd||bg};color:${fg};border-radius:8px;padding:9px 6px;font-family:${SANS};font-size:13px;font-weight:800;white-space:nowrap">${lbl}</button>`;
+  const chip=(act,base,lbl,bg,fg,bd)=>`<button data-act="${act}" data-arg="${base}" style="flex:1 1 auto;min-width:0;background:${bg};border:none;border-radius:0;color:${fg};padding:11px 6px;font-family:${SANS};font-size:13px;font-weight:800;white-space:nowrap">${lbl}</button>`;
   const runnerRows=occ.map(b=>{ const r=G.bases[b];
     return `<div style="background:${T.surface2};border:2px solid ${T.line};border-radius:11px;padding:10px 11px;display:flex;flex-direction:column;gap:8px">
         <div style="display:flex;align-items:center;gap:9px"><span style="font-family:${MONO};font-size:15px;font-weight:800;color:${r.color||T.clay}">${b}B</span>
           <span style="font-size:16px;font-weight:700;color:${T.chalk};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${((r.name||r.label||"Runner")+"").replace(/</g,"&lt;")}</span></div>
-        <div style="display:flex;flex-wrap:wrap;gap:6px">
+        <div style="display:flex;flex-wrap:wrap;gap:2px;background:${T.line};border:2px solid ${T.line};border-radius:10px;overflow:hidden">
           ${chip("brsteal",b,"&#9650; Steal",T.safe,"#fff")}
           ${chip("bradv",b,"Adv +1",T.surface,T.chalk,T.line)}
           ${chip("brscore",b,"Score",T.lime,"#fff")}
@@ -1097,7 +1097,7 @@ function baseRunModal(){
           ${advEvents?chip("bronerror",b,"On error +1",T.surface,T.amber,T.amber):""}
           ${advEvents?chip("brout",b,"Out",T.surface,T.out,T.out):""}
         </div></div>`;}).join("");
-  const gbtn=(act,lbl)=>`<button data-act="${act}" style="flex:1 1 auto;background:${T.surface2};border:2px solid ${T.line};color:${T.chalk};border-radius:9px;padding:11px 8px;font-family:${SANS};font-size:14px;font-weight:800;white-space:nowrap">${lbl}</button>`;
+  const gbtn=(act,lbl)=>`<button data-act="${act}" style="flex:1 1 auto;background:${T.surface2};border:none;border-radius:0;color:${T.chalk};padding:12px 8px;font-family:${SANS};font-size:14px;font-weight:800;white-space:nowrap">${lbl}</button>`;
   return `<div data-act="brclose" style="position:fixed;left:0;right:0;top:0;height:calc(var(--avh) * 100);z-index:120;background:rgba(8,11,16,.78);display:flex;align-items:center;justify-content:center;padding:16px">
       <div data-act="noop" style="width:100%;max-width:460px;max-height:calc(var(--avh) * 90);overflow-y:auto;-webkit-overflow-scrolling:touch;background:${T.surface};border:2px solid ${T.lime};border-radius:18px;padding:16px;display:flex;flex-direction:column;gap:12px;box-shadow:0 18px 54px rgba(0,0,0,.6)">
         <div style="display:flex;align-items:center;gap:10px"><div style="flex:1;font-family:${MONO};font-size:18px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:${T.lime}">Base running</div>
@@ -1112,7 +1112,7 @@ function baseRunModal(){
         `:`
         <div style="font-size:12px;color:${T.sage};margin-top:-4px">No ball in play — the batter stays up with the same count.</div>
         <div><div style="font-size:10px;font-weight:800;letter-spacing:1px;color:${T.sageDim};margin:0 2px 6px">ALL RUNNERS ADVANCE</div>
-          <div style="display:flex;gap:6px">${gbtn("brwp","Wild pitch")}${gbtn("brpb","Passed ball")}${gbtn("brbalk","Balk")}</div></div>
+          <div style="display:flex;gap:2px;background:${T.line};border:2px solid ${T.line};border-radius:9px;overflow:hidden">${gbtn("brwp","Wild pitch")}${gbtn("brpb","Passed ball")}${gbtn("brbalk","Balk")}</div></div>
         <div style="display:flex;flex-direction:column;gap:8px">${runnerRows||`<div style="font-size:13px;color:${T.sageDim};text-align:center;padding:14px">No runners on base.</div>`}</div>`}
       </div></div>`;
 }
@@ -3116,12 +3116,12 @@ function actionArea(){
           <select onchange="ngRulebook(this.value)" style="${selStyle}">${allRulebooks().map(r=>`<option value="${r.id}"${grb===r.id?" selected":""}>${(r.name||'').replace(/</g,'&lt;')}</option>`).join("")}</select>
           <button data-act="viewgamerulebook" style="width:100%;margin-top:8px;background:${T.surface2};color:${T.lime};border:2px solid ${T.line};border-radius:9px;padding:11px;font-family:${MONO};font-weight:800;font-size:14px;display:flex;align-items:center;justify-content:center;gap:8px">${ICN.doc} View rulebook</button></div>`;
     const ac=alertsCfg();
-    const aChip=(k,lbl)=>`<button data-act="alerttoggle" data-arg="${k}" style="background:${ac[k]?T.lime:T.surface2};border:2px solid ${ac[k]?T.lime:T.line};color:${ac[k]?"#fff":T.sage};border-radius:999px;padding:7px 13px;font-family:${MONO};font-weight:800;font-size:12px">${lbl}</button>`;
+    const aChip=(k,lbl)=>`<button data-act="alerttoggle" data-arg="${k}" style="background:${ac[k]?T.lime:T.surface2};border:none;border-radius:0;color:${ac[k]?"#fff":T.sage};padding:11px 8px;font-family:${MONO};font-weight:800;font-size:12px;text-align:center">${lbl}</button>`;
     const alertsCard=`<div style="${rowCard};flex-wrap:wrap">
           <div style="flex:1;min-width:150px"><div style="font-weight:800;color:${T.ink};font-size:19px">Rule alerts</div>
             <div style="color:${T.sage};font-size:13px;margin-top:3px">Pop-up reminders during the game</div></div>
           <button data-act="alerttoggle" data-arg="on" style="background:${ac.on?T.lime:T.surface2};border:2px solid ${ac.on?T.lime:T.line};color:${ac.on?"#fff":T.sage};border-radius:999px;padding:10px 20px;font-family:${MONO};font-weight:800;font-size:15px;min-width:66px">${ac.on?"ON":"OFF"}</button>
-          ${ac.on?`<div style="width:100%;display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">${aChip("runRule","Run rule")}${aChip("runCap","Run cap")}${aChip("pitch","Pitch limit")}${aChip("inning","Final inning")}</div>`:""}</div>`;
+          ${ac.on?`<div style="width:100%;display:grid;grid-template-columns:1fr 1fr;gap:2px;background:${T.line};border:2px solid ${T.line};border-radius:9px;overflow:hidden;margin-top:6px">${aChip("runRule","Run rule")}${aChip("runCap","Run cap")}${aChip("pitch","Pitch limit")}${aChip("inning","Final inning")}</div>`:""}</div>`;
     const pitchCatchCard=`<div style="${rowCard};flex-wrap:wrap">
           <div style="flex:1;min-width:150px"><div style="font-weight:800;color:${T.ink};font-size:19px">Pitch &amp; catch rule alerts</div>
             <div style="color:${T.sage};font-size:13px;margin-top:3px;line-height:1.4">Tournament limits — pops a warning as a pitcher nears the catch cutoff (28/30/31), the 48-hr line (66) and the 85 daily max, and when a catcher hits 3 / 4 innings caught. Uses the counts you're already keeping.</div></div>
@@ -3414,16 +3414,16 @@ function actionArea(){
   }
   if(mode==="errpos"){
     const order=["P","C","1B","2B","3B","SS","LF","CF","RF"];
-    const cells=order.map(p=>{const sel=p===tap.pos;return `<button data-act="errpos" data-arg="${p}" style="display:flex;flex-direction:column;align-items:center;gap:2px;background:${sel?T.surface2:T.surface};border:2px solid ${sel?T.clay:T.line};color:${T.chalk};border-radius:9px;padding:13px 4px;font-size:15px;font-weight:800">${p}<span style="font-size:10px;color:${T.sage};font-weight:600">${POSNUM[p]}</span></button>`;}).join("");
+    const cells=order.map(p=>{const sel=p===tap.pos;return `<button data-act="errpos" data-arg="${p}" style="display:flex;flex-direction:column;align-items:center;gap:2px;background:${sel?T.clay:T.surface};border:none;border-radius:0;color:${T.chalk};padding:15px 4px;font-size:15px;font-weight:800">${p}<span style="font-size:10px;color:${T.sage};font-weight:600">${POSNUM[p]}</span></button>`;}).join("");
     return step("Error charged to which fielder?","Defaults to where the ball went — tap another fielder if the error was elsewhere.",
-      `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">${cells}</div>
+      `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:2px;background:${T.line};border:2px solid ${T.line};border-radius:10px;overflow:hidden">${cells}</div>
        <button data-act="back-result" style="${ghost};margin-top:10px;width:100%">Back</button>`);
   }
   if(mode==="outpos"){
     const order=["P","C","1B","2B","3B","SS","LF","CF","RF"];
-    const cells=order.map(p=>`<button data-act="outpos" data-arg="${p}" style="display:flex;flex-direction:column;align-items:center;gap:2px;background:${T.surface};border:2px solid ${T.line};color:${T.chalk};border-radius:9px;padding:13px 4px;font-size:15px;font-weight:800">${p}<span style="font-size:10px;color:${T.sage};font-weight:600">${POSNUM[p]}</span></button>`).join("");
+    const cells=order.map(p=>`<button data-act="outpos" data-arg="${p}" style="display:flex;flex-direction:column;align-items:center;gap:2px;background:${T.surface};border:none;border-radius:0;color:${T.chalk};padding:15px 4px;font-size:15px;font-weight:800">${p}<span style="font-size:10px;color:${T.sage};font-weight:600">${POSNUM[p]}</span></button>`).join("");
     return step("Which fielder made the play?",(result?result.label+" — ":"")+"tap the position that fielded it.",
-      `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">${cells}</div>
+      `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:2px;background:${T.line};border:2px solid ${T.line};border-radius:10px;overflow:hidden">${cells}</div>
        <button data-act="back-result" style="${ghost};margin-top:10px;width:100%">Back</button>`);
   }
   if(mode==="result"){
@@ -4207,11 +4207,11 @@ function renderToolbar(){
   // In a live game the title slot becomes the Scorer/Viewer role toggle (the matchup
   // already shows in the scorebug below — no need to repeat it here).
   const scorerLocked=!canScoreNow();   // signed-in follower (not a scorer) → grey the Scorer tab
-  const roleSeg=(r,lbl)=>{const lock=(r==="scorer"&&scorerLocked);return `<button data-act="role" data-arg="${r}" title="${lock?'Scorers only — ask the owner for access':''}" style="padding:${isWide()?'8px 14px':'7px 10px'};border:none;font-family:${MONO};font-weight:800;font-size:${isWide()?'13px':'12px'};letter-spacing:.5px;text-transform:uppercase;cursor:${lock?'not-allowed':'pointer'};background:${viewMode===r?T.lime:"transparent"};color:${viewMode===r?"#fff":T.sage};${lock?'opacity:.4':''};display:inline-flex;align-items:center;gap:5px">${lbl}${lock?IC('key',12):''}</button>`;};
+  const roleSeg=(r,lbl)=>{const lock=(r==="scorer"&&scorerLocked);return `<button data-act="role" data-arg="${r}" title="${lock?'Scorers only — ask the owner for access':''}" style="padding:${isWide()?'8px 14px':'7px 10px'};border:none;font-family:${MONO};font-weight:800;font-size:${isWide()?'13px':'12px'};letter-spacing:.5px;text-transform:uppercase;cursor:${lock?'not-allowed':'pointer'};background:${viewMode===r?T.lime:T.surface};color:${viewMode===r?"#fff":T.sage};${lock?'opacity:.4':''};display:inline-flex;align-items:center;gap:5px">${lbl}${lock?IC('key',12):''}</button>`;};
   const chip=(playMode2&&viewerLocked)
     ? `<div style="display:inline-flex;align-items:center;gap:8px"><span style="display:inline-flex;align-items:center;gap:5px;background:${T.surface};border:2px solid ${T.line};border-radius:999px;padding:5px 11px;font-family:${MONO};font-size:11px;font-weight:800;letter-spacing:1px;color:${T.lime}">${IC('eye',14)} WATCHING</span><span style="font-family:${MONO};font-weight:700;font-size:15px;color:${T.chalk}">${OUR.short||"US"} <span style="color:${T.sageDim};font-weight:600">vs</span> ${OPP.short||"OPP"}</span></div>`
     : playMode2
-    ? `<div style="display:inline-flex;background:${T.surface};border:2px solid ${T.line};border-radius:10px;overflow:hidden">${roleSeg("scorer","Scorer")}${roleSeg("viewer","Viewer")}</div>`
+    ? `<div style="display:inline-flex;gap:2px;background:${T.line};border:2px solid ${T.line};border-radius:10px;overflow:hidden">${roleSeg("scorer","Scorer")}${roleSeg("viewer","Viewer")}</div>`
     : inGame
       ? `${OUR.short||"US"} <span style="color:${T.sageDim};font-weight:600">vs</span> ${OPP.short||"OPP"}`
       : `ALL-STARS <span style="color:${T.lime}">LIVE</span>`;
@@ -4584,7 +4584,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v183";
+var APP_VERSION="v184";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
