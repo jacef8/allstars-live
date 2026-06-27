@@ -19,7 +19,8 @@ Status: [ ] todo · [~] in progress · [x] done. Grouped by theme; recurring/met
 
 ## B. Scoreboard + game feed
 - [ ] B1. Scorer scoreboard is too small, not grid-defined, no colors — hard to read what's what. Redesign.
-- [ ] B2. Game feed: add OUTS and/or RUNS to a play's feed line when relevant.
+- [~] B2. Game feed: out-making plays now show "· N OUT(S)" (v195). Runs-scored on a play still TODO —
+      folded into B5 (RBI detail) since both need run-attribution.
 - [ ] B3. Remove pitch-count increment from wild pitch / passed ball / etc. (and don't show "pitch +1"
       on every feed update for those).
 - [ ] B4. Strikeouts need a looking vs swinging option.

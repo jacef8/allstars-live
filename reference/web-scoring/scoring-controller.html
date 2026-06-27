@@ -1367,11 +1367,14 @@ const PITCH_TYPE_NAME=k=>{const p=PITCH_TYPES.find(x=>x.k===k);return p?p.n:k;};
 const PLAYHEAD={single:"SINGLE",double:"DOUBLE",triple:"TRIPLE",hr:"HOME RUN",error:"REACHED ON ERROR",
   fc:"FIELDER'S CHOICE",out1:"GROUND OUT",flyout:"FLY OUT",lineout:"LINE OUT",popout:"POP OUT",
   dp:"DOUBLE PLAY",sacfly:"SAC FLY",sacbunt:"SAC BUNT",walk:"WALK",hbp:"HIT BY PITCH",strikeout:"STRIKEOUT"};
+// Plays that record an out — the feed shows the resulting out count after these (B2).
+const OUT_KINDS=["out1","flyout","lineout","popout","dp","sacfly","sacbunt","strikeout","fc"];
 function bcastEvent(kind,sub,team){
   const head=PLAYHEAD[kind]||kind.toUpperCase();
   _event={id:++_eventId,head,sub:sub||"",team};
-  // Append to the live game feed (play-by-play) shown to viewers.
-  gameFeed.push({id:_eventId,inn:G.inning,half:G.half,type:"play",head,sub:sub||"",away:G.away,home:G.home});
+  // Append to the live game feed (play-by-play) shown to viewers. Carry kind + the post-play out
+  // count so the feed can tag out-making plays with "· N out" (relevant context for that play).
+  gameFeed.push({id:_eventId,inn:G.inning,half:G.half,type:"play",kind:kind,outs:(G.outs|0),head,sub:sub||"",away:G.away,home:G.home});
   if(gameFeed.length>220)gameFeed.shift();
 }
 /* Assemble the live box score (per-batter rows + R/H/E totals), mapped to away/home. */
@@ -2170,7 +2173,7 @@ function feedPanel(){
     const pit=e.type==="pitch";
     return `<div style="display:flex;align-items:baseline;gap:12px;padding:${pit?"6px 15px":"11px 15px"};border-bottom:1.5px solid ${pit?";background:rgba(255,255,255,.02)":""}">
       <span style="font-family:${MONO};font-size:${pit?"13px":"15px"};font-weight:800;color:${pit?T.sageDim:T.lime};min-width:38px">${e.half==="T"?"▲":"▼"}${e.inn}</span>
-      <span style="flex:1;min-width:0;color:${pit?T.sage:T.chalk};font-size:${pit?"14px":"17px"};font-weight:${pit?"600":"700"}">${e.head}${e.sub?` <span style="color:${T.sageDim};font-weight:600">— ${e.sub}</span>`:""}</span>
+      <span style="flex:1;min-width:0;color:${pit?T.sage:T.chalk};font-size:${pit?"14px":"17px"};font-weight:${pit?"600":"700"}">${e.head}${e.sub?` <span style="color:${T.sageDim};font-weight:600">— ${e.sub}</span>`:""}${(!pit&&OUT_KINDS.includes(e.kind)&&e.outs!=null)?` <span style="font-family:${MONO};font-size:12px;font-weight:800;color:${e.outs>=3?T.lime:T.sageDim};white-space:nowrap">&middot; ${e.outs} OUT${e.outs===1?"":"S"}</span>`:""}</span>
       <span style="font-family:${MONO};font-size:${pit?"13px":"15px"};color:${T.sage};white-space:nowrap">${TEAMS.away.short} ${e.away}-${e.home} ${TEAMS.home.short}</span>
     </div>`;}).join("");
   const seg=(v,lbl)=>`<button data-act="feedview" data-arg="${v}" style="padding:5px 11px;border:none;font-family:${MONO};font-weight:800;font-size:11px;letter-spacing:.4px;cursor:pointer;background:${feedView===v?T.lime:"transparent"};color:${feedView===v?"#fff":T.sage}">${lbl}</button>`;
@@ -4693,7 +4696,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v194";
+var APP_VERSION="v195";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
