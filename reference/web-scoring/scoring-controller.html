@@ -1498,7 +1498,11 @@ function commit(r,movers){
   creditBatter(r.kind,rbi);
   nextBatter();
   const capped=capReached(); if(capped)doFlip(); else flipIfNeeded();
-  bcastEvent(r.kind, bn+(runs?` · ${runs} run${runs>1?"s":""}`:"")+(rbi?` · ${rbi} RBI`:""), k0);
+  // Named RBI detail (B5): list the runners who crossed home and where from, e.g.
+  // "Caden Schaefer; Jones scores from 3rd · 1 RBI" — richer than a bare run/RBI count.
+  const _ord={1:"1st",2:"2nd",3:"3rd"};
+  const _scd=movers.filter(m=>!m.out&&m.dest===4&&!m.isBatter).map(m=>((m.name||m.label||"Runner")+(_ord[m.start]?" scores from "+_ord[m.start]:" scores")));
+  bcastEvent(r.kind, bn+(_scd.length?"; "+_scd.join(", "):"")+(rbi?` · ${rbi} RBI`:""), k0);
   flash(r.note+(runs?` · ${runs} run${runs>1?"s":""}`:"")+(rbi?` · ${rbi} RBI`:"")+(capped?" · run cap":""));resetUI();render();broadcast();
   try{ triggerAnim(G.anim); }catch(e){}
 }
@@ -4701,7 +4705,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v196";
+var APP_VERSION="v197";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;

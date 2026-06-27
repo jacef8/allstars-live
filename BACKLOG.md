@@ -24,7 +24,8 @@ Status: [ ] todo · [~] in progress · [x] done. Grouped by theme; recurring/met
 - [ ] B3. Remove pitch-count increment from wild pitch / passed ball / etc. (and don't show "pitch +1"
       on every feed update for those).
 - [ ] B4. Strikeouts need a looking vs swinging option.
-- [ ] B5. RBI feed detail, e.g. "Double — Caden Schaefer; Jones scores from 3rd."
+- [x] B5. RBI feed detail (v197): hit feed lines now name the scorers, e.g. "DOUBLE — Caden Schaefer;
+      Jones scores from 3rd, Smith scores from 2nd · 2 RBI" (built from the play movers). Covers B2 runs.
 - [x] B6. Caught-stealing HOW (v196): the base-running sheet already had separate actions; relabeled to
       "Caught steal" (catcher threw out) vs "Picked off" so the two methods are clear in the feed.
 - [x] B7. End-of-inning notification in the feed (v193): doFlip adds a centered divider line
@@ -61,7 +62,10 @@ Status: [ ] todo · [~] in progress · [x] done. Grouped by theme; recurring/met
       (games log, derived W-L-T record, season batting rollup) verified end-to-end.
 
 ## E. Pitch count
-- [ ] E1. Track the OPPONENT pitch count too, and expose it in the editor.
+- [x] E1. Already supported: recordPitch->countPitch increments the opponent pitcher (oppP) on every
+      pitch while we bat; field pitch-chip + box score show it; the correction editor pitch row targets
+      the opponent pitcher ("OPP pitcher") when batting. Verify on device.
+
 
 ## F. Streaming / connectivity
 - [~] F1. IP changed → Mevo couldn't reach the app. Root cause: the RTMP address shown to the camera
@@ -83,7 +87,9 @@ Status: [ ] todo · [~] in progress · [x] done. Grouped by theme; recurring/met
 
 ## G. Small / polish
 - [x] G1. Short, light haptic vibrate on pitch-button input (v189).
-- [ ] G2. Changing rules mid-game must apply immediately mid-game.
+- [x] G2. Already supported: in-game Setup (settingsMode) edits G.runCap/innings/mercy/pitchMax (and
+      league presets via ngLeague) directly with a re-render, so changes apply to the live game at once;
+      Done (settingsdone) persists via broadcast and returns to play without resetting. Verify on device.
 
 ---
 Done earlier this session: edit/correction ghost-click fix (v185), grid-button sweep (v184),
