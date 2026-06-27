@@ -70,8 +70,10 @@ Status: [ ] todo · [~] in progress · [x] done. Grouped by theme; recurring/met
       + pins YouTube API calls to cellular when the active net has no internet; new no-internet warning
       banner in the stream overlay. User also enabled "Mobile data always active" (system fallback).
       Google sign-in runs in Play Services (separate process) so it relies on the system fallback, not
-      app binding. On-device verify owed: install, confirm NetworkRouter starts + Go Live over cellular
-      while on the Mevo Wi-Fi. NOTE: the tablet's USB connection has been dropping repeatedly today.
+      app binding. INSTALLED + on-device verified 2026-06-27: NetworkRouter starts, requestNetwork
+      (cellular) + registerDefaultNetworkCallback fire, "cellular available" logged, no crash; warning
+      correctly hidden on validated cellular. FIELD test owed: on the Mevo Wi-Fi confirm the warning
+      shows + Go Live succeeds over cellular. NOTE: tablet USB dropped repeatedly today (check cable).
 
 ## G. Small / polish
 - [x] G1. Short, light haptic vibrate on pitch-button input (v189).
