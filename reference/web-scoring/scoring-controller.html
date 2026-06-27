@@ -1232,6 +1232,8 @@ function correctModal(){
         ${step("balls","Balls",G.balls)}
         ${step("strikes","Strikes",G.strikes)}
         ${step("outs","Outs",G.outs)}
+        <div style="font-size:10px;font-weight:800;letter-spacing:1px;color:${T.sageDim};margin:6px 2px 0">BATTER &mdash; SKIP / GO BACK</div>
+        ${step("batter","At-bat spot",battingSlot()+1,(()=>{const b=batter();return (b.ours?(b.name||("#"+b.num)):("#"+(b.num||"?")))+" is up";})())}
         <div style="font-size:10px;font-weight:800;letter-spacing:1px;color:${T.sageDim};margin:6px 2px 0">SCORE</div>
         ${step("away",(TEAMS.away.short||"Away")+" runs",G.away,"this inning &amp; total")}
         ${step("home",(TEAMS.home.short||"Home")+" runs",G.home,"this inning &amp; total")}
@@ -4080,6 +4082,7 @@ document.getElementById("app").addEventListener("click",e=>{
     else if(f==="half") G.half=(G.half==="T"?"B":"T");
     else if(f==="away"||f==="home"){ G[f]=Math.max(0,(G[f]||0)+d); if(!G.line)G.line={away:[],home:[]}; if(!G.line[f])G.line[f]=[]; G.line[f][G.inning]=Math.max(0,(G.line[f][G.inning]||0)+d); }
     else if(f==="pitch"){ if(!G.pitches)G.pitches={}; const k=currentPitcherKey(); G.pitches[k]=Math.max(0,(G.pitches[k]||0)+d); G.halfPitches=Math.max(0,(G.halfPitches||0)+d); }
+    else if(f==="batter"){ const k=G.half==="T"?"awayPtr":"homePtr"; G[k]=Math.max(0,(G[k]||0)+d); G.balls=0; G.strikes=0; G.ab={pitches:[],loc:null}; }   // skip / go back a batter (C3) — fresh count
     render(); broadcast(); return; }
   if(act==="brsteal"){ brSteal(+arg); return; }
   if(act==="bradv"){ brAdvance(+arg); return; }
@@ -4797,7 +4800,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v204";
+var APP_VERSION="v205";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;

@@ -51,7 +51,8 @@ Status: [ ] todo · [~] in progress · [x] done. Grouped by theme; recurring/met
       Field map = a diamond with all 9 spots; tap a position, tap a player, and assignPos does a clean
       2-player swap (displaced player takes the picked players old spot) — all visible at once, no
       cascade. Verified the swap touches only the two involved. (Drag-drop could come later; tap works.)
-- [ ] C3. Skip a batter in the batting order.
+- [x] C3. Skip a batter (v205): the correction sheet (Edit pencil) has a BATTER stepper — skip to the
+      next spot in the order or go back, resetting the count/at-bat. Verified +1/-1 move the order spot.
 - [x] C4. Current batter highlighted on the in-game lineup edit (v199): our up-batter slot gets a lime
       border + tint + an "AT BAT" badge, so the row most likely to need editing is easy to find.
 - [ ] C5. Record lineup changes throughout the game for the historical record.
