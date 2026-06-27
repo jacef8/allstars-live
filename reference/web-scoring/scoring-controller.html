@@ -683,7 +683,7 @@ const initGame=()=>({inning:1,half:"T",away:0,home:0,outs:0,balls:0,strikes:0,
   bases:{1:null,2:null,3:null},awayPtr:0,homePtr:0,
   ourSide:"home",
   innings:6,       // regulation innings (from game setup) — drives the viewer line-score width
-  runCap:5,        // runs allowed per half-inning (tournament rule); 0 = no cap
+  runCap:0,        // runs allowed per half-inning; 0 = NO CAP (default). A league preset can set one.
   league:"custom", // selected league preset (drives default rules + the rule-alert popups)
   mercy:null,      // {r15:innings,r10:innings} run-rule thresholds from the league; null = off
   pitchMax:0,      // per-pitcher daily pitch limit from the league; 0 = no pitch-limit alert
@@ -831,7 +831,7 @@ function fieldMapHtml(){
     panel=`<div style="flex:none;font-size:12.5px;color:${T.sageDim};text-align:center;padding:6px 8px;border:1px dashed ${T.line};border-radius:9px">Tap a position, then tap a player to put him there. If that spot's taken, you'll choose where the bumped player goes.</div>`;
   }
   return `<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px">
-      <div style="position:relative;width:100%;aspect-ratio:300/280;min-height:260px;max-height:46vh;margin:0 auto;border:2px solid ${T.line};border-radius:10px;overflow:hidden;flex:none">${diamond}${POSLIST.map(spot).join("")}</div>
+      <div style="position:relative;width:100%;max-width:400px;margin:0 auto;flex:none"><div style="position:relative;width:100%;height:0;padding-bottom:93.33%;border:2px solid ${T.line};border-radius:10px;overflow:hidden">${diamond}${POSLIST.map(spot).join("")}</div></div>
       ${panel}</div>`;
 }
 /* Opponent field map (parity with our field map): tap a position, tap a hitter to place him there.
@@ -863,7 +863,7 @@ function oppFieldMapHtml(){
     panel=`<div style="flex:none;font-size:12.5px;color:${T.sageDim};text-align:center;padding:6px 8px;border:1px dashed ${T.line};border-radius:9px">Tap a position, then tap a hitter to put him there. Positions swap cleanly.</div>`;
   }
   return `<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px">
-      <div style="position:relative;width:100%;aspect-ratio:300/280;min-height:260px;max-height:46vh;margin:0 auto;border:2px solid ${T.line};border-radius:10px;overflow:hidden;flex:none">${diamond}${POSLIST.map(spot).join("")}</div>
+      <div style="position:relative;width:100%;max-width:400px;margin:0 auto;flex:none"><div style="position:relative;width:100%;height:0;padding-bottom:93.33%;border:2px solid ${T.line};border-radius:10px;overflow:hidden">${diamond}${POSLIST.map(spot).join("")}</div></div>
       ${panel}</div>`;
 }
 /* ---- continuous batting order: 9 fielders + extra hitters (bat only), up to 12 ---- */
@@ -958,7 +958,7 @@ window.ngOppBatters=function(v){const n=parseInt(v,10); G.oppBatters=(isNaN(n)||
 
 /* ===== League presets (Diamond Youth Baseball 2026 + custom) — set default rules & alerts ===== */
 const LEAGUES=[
-  {id:"custom",  name:"Custom (set manually)", innings:6, runCap:5, mercy:null,          pitch:0,  note:"Set every rule yourself."},
+  {id:"custom",  name:"Custom (set manually)", innings:6, runCap:0, mercy:null,          pitch:0,  note:"Set every rule yourself · no run cap unless you set one."},
   {id:"dyb-tb",  name:"DYB Tee Ball",          innings:4, runCap:5, mercy:null,          pitch:0,  note:"Tee/coach pitch · no pitch limits."},
   {id:"dyb-cp",  name:"DYB 6U/8U Coach Pitch", innings:6, runCap:5, mercy:{r15:3,r10:4}, pitch:0,  note:"Coaches pitch · 15-run after 3, 10-run after 4 innings."},
   {id:"dyb-a",   name:"DYB A / AA",            innings:6, runCap:7, mercy:{r15:3,r10:4}, pitch:75, note:"6 inn · 15-after-3 / 10-after-4 · opt. 7 runs/half · 75 pitches/day (≤10U)."},
@@ -4482,7 +4482,7 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="confirm-no"){confirmAct=null;render();}
   else if(act==="confirm-yes"){const r=confirmAct&&confirmAct.run;confirmAct=null;if(r)r();else render();}
   else if(act==="newgame"){mode="newgame";render();}
-  else if(act==="gohome"){mode="home";render();}
+  else if(act==="gohome"){mode="home";teamTab="hub";render();}   // reset sub-tab so the next team opens clean
   else if(act==="opendebug"){mode="debug";render();}
   else if(act==="syncnow"){ try{ if(window.cloudSyncNow){ window.cloudSyncNow(); flash("Syncing…"); setTimeout(function(){ try{ render(); }catch(e){} },1200); } else flash("Sign in first"); }catch(e){} }
   else if(act==="opensettings"){mode="settings";render();}
@@ -4508,7 +4508,7 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="teamcolor"){const t=teamById(openTeamId);if(t){t.color=arg;saveDB();}render();}
   else if(act==="rmlogo"){const t=teamById(openTeamId);if(t){delete t.logo;saveDB();render();}}
   else if(act==="lineupcard"){const t=teamById(openTeamId);if(t){const lu=activeLineup(t);printLineupCard(t,lu?{lineup:lineupToIdx(t,lu)}:undefined);}}
-  else if(act==="newteam"){const t=newTeam("");openTeamId=t.id;teamTab="hub";mode="team";render();}
+  else if(act==="newteam"){const t=newTeam("");openTeamId=t.id;teamTab="hub";openTeamFrom=(mode==="home"?"home":"teams");mode="team";render();}   // remember where we came from so Back returns there
   else if(act==="teamsback"){mode="teams";render();}
   else if(act==="deleteteam"){ const delId=openTeamId; const td=teamById(delId); if(!td)return; confirmAct={title:"Delete "+(td.name||"team")+"?",msg:"This removes the roster and all season stats and can't be undone.",yes:"Delete",danger:true,run:function(){ try{ if(window.cloudDeleteTeam)cloudDeleteTeam(delId); }catch(e){} DB.teams=DB.teams.filter(t=>t.id!==delId); if(curTeamId===delId)curTeamId=null; openTeamId=null; teamTab="hub"; saveDB(); mode="teams"; render(); }}; render(); }
   else if(act==="shareapp"){ openShareLink({ url:appDownloadUrl(), title:"SHARE ALL-STARS LIVE",
@@ -4969,7 +4969,7 @@ function applySetupParams(){
   ROSTER=genericRoster();
   G=initGame();
   G.ourSide=our;
-  G.runCap=clampInt(q.get("runcap"),0,30,5);
+  G.runCap=clampInt(q.get("runcap"),0,30,0);   // default NO cap unless the link/league sets one
   G.innings=clampInt(q.get("innings"),1,15,6);
   G.lineup.order=Array.from({length:batters},(_,i)=>i);            // our continuous batting order
   G.oppBatters=batters;
@@ -5024,7 +5024,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v214";
+var APP_VERSION="v215";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
