@@ -50,7 +50,7 @@
     /* Blue turf shows in the open areas; only a light scrim so it's clearly visible.
        Readability comes from the frosted "windows" below, not from darkening the turf.
        The native app overrides this to transparent (IS_APP) and paints the turf natively. */
-    background:linear-gradient(rgba(7,11,19,.12),rgba(7,11,19,.34)), url("bg-turf.jpg") center center / cover no-repeat #0B0E13;}
+    background:linear-gradient(rgba(7,11,19,.04),rgba(7,11,19,.18)), url("bg-turf.jpg") center center / cover no-repeat #0B0E13;}
   /* Frosted "windows": the inline solid card/panel surfaces become translucent with a blur
      INSIDE the window, so the text stays readable while the turf is blurred behind them and
      sharp everywhere outside. */
@@ -1411,6 +1411,7 @@ function broadcast(){
 }
 
 function pitch(type){
+  try{ if(navigator.vibrate) navigator.vibrate(12); }catch(e){}   // short, light haptic confirm on each pitch tap
   snapshot();const k0=battingKey(),b0=batter(),bn=b0.name,bnum=b0.num;_pitch=type;recordPitch(type);
   const pt=(advPitch&&pitchType)?" "+pitchType:"";   // pitch type tag (if advanced tracking on)
   if(type==="ball"){G.balls++;try{Snd.pip("ball");}catch(e){}feedPitch("Ball"+pt,"#"+bnum+" · "+G.balls+"-"+G.strikes);if(G.balls>=4){applyPlanInline("walk");flash("Walk");bcastEvent("walk","Ball four · "+bn,k0);}}
@@ -3653,6 +3654,25 @@ function setupBuilderDrag(){
 }
 /* Tablet-in-landscape = wide enough for a side panel instead of a bottom sheet. */
 function isWide(){return window.innerWidth>=760 && window.innerWidth>window.innerHeight;}
+
+/* ===== Scroll preservation — render() rebuilds #content, which would reset every inner scroll
+   container back to the top. We continuously remember the scrollTop of any id'd element (scroll
+   doesn't bubble, so capture phase), then restore those positions immediately after each rebuild.
+   This is why entering a value in the in-game lineup list no longer snaps the page to the top. ===== */
+window._scrollMemo = window._scrollMemo || {};
+document.addEventListener("scroll", function(e){ var t=e.target; if(t && t.nodeType===1 && t.id) window._scrollMemo[t.id]=t.scrollTop; }, true);
+/* Tap-to-replace: focusing a number/text box selects its contents so a new value can be typed
+   straight over the old one — no need to clear it first. (Defer the select so mobile Safari/Chrome
+   don't immediately collapse the selection on the same tap.) */
+document.addEventListener("focusin", function(e){
+  var el=e.target; if(!el || el.tagName!=="INPUT") return;
+  var ty=(el.type||"text").toLowerCase();
+  if(ty==="number"||ty==="text"||ty==="tel"||ty==="search"){ setTimeout(function(){ try{ el.select(); }catch(_){}}, 0); }
+});
+function restoreScroll(){ var m=window._scrollMemo||{}; for(var id in m){ if(m[id]>0){ var el=document.getElementById(id); if(el) el.scrollTop=m[id]; } } }
+/* Paint new HTML into #content and put the scroll positions back (no jump-to-top). */
+function paintContent(html){ var c=document.getElementById("content"); if(!c) return; c.innerHTML=html; restoreScroll(); }
+
 function render(){
   // Watch-link viewer, but no live game yet → show a friendly lobby instead of the Home screen
   // (a fan opening "Invite to watch" before first pitch shouldn't land on New Game / Manage Teams).
@@ -3704,7 +3724,7 @@ function render(){
     // transition reads as a jarring "flash" when you're just popping a quick chooser open.
     const stepModes=["pickplayer","pickpos","editplayer","opppickpos","opppickpitch","oppeditplayer"];
     const cls=`${(mode!==_lastMode&&!stepModes.includes(mode))?"screen-in ":""}${(scroll&&!building)?"page-zoom":""}`;
-    document.getElementById("content").innerHTML=`<div class="${cls}" style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px;${scroll?"overflow-y:auto;-webkit-overflow-scrolling:touch":""}">${actionArea()}</div>${confirmOverlay()}`;
+    paintContent(`<div class="${cls}" style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px;${scroll?"overflow-y:auto;-webkit-overflow-scrolling:touch":""}">${actionArea()}</div>${confirmOverlay()}`);
     _lastMode=mode; _lastSubTab=subTab;
     try{ const _sk=mode+"|"+subTab; if(scroll&&_scrollMem[_sk]!=null){ const c=document.querySelector("#content > div"); if(c)c.scrollTop=_scrollMem[_sk]; }
          if(mode==="lineup"&&_scrollMem["__lineup"]!=null){ const l=document.getElementById("lineup-list"); if(l)l.scrollTop=_scrollMem["__lineup"]; } }catch(e){}
@@ -3869,7 +3889,7 @@ function render(){
   // overlay holding the draggable/resizable AT BAT window (prototype panel).
   const floatToggleBtn = "";   // toggle moved into the toolbar (renderToolbar) so it can't cover scoring controls
   const floatLayer = floatActive ? `<div id="float-layer" style="position:fixed;inset:0;z-index:35;pointer-events:none">${floatWindow("score","Scoreboard",statusBar(),{x:20,y:8,w:360,h:130})}${floatWindow("batter","At Bat",batterCard(),{x:24,y:150,w:340,h:168})}</div>` : "";
-  document.getElementById("content").innerHTML=`
+  paintContent(`
     ${body}${confirmOverlay()}${alertOverlay()}
     ${reviewBatter?batterReviewModal():""}
     ${reviewInn?inningLogModal():""}
@@ -3877,7 +3897,7 @@ function render(){
     ${correctOpen?correctModal():""}
     ${(pickerModal&&wide)?`<div style="${sheetWrap}">
         <div id="action-area" style="${sheetCard};overflow-y:auto;-webkit-overflow-scrolling:touch;background:${T.surface};padding:16px;display:flex;flex-direction:column;gap:8px">${actionArea()}</div></div>`:""}
-    ${floatLayer}${floatToggleBtn}`;
+    ${floatLayer}${floatToggleBtn}`);
   try{ setupFloatWins(); }catch(e){}
   try{ setupLongPress(); }catch(e){}
   animateStatusBar();
@@ -4625,7 +4645,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v188";
+var APP_VERSION="v189";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
