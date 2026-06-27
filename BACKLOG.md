@@ -61,7 +61,9 @@ Status: [ ] todo · [~] in progress · [x] done. Grouped by theme; recurring/met
       next spot in the order or go back, resetting the count/at-bat. Verified +1/-1 move the order spot.
 - [x] C4. Current batter highlighted on the in-game lineup edit (v199): our up-batter slot gets a lime
       border + tint + an "AT BAT" badge, so the row most likely to need editing is easy to find.
-- [ ] C5. Record lineup changes throughout the game for the historical record.
+- [x] C5. Record lineup changes throughout the game (v211): logLineup() stamps every in-game position/
+      batting-order change with inning+half onto G.lineupLog (no-ops during pre-game setup); stored on the
+      finished game via liveGameBox; shown as a "LINEUP CHANGES" section in the Inning log modal.
 - [x] C6. Edit opponent roster from setup (v206): the New Game setup screen now has an "Edit <OPP>
       roster" button (both layouts) that opens the opponent roster/lineup editor and returns to setup on
       Back (luFromSetup flag). So you can enter their numbers/names before starting. Verified round-trip.
@@ -126,6 +128,16 @@ Status: [ ] todo · [~] in progress · [x] done. Grouped by theme; recurring/met
 - [x] G2. Already supported: in-game Setup (settingsMode) edits G.runCap/innings/mercy/pitchMax (and
       league presets via ngLeague) directly with a re-render, so changes apply to the live game at once;
       Done (settingsdone) persists via broadcast and returns to play without resetting. Verify on device.
+
+## I. Bug fixes (NEW 2026-06-27)
+- [x] I1. Team-chat Delete button did nothing on the tablet (v211). Root cause: the native app has NO
+      WebChromeClient, so Android WebView's window.confirm() returns false by default — the "Delete this
+      message for everyone?" gate always cancelled. Fix: WebView-safe two-tap inline confirm (Delete →
+      "Confirm delete?"), no confirm() dialog. Resets on chat close.
+- [x] I2. Delete-saved-lineup had the SAME broken confirm() (v211) → converted to the in-app confirmAct
+      modal (the pattern the rest of the app's deletes already use, which works on native).
+      NOTE: any other window.confirm() added later will silently fail on the tablet — use confirmAct or a
+      two-tap inline confirm, never confirm()/alert() for control flow on native.
 
 ---
 Done earlier this session: edit/correction ghost-click fix (v185), grid-button sweep (v184),
