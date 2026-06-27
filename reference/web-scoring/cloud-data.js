@@ -97,7 +97,15 @@
     if (!d || !u || !t || !t.id) return;
     if (t.ownerUid && t.ownerUid !== u && (t.scorers || []).indexOf(myEmail()) < 0 && (t.coOwners || []).indexOf(myEmail()) < 0) return; // not mine
     d.collection("teams").doc(t.id).set(teamDoc(t), { merge: true })
+      .then(function () { window._lastCloudPush = Date.now(); })
       .catch(function (e) { console.warn("cloudSaveTeam:", e.message); });
+  };
+
+  // Force an immediate push of every team I can write (bypasses the debounce) — wired to the
+  // "Sync now" button on the Diagnostics page.
+  window.cloudSyncNow = function () {
+    try { (DB.teams || []).forEach(window.cloudSaveTeam); } catch (e) {}
+    try { window.cloudRefreshFollowed(); } catch (e) {}
   };
 
   // ===== Per-user UI preferences (e.g. floating scorer-window layout) — synced so a user's setup
@@ -193,6 +201,7 @@
     }
     function sansTimestamp(o) { var x = Object.assign({}, o); delete x.updatedAt; return JSON.stringify(x); }
     function merge(docs) {
+      window._lastCloudPull = Date.now();
       var changed = false;
       var dead = deletedSet();
       docs.forEach(function (doc) {

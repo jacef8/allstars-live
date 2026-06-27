@@ -106,6 +106,16 @@
   .screen-in{animation:screenIn .28s var(--ease) both;}
   @keyframes screenIn{0%{opacity:0;transform:translateY(7px);}100%{opacity:1;transform:translateY(0);}}
 
+  /* "Look here" pulse — draw the eye to a panel we just scrolled to (e.g. the schedule edit form
+     after tapping Edit, which otherwise just quietly populates fields far down the page). */
+  .flash-attn{animation:flashAttn 1.5s var(--ease) 1;}
+  @keyframes flashAttn{
+    0%{box-shadow:0 0 0 0 rgba(225,29,46,0);}
+    12%{box-shadow:0 0 0 4px rgba(225,29,46,.95),0 0 26px 6px rgba(225,29,46,.55);transform:scale(1.012);}
+    40%{box-shadow:0 0 0 3px rgba(225,29,46,.55),0 0 18px 4px rgba(225,29,46,.3);transform:scale(1);}
+    70%{box-shadow:0 0 0 4px rgba(225,29,46,.9),0 0 24px 6px rgba(225,29,46,.5);}
+    100%{box-shadow:0 0 0 0 rgba(225,29,46,0);transform:scale(1);}}
+
   /* Branded splash / intro — fades out on load */
   #splash{position:fixed;inset:0;z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;
     background:linear-gradient(rgba(7,11,19,.20),rgba(7,11,19,.48)), url("bg-turf.jpg") center center / cover no-repeat #0B0E13;
@@ -280,7 +290,13 @@ function loadDB(){try{const r=localStorage.getItem(DB_KEY);if(r){const d=JSON.pa
 function saveDB(){
   // Stamp the team(s) being edited as freshly-changed so the cloud merge keeps OUR copy until it's
   // pushed (a stale inbound snapshot can't silently wipe a just-added schedule game any more).
-  try{ [typeof openTeamId!=="undefined"?openTeamId:null, typeof curTeamId!=="undefined"?curTeamId:null].forEach(function(id){ if(id){ var _t=(DB.teams||[]).find(function(x){return x.id===id;}); if(_t)_t.updatedAt=Date.now(); } }); }catch(e){}
+  // CRUCIAL: skip this while APPLYING an inbound cloud snapshot — otherwise saveDB would bump the
+  // just-merged team's updatedAt to our local "now", making our copy look newer than the cloud, so
+  // the next remote edit's `cTs > lTs` guard fails and we silently stop receiving that team's
+  // changes (the "edits on one device never reach the other while both have it open" bug).
+  if(!window._cloudApplying){
+    try{ [typeof openTeamId!=="undefined"?openTeamId:null, typeof curTeamId!=="undefined"?curTeamId:null].forEach(function(id){ if(id){ var _t=(DB.teams||[]).find(function(x){return x.id===id;}); if(_t)_t.updatedAt=Date.now(); } }); }catch(e){}
+  }
   try{localStorage.setItem(DB_KEY,JSON.stringify(DB));}catch(e){} try{ if(window.cloudPushSoon)window.cloudPushSoon(); }catch(e){}}
 // Persist the in-progress game (lineup, positions, score, everything in G) so it survives
 // reloads and app updates — the operator never re-enters a lineup. Teams/roster persist in
@@ -1168,6 +1184,18 @@ function setupLongPress(){
     el.addEventListener("pointerleave",cancel);
     el.addEventListener("pointercancel",cancel);
   });
+}
+
+/* Tapping "Edit" on a scheduled game used to just quietly fill the form fields far down the page —
+   people tapped it repeatedly thinking it was dead. Scroll the form into view and flash it so it's
+   obvious. Re-arming the class with a reflow restarts the pulse on every tap. */
+function flashSchedEdit(){
+  try{ requestAnimationFrame(function(){
+    var el=document.getElementById("schedEditCard"); if(!el) return;
+    try{ el.scrollIntoView({behavior:"smooth",block:"center"}); }catch(e){ try{ el.scrollIntoView(); }catch(_){} }
+    el.classList.remove("flash-attn"); void el.offsetWidth; el.classList.add("flash-attn");
+    setTimeout(function(){ try{ el.classList.remove("flash-attn"); }catch(e){} }, 1700);
+  }); }catch(e){}
 }
 
 /* ===== broadcast link — the controller is the single source of truth =====
@@ -2609,7 +2637,7 @@ function actionArea(){
     const dbOpps=(DB.teams||[]).filter(x=>x.id!==t.id);
     const recentOpps=getRecentOpps().filter(o=>o.name && !dbOpps.some(x=>x.name===o.name));   // saved-for-reuse opponent names
     const oppNewSel = !!(editing && eOpp && !dbOpps.some(x=>x.name===eOpp) && !recentOpps.some(o=>o.name===eOpp));
-    const scheduleEditCard=`<div class="frost-card" style="background:${T.surface};border:2px solid ${editing?T.lime:T.line};border-radius:14px;padding:16px 18px;display:flex;flex-direction:column;gap:11px">
+    const scheduleEditCard=`<div id="schedEditCard" class="frost-card" style="scroll-margin:80px;background:${T.surface};border:2px solid ${editing?T.lime:T.line};border-radius:14px;padding:16px 18px;display:flex;flex-direction:column;gap:11px">
         <div style="font-size:14px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime}">${editing?"Edit game or practice":"Add a game or practice"}</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           ${fld("Type",`<select id="schType" style="${cellL}"><option value="game"${editing&&editing.type!=="practice"?" selected":""}>Game</option><option value="practice"${editing&&editing.type==="practice"?" selected":""}>Practice</option></select>`)}
@@ -2634,7 +2662,10 @@ function actionArea(){
     const pastGamesCard=`<div class="frost-card" style="background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:16px 18px;display:flex;flex-direction:column;gap:9px">
         <div style="font-size:14px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime}">Past games &mdash; tap to see the score &amp; stats</div>
         ${pastRows||`<div style="font-size:12px;color:${T.sageDim}">No finished games yet — each game lands here once you end it.</div>`}</div>`;
-    const scheduleSection=scheduleViewCard+pastGamesCard+scheduleEditCard;
+    // While EDITING, lift the edit form up directly under the schedule list (right by the game you
+    // tapped) instead of leaving it below Past games — combined with the scroll+flash on `schededit`,
+    // it's obvious where the edit happens. When just adding, keep the form at the bottom.
+    const scheduleSection=editing?(scheduleViewCard+scheduleEditCard+pastGamesCard):(scheduleViewCard+pastGamesCard+scheduleEditCard);
     // Rulebook repository — pick the team's league (radio), view any rulebook, add your own.
     const rbSel=t.rulebookId||"dyb";
     const rbRow=(r)=>`<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1.5px solid ${T.line}">
@@ -2996,7 +3027,14 @@ function actionArea(){
       drow("Stream",phase==="LIVE"?("LIVE"+(yt?" · "+yt:"")):(phase==="STARTING"?"Going live…":"Offline"),phase==="LIVE"?true:(phase==="STARTING"?"warn":null)),
       drow("Live relay",hasRelay?(relayConn?"Connected":"Disconnected"):"Local only",hasRelay?relayConn:null,"Carries the live score to viewers"),
       drow("Cloud sync",(C&&C.enabled)?"Enabled":"Disabled",(C&&C.enabled)?true:null),
-      drow("Signed in",signedIn?((C.user.email||"yes").replace(/</g,"")):"No",signedIn?true:null),
+      drow("Signed in",signedIn?((C.user.email||"yes").replace(/</g,"")):"No",signedIn?true:null,signedIn?"BOTH devices must show THIS same email to sync":"Sign in on Home to sync across devices"),
+      (function(){ var myUid=C&&C.user&&C.user.uid; var ts=DB.teams||[];
+        var mine=ts.filter(function(t){return !t.ownerUid||t.ownerUid===myUid;}).length;
+        var other=ts.filter(function(t){return t.ownerUid&&myUid&&t.ownerUid!==myUid&&!(window.cloudIsScorer&&window.cloudIsScorer(t));}).length;
+        return drow("Teams",ts.length+" · "+mine+" yours"+(other?" · "+other+" other account":""),other?"warn":null,other?"Teams owned by another account won't sync here":"Synced across devices on the same account"); })(),
+      (function(){ var last=Math.max(window._lastCloudPush||0,window._lastCloudPull||0);
+        var v=last?(Math.max(0,Math.round((Date.now()-last)/1000))+"s ago"):(signedIn?"waiting…":"—");
+        return drow("Last sync",v,last?true:(signedIn?"warn":null),"Tap Sync now to push immediately"); })(),
       drow("Current game",gameActive?(((OUR.short||"US")+" vs "+(OPP.short||"OPP")).replace(/</g,"")):"None",null),
       drow("Screen",window.innerWidth+"×"+window.innerHeight+(isWide()?" · wide":" · phone"),null),
       drow("Browser",(navigator.userAgent||"").slice(0,58),null)
@@ -3030,6 +3068,7 @@ function actionArea(){
         ${flipBlock}
         ${tip}
         <div style="display:flex;gap:8px">
+          ${signedIn?`<button data-act="syncnow" style="${bigBtn(T.lime,'')};flex:1;display:flex;align-items:center;justify-content:center;gap:8px">${ICN.refresh} Sync now</button>`:""}
           <button data-act="opendebug" style="${ghost};flex:1;display:flex;align-items:center;justify-content:center;gap:8px">${ICN.refresh} Refresh</button>
           <button data-act="copydiag" style="${ghost};flex:1;display:flex;align-items:center;justify-content:center;gap:8px">${ICN.doc} Copy</button></div>
       </div>`;
@@ -3935,7 +3974,7 @@ document.getElementById("app").addEventListener("click",e=>{
   if(act==="ngdatetoggle"){ ngDateOpen=!ngDateOpen; if(ngDateOpen)ngDateYM=null; render(); return; }
   if(act==="ngmonth"){ if(!ngDateYM){const d=new Date();ngDateYM={y:d.getFullYear(),m:d.getMonth()};} let mm=ngDateYM.m+(+arg),yy=ngDateYM.y; while(mm<0){mm+=12;yy--;} while(mm>11){mm-=12;yy++;} ngDateYM={y:yy,m:mm}; render(); return; }
   if(act==="ngday"){ ngDateVal=arg; ngDateOpen=false; render(); return; }   // tap a day = selected, no OK step
-  if(act==="schededit"){ schedEditId=arg; ngDateVal=null; ngDateOpen=false; ngDateYM=null; render(); return; }
+  if(act==="schededit"){ schedEditId=arg; ngDateVal=null; ngDateOpen=false; ngDateYM=null; render(); flashSchedEdit(); return; }
   if(act==="schedcancel"){ schedEditId=null; ngDateVal=null; ngDateOpen=false; ngDateYM=null; render(); return; }
   if(act==="schedadd"){ const t=teamById(openTeamId); if(!t)return; const g=id=>{const e=document.getElementById(id);return e?(e.value||""):"";}; const date=g("schDate"); if(!date){flash("Pick a date");return;} ngDateVal=null;ngDateOpen=false;ngDateYM=null; const _sel=g("schOppSel"); const opp=(_sel==="__new__"?g("schOppNew"):_sel).trim(); if(!Array.isArray(t.schedule))t.schedule=[];
     const fields={type:g("schType")||"game",date:date,time:g("schTime"),opp:opp,loc:g("schLoc").trim(),notes:g("schNotes").trim()};
@@ -4114,6 +4153,7 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="newgame"){mode="newgame";render();}
   else if(act==="gohome"){mode="home";render();}
   else if(act==="opendebug"){mode="debug";render();}
+  else if(act==="syncnow"){ try{ if(window.cloudSyncNow){ window.cloudSyncNow(); flash("Syncing…"); setTimeout(function(){ try{ render(); }catch(e){} },1200); } else flash("Sign in first"); }catch(e){} }
   else if(act==="opensettings"){mode="settings";render();}
   else if(act==="copydiag"){ const u=window.__diagText||""; const done=()=>flash("Diagnostics copied"); if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(u).then(done).catch(done);}else{done();} }
   else if(act==="toggleteams"){teamsOpen=!teamsOpen;try{localStorage.setItem("al-teams-open",teamsOpen?"1":"0");}catch(e){}render();}
@@ -4587,7 +4627,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v186";
+var APP_VERSION="v187";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
