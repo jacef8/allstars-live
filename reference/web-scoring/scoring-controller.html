@@ -1382,6 +1382,7 @@ let _myClaimAt=0;                    // when I last claimed scoring (vs another 
 let _takeoverUnsub=null,_takeoverTeam=null;
 let _watchLiveUnsub=null;   // follower watching a live game from Home (read-only cloud subscription)
 let _liveGames={},_liveHomeSubs={};  // teamId → {summary,activeUid,activeName} for the Home "in progress" row
+let vtLive=null,_vtLiveUnsub=null;   // live-game summary for the public team being viewed (teamstats) — drives "Watch game in progress"
 function myCloudUid(){ return (window.Cloud&&window.Cloud.user&&window.Cloud.user.uid)||""; }
 function myCloudName(){ try{ return window.cloudMyName?window.cloudMyName():""; }catch(e){ return ""; } }
 // Watch our live doc so that if ANOTHER device takes over scoring, we relinquish and follow read-only.
@@ -1407,7 +1408,9 @@ function watchLiveTakeover(teamId){
 // "in progress" — scorers get "take over", followers get "watch live". Live game docs are publicly
 // readable (see firestore.rules), so a follower subscription is allowed.
 function setupLiveHomeWatch(){
-  if(!(window.Cloud&&window.Cloud.user&&window.cloudSubscribeGameDoc)) return;
+  // Live game docs are PUBLICLY readable (firestore.rules: games allow read:if true), so this works
+  // even with NO login — a signed-out user still sees "game in progress" for their followed teams.
+  if(!(window.Cloud&&window.Cloud.db&&window.cloudSubscribeGameDoc)) return;
   (DB.teams||[]).forEach(function(t){
     if(_liveHomeSubs[t.id]) return;
     _liveHomeSubs[t.id]=window.cloudSubscribeGameDoc(t.id+"-live",function(doc){
@@ -2833,7 +2836,7 @@ function actionArea(){
         <div style="font-size:12px;color:${T.sage};margin-top:-6px">Manage rosters &amp; season stats.</div>
         <div style="display:flex;flex-direction:column;gap:8px">${cards}</div>
         <button data-act="newteam" style="${bigBtn(OUR.color)}">${IC('<path d="M12 5v14M5 12h14"/>')} New team</button>
-        ${(window.Cloud&&window.Cloud.enabled&&window.Cloud.user)?`<button data-act="opendirectory" style="${ghost};display:flex;align-items:center;justify-content:center;gap:9px">${ICN.search} Browse public teams to follow</button>`:""}
+        ${(window.Cloud&&window.Cloud.enabled)?`<button data-act="opendirectory" style="${ghost};display:flex;align-items:center;justify-content:center;gap:9px">${ICN.search} Browse public teams to follow</button>`:""}
         <div style="display:flex;gap:8px"><button data-act="importteam" style="${ghost};flex:1">&#8682; Import team</button><button data-act="importgame" style="${ghost};flex:1">&#8682; Import game</button></div>
       </div>`;
   }
@@ -3261,7 +3264,12 @@ function actionArea(){
     const favBtn=alreadyFav
       ? `<button data-act="favpublicteam" style="${ghost};display:flex;align-items:center;justify-content:center;gap:9px;color:${T.amber}">${ICN.starFill} Following — tap to remove from my home</button>`
       : `<button data-act="favpublicteam" style="${bigBtn(T.lime,'')};display:flex;align-items:center;justify-content:center;gap:9px">${ICN.star} Follow this team — add to my home</button>`;
-    return step("Team stats","",`<div style="display:flex;flex-direction:column;gap:12px">${head}${favBtn}<div style="font-size:11px;color:${T.sageDim};text-align:center;margin-top:-4px">Following just keeps this team on your home to watch — it does NOT make you a member.</div>${roster}${statBlock}</div>`,"opendirectory");
+    // Watch their game live — NO login. Shows only when a game is actually in progress (vtLive set by the
+    // live-doc subscription started in viewteamstats). Live games are world-readable (firestore.rules).
+    const liveBtn=vtLive
+      ? `<button data-act="watchlive" data-arg="${vt.id}" style="${bigBtn(T.live,'')};display:flex;align-items:center;justify-content:center;gap:10px;font-size:18px"><span class="livedot" style="width:10px;height:10px;border-radius:50%;background:#fff;box-shadow:0 0 9px #fff;flex:none"></span>Watch game in progress &middot; ${(vtLive.a||"").replace(/</g,"")} ${vtLive.as||0}&#8209;${vtLive.hs||0} ${(vtLive.h||"").replace(/</g,"")}</button>`
+      : `<div style="font-size:12px;color:${T.sageDim};text-align:center;padding:11px;border:1px dashed ${T.line};border-radius:11px">No live game right now — this button lights up when they're playing.</div>`;
+    return step("Team stats","",`<div style="display:flex;flex-direction:column;gap:12px">${head}${liveBtn}${favBtn}<div style="font-size:11px;color:${T.sageDim};text-align:center;margin-top:-4px">Watch &amp; follow with no account — saved on this device. Following just keeps the team on your home.</div>${roster}${statBlock}</div>`,"opendirectory");
   }
   if(mode==="settings"){
     const C=window.Cloud, signedIn=!!(C&&C.enabled&&C.user);
@@ -4495,7 +4503,7 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="home"){ if(_watchLiveUnsub){ try{_watchLiveUnsub();}catch(e){} _watchLiveUnsub=null; gameActive=false; _remoteLive=false; G=initGame(); }   // leaving a watch session → drop the borrowed game
     mode="home";render();}
   else if(act==="watchlive"){ const teamId=arg;
-    if(!window.cloudSubscribeGameDoc){ flash("Sign in to watch the live game"); return; }
+    if(!(window.Cloud&&window.Cloud.db&&window.cloudSubscribeGameDoc)){ flash("Watching live needs an internet connection"); return; }   // NO login needed — live games are world-readable
     flash("Loading game…");
     amActiveScorer=false; viewMode="viewer";
     if(_watchLiveUnsub){ try{_watchLiveUnsub();}catch(e){} _watchLiveUnsub=null; }
@@ -4609,9 +4617,14 @@ document.getElementById("app").addEventListener("click",e=>{
     mode="pickteam";render();}
   else if(act==="oppcolor"){ OPP.color=arg; render(); broadcast(); }
   else if(act==="findteams"){ const e=document.getElementById("finderQ"); const q=e?(e.value||"").trim():""; window._finderQ=q; if(!window.cloudSearchTeams){flash("Search needs sign-in");return;} flash("Searching…"); window.cloudSearchTeams(q).then(function(res){ finderResults=res||[]; render(); }); }
-  else if(act==="opendirectory"){ if(!(window.Cloud&&window.Cloud.enabled&&window.Cloud.user)){flash("Sign in to browse teams");return;} mode="directory"; render(); }
-  else if(act==="dirsearch"){ const e=document.getElementById("dirQ"); const q=e?(e.value||"").trim():""; window._dirQ=q; if(!window.cloudSearchTeams){flash("Search needs sign-in");return;} flash("Searching…"); window.cloudSearchTeams(q).then(function(res){ dirResults=res||[]; render(); }); }
-  else if(act==="viewteamstats"){ if(!window.cloudGetTeam){flash("Sign in to view");return;} flash("Loading…"); window.cloudGetTeam(arg).then(function(t){ viewTeam=t; mode="teamstats"; render(); }); }
+  else if(act==="opendirectory"){ if(!(window.Cloud&&window.Cloud.db)){flash("Browsing public teams needs an internet connection");return;} if(_vtLiveUnsub){try{_vtLiveUnsub();}catch(e){}_vtLiveUnsub=null;} vtLive=null; mode="directory"; render(); }   // NO login needed — public teams are world-readable
+  else if(act==="dirsearch"){ const e=document.getElementById("dirQ"); const q=e?(e.value||"").trim():""; window._dirQ=q; if(!(window.Cloud&&window.Cloud.db&&window.cloudSearchTeams)){flash("Search needs an internet connection");return;} flash("Searching…"); window.cloudSearchTeams(q).then(function(res){ dirResults=res||[]; render(); }); }
+  else if(act==="viewteamstats"){ if(!(window.Cloud&&window.Cloud.db&&window.cloudGetTeam)){flash("Loading needs an internet connection");return;} flash("Loading…");
+    if(_vtLiveUnsub){try{_vtLiveUnsub();}catch(e){}_vtLiveUnsub=null;} vtLive=null;
+    window.cloudGetTeam(arg).then(function(t){ viewTeam=t; mode="teamstats"; render();
+      // Watch their live game with NO login — subscribe to the public live doc to know if one's on now.
+      try{ _vtLiveUnsub=window.cloudSubscribeGameDoc(arg+"-live",function(doc){ vtLive=(doc&&!doc.final&&doc.summary&&doc.activeUid)?doc.summary:null; if(mode==="teamstats")render(); }); }catch(e){}
+    }); }
   else if(act==="favpublicteam"){ if(!viewTeam)return; const ex=DB.teams.find(x=>x.id===viewTeam.id); if(ex){ DB.teams=DB.teams.filter(x=>x.id!==viewTeam.id); saveDB(); flash("Removed from your home"); } else { const copy=JSON.parse(JSON.stringify(viewTeam)); copy.fav=true; copy.external=true; if(!Array.isArray(copy.players))copy.players=[]; DB.teams.push(copy); saveDB(); flash("Added to your home — watch them from the Home screen"); } render(); }
   else if(act==="setpubopp"){ const r=finderResults&&finderResults[+arg]; if(r){ oppTeamId=r.id; OPP.name=r.name; OPP.short=r.short||(r.name||"OPP").slice(0,3).toUpperCase(); OPP.color=r.color; OPP.logo=r.logo||null; recordRecentOpp(OPP); } finderResults=null; mode="newgame"; render(); broadcast(); }
   else if(act==="setrecentopp"){ const o=getRecentOpps()[+arg]; if(o){ oppTeamId=null; OPP.name=o.name; OPP.short=o.short||(o.name||"OPP").slice(0,3).toUpperCase(); OPP.color=o.color||"#E11D2E"; recordRecentOpp(OPP); } mode="newgame"; render(); broadcast(); }
@@ -5110,7 +5123,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v223";
+var APP_VERSION="v224";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
