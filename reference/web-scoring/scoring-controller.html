@@ -3116,7 +3116,7 @@ function actionArea(){
     const hbAct=(act,icon,label,extra)=>`<button data-act="${act}" style="display:flex;flex-direction:row;align-items:center;justify-content:center;gap:10px;background:${T.surface};border:none;border-radius:0;padding:16px 10px;min-height:0;cursor:pointer;${extra||""}"><span style="font-size:22px;color:${T.lime};display:flex">${icon}</span><span style="font-weight:800;color:${T.ink};font-size:15px;text-align:center;line-height:1.15">${label}</span></button>`;
     return secWrap(`
         <div class="frost-card" style="display:flex;align-items:center;gap:10px;background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:12px 14px">
-          ${openTeamFrom==="home"?`<button data-act="gohome" style="${ghost};padding:9px 11px">&lsaquo; Home</button>`:`<button data-act="teamsback" style="${ghost};padding:9px 11px">&lsaquo; Teams</button>`}
+          <button data-act="teamsback" style="${ghost};padding:9px 11px">&lsaquo; Teams</button>${"" /* always walk up the same hierarchy: hub → Teams list → Home, no matter where the team was opened from (predictable Back) */}
           ${t.logo?`<img src="${t.logo}" alt="" style="width:44px;height:44px;flex:none;border-radius:9px;object-fit:contain;background:#fff;box-shadow:0 0 0 1px ${T.line}">`:""}
           <div style="flex:1;min-width:0;border-left:5px solid ${t.color};padding-left:10px">
             <div style="font-family:${MONO};font-size:22px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${(t.name||"Team").replace(/</g,"")}</div>
@@ -4811,7 +4811,7 @@ window.appBack=function(){
     if(mode==="lineup"){ mode=gameActive?"idle":"home"; render(); return true; }
     if(mode==="team"&&teamTab==="lineupedit"){ teamTab="roster"; render(); return true; }
     if(mode==="team"&&teamTab&&teamTab!=="hub"){ teamTab="hub"; render(); return true; }
-    if(mode==="team"){ mode=(openTeamFrom==="home"?"home":"teams"); render(); return true; }
+    if(mode==="team"){ mode="teams"; render(); return true; }   // hub → Teams list (then Teams → Home); predictable single hierarchy
     if(mode==="teamstats"){ mode="directory"; render(); return true; }   // public team view → back to search
     if(mode==="directory"){ mode="teams"; render(); return true; }       // browse teams → back to Teams
     if(mode==="debug"){ mode="settings"; render(); return true; }
@@ -5024,7 +5024,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v215";
+var APP_VERSION="v216";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
