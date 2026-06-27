@@ -2191,7 +2191,7 @@ function pitchBtn(act,label,icon,accent){
   return `<button data-act="${act}" style="background:${bg};border:none;border-radius:0;color:${txt};padding:11px 4px;display:flex;flex-direction:column;align-items:center;gap:5px;font-family:${SANS};font-size:12.5px;font-weight:800;line-height:1.05;text-align:center;letter-spacing:.2px">
     <span style="width:34px;height:34px;border-radius:50%;background:${circ};display:flex;align-items:center;justify-content:center;color:${ic}">${icon}</span>${label}</button>`;
 }
-function chip(c){const a=contact===c;return `<button data-act="contact" data-arg="${c}" style="background:${a?T.clay:T.surface};border:2px solid ${a?T.clay:T.line};color:${a?"#FFFFFF":T.chalk};border-radius:8px;padding:12px 6px;font-family:${MONO};font-size:14px;font-weight:800;letter-spacing:.5px;text-transform:uppercase">${c}</button>`;}
+function chip(c){const a=contact===c;return `<button data-act="contact" data-arg="${c}" style="background:${a?T.clay:T.surface};border:none;border-radius:0;color:${a?"#FFFFFF":T.chalk};padding:13px 6px;font-family:${MONO};font-size:14px;font-weight:800;letter-spacing:.5px;text-transform:uppercase">${c}</button>`;}
 
 /* Custom time picker — the native <input type=time> popup renders its OK/Cancel off-screen in
    this WebView, so use plain Hour:Min:AM/PM selects. Renders the 3 selects + a hidden input
@@ -2426,8 +2426,8 @@ function actionArea(){
     const shareIco=`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="${T.lime}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="19" r="2.6"/><path d="M8.3 10.8 15.7 6.4M8.3 13.2l7.4 4.4"/></svg>`;
     // Compact share row — share the live game (only while one's on) and share the app itself. Kept
     // small so they never push the team cards into a scroll.
-    const shareBtnHome = gameActive ? `<button data-act="share" style="flex:1;min-width:0;display:flex;align-items:center;justify-content:center;gap:7px;background:${T.surface};border:2px solid ${T.line};color:${T.chalk};border-radius:11px;padding:9px 12px;font-family:${SANS};font-weight:800;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${shareIco}Share game &middot; ${(OUR.short||"US")} vs ${(OPP.short||"OPP")}</button>` : "";
-    const shareAppBtn = `<button data-act="shareapp" style="flex:1;min-width:0;display:flex;align-items:center;justify-content:center;gap:7px;background:${T.surface2};border:2px solid ${T.line};color:${T.sage};border-radius:11px;padding:9px 12px;font-family:${SANS};font-weight:800;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${shareIco}Share All-Stars Live</button>`;
+    const shareBtnHome = gameActive ? `<button data-act="share" style="flex:1;min-width:0;display:flex;align-items:center;justify-content:center;gap:7px;background:${T.surface};border:none;color:${T.chalk};border-radius:0;padding:11px 12px;font-family:${SANS};font-weight:800;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${shareIco}Share game &middot; ${(OUR.short||"US")} vs ${(OPP.short||"OPP")}</button>` : "";
+    const shareAppBtn = `<button data-act="shareapp" style="flex:1;min-width:0;display:flex;align-items:center;justify-content:center;gap:7px;background:${T.surface2};border:none;color:${T.sage};border-radius:0;padding:11px 12px;font-family:${SANS};font-weight:800;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${shareIco}Share All-Stars Live</button>`;
     // Cloud sign-in bar — only appears once Firebase is configured (firebase-config.js apiKey).
     // Until then it's empty and the home looks/works exactly as the local-only version.
     const C=window.Cloud;
@@ -2499,11 +2499,11 @@ function actionArea(){
             ${liveRows?`<div style="flex:none;display:flex;flex-direction:column;gap:8px">${liveRows}</div>`:""}
             ${teamsArea}
             ${followingBlock?`<div style="flex:none">${followingBlock}</div>`:""}
-            <div style="flex:none;display:flex;flex-direction:column;gap:8px"><div style="display:flex;gap:8px">${shareBtnHome}${shareAppBtn}</div>${authBar}</div>
+            <div style="flex:none;display:flex;flex-direction:column;gap:8px"><div style="display:flex;gap:2px;background:${T.line};border:2px solid ${T.line};border-radius:11px;overflow:hidden">${shareBtnHome}${shareAppBtn}</div>${authBar}</div>
           </div>
         </div>`;
     }
-    return `<div style="position:relative;min-height:100%;display:flex;flex-direction:column;justify-content:safe center;gap:14px;padding:6px 0">${settingsGear}${hero}${resumeBtn}${liveRows}${newGameBtn}${showTeams?`<div style="flex:none">${teamsBlock}</div>`:""}${showTeams?manageBtn:""}${followingBlock}<div style="display:flex;gap:8px">${shareBtnHome}${shareAppBtn}</div>${authBar}</div>`;
+    return `<div style="position:relative;min-height:100%;display:flex;flex-direction:column;justify-content:safe center;gap:14px;padding:6px 0">${settingsGear}${hero}${resumeBtn}${liveRows}${newGameBtn}${showTeams?`<div style="flex:none">${teamsBlock}</div>`:""}${showTeams?manageBtn:""}${followingBlock}<div style="display:flex;gap:2px;background:${T.line};border:2px solid ${T.line};border-radius:11px;overflow:hidden">${shareBtnHome}${shareAppBtn}</div>${authBar}</div>`;
   }
   if(mode==="teams"){
     const sorted=DB.teams.slice().sort((a,b)=>(b.fav?1:0)-(a.fav?1:0));
@@ -2598,10 +2598,10 @@ function actionArea(){
     const fLbl=`font-size:12px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:${T.sageDim};margin:0 2px 5px`;
     const cellL=cell+";font-size:17px;padding:12px 12px";   // larger inputs for the schedule form
     const fld=(lbl,inner)=>`<div style="flex:1;min-width:150px;display:flex;flex-direction:column">${lbl?`<div style="${fLbl}">${lbl}</div>`:""}${inner}</div>`;
-    const svBtn=(v,lbl)=>`<button data-act="schview" data-arg="${v}" style="flex:1;background:${scheduleView===v?T.lime:T.surface2};color:${scheduleView===v?"#fff":T.sage};border:2px solid ${scheduleView===v?T.lime:T.line};border-radius:8px;padding:8px 0;font-weight:800;font-size:12px;letter-spacing:.4px">${lbl}</button>`;
+    const svBtn=(v,lbl)=>`<button data-act="schview" data-arg="${v}" style="flex:1;background:${scheduleView===v?T.lime:T.surface2};color:${scheduleView===v?"#fff":T.sage};border:none;border-radius:0;padding:9px 0;font-weight:800;font-size:12px;letter-spacing:.4px">${lbl}</button>`;
     const scheduleViewCard=`<div class="frost-card" style="background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:16px 18px;display:flex;flex-direction:column;gap:11px">
         <div style="font-size:14px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime}">Upcoming — games &amp; practices</div>
-        <div style="display:flex;gap:6px">${svBtn("list",IC('list',15)+" List")}${svBtn("calendar",IC('grid',15)+" Calendar")}</div>
+        <div style="display:flex;gap:2px;background:${T.line};border:2px solid ${T.line};border-radius:8px;overflow:hidden">${svBtn("list",IC('list',15)+" List")}${svBtn("calendar",IC('grid',15)+" Calendar")}</div>
         ${scheduleView==="calendar" ? calendarHtml(t) : (schedRows||`<div style="font-size:12px;color:${T.sageDim}">Nothing scheduled yet.</div>`)}</div>`;
     const editing = schedEditId ? (t.schedule||[]).find(s=>s.id===schedEditId) : null;
     const eq=v=>(v||"").replace(/"/g,"&quot;");
@@ -3081,7 +3081,7 @@ function actionArea(){
     const lbl=`font-size:13px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin:0 2px 8px`;
     const inpSm=`width:98px;flex:none;background:${T.surface2};border:2px solid ${T.line};color:${T.ink};border-radius:10px;padding:14px 10px;font-family:${MONO};font-size:27px;font-weight:800;text-align:center;outline:none`;
     const rowCard=`display:flex;align-items:center;justify-content:space-between;gap:12px;background:${T.surface};border:2px solid ${T.line};border-radius:12px;padding:18px 20px;box-shadow:0 2px 6px rgba(15,30,60,.07)`;
-    const sideBtn=(s,lbl2)=>{const on=G.ourSide===s;return `<button data-act="ng-side" data-arg="${s}" style="flex:1;padding:18px;border-radius:11px;font-family:${MONO};font-weight:800;font-size:19px;text-transform:uppercase;letter-spacing:.5px;border:2px solid ${on?OUR.color:T.line};background:${on?OUR.color:T.surface};color:${on?"#FFFFFF":T.ink}">${lbl2}</button>`;};
+    const sideBtn=(s,lbl2)=>{const on=G.ourSide===s;return `<button data-act="ng-side" data-arg="${s}" style="flex:1;padding:18px;border:none;border-radius:0;font-family:${MONO};font-weight:800;font-size:19px;text-transform:uppercase;letter-spacing:.5px;background:${on?OUR.color:T.surface};color:${on?"#FFFFFF":T.ink}">${lbl2}</button>`;};
     const teamRow=(who,name,short,color,act)=>`<button data-act="${act}" class="frost-card" style="display:flex;align-items:center;gap:14px;background:rgba(13,19,32,.82);border:2px solid ${color};border-left:11px solid ${color};border-radius:12px;padding:14px 16px;width:100%;text-align:left">
         <span style="width:54px;height:54px;flex:none;border-radius:12px;background:${color};color:${idealText(color)};display:flex;align-items:center;justify-content:center;font-family:${MONO};font-weight:800;font-size:18px;letter-spacing:.5px;box-shadow:0 0 0 1px rgba(255,255,255,.2)">${((short||name||"?").slice(0,4)).toUpperCase()}</span>
         <div style="flex:1;min-width:0"><div style="${lbl};margin:0 0 4px">${who}</div><div style="font-family:${MONO};font-size:23px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${name}</div></div>
@@ -3101,7 +3101,7 @@ function actionArea(){
           <div style="flex:1;min-width:0;font-family:${MONO};font-size:23px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:${T.lime};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${setMode?"Game Settings":"New Game"}</div>${startTop}</div>`;
     const sideSel=`<div class="frost-card" style="background:${T.surface};border:2px solid ${T.line};border-radius:12px;padding:16px 20px;display:flex;flex-direction:column;gap:11px;box-shadow:0 2px 6px rgba(15,30,60,.07)">
           <div style="font-weight:800;color:${T.ink};font-size:19px">Is ${OUR.name} home or away?</div>
-          <div style="display:flex;gap:8px">${sideBtn("home","Home")}${sideBtn("away","Away")}</div></div>`;
+          <div style="display:flex;gap:2px;background:${T.line};border:2px solid ${T.line};border-radius:11px;overflow:hidden">${sideBtn("home","Home")}${sideBtn("away","Away")}</div></div>`;
     const selStyle=`background:${T.surface2};border:2px solid ${T.line};color:${T.ink};border-radius:10px;padding:13px 12px;font-family:${MONO};font-size:16px;font-weight:800;outline:none;max-width:190px`;
     const curL=leagueById(G.league);
     const leagueCard=`<div style="${rowCard};flex-wrap:wrap">
@@ -3383,9 +3383,9 @@ function actionArea(){
     return `${ptypeRow}
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:2px;background:${T.line};border:2px solid ${T.line};border-radius:12px;overflow:hidden">
         ${pitchBtn("ball","Ball",ICN.ball)}${pitchBtn("strike","Strike",ICN.strike)}${pitchBtn("foul","Foul",ICN.foul)}${pitchBtn("inplay","In Play",ICN.inplay,true)}</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        <button data-act="hbp" style="${flatBtn}"><span style="color:${T.sage}">${ICN.hbp}</span>HBP</button>
-        <button data-act="endinning" style="${flatBtn};flex-direction:column;gap:2px;border-left:4px solid ${T.amber}"><span style="display:flex;align-items:center;gap:6px"><span style="color:${T.amber}">${ICN.inning}</span>End Inning</span><span style="color:${T.sage};font-weight:600;font-size:11px;text-transform:none;letter-spacing:0">${halfLabel} · ${G.outs} out${G.outs===1?"":"s"}</span></button></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px;background:${T.line};border:2px solid ${T.line};border-radius:10px;overflow:hidden">
+        <button data-act="hbp" style="${flatBtn};border:none;border-radius:0"><span style="color:${T.sage}">${ICN.hbp}</span>HBP</button>
+        <button data-act="endinning" style="${flatBtn};border:none;border-radius:0;flex-direction:column;gap:2px"><span style="display:flex;align-items:center;gap:6px"><span style="color:${T.amber}">${ICN.inning}</span>End Inning</span><span style="color:${T.sage};font-weight:600;font-size:11px;text-transform:none;letter-spacing:0">${halfLabel} · ${G.outs} out${G.outs===1?"":"s"}</span></button></div>
       ${[1,2,3].some(b=>G.bases&&G.bases[b])?`<button data-act="brsheet" style="${flatBtn};border-left:4px solid ${T.safe}"><span style="color:${T.safe};font-size:16px;line-height:1">&#9826;</span>Base running <span style="color:${T.sage};font-weight:600;font-size:11px;text-transform:none;letter-spacing:0">steal · WP/PB · balk</span></button>`:""}`;
   }
   if(mode==="locate"){
@@ -3397,9 +3397,9 @@ function actionArea(){
   }
   if(mode==="contact"){
     return step(`Hit ${tap.zone} — what kind?`,`Fielder: ${fielderLabel(tap.pos)}. Re-tap the field to move it.`,
-      `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
-        ${["Grounder","Liner","Fly","Popup","Bunt"].map(chip).join("")}
-        <button data-act="cancel" style="${ghost};grid-column:1/-1">Cancel</button></div>`);
+      `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:2px;background:${T.line};border:2px solid ${T.line};border-radius:10px;overflow:hidden">
+        ${["Grounder","Liner","Fly","Popup","Bunt"].map(chip).join("")}<div style="background:${T.surface}"></div></div>
+        <button data-act="cancel" style="${ghost};width:100%;margin-top:8px">Cancel</button>`);
   }
   if(mode==="dppick"){
     const BN={1:"1st",2:"2nd",3:"3rd"};
@@ -3820,8 +3820,8 @@ function render(){
     const pane=phonePane==="video"
       ? `<div style="flex:1;min-height:0;display:flex;flex-direction:column;justify-content:center;gap:11px">${monitorPane()}</div>`
       : isView
-        ? (function(){var vp=viewerPhone;var vseg=(id,l)=>`<button data-act="viewerphone" data-arg="${id}" style="flex:1;background:${vp===id?T.lime:T.surface2};color:${vp===id?"#fff":T.sage};border:2px solid ${vp===id?T.lime:T.line};border-radius:9px;padding:8px;font-family:${MONO};font-weight:800;font-size:12.5px;letter-spacing:.4px;text-transform:uppercase">${l}</button>`;
-          return `<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px">${statusBar()}${batterCard()}<div style="display:flex;gap:8px;flex:none">${vseg("both","Both")}${vseg("field","Field")}${vseg("feed","Feed")}</div>${vp==="feed"?"":fieldEl}${vp==="field"?"":feedPanel()}</div>`;})()
+        ? (function(){var vp=viewerPhone;var vseg=(id,l)=>`<button data-act="viewerphone" data-arg="${id}" style="flex:1;background:${vp===id?T.lime:T.surface2};color:${vp===id?"#fff":T.sage};border:none;border-radius:0;padding:9px;font-family:${MONO};font-weight:800;font-size:12.5px;letter-spacing:.4px;text-transform:uppercase">${l}</button>`;
+          return `<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px">${statusBar()}${batterCard()}<div style="display:flex;gap:2px;flex:none;background:${T.line};border:2px solid ${T.line};border-radius:9px;overflow:hidden">${vseg("both","Both")}${vseg("field","Field")}${vseg("feed","Feed")}</div>${vp==="feed"?"":fieldEl}${vp==="field"?"":feedPanel()}</div>`;})()
         : `<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px">${(focusPlay||floatActive)?"":statusBar()}${floatActive?"":batterCard()}${focusPlay?fieldEl:pcLine+'<div style="flex:1;min-height:0"></div>'}${actionEl}${controls}</div>`;
     body=`<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:9px">
         ${focusPlay?"":`<div style="display:flex;gap:8px;flex:none">${tab("score",isView?ICN.inplay+" Field":ICN.dot+" Scoring")}${tab("video",ICN.play+" Video")}</div>`}
@@ -4584,7 +4584,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v182";
+var APP_VERSION="v183";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
