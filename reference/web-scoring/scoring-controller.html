@@ -29,7 +29,7 @@
     /* GroundLink-style dark theme: charcoal base, navy + lime-green accents. */
     --field:#10141A; --ink:#F2F5FA; --surface:#212A38; --surface2:#324056; --line:#FFFFFF;
     --clay:#E0974F; --chalk:#F2F5FA; --grass:#1F5C3A; --grassLt:#2C7D4E;
-    --safe:#2E6BE6; --out:#FF6B52; --sage:#FFFFFF; --sageDim:#DDE5F1; --amber:#F0B43E;
+    --safe:#2E6BE6; --out:#E11D2E; --sage:#FFFFFF; --sageDim:#DDE5F1; --amber:#F0B43E;
     --live:#FF3B5C; --navy:#1D3A66; --lime:#E11D2E;
     --mono:"Saira Condensed",system-ui,-apple-system,sans-serif;
     --sans:"Barlow",system-ui,-apple-system,sans-serif;
@@ -229,7 +229,7 @@
 ---------------------------------------------------------------------- */
 const T={field:"#10141A",ink:"#F2F5FA",surface:"#212A38",surface2:"#324056",line:"#FFFFFF",
   clay:"#E0974F",chalk:"#F2F5FA",grass:"#1F5C3A",grassLt:"#2C7D4E",safe:"#2E6BE6",
-  out:"#FF6B52",sage:"#FFFFFF",sageDim:"#DDE5F1",amber:"#F0B43E",live:"#FF3B5C",
+  out:"#E11D2E",sage:"#FFFFFF",sageDim:"#DDE5F1",amber:"#F0B43E",live:"#FF3B5C",
   navy:"#1D3A66",lime:"#E11D2E"};
 const FIELDLINE="#F4F8FC";  // white chalk for the field graphic (stays light on the green diamond)
 const MONO="'Saira Condensed',system-ui,-apple-system,sans-serif";  // condensed display — scoreboard numbers & headers
@@ -4584,7 +4584,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v181";
+var APP_VERSION="v182";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
