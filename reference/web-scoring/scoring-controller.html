@@ -706,7 +706,7 @@ const initGame=()=>({inning:1,half:"T",away:0,home:0,outs:0,balls:0,strikes:0,
   startedAt:null,  // wall-clock ms when the game ACTUALLY started (auto-set at first pitch / game start; editable in Game Setup) — drives the game timer
   lineup:{ order:[0,1,2,3,4,5,6,7,8],   // batting order: 9-12 entries (slots 10+ = extra hitters)
            pos:{P:0,C:1,"1B":2,"2B":3,"3B":4,SS:5,LF:6,CF:7,RF:8} }});
-let G=initGame(),hist=[],mode="home",tap=null,contact=null,result=null,plan=null,toast=null,toastTimer=null,curResults=[],showAll=false,showZones=false,editSlot=null,confirmAct=null,gameActive=false,lineupTab="us",newgameFrom="home",brSheet=false,correctOpen=false,correctOpenAt=0,lineupView="list",fieldAssign=null,fieldHold=null,fieldDisplaced=null,lineEditSlot=null,luFromSetup=false,koPick=null,oppFieldSel=null;
+let G=initGame(),hist=[],mode="home",tap=null,contact=null,result=null,plan=null,toast=null,toastTimer=null,curResults=[],showAll=false,showZones=false,editSlot=null,confirmAct=null,gameActive=false,lineupTab="us",newgameFrom="home",brSheet=false,correctOpen=false,correctOpenAt=0,lineupView="list",fieldAssign=null,fieldHold=null,fieldDisplaced=null,lineEditSlot=null,luFromSetup=false,koPick=null,oppFieldSel=null,gcArrange=false;
 // Resume the last in-progress game (saved by saveGame) across reloads/app updates, so the
 // lineup/score is never lost. Stays on the home screen → shows "Resume". Re-links ROSTER
 // to the saved team so the lineup's player indices resolve correctly.
@@ -1940,7 +1940,7 @@ function batterCard(){
       <div style="font-family:${MONO};font-size:18px;font-weight:800;color:${c};margin-top:7px">${abp}</div>
       <div style="font-size:9px;font-weight:800;letter-spacing:1.2px;color:${T.sageDim};margin-top:1px">${abp===1?"PITCH":"PITCHES"}</div>
     </div>
-    <div style="text-align:right;line-height:1.1;min-width:58px">
+    <div style="text-align:center;line-height:1.1;min-width:64px">
       <div style="font-family:${MONO};font-size:10px;font-weight:800;letter-spacing:1.5px;color:${c}">TODAY</div>
       <div style="font-family:${MONO};font-size:22px;font-weight:800;color:${T.chalk};line-height:1.05">${lp.line}</div>
       ${lp.extra?`<div style="font-size:10px;font-weight:600;color:${T.sage};white-space:nowrap">${lp.extra}</div>`:""}
@@ -2191,16 +2191,31 @@ function miniCount(){
 /* Slim score-only bar above the field (wide scorer). Just the numbers — big and spaced out.
    The current batter and the game controls live in the top toolbar, not here. */
 function scoreBar(){
-  const onb=[1,2,3].filter(n=>G.bases&&G.bases[n]).length;
-  const big=`font-weight:800;font-size:25px;color:${T.chalk};line-height:1`;
-  const lab=`font-size:11px;font-weight:700;letter-spacing:1.5px;color:${T.sageDim}`;
-  return `<div id="scorebar" data-longpress="correct" title="Tap the pencil (or hold) to correct the count / outs / score" style="display:flex;align-items:center;gap:24px;background:rgba(13,19,32,.82);border:2px solid ${T.line};border-radius:10px;padding:11px 20px;flex-shrink:0;font-family:${MONO};flex-wrap:wrap;position:relative;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none">
-    <span style="${big};letter-spacing:.5px">${TEAMS.away.short} ${G.away}<span style="color:${T.line};font-weight:600;margin:0 13px">·</span>${TEAMS.home.short} ${G.home}</span>
-    <span style="font-weight:800;font-size:23px;color:${T.sage};line-height:1">${G.half==="T"?"▲":"▼"}${G.inning}</span>
-    <span style="display:inline-flex;align-items:baseline;gap:8px"><b style="${big}">${G.balls}-${G.strikes}</b><span style="${lab}">COUNT</span></span>
-    <span style="display:inline-flex;align-items:baseline;gap:8px"><b style="${big}">${G.outs}</b><span style="${lab}">OUT${G.outs===1?"":"S"}</span></span>
-    ${onb?`<span style="font-weight:800;font-size:19px;color:${T.clay};line-height:1">${onb} ON</span>`:""}
-    <button data-act="correctopen" title="Correct the count, outs, score &amp; inning" style="margin-left:auto;flex:none;display:inline-flex;align-items:center;justify-content:center;gap:6px;background:${T.surface2};border:2px solid ${T.line};color:${T.lime};border-radius:8px;height:32px;padding:0 12px;font-family:${SANS};font-size:13px;font-weight:700;cursor:pointer"><span style="font-size:15px;line-height:1">&#9998;</span>Edit</button>
+  // Wide (tablet) scorer scoreboard — same labelled-grid look as the broadcast scorebug (statusBar),
+  // but full-width with flex:1 cells so the row fills evenly (no wasted gap) and the Edit button sits
+  // inline at the end. NOTE: deliberately NO sb-* element IDs here — statusBar (the monitor overlay)
+  // owns those animation hooks, and both can be on screen at once on the wide console (duplicate IDs
+  // would break the score-pop). This bar just reflects state; the broadcast bug is what animates.
+  const col=t=>TEAMS[t].color;
+  const teamRow=(t,val,act)=>`<div style="display:flex;align-items:center;gap:10px;height:42px;padding:0 14px;background:${act?col(t)+"2b":"transparent"};border-left:7px solid ${col(t)}">
+      ${TEAMS[t].logo?`<img src="${TEAMS[t].logo}" alt="" style="width:24px;height:24px;object-fit:contain;border-radius:5px;background:#fff;flex:none;${act?"":"opacity:.5"}">`:""}
+      <span style="font-family:${MONO};font-weight:800;font-size:19px;letter-spacing:.4px;color:${act?T.chalk:T.sage};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${TEAMS[t].short}</span>
+      ${act?`<span title="at bat" style="width:8px;height:8px;border-radius:50%;background:${col(t)};box-shadow:0 0 8px ${col(t)};flex:none"></span>`:""}
+      <span style="margin-left:auto;font-family:${MONO};font-weight:800;font-size:32px;line-height:1;color:${act?T.chalk:T.sage}">${val}</span></div>`;
+  const b=G.bases,base=(x,y,on)=>`<rect x="${x-7}" y="${y-7}" width="14" height="14" rx="2" transform="rotate(45 ${x} ${y})" fill="${on?T.clay:"none"}" stroke="${on?T.clay:T.sageDim}" stroke-width="2"/>`;
+  const diamond=`<svg width="48" height="42" viewBox="0 0 48 44" style="overflow:visible">${base(24,10,b[2])}${base(38,24,b[1])}${base(10,24,b[3])}</svg>`;
+  const pip=(on,c)=>`<span style="width:11px;height:11px;border-radius:50%;background:${on?c:"transparent"};border:2px solid ${on?c:T.sageDim};display:inline-block"></span>`;
+  const pipRow=(label,n,max,c)=>`<div style="display:flex;align-items:center;gap:5px">${label?`<span style="font-family:${MONO};font-size:12px;font-weight:800;color:${T.sageDim};width:11px">${label}</span>`:""}${Array.from({length:max},(_,i)=>pip(i<n,c)).join("")}</div>`;
+  const cell=(label,inner)=>`<div style="flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;padding:8px 6px;border-left:1.5px solid ${T.line}">
+      <div style="font-family:${MONO};font-size:9.5px;font-weight:800;letter-spacing:1.2px;color:${T.sageDim};white-space:nowrap">${label}</div>${inner}</div>`;
+  return `<div id="scorebar" data-longpress="correct" title="Tap the pencil (or hold) to correct the count / outs / score" style="display:flex;align-items:stretch;background:${T.surface};border:2px solid ${T.line};border-radius:12px;overflow:hidden;flex-shrink:0;box-shadow:0 2px 11px rgba(0,0,0,.4);user-select:none;-webkit-user-select:none;-webkit-touch-callout:none">
+    <div style="display:flex;flex-direction:column;justify-content:center;width:200px;flex:none">${teamRow("away",G.away,G.half==="T")}<div style="height:1.5px;background:${T.line}"></div>${teamRow("home",G.home,G.half==="B")}</div>
+    ${cell("INNING",`<div style="font-family:${MONO};font-size:26px;font-weight:800;color:${T.chalk};line-height:.95">${G.half==="T"?"▲":"▼"}${G.inning}</div>`)}
+    ${cell("COUNT",`<div style="display:flex;flex-direction:column;gap:5px">${pipRow("B",G.balls,3,T.amber)}${pipRow("S",G.strikes,2,T.out)}</div>`)}
+    ${cell("OUTS",pipRow("",G.outs,3,T.sage))}
+    ${cell("ON BASE",diamond)}
+    ${G.startedAt?cell("TIME",`<div style="font-family:${MONO};font-size:14px;font-weight:700;color:${T.sage};white-space:nowrap"><span class="game-clock">${gameClockStr()}</span></div>`):""}
+    <button data-act="correctopen" title="Correct the count, outs, score &amp; inning" style="flex:none;display:inline-flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;width:66px;border:none;border-left:1.5px solid ${T.line};background:${T.surface2};color:${T.lime};font-family:${SANS};font-size:12px;font-weight:800;cursor:pointer"><span style="font-size:18px;line-height:1">&#9998;</span>Edit</button>
   </div>`;
 }
 
@@ -4310,6 +4325,7 @@ document.getElementById("app").addEventListener("click",e=>{
   if(act==="swapviewer"){ viewerRight=viewerRight==="field"?"feed":"field"; try{localStorage.setItem("al-viewer-right",viewerRight);}catch(e){} render(); return; }
   if(act==="viewerphone"){ viewerPhone=(arg==="field"||arg==="feed")?arg:"both"; try{localStorage.setItem("al-viewer-phone",viewerPhone);}catch(e){} render(); return; }
   if(act==="soundtoggle"){ Snd.setOn(!Snd.isOn()); if(Snd.isOn())Snd.crack(); renderToolbar(); return; }
+  if(act==="gcarrange"){ gcArrange=!gcArrange; renderToolbar(); if(!gcArrange)flash("Toolbar order saved"); return; }
   if(act==="inviteadd"){ const e=document.getElementById("inviteWho"); if(!e)return; const v=(e.value||"").trim(); if(!v){flash("Enter an email or phone number");return;}
     const url=appBaseUrl()+"?invite="+encodeURIComponent(openTeamId); const t=teamById(openTeamId);
     const team=(t&&t.name)?t.name:"our team"; const isEmail=v.indexOf("@")>=0;
@@ -4554,6 +4570,34 @@ document.getElementById("app").addEventListener("click",e=>{
 });
 
 /* ===== top toolbar: game info chip · Share/QR · relay connection dot ===== */
+/* Top-bar game controls: the operator can drag to reorder them (D), persisted so EVERY future game
+   uses the same arrangement. Order lives in localStorage (applies to all games on this device). */
+const GC_DEFAULT=["lineup","inninglog","ingamesettings","home","endgame","undo"];
+function gcOrder(){ let saved=[]; try{ saved=JSON.parse(localStorage.getItem("al-gc-order")||"[]"); }catch(e){}
+  if(!Array.isArray(saved))saved=[];
+  const known=saved.filter(k=>GC_DEFAULT.includes(k));
+  return known.concat(GC_DEFAULT.filter(k=>!known.includes(k))); }   // keep saved order, append any new controls
+function saveGcOrder(arr){ try{ localStorage.setItem("al-gc-order",JSON.stringify(arr)); }catch(e){} }
+function setupGcDrag(){
+  const row=document.getElementById("gc-row"); if(!row)return;
+  row.querySelectorAll('[data-gc]').forEach(chip=>{
+    chip.addEventListener('pointerdown',e=>{
+      e.preventDefault();
+      chip.style.opacity='0.6'; document.body.style.userSelect='none';
+      const move=ev=>{
+        const chips=[...row.querySelectorAll('[data-gc]')];
+        for(const c of chips){ if(c===chip)continue; const b=c.getBoundingClientRect();
+          if(ev.clientX < b.left + b.width/2){ row.insertBefore(chip,c); return; } }
+        const toggle=row.querySelector('[data-act="gcarrange"]');
+        if(toggle)row.insertBefore(chip,toggle); else row.appendChild(chip);   // never past the Done toggle
+      };
+      const up=()=>{ window.removeEventListener('pointermove',move); window.removeEventListener('pointerup',up);
+        document.body.style.userSelect=''; chip.style.opacity='';
+        saveGcOrder([...row.querySelectorAll('[data-gc]')].map(c=>c.getAttribute('data-gc'))); };
+      window.addEventListener('pointermove',move); window.addEventListener('pointerup',up);
+    });
+  });
+}
 function renderToolbar(){
   const tb=document.getElementById("toolbar"); if(!tb)return;
   const inGame=!["home","teams","team","pickteam"].includes(mode);
@@ -4592,9 +4636,25 @@ function renderToolbar(){
   // Game controls (wide/tablet): ICON-ONLY so they're big, tappable, AND fit on ONE row (labels made
   // the row wrap to two — see allstars-recurring-ux-rules). Each keeps a tooltip + aria-label. Undo
   // stays labeled + accent-bordered (used most, far right). End game keeps its red danger styling.
-  const gcIcon=(act,title,icon,extra)=>`<button data-act="${act}" title="${title}" aria-label="${title}" style="background:${T.surface2};border:2px solid ${T.line};color:${T.chalk};border-radius:9px;width:44px;height:40px;flex:none;display:inline-flex;align-items:center;justify-content:center;${extra||""}">${icon}</button>`;
+  // Labelled controls (bigger than the old icon-only set so the top-bar space is used), rendered in the
+  // operator's saved order and reorderable in "arrange" mode (D). Each keeps its tooltip + aria-label.
+  const GEAR='<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>';
+  const gcDefs={
+    lineup:{t:"Lineup",i:IC('users',19)},
+    inninglog:{t:"Log",i:IC('doc',19)},
+    ingamesettings:{t:"Settings",i:IC(GEAR,18)},
+    home:{t:"Home",i:IC('home',19)},
+    endgame:{t:"End",i:IC('<rect x="6" y="6" width="12" height="12" rx="1.5"/>',17),ex:`color:${T.out};border-color:${T.out}`},
+    undo:{t:"Undo",i:IC('undo',18),ex:`border-color:${T.lime};font-weight:800`}
+  };
+  const grip=IC('<path d="M4 7h16M4 12h16M4 17h16"/>',15);
+  const gcBtn=k=>{ const d=gcDefs[k]; if(!d)return"";
+    const base=`display:inline-flex;align-items:center;gap:7px;background:${T.surface2};border-radius:10px;height:42px;padding:0 14px;font-family:${SANS};font-size:14px;font-weight:700;white-space:nowrap;flex:none;color:${T.chalk}`;
+    if(gcArrange) return `<div data-gc="${k}" style="${base};border:2px dashed ${T.lime};cursor:grab;touch-action:none;${d.ex||""}"><span style="color:${T.sageDim}">${grip}</span>${d.i}<span>${d.t}</span></div>`;
+    return `<button data-act="${k}" title="${d.t}" aria-label="${d.t}" style="${base};border:2px solid ${T.line};${d.ex||""}">${d.i}<span>${d.t}</span></button>`; };
+  const arrangeToggle=`<button data-act="gcarrange" title="${gcArrange?"Done — save this order":"Rearrange these buttons (saved for every game)"}" aria-label="Rearrange buttons" style="flex:none;display:inline-flex;align-items:center;justify-content:center;gap:6px;background:${gcArrange?T.lime:T.surface2};border:2px solid ${gcArrange?T.lime:T.line};color:${gcArrange?"#fff":T.sageDim};border-radius:10px;height:42px;padding:0 13px;font-family:${SANS};font-size:13px;font-weight:800">${gcArrange?"&#10003; Done":grip}</button>`;
   const gc=(isWide()&&mode==="idle"&&viewMode==="scorer")
-    ? `<div style="display:flex;gap:6px;flex:none;align-items:center;justify-content:flex-end;margin-left:auto">${gcIcon("lineup","Lineup",IC('users',20))}${gcIcon("inninglog","Inning log",IC('doc',20))}${gcIcon("ingamesettings","Settings",IC('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>',18))}${gcIcon("home","Home",IC('home',20))}${gcIcon("endgame","End game",IC('<rect x="6" y="6" width="12" height="12" rx="1.5"/>',18),`color:${T.out};border-color:${T.out}`)}<button data-act="undo" title="Undo last action" style="display:flex;align-items:center;gap:7px;background:${T.surface2};border:2px solid ${T.lime};color:${T.chalk};border-radius:9px;height:40px;padding:0 16px;font-family:${SANS};font-size:14px;font-weight:800;flex:none">${IC('undo',18)} Undo</button></div>`
+    ? `<div id="gc-row" style="display:flex;gap:7px;flex:none;align-items:center;justify-content:flex-end;margin-left:auto">${gcOrder().map(gcBtn).join("")}${arrangeToggle}</div>`
     : "";
   // Viewer (video on): the field/feed swap lives in the top bar, labeled with what you switch TO.
   const vsw=(isWide()&&viewMode==="viewer"&&monitorOn)
@@ -4632,6 +4692,7 @@ function renderToolbar(){
     ${vsw}
     ${gc}
   </div>`;
+  if(gcArrange) setupGcDrag();   // wire horizontal drag-reorder once the toolbar is in the DOM (D)
 }
 window.onLinkChange=renderToolbar;   // relay open/close → repaint the dot
 window.cloudMyName=function(){ const u=window.Cloud&&window.Cloud.user; if(!u)return ""; return u.displayName||(u.email||"").split("@")[0]||"Someone"; };
@@ -4963,7 +5024,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v213";
+var APP_VERSION="v214";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
