@@ -21,8 +21,10 @@ Status: [ ] todo · [~] in progress · [x] done. Grouped by theme; recurring/met
 - [ ] B1. Scorer scoreboard is too small, not grid-defined, no colors — hard to read what's what. Redesign.
 - [~] B2. Game feed: out-making plays now show "· N OUT(S)" (v195). Runs-scored on a play still TODO —
       folded into B5 (RBI detail) since both need run-attribution.
-- [ ] B3. Remove pitch-count increment from wild pitch / passed ball / etc. (and don't show "pitch +1"
-      on every feed update for those).
+- [~] B3. "Score doesnt need to be on every feed update" DONE (v198): per-pitch feed lines no longer
+      show the running score (only play lines do). The "remove pitch-count increment from wild pitch/
+      passed ball" part is NOT done — WP/PB is genuinely a pitch (ball/strike) so counting it is correct,
+      and the sheet flow already records it once; need to clarify the exact double-count scenario.
 - [ ] B4. Strikeouts need a looking vs swinging option.
 - [x] B5. RBI feed detail (v197): hit feed lines now name the scorers, e.g. "DOUBLE — Caden Schaefer;
       Jones scores from 3rd, Smith scores from 2nd · 2 RBI" (built from the play movers). Covers B2 runs.

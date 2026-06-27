@@ -2178,7 +2178,7 @@ function feedPanel(){
     return `<div style="display:flex;align-items:baseline;gap:12px;padding:${pit?"6px 15px":"11px 15px"};border-bottom:1.5px solid ${pit?";background:rgba(255,255,255,.02)":""}">
       <span style="font-family:${MONO};font-size:${pit?"13px":"15px"};font-weight:800;color:${pit?T.sageDim:T.lime};min-width:38px">${e.half==="T"?"▲":"▼"}${e.inn}</span>
       <span style="flex:1;min-width:0;color:${pit?T.sage:T.chalk};font-size:${pit?"14px":"17px"};font-weight:${pit?"600":"700"}">${e.head}${e.sub?` <span style="color:${T.sageDim};font-weight:600">— ${e.sub}</span>`:""}${(!pit&&OUT_KINDS.includes(e.kind)&&e.outs!=null)?` <span style="font-family:${MONO};font-size:12px;font-weight:800;color:${e.outs>=3?T.lime:T.sageDim};white-space:nowrap">&middot; ${e.outs} OUT${e.outs===1?"":"S"}</span>`:""}</span>
-      <span style="font-family:${MONO};font-size:${pit?"13px":"15px"};color:${T.sage};white-space:nowrap">${TEAMS.away.short} ${e.away}-${e.home} ${TEAMS.home.short}</span>
+      ${pit?"":`<span style="font-family:${MONO};font-size:15px;color:${T.sage};white-space:nowrap">${TEAMS.away.short} ${e.away}-${e.home} ${TEAMS.home.short}</span>`}
     </div>`;}).join("");
   const seg=(v,lbl)=>`<button data-act="feedview" data-arg="${v}" style="padding:5px 11px;border:none;font-family:${MONO};font-weight:800;font-size:11px;letter-spacing:.4px;cursor:pointer;background:${feedView===v?T.lime:"transparent"};color:${feedView===v?"#fff":T.sage}">${lbl}</button>`;
   return `<div style="flex:1;min-height:0;display:flex;flex-direction:column;background:${T.surface};border:2px solid ${T.line};border-radius:12px;overflow:hidden">
@@ -4705,7 +4705,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v197";
+var APP_VERSION="v198";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
