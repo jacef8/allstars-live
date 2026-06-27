@@ -1960,7 +1960,13 @@ function monitorPane(){
   const endBtn=`<button data-act="appstop" title="End broadcast" style="height:32px;border-radius:8px;background:#FF3B5C;border:1px solid #FF3B5C;color:#fff;display:flex;align-items:center;justify-content:center;padding:0 12px;font-family:${SANS};font-weight:800;font-size:12px;cursor:pointer">End</button>`;
   const muteBtn=`<button data-act="mutebcast" title="${bcastMuted?'Broadcast audio is OFF — tap to unmute':'Mute the broadcast audio'}" style="${monBtn};${bcastMuted?'background:#FF3B5C;border-color:#FF3B5C':''}">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4z"/>${bcastMuted?'<path d="M22 9l-6 6M16 9l6 6"/>':'<path d="M15.5 8.5a5 5 0 0 1 0 7"/>'}</svg></button>`;
+  const _audSrc=bcastMuted?"MUTED":(bcastCamAudio?"CAM":"MIC"), _audCol=bcastMuted?"#FF8F8F":(bcastCamAudio?"#8FE6A4":"#FFFFFF");
+  const _audIco=bcastCamAudio?`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>`:`<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3"/></svg>`;
+  // Audio-source badge on the live monitor: shows whether YouTube is getting the tablet MIC, the
+  // external CAMera's audio, or is MUTED — so the operator can see the source at a glance.
+  const audBadge=(IS_APP&&appLive())?`<div title="Broadcast audio: ${bcastMuted?'muted (silent)':(bcastCamAudio?'external camera':'tablet mic')}" style="height:32px;border-radius:8px;background:rgba(8,11,16,.6);border:1px solid rgba(255,255,255,.2);color:${_audCol};display:inline-flex;align-items:center;gap:5px;padding:0 10px;font-family:${MONO};font-weight:800;font-size:11px;letter-spacing:.5px">${_audIco} ${_audSrc}</div>`:"";
   const ctrls=`<div style="position:absolute;top:9px;right:10px;display:flex;gap:6px;z-index:3">
+      ${audBadge}
       ${IS_APP&&appLive()?muteBtn:""}
       ${IS_APP&&appLive()?endBtn:""}
       ${setGear}
@@ -2216,6 +2222,25 @@ function recordRecentLoc(loc){ loc=(loc||"").trim(); if(!loc)return; try{ let r=
 window._oppFilter=function(v){ v=(v||"").trim().toLowerCase(); try{ document.querySelectorAll('[data-tname]').forEach(function(el){ el.style.display=(!v||(el.getAttribute('data-tname')||'').indexOf(v)>=0)?"":"none"; }); }catch(e){} };
 /* Schedule month-calendar view (toggle with the list). calYM = {y,m} of the shown month. */
 let calYM=null, calSelDay=null, schedEditId=null, scheduleView=(()=>{try{return localStorage.getItem("al-sched-view")||"list";}catch(e){return "list";}})();
+// Custom tap-to-select date picker for the schedule "Add a game/practice" form (no native OK step).
+let ngDateOpen=false, ngDateYM=null, ngDateVal=null;
+function fmtDateNice(ds){ if(!ds)return ""; try{ return new Date(ds+"T00:00").toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric",year:"numeric"}); }catch(e){ return ds; } }
+// Full-width month grid; tapping a day selects it immediately (sets the hidden #schDate value).
+function schedCalGrid(val){
+  let ym=ngDateYM; if(!ym){ const d=val?new Date(val+"T00:00"):new Date(); ym={y:d.getFullYear(),m:d.getMonth()}; ngDateYM=ym; }
+  const y=ym.y,m=ym.m,startDow=new Date(y,m,1).getDay(),daysIn=new Date(y,m+1,0).getDate(),today=(()=>{const n=new Date(),p=x=>String(x).padStart(2,"0");return n.getFullYear()+"-"+p(n.getMonth()+1)+"-"+p(n.getDate());})();
+  const monLabel=new Date(y,m,1).toLocaleDateString(undefined,{month:"long",year:"numeric"});
+  const dow=["Su","Mo","Tu","We","Th","Fr","Sa"].map(d=>`<div style="text-align:center;font-size:11px;font-weight:800;color:${T.sageDim};padding-bottom:2px">${d}</div>`).join("");
+  let cells=""; for(let i=0;i<startDow;i++)cells+="<div></div>";
+  for(let dn=1;dn<=daysIn;dn++){ const ds=`${y}-${String(m+1).padStart(2,"0")}-${String(dn).padStart(2,"0")}`,sel=ds===val,isT=ds===today;
+    cells+=`<button data-act="ngday" data-arg="${ds}" style="min-height:42px;border:2px solid ${sel?T.lime:(isT?T.amber:T.line)};border-radius:8px;background:${sel?T.lime:T.surface2};color:${sel?"#fff":T.chalk};font-family:${MONO};font-weight:800;font-size:15px;cursor:pointer">${dn}</button>`; }
+  return `<div style="background:${T.surface};border:2px solid ${T.line};border-radius:12px;padding:10px 12px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <button data-act="ngmonth" data-arg="-1" style="${ghost};padding:7px 16px;font-size:18px">&lsaquo;</button>
+        <div style="font-family:${MONO};font-weight:800;font-size:16px;color:${T.chalk}">${monLabel}</div>
+        <button data-act="ngmonth" data-arg="1" style="${ghost};padding:7px 16px;font-size:18px">&rsaquo;</button></div>
+      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px">${dow}${cells}</div></div>`;
+}
 /* Public-team directory browser + read-only stats viewer (any team that opted public). */
 let dirResults=null, viewTeam=null;
 
@@ -2569,8 +2594,9 @@ function actionArea(){
         <div style="font-size:14px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime}">${editing?"Edit game or practice":"Add a game or practice"}</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           ${fld("Type",`<select id="schType" style="${cellL}"><option value="game"${editing&&editing.type!=="practice"?" selected":""}>Game</option><option value="practice"${editing&&editing.type==="practice"?" selected":""}>Practice</option></select>`)}
-          ${fld("Date",`<input id="schDate" type="date" value="${editing?eq(editing.date):(calSelDay||'')}" style="${cellL}">`)}
+          ${fld("Date",(()=>{const v=(ngDateVal!=null)?ngDateVal:(editing?(editing.date||""):(calSelDay||""));return `<input id="schDate" type="hidden" value="${v}"><button data-act="ngdatetoggle" style="${cellL};display:flex;align-items:center;justify-content:space-between;gap:8px;text-align:left;cursor:pointer"><span style="${v?'':`color:${T.sageDim}`}">${v?fmtDateNice(v):"Tap to pick a date"}</span><span style="color:${T.lime};display:flex;flex:none">${IC('<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',17)}</span></button>`;})())}
           ${fld("Time",timeSelects("schTime",editing?(editing.time||""):""))}</div>
+        ${ngDateOpen?schedCalGrid((ngDateVal!=null)?ngDateVal:(editing?(editing.date||""):(calSelDay||""))):""}
         ${fld("Opponent (games only)",`<select id="schOppSel" onchange="var n=document.getElementById('schOppNew');if(n)n.style.display=this.value==='__new__'?'block':'none'" style="${cellL}"><option value=""${!editing||!eOpp?" selected":""}>— pick an opponent —</option>${dbOpps.length?`<optgroup label="Your teams">${dbOpps.map(x=>`<option value="${eq(x.name)}"${eOpp&&eOpp===x.name?" selected":""}>${(x.name||'').replace(/</g,'')}</option>`).join("")}</optgroup>`:""}${recentOpps.length?`<optgroup label="Recent opponents">${recentOpps.map(o=>`<option value="${eq(o.name)}"${eOpp&&eOpp===o.name?" selected":""}>${(o.name||'').replace(/</g,'')}</option>`).join("")}</optgroup>`:""}<option value="__new__"${oppNewSel?" selected":""}>+ New opponent…</option></select><input id="schOppNew" placeholder="New opponent name" value="${oppNewSel?eq(eOpp):""}" style="${cellL};margin-top:6px;display:${oppNewSel?"block":"none"}">`)}
         ${fld("Location",`<input id="schLoc" list="schLocList" placeholder="e.g. City Park — Field 2" value="${editing?eq(editing.loc):""}" style="${cellL}"><datalist id="schLocList">${getRecentLocs().map(l=>`<option value="${eq(l)}"></option>`).join("")}</datalist>`)}
         ${fld("Notes (optional)",`<input id="schNotes" placeholder="e.g. arrive 45 min early, white jerseys" value="${editing?eq(editing.notes):""}" style="${cellL}">`)}
@@ -3884,9 +3910,12 @@ document.getElementById("app").addEventListener("click",e=>{
       else { oppTeamId=null; OPP.name=s.opp; OPP.short=(s.opp||"OPP").slice(0,3).toUpperCase(); OPP.color="#E2574C"; OPP.logo=null; }
       try{ recordRecentOpp(OPP); }catch(e){} }
     mode="newgame"; render(); broadcast(); return; }
-  if(act==="schededit"){ schedEditId=arg; render(); return; }
-  if(act==="schedcancel"){ schedEditId=null; render(); return; }
-  if(act==="schedadd"){ const t=teamById(openTeamId); if(!t)return; const g=id=>{const e=document.getElementById(id);return e?(e.value||""):"";}; const date=g("schDate"); if(!date){flash("Pick a date");return;} const _sel=g("schOppSel"); const opp=(_sel==="__new__"?g("schOppNew"):_sel).trim(); if(!Array.isArray(t.schedule))t.schedule=[];
+  if(act==="ngdatetoggle"){ ngDateOpen=!ngDateOpen; if(ngDateOpen)ngDateYM=null; render(); return; }
+  if(act==="ngmonth"){ if(!ngDateYM){const d=new Date();ngDateYM={y:d.getFullYear(),m:d.getMonth()};} let mm=ngDateYM.m+(+arg),yy=ngDateYM.y; while(mm<0){mm+=12;yy--;} while(mm>11){mm-=12;yy++;} ngDateYM={y:yy,m:mm}; render(); return; }
+  if(act==="ngday"){ ngDateVal=arg; ngDateOpen=false; render(); return; }   // tap a day = selected, no OK step
+  if(act==="schededit"){ schedEditId=arg; ngDateVal=null; ngDateOpen=false; ngDateYM=null; render(); return; }
+  if(act==="schedcancel"){ schedEditId=null; ngDateVal=null; ngDateOpen=false; ngDateYM=null; render(); return; }
+  if(act==="schedadd"){ const t=teamById(openTeamId); if(!t)return; const g=id=>{const e=document.getElementById(id);return e?(e.value||""):"";}; const date=g("schDate"); if(!date){flash("Pick a date");return;} ngDateVal=null;ngDateOpen=false;ngDateYM=null; const _sel=g("schOppSel"); const opp=(_sel==="__new__"?g("schOppNew"):_sel).trim(); if(!Array.isArray(t.schedule))t.schedule=[];
     const fields={type:g("schType")||"game",date:date,time:g("schTime"),opp:opp,loc:g("schLoc").trim(),notes:g("schNotes").trim()};
     if(opp)recordRecentOpp({name:opp}); if(fields.loc)recordRecentLoc(fields.loc);   // remember for next time
     if(schedEditId){ const ex=t.schedule.find(s=>s.id===schedEditId); if(ex)Object.assign(ex,fields); schedEditId=null; saveDB(); try{ if(window.cloudSaveTeam)window.cloudSaveTeam(t); }catch(e){} flash("Schedule updated"); render(); return; }
@@ -4536,7 +4565,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v174";
+var APP_VERSION="v175";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
