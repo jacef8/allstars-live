@@ -2724,7 +2724,7 @@ function actionArea(){
     // Owner-only discovery toggles (public team directory + public stats).
     const toggleRow=(act,on,label,sub)=>`<button data-act="${act}" style="display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;background:${T.surface};border:2px solid ${T.line};border-radius:10px;padding:12px 14px;text-align:left;cursor:pointer">
         <div style="flex:1;min-width:0"><div style="font-weight:800;color:${T.ink};font-size:14px">${label}</div><div style="font-size:11px;color:${T.sageDim};margin-top:2px;line-height:1.35">${sub}</div></div>
-        <span style="flex:none;width:46px;height:26px;border-radius:13px;background:${on?T.lime:T.line};position:relative;display:inline-block"><span style="position:absolute;top:3px;left:${on?"23px":"3px"};width:20px;height:20px;border-radius:50%;background:#fff"></span></span></button>`;
+        <span style="flex:none;width:46px;height:26px;border-radius:13px;background:${on?T.lime:"#0E1726"};border:1.5px solid ${on?T.lime:"#5A6B85"};position:relative;display:inline-block"><span style="position:absolute;top:2px;left:${on?"22px":"2px"};width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.5)"></span></span></button>`;
     const discoverySection = owner ? `<div style="display:flex;flex-direction:column;gap:10px">
         <div style="font-size:13.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime}">Discovery</div>
         ${toggleRow("togglepublic",!!t.public,"Public team","Anyone can search for this team by name and add it as an opponent in a new game.")}
@@ -4674,7 +4674,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v191";
+var APP_VERSION="v192";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
