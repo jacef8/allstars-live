@@ -149,7 +149,7 @@
 
 <!-- Share / QR modal: fans scan to open the live viewer -->
 <div id="qrmodal" style="display:none;position:fixed;inset:0;z-index:200;background:rgba(8,11,16,.84);align-items:center;justify-content:center;padding:20px">
-  <div style="max-width:330px;width:100%;background:#212A38;border:1px solid #4A5870;border-radius:18px;padding:20px;text-align:center;box-shadow:0 24px 60px rgba(0,0,0,.6)">
+  <div style="max-width:330px;width:100%;background:#212A38;border:2px solid #FFFFFF;border-radius:18px;padding:20px;text-align:center;box-shadow:0 24px 60px rgba(0,0,0,.6)">
     <div id="qrTitle" style="font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:20px;letter-spacing:.5px;color:#EAEDF2">SHARE THE GAME</div>
     <div id="qrSub" style="font-size:12px;color:#B7C2D6;margin:3px 0 12px">Nearby? Have them <b style="color:#E11D2E">scan</b>. Far away? Send the link.</div>
     <div id="shareToggle"></div>
@@ -169,7 +169,7 @@
 
 <!-- Connect-stream modal: point the monitor at a YouTube Live stream -->
 <div id="ytmodal" style="display:none;position:fixed;inset:0;z-index:200;background:rgba(8,11,16,.84);align-items:center;justify-content:center;padding:20px">
-  <div style="max-width:390px;width:100%;background:#212A38;border:1px solid #4A5870;border-radius:18px;padding:20px;box-shadow:0 24px 60px rgba(0,0,0,.6)">
+  <div style="max-width:390px;width:100%;background:#212A38;border:2px solid #FFFFFF;border-radius:18px;padding:20px;box-shadow:0 24px 60px rgba(0,0,0,.6)">
     <div style="display:flex;align-items:center;gap:9px">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="#FF0000"><path d="M23 7.5a3 3 0 0 0-2.1-2.1C19 5 12 5 12 5s-7 0-8.9.4A3 3 0 0 0 1 7.5 31 31 0 0 0 .6 12 31 31 0 0 0 1 16.5a3 3 0 0 0 2.1 2.1C5 19 12 19 12 19s7 0 8.9-.4a3 3 0 0 0 2.1-2.1A31 31 0 0 0 23.4 12 31 31 0 0 0 23 7.5z"/><path d="M9.8 15.3V8.7l5.7 3.3z" fill="#212A38"/></svg>
       <div style="font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:20px;letter-spacing:.5px;color:#EAEDF2">CONNECT YOUR STREAM</div>
@@ -189,7 +189,7 @@
 
 <!-- Searchable rulebook: load the league rules text on demand; filter/highlight for disputes. -->
 <div id="rulesmodal" style="display:none;position:fixed;left:0;right:0;top:0;height:calc(var(--avh) * 100);z-index:200;background:rgba(8,11,16,.84);align-items:center;justify-content:center;padding:14px">
-  <div style="max-width:680px;width:100%;height:min(calc(var(--avh) * 90),820px);display:flex;flex-direction:column;background:#0E1420;border:1px solid #2A3650;border-radius:18px;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,.6)">
+  <div style="max-width:680px;width:100%;height:min(calc(var(--avh) * 90),820px);display:flex;flex-direction:column;background:#0E1420;border:2px solid #FFFFFF;border-radius:18px;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,.6)">
     <div style="display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid #2A3650;flex:none">
       <div id="rulesTitle" style="font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:19px;letter-spacing:.5px;color:#EAEDF2;flex:1"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none;vertical-align:middle"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg> Rulebook</div>
       <button data-act="closerules" style="background:#1A2233;border:1px solid #2A3650;color:#B7C2D6;border-radius:8px;padding:7px 11px;font-weight:700;font-size:13px;cursor:pointer">&times;</button>
@@ -204,7 +204,7 @@
 
 <!-- Team chat: real-time messages for owner/scorers/followers (parents). DORMANT until cloud is on. -->
 <div id="chatmodal" style="display:none;position:fixed;left:0;right:0;top:0;height:calc(var(--avh) * 100);z-index:200;background:rgba(8,11,16,.84);align-items:center;justify-content:center;padding:14px">
-  <div style="max-width:460px;width:100%;height:min(calc(var(--avh) * 82),660px);display:flex;flex-direction:column;background:#0E1420;border:1px solid #2A3650;border-radius:18px;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,.6)">
+  <div style="max-width:460px;width:100%;height:min(calc(var(--avh) * 82),660px);display:flex;flex-direction:column;background:#0E1420;border:2px solid #FFFFFF;border-radius:18px;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,.6)">
     <div style="display:flex;align-items:center;gap:8px;padding:13px 15px;border-bottom:1px solid #2A3650;flex:none">
       <div id="chatTitle" style="font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:19px;letter-spacing:.5px;color:#EAEDF2;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Team chat</div>
       <button data-act="closechat" aria-label="Close chat" style="flex:none;background:#1A2233;border:1px solid #2A3650;color:#EAEDF2;border-radius:10px;width:40px;height:40px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:26px;line-height:1;cursor:pointer">&times;</button>
@@ -1099,7 +1099,7 @@ function baseRunModal(){
         </div></div>`;}).join("");
   const gbtn=(act,lbl)=>`<button data-act="${act}" style="flex:1 1 auto;background:${T.surface2};border:none;border-radius:0;color:${T.chalk};padding:12px 8px;font-family:${SANS};font-size:14px;font-weight:800;white-space:nowrap">${lbl}</button>`;
   return `<div data-act="brclose" style="position:fixed;left:0;right:0;top:0;height:calc(var(--avh) * 100);z-index:120;background:rgba(8,11,16,.78);display:flex;align-items:center;justify-content:center;padding:16px">
-      <div data-act="noop" style="width:100%;max-width:460px;max-height:calc(var(--avh) * 90);overflow-y:auto;-webkit-overflow-scrolling:touch;background:${T.surface};border:2px solid ${T.lime};border-radius:18px;padding:16px;display:flex;flex-direction:column;gap:12px;box-shadow:0 18px 54px rgba(0,0,0,.6)">
+      <div data-act="noop" style="width:100%;max-width:460px;max-height:calc(var(--avh) * 90);overflow-y:auto;-webkit-overflow-scrolling:touch;background:${T.surface};border:2px solid ${T.line};border-radius:18px;padding:16px;display:flex;flex-direction:column;gap:12px;box-shadow:0 18px 54px rgba(0,0,0,.6)">
         <div style="display:flex;align-items:center;gap:10px"><div style="flex:1;font-family:${MONO};font-size:18px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:${T.lime}">Base running</div>
           <button data-act="brclose" style="${ghost};padding:8px 14px;flex:none">Close</button></div>
         ${brPitchPick?`
@@ -1135,7 +1135,7 @@ function correctModal(){
       <div style="font-weight:700;color:${T.ink};font-size:15px">Half</div>
       <button data-act="corr" data-arg="half:0" style="background:${T.surface};border:2px solid ${T.line};color:${T.chalk};border-radius:10px;padding:11px 18px;font-family:${MONO};font-weight:800;font-size:15px">${G.half==="T"?"▲ TOP":"▼ BOTTOM"} &middot; tap to flip</button></div>`;
   return `<div data-act="correctclose" style="position:fixed;left:0;right:0;top:0;height:calc(var(--avh) * 100);z-index:120;background:rgba(8,11,16,.78);display:flex;align-items:center;justify-content:center;padding:16px">
-      <div data-act="noop" style="width:100%;max-width:440px;max-height:calc(var(--avh) * 92);overflow-y:auto;-webkit-overflow-scrolling:touch;background:${T.surface};border:2px solid ${T.lime};border-radius:18px;padding:16px;display:flex;flex-direction:column;gap:10px;box-shadow:0 18px 54px rgba(0,0,0,.6)">
+      <div data-act="noop" style="width:100%;max-width:440px;max-height:calc(var(--avh) * 92);overflow-y:auto;-webkit-overflow-scrolling:touch;background:${T.surface};border:2px solid ${T.line};border-radius:18px;padding:16px;display:flex;flex-direction:column;gap:10px;box-shadow:0 18px 54px rgba(0,0,0,.6)">
         <div style="display:flex;align-items:center;gap:10px"><div style="flex:1;font-family:${MONO};font-size:18px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:${T.lime}">Correct the game</div>
           <button data-act="correctclose" style="${ghost};padding:8px 14px;flex:none">Done</button></div>
         <div style="font-size:12px;color:${T.sage};margin-top:-4px">Directly fix the count, outs, score &amp; inning. Each change is undoable.</div>
@@ -1805,7 +1805,7 @@ function floatGeo(id,def){ const g=FLOAT[id]||{}; return {x:g.x!=null?g.x:def.x,
 function floatWindow(id,title,inner,def){
   const g=floatGeo(id,def);
   const natW=def.w;   // the content's natural width; it's scaled to fit the window's width so nothing is cut off
-  return `<div data-floatwin="${id}" style="position:absolute;left:${g.x}px;top:${g.y}px;width:${g.w}px;height:${g.h}px;z-index:40;pointer-events:auto;display:flex;flex-direction:column;background:rgba(13,19,32,.97);border:2px solid ${T.lime};border-radius:12px;box-shadow:0 14px 44px rgba(0,0,0,.6);overflow:hidden">
+  return `<div data-floatwin="${id}" style="position:absolute;left:${g.x}px;top:${g.y}px;width:${g.w}px;height:${g.h}px;z-index:40;pointer-events:auto;display:flex;flex-direction:column;background:rgba(13,19,32,.97);border:2px solid ${T.line};border-radius:12px;box-shadow:0 14px 44px rgba(0,0,0,.6);overflow:hidden">
     <div data-floatdrag="${id}" style="flex:none;display:flex;align-items:center;gap:8px;padding:6px 10px;background:${T.surface2};border-bottom:1.5px solid ${T.line};cursor:move;touch-action:none;user-select:none">
       <span style="font-size:14px;color:${T.sageDim};line-height:1">&#9783;</span>
       <span style="flex:1;font-size:12.5px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:${T.lime};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${title}</span>
@@ -2056,7 +2056,7 @@ function fieldOverlays(){
 /* ===== tap-to-review modals (batter at-bats, inning log) ===== */
 function modalWrap(title,sub,inner,closeAct){
   return `<div data-act="${closeAct}" style="position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;background:rgba(8,11,16,.62);padding:24px">
-    <div data-act="noop" class="screen-in" style="background:${T.navy};border:2px solid ${T.lime};border-radius:16px;max-width:540px;width:100%;max-height:100%;overflow-y:auto;-webkit-overflow-scrolling:touch;box-shadow:0 20px 50px rgba(0,0,0,.55)">
+    <div data-act="noop" class="screen-in" style="background:${T.navy};border:2px solid ${T.line};border-radius:16px;max-width:540px;width:100%;max-height:100%;overflow-y:auto;-webkit-overflow-scrolling:touch;box-shadow:0 20px 50px rgba(0,0,0,.55)">
       <div style="padding:16px 18px">
         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">
           <div style="min-width:0"><div style="font-family:${MONO};font-size:19px;font-weight:800;color:${T.chalk};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${title}</div>
@@ -3698,8 +3698,8 @@ function render(){
     ? `position:fixed;inset:0;z-index:50;display:flex;justify-content:flex-end;background:rgba(8,11,16,.5)`
     : `position:fixed;left:0;right:0;bottom:0;z-index:50;display:flex;justify-content:center;background:rgba(8,11,16,.55)`;
   const sheetCard=wide
-    ? `width:min(440px,46vw);height:100%;border:2px solid ${T.lime};border-right:none;border-radius:18px 0 0 18px;box-shadow:-16px 0 48px rgba(0,0,0,.6)`
-    : `width:100%;max-width:420px;max-height:calc(var(--avh) * 78);border:2px solid ${T.lime};border-bottom:none;border-radius:18px 18px 0 0;box-shadow:0 -16px 48px rgba(0,0,0,.6)`;
+    ? `width:min(440px,46vw);height:100%;border:2px solid ${T.line};border-right:none;border-radius:18px 0 0 18px;box-shadow:-16px 0 48px rgba(0,0,0,.6)`
+    : `width:100%;max-width:420px;max-height:calc(var(--avh) * 78);border:2px solid ${T.line};border-bottom:none;border-radius:18px 18px 0 0;box-shadow:0 -16px 48px rgba(0,0,0,.6)`;
   const _fb=`flex:1 1 0;min-width:0;display:flex;align-items:center;justify-content:center;gap:5px;border:2px solid ${T.line};border-radius:8px;padding:9px 4px;font-size:12.5px;font-weight:700;white-space:nowrap;color:${T.chalk};background:${T.surface2}`;
   const footer=playing?"":`<div style="display:flex;align-items:stretch;gap:6px;flex-shrink:0">
       <button data-act="undo" style="${_fb};background:transparent;color:${hist.length?T.chalk:T.sageDim}">${ICN.undo} Undo</button>
@@ -4445,9 +4445,9 @@ function openShare(){
   if(!hasVid) shareMode="feed";
   const tog=document.getElementById("shareToggle");
   if(tog){
-    const pill=(m,lbl)=>`<button data-act="sharemode" data-arg="${m}" style="padding:8px 16px;border:none;font-family:'Barlow',sans-serif;font-weight:800;font-size:13px;cursor:pointer;background:${shareMode===m?"#E11D2E":"transparent"};color:${shareMode===m?"#fff":"#B7C2D6"}">${lbl}</button>`;
+    const pill=(m,lbl)=>`<button data-act="sharemode" data-arg="${m}" style="padding:8px 16px;border:none;font-family:'Barlow',sans-serif;font-weight:800;font-size:13px;cursor:pointer;background:${shareMode===m?"#E11D2E":"#10141A"};color:${shareMode===m?"#fff":"#B7C2D6"}">${lbl}</button>`;
     tog.innerHTML = hasVid
-      ? `<div style="display:inline-flex;background:#10141A;border:1px solid #4A5870;border-radius:9px;overflow:hidden;margin-bottom:12px">${pill("feed","Game feed")}${pill("video","Feed + video")}</div>`
+      ? `<div style="display:inline-flex;background:${T.line};gap:2px;border:2px solid ${T.line};border-radius:9px;overflow:hidden;margin-bottom:12px">${pill("feed","Game feed")}${pill("video","Feed + video")}</div>`
       : "";
   }
   const url=curShareUrl();
@@ -4587,7 +4587,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v185";
+var APP_VERSION="v186";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;

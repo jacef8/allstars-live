@@ -121,11 +121,15 @@ object LocalApManager {
                 val cfg = res.softApConfiguration
                 val ssid = cfg.ssid
                 val pass = cfg.passphrase
-                val band = when (cfg.band) {
-                    1 -> "2.4 GHz"                 // BAND_2GHZ
-                    2, 3 -> "5 GHz"                // BAND_5GHZ (3 = 2.4|5)
-                    else -> null
-                }
+                // SoftApConfiguration.getBand() is a @SystemApi (not in the public SDK), so read it
+                // reflectively and fall back to null — the band label is cosmetic only.
+                val band = try {
+                    when (cfg.javaClass.getMethod("getBand").invoke(cfg) as? Int) {
+                        1 -> "2.4 GHz"                 // BAND_2GHZ
+                        2, 3 -> "5 GHz"                // BAND_5GHZ (3 = 2.4|5)
+                        else -> null
+                    }
+                } catch (_: Throwable) { null }
                 Triple(ssid, pass, band)
             } else {
                 @Suppress("DEPRECATION")
