@@ -2402,8 +2402,38 @@ function recordRecentOpp(o){ if(!o||!o.name||o.name==="Opponent")return; try{ le
 /* Reusable list of places you've scheduled at (for the schedule form's location autocomplete). */
 function getRecentLocs(){ try{ return JSON.parse(localStorage.getItem("al-recent-locs")||"[]"); }catch(e){ return []; } }
 function recordRecentLoc(loc){ loc=(loc||"").trim(); if(!loc)return; try{ let r=getRecentLocs().filter(x=>x.toLowerCase()!==loc.toLowerCase()); r.unshift(loc); localStorage.setItem("al-recent-locs",JSON.stringify(r.slice(0,15))); }catch(e){} }
-/* Live client-side filter for the opponent picker (no re-render → keeps the input focused). */
+/* Live client-side filter for the OUR-team picker (no re-render → keeps the input focused). */
 window._oppFilter=function(v){ v=(v||"").trim().toLowerCase(); try{ document.querySelectorAll('[data-tname]').forEach(function(el){ el.style.display=(!v||(el.getAttribute('data-tname')||'').indexOf(v)>=0)?"":"none"; }); }catch(e){} };
+/* Live type-ahead for the OPPONENT picker: as you type a name we filter the recent-opponent chips,
+   toggle the "use this name" button, and debounce-search the public team directory — all by patching
+   the DOM directly (NOT render()) so the text field never loses focus mid-type. */
+let _oppSearchTimer=null;
+window._oppSearch=function(v){
+  v=(v||"").trim(); window._finderQ=v; const vl=v.toLowerCase();
+  try{ document.querySelectorAll('[data-recentopp]').forEach(function(el){ const n=el.getAttribute('data-recentopp')||""; el.style.display=(!vl||n.indexOf(vl)>=0)?"":"none"; }); }catch(e){}
+  try{ const ut=document.getElementById('oppUseTyped'); if(ut){ ut.style.display=v?"flex":"none"; const lab=ut.querySelector('[data-typed]'); if(lab)lab.textContent='"'+v+'"'; } }catch(e){}
+  const box=document.getElementById('oppPubResults'); if(!box)return;
+  clearTimeout(_oppSearchTimer);
+  if(!v){ box.innerHTML=""; return; }
+  if(!(window.Cloud&&window.Cloud.enabled&&window.Cloud.user&&window.cloudSearchTeams)){ box.innerHTML=""; return; }
+  box.innerHTML='<div style="font-size:12px;color:'+T.sageDim+';margin-top:8px">Searching public teams…</div>';
+  _oppSearchTimer=setTimeout(function(){
+    const q=v;
+    window.cloudSearchTeams(q).then(function(res){
+      if((window._finderQ||"")!==q) return;   // a newer keystroke superseded this query
+      finderResults=res||[];
+      const b=document.getElementById('oppPubResults'); if(!b)return;
+      if(!finderResults.length){ b.innerHTML='<div style="font-size:12px;color:'+T.sageDim+';margin-top:8px">No public team matches that name yet — use the green button to add them by name.</div>'; return; }
+      b.innerHTML='<div style="font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:'+T.sageDim+';margin:6px 0 2px">Public teams</div>'+finderResults.map(function(r,i){
+        const rec=(r.statsPublic&&r.record)?(' &middot; '+r.record.w+'-'+r.record.l+(r.record.t?'-'+r.record.t:'')):'';
+        return '<button data-act="setpubopp" data-arg="'+i+'" style="display:flex;align-items:center;gap:10px;width:100%;background:'+T.surface+';border:2px solid '+T.line+';border-left:5px solid '+(r.color||T.out)+';border-radius:10px;padding:10px 12px;margin-top:8px;text-align:left">'
+          +'<div style="flex:1;min-width:0"><div style="font-family:'+MONO+';font-size:16px;font-weight:800;color:'+T.ink+';white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(r.name||'').replace(/</g,'&lt;')+'</div>'
+          +'<div style="font-size:11px;color:'+T.sage+';margin-top:2px">'+(r.players||0)+' players'+rec+'</div></div>'
+          +'<span style="color:'+(r.color||T.out)+';font-weight:800;font-size:12px">PICK &rsaquo;</span></button>';
+      }).join("");
+    }).catch(function(){ const b=document.getElementById('oppPubResults'); if(b)b.innerHTML='<div style="font-size:12px;color:'+T.sageDim+';margin-top:8px">Couldn\'t search right now — you can still type their name below.</div>'; });
+  },320);
+};
 /* Schedule month-calendar view (toggle with the list). calYM = {y,m} of the shown month. */
 let calYM=null, calSelDay=null, schedEditId=null, scheduleView=(()=>{try{return localStorage.getItem("al-sched-view")||"list";}catch(e){return "list";}})();
 // Custom tap-to-select date picker for the schedule "Add a game/practice" form (no native OK step).
@@ -3060,36 +3090,37 @@ function actionArea(){
       `);
   }
   if(mode==="pickteam"){
+    const inpCss=`background:${T.surface2};border:2px solid ${T.line};color:${T.ink};border-radius:8px;padding:10px 12px;font-size:14px;outline:none`;
+    // ---- OPPONENT picker: search-first. NOT your own saved teams — you don't play yourself. Type a name
+    //      to live-search the public directory + filter recent opponents, or just use the typed name. ----
+    if(pickFor==="opp"){
+      const C2=window.Cloud, canSearch=!!(C2&&C2.enabled&&C2.user);
+      const typed=(window._finderQ||"").trim();
+      const recent=getRecentOpps();
+      const recentBlock = recent.length ? `<div>
+          <div style="font-size:13.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin-bottom:6px">Recent opponents</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px">${recent.map((o,i)=>`<button data-act="setrecentopp" data-arg="${i}" data-recentopp="${(o.name||'').toLowerCase().replace(/"/g,'&quot;')}" style="background:${T.surface};border:2px solid ${T.line};border-left:4px solid ${o.color||T.out};color:${T.ink};border-radius:8px;padding:8px 12px;font-family:${MONO};font-weight:800;font-size:13px">${(o.name||'').replace(/</g,'&lt;')}</button>`).join("")}</div></div>` : "";
+      return step("Choose the opponent","Type their name to find a public team, or just use the name. You can add their lineup on the next screen.",
+        `<div style="display:flex;flex-direction:column;gap:12px">
+            <input id="oppNameInput" oninput="window._oppSearch(this.value)" value="${typed.replace(/"/g,'&quot;')}" placeholder="Opponent name…" autocomplete="off" style="${inpCss};width:100%;box-sizing:border-box;font-size:16px">
+            <div style="font-size:12px;color:${T.sageDim};margin-top:-4px">${canSearch?"Matching public teams appear as you type.":"Sign in to also search public teams — typing still works."}</div>
+            <div id="oppPubResults"></div>
+            <button id="oppUseTyped" data-act="oppusetyped" style="${bigBtn(T.lime,'')};display:${typed?"flex":"none"};align-items:center;justify-content:center;gap:6px">&#9654; Use <span data-typed style="margin:0 2px">"${typed.replace(/</g,'&lt;')}"</span> as the opponent</button>
+            ${recentBlock}
+            <button data-act="oppnoroster" style="${ghost}">Unnamed opponent (no roster)</button>
+          </div>`,"ngback");
+    }
+    // ---- OUR-team picker: pick from your saved teams (or make one). ----
     const sortedTeams=DB.teams.slice().sort((a,b)=>((a.name||"").toLowerCase()<(b.name||"").toLowerCase()?-1:1));
     const cards=sortedTeams.map(t=>{const R=teamRec(t),rec=R.w+"-"+R.l+(R.t?"-"+R.t:"");return `<button data-act="setteam" data-arg="${t.id}" data-tname="${(t.name||'').toLowerCase().replace(/"/g,'&quot;')}" style="display:flex;align-items:center;gap:12px;background:${T.surface};border:2px solid ${T.line};border-left:5px solid ${t.color};border-radius:10px;padding:12px 14px;text-align:left;width:100%">
         <div style="flex:1;min-width:0"><div style="font-family:${MONO};font-size:17px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.name}</div>
           <div style="font-family:${MONO};font-size:15px;font-weight:800;color:${t.color};margin-top:3px">${rec}</div></div>
         <span style="color:${t.color};font-weight:800;font-size:12px">PICK &rsaquo;</span></button>`;}).join("")
       ||`<div style="color:${T.sage};font-size:13px;text-align:center;padding:16px 8px;border:1px dashed ${T.line};border-radius:10px">No saved teams yet — create one below.</div>`;
-    // Type-to-filter the saved-team list (alphabetical, live). Recent opponents = quick re-picks.
-    const filterInput = sortedTeams.length>3 ? `<input oninput="window._oppFilter(this.value)" placeholder="Type to filter teams…" autocomplete="off" style="background:${T.surface2};border:2px solid ${T.line};color:${T.ink};border-radius:8px;padding:10px 12px;font-size:14px;outline:none;width:100%;box-sizing:border-box">` : "";
-    const recent = (pickFor==="opp") ? getRecentOpps() : [];
-    const recentBlock = recent.length ? `<div style="border-bottom:1.5px solid ${T.line};margin-bottom:4px;padding-bottom:10px">
-        <div style="font-size:13.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin-bottom:6px">Recent opponents</div>
-        <div style="display:flex;flex-wrap:wrap;gap:6px">${recent.map((o,i)=>`<button data-act="setrecentopp" data-arg="${i}" style="background:${T.surface};border:2px solid ${T.line};border-left:4px solid ${o.color||T.out};color:${T.ink};border-radius:8px;padding:8px 12px;font-family:${MONO};font-weight:800;font-size:13px">${(o.name||'').replace(/</g,'&lt;')}</button>`).join("")}</div></div>` : "";
-    // Public team directory search (opponent only; needs sign-in). Find a public team by name and
-    // use it as the opponent for this game.
-    const C2=window.Cloud, canSearch=!!(C2&&C2.enabled&&C2.user);
-    const inpCss=`background:${T.surface2};border:2px solid ${T.line};color:${T.ink};border-radius:8px;padding:10px 12px;font-size:14px;outline:none`;
-    const resCard=(r,i)=>`<button data-act="setpubopp" data-arg="${i}" style="display:flex;align-items:center;gap:10px;width:100%;background:${T.surface};border:2px solid ${T.line};border-left:5px solid ${r.color};border-radius:10px;padding:10px 12px;margin-top:8px;text-align:left">
-        <div style="flex:1;min-width:0"><div style="font-family:${MONO};font-size:16px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${(r.name||'').replace(/</g,'')}</div>
-          <div style="font-size:11px;color:${T.sage};margin-top:2px">${r.players} players${r.statsPublic?` &middot; ${r.record.w}-${r.record.l}${r.record.t?'-'+r.record.t:''}`:''}</div></div>
-        <span style="color:${r.color};font-weight:800;font-size:12px">PICK &rsaquo;</span></button>`;
-    const searchBlock = (pickFor==="opp" && canSearch) ? `<div style="border-top:1.5px solid ${T.line};margin-top:4px;padding-top:10px">
-        <div style="font-size:13.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin-bottom:6px">Find a public team</div>
-        <div style="display:flex;gap:8px"><input id="finderQ" placeholder="Search team name" value="${(window._finderQ||'').replace(/"/g,'&quot;')}" style="${inpCss};flex:1;min-width:0"><button data-act="findteams" style="background:${T.lime};color:#fff;border:none;border-radius:8px;padding:9px 16px;font-weight:800;font-size:13px">Search</button></div>
-        ${finderResults!==null?(finderResults.length?finderResults.map(resCard).join(""):`<div style="font-size:12px;color:${T.sageDim};margin-top:8px">No public teams match that name.</div>`):""}
-      </div>` : "";
-    return step(`Choose ${pickFor==="our"?"your team":"the opponent"}`,"Pick a saved team, a recent opponent, search the directory, or create one.",
-      `<div style="display:flex;flex-direction:column;gap:8px">${recentBlock}${filterInput}${cards}
-        <button data-act="newteampick" style="${ghost}">+ New team</button>
-        ${pickFor==="opp"?`<button data-act="oppnoroster" style="${ghost}">Unnamed opponent (no roster)</button>`:""}
-        ${searchBlock}</div>`,"ngback");
+    const filterInput = sortedTeams.length>3 ? `<input oninput="window._oppFilter(this.value)" placeholder="Type to filter teams…" autocomplete="off" style="${inpCss};width:100%;box-sizing:border-box">` : "";
+    return step("Choose your team","Pick a saved team, or create one.",
+      `<div style="display:flex;flex-direction:column;gap:8px">${filterInput}${cards}
+        <button data-act="newteampick" style="${ghost}">+ New team</button></div>`,"ngback");
   }
   if(mode==="directory"){
     const inpCss=`background:${T.surface2};border:2px solid ${T.line};color:${T.ink};border-radius:8px;padding:10px 12px;font-size:14px;outline:none`;
@@ -3354,7 +3385,7 @@ function actionArea(){
       return `<div style="min-height:100%;display:flex;flex-direction:column;gap:14px;justify-content:safe center">
           ${header}
           <div style="width:100%;max-width:1180px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start">
-            <div style="display:flex;flex-direction:column;gap:12px">${teamRow("Your team",OUR.name,OUR.short,OUR.color,"pickour")}${teamRow("Opponent",OPP.name,OPP.short,OPP.color,"pickopp")}<button data-act="editopproster" style="${ghost};display:flex;align-items:center;justify-content:center;gap:8px;width:100%;flex:none;margin-top:-6px">${IC('users',16)} Edit ${(OPP.short||"opponent").replace(/</g,"&lt;")} roster &rsaquo;</button>${sideSel}<div style="display:flex;gap:12px"><div style="flex:1;min-width:0">${runCapCard}</div><div style="flex:1;min-width:0">${hittersCard}</div></div></div>
+            <div style="display:flex;flex-direction:column;gap:12px">${teamRow("Your team",OUR.name,OUR.short,OUR.color,"pickour")}${teamRow("Opponent",OPP.name,OPP.short,OPP.color,"pickopp")}<button data-act="editopproster" style="${ghost};border-color:${OPP.color||T.lime};color:${T.ink};display:flex;align-items:center;justify-content:center;gap:8px;width:100%;flex:none;margin-top:-6px">${IC('users',16)} Add / edit ${(OPP.short||"opponent").replace(/</g,"&lt;")} lineup &rsaquo;</button>${sideSel}<div style="display:flex;gap:12px"><div style="flex:1;min-width:0">${runCapCard}</div><div style="flex:1;min-width:0">${hittersCard}</div></div></div>
             <div style="display:flex;flex-direction:column;gap:12px">${leagueCard}${alertsCard}${pitchCatchCard}${pitchTypeCard}${detailedCard}${startCard}</div>
           </div>
           <div style="width:100%;max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:10px">${lineupCardBtn}</div>
@@ -3365,7 +3396,7 @@ function actionArea(){
         ${header}
         ${teamRow("Your team",OUR.name,OUR.short,OUR.color,"pickour")}
         ${teamRow("Opponent",OPP.name,OPP.short,OPP.color,"pickopp")}
-        <button data-act="editopproster" style="${ghost};display:flex;align-items:center;justify-content:center;gap:8px;width:100%;flex:none;margin-top:-6px">${IC('users',16)} Edit ${(OPP.short||"opponent").replace(/</g,"&lt;")} roster &rsaquo;</button>
+        <button data-act="editopproster" style="${ghost};border-color:${OPP.color||T.lime};color:${T.ink};display:flex;align-items:center;justify-content:center;gap:8px;width:100%;flex:none;margin-top:-6px">${IC('users',16)} Add / edit ${(OPP.short||"opponent").replace(/</g,"&lt;")} lineup &rsaquo;</button>
         ${sideSel}${ruleCards}${lineupCardBtn}
       </div>`;
   }
@@ -4472,6 +4503,7 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="setteam"){const id=arg;if(pickFor==="our"){selectTeam(id);}else{const t=teamById(id);oppTeamId=id;if(t){OPP.name=t.name;OPP.short=t.short;OPP.color=t.color;OPP.logo=t.logo||null;recordRecentOpp(OPP);}}mode="newgame";render();broadcast();}
   else if(act==="newteampick"){const t=newTeam("");if(pickFor==="our"){selectTeam(t.id);}else{oppTeamId=t.id;OPP.name=t.name;OPP.short=t.short;OPP.color=t.color;OPP.logo=null;}mode="newgame";render();broadcast();}
   else if(act==="oppnoroster"){oppTeamId=null;OPP.name="Opponent";OPP.short="OPP";OPP.color="#E11D2E";mode="newgame";render();broadcast();}
+  else if(act==="oppusetyped"){ const e=document.getElementById("oppNameInput"); const nm=(e?(e.value||""):(window._finderQ||"")).trim(); if(!nm){flash("Type an opponent name first");return;} oppTeamId=null; OPP.name=nm; OPP.short=(nm.replace(/[^A-Za-z0-9]/g,"").slice(0,3).toUpperCase())||"OPP"; OPP.color="#E11D2E"; OPP.logo=null; recordRecentOpp(OPP); finderResults=null; mode="newgame"; render(); broadcast(); }
   else if(act==="ngback"){mode="newgame";render();}
   else if(act==="ng-side"){G.ourSide=arg;render();broadcast();}
   else if(act==="ng-start")startNewGame();
@@ -4892,7 +4924,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v211";
+var APP_VERSION="v212";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
