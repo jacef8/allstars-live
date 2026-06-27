@@ -1119,8 +1119,8 @@ function baseRunModal(){
           ${chip("brsteal",b,"&#9650; Steal",T.safe,"#fff")}
           ${chip("bradv",b,"Adv +1",T.surface,T.chalk,T.line)}
           ${chip("brscore",b,"Score",T.lime,"#fff")}
-          ${chip("brcaught",b,"Caught",T.surface,T.out,T.out)}
-          ${chip("brpick",b,"Pickoff",T.surface,T.out,T.out)}
+          ${chip("brcaught",b,"Caught steal",T.surface,T.out,T.out)}
+          ${chip("brpick",b,"Picked off",T.surface,T.out,T.out)}
           ${advEvents?chip("bronerror",b,"On error +1",T.surface,T.amber,T.amber):""}
           ${advEvents?chip("brout",b,"Out",T.surface,T.out,T.out):""}
         </div></div>`;}).join("");
@@ -4277,7 +4277,12 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="pasteplayers"){ const t=teamById(openTeamId); if(t){ let txt=""; try{txt=prompt("Paste players — one per line. Each line: number then name, e.g.\n12 John Smith\n7 Maria Diaz");}catch(e){} if(txt){ let added=0; txt.split(/\r?\n/).forEach(line=>{ line=line.trim(); if(!line)return; if(t.players.length>=20)return; const m=line.match(/^(\d{1,3})\s+(.*)$/); let num="",nm=line; if(m){num=m[1];nm=m[2].trim();} const parts=nm.split(/\s+/).filter(Boolean); const first=parts.length>1?parts.slice(0,-1).join(" "):(parts[0]||""); const last=parts.length>1?parts[parts.length-1]:""; const p={id:nextId("p"),num:num,first:first,last:last,name:""}; ensureName(p); t.players.push(p); added++; }); if(added){saveDB();render();} else {try{alert("No players found — check the format.");}catch(e){}} } } }
   else if(act==="startteam"){newgameFrom="team";selectTeam(openTeamId);G=initGame();loadTeamLineup(teamById(curTeamId));hist=[];resetUI();mode="newgame";render();broadcast();}
   else if(act==="pickour"){pickFor="our";mode="pickteam";render();}
-  else if(act==="pickopp"){pickFor="opp";finderResults=null;window._finderQ="";mode="pickteam";render();}
+  else if(act==="pickopp"){pickFor="opp";finderResults=null;window._finderQ="";
+    // Seed the recent-opponent quick-picks from the team's SCHEDULE (which syncs across devices), so a
+    // team you put on the schedule is pickable here even on a different device — recent-opps are local-
+    // only, but the schedule isn't. recordRecentOpp dedupes by name. (D2)
+    try{ const _t=curTeam()||teamById(openTeamId); if(_t&&Array.isArray(_t.schedule)){ _t.schedule.slice().reverse().forEach(function(s){ if(s&&s.type!=="practice"&&s.opp) recordRecentOpp({name:s.opp}); }); } }catch(e){}
+    mode="pickteam";render();}
   else if(act==="oppcolor"){ OPP.color=arg; render(); broadcast(); }
   else if(act==="findteams"){ const e=document.getElementById("finderQ"); const q=e?(e.value||"").trim():""; window._finderQ=q; if(!window.cloudSearchTeams){flash("Search needs sign-in");return;} flash("Searching…"); window.cloudSearchTeams(q).then(function(res){ finderResults=res||[]; render(); }); }
   else if(act==="opendirectory"){ if(!(window.Cloud&&window.Cloud.enabled&&window.Cloud.user)){flash("Sign in to browse teams");return;} mode="directory"; render(); }
@@ -4696,7 +4701,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v195";
+var APP_VERSION="v196";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;

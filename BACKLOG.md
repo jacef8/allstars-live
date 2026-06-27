@@ -25,7 +25,8 @@ Status: [ ] todo · [~] in progress · [x] done. Grouped by theme; recurring/met
       on every feed update for those).
 - [ ] B4. Strikeouts need a looking vs swinging option.
 - [ ] B5. RBI feed detail, e.g. "Double — Caden Schaefer; Jones scores from 3rd."
-- [ ] B6. Caught stealing: add HOW (picked off / catcher threw them out).
+- [x] B6. Caught-stealing HOW (v196): the base-running sheet already had separate actions; relabeled to
+      "Caught steal" (catcher threw out) vs "Picked off" so the two methods are clear in the feed.
 - [x] B7. End-of-inning notification in the feed (v193): doFlip adds a centered divider line
       "End of Top 3 · 3 outs · TEAM 2 runs, 3 hits" (reason = 3 outs vs run cap). Verified.
 - [ ] B8. Update the batter display after his at-bat completes.
@@ -49,7 +50,9 @@ Status: [ ] todo · [~] in progress · [x] done. Grouped by theme; recurring/met
 
 ## D. Schedule / teams / setup
 - [ ] D1. Send a link to the game from the schedule window.
-- [ ] D2. Adding a team in Schedule should make it selectable in the opponent picker at game start.
+- [x] D2. Scheduled opponent now selectable in the opponent picker (v196). schedadd already saved it to
+      local recent-opps; now opening the opponent picker ALSO seeds quick-picks from the team schedule
+      (which syncs), so a scheduled opponent shows even on a different device. Verified.
 - [ ] D3. Autopopulate the YouTube video name as "My Team vs Opponent."
 - [x] D4. BUG: after End Game → stats/record/schedule didn't update (v190). Root cause: finished game
       stamped with UTC date (evening scoring → tomorrow) so it never matched the local scheduled date.
