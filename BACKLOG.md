@@ -56,7 +56,9 @@ Status: [ ] todo · [~] in progress · [x] done. Grouped by theme; recurring/met
 - [x] C4. Current batter highlighted on the in-game lineup edit (v199): our up-batter slot gets a lime
       border + tint + an "AT BAT" badge, so the row most likely to need editing is easy to find.
 - [ ] C5. Record lineup changes throughout the game for the historical record.
-- [ ] C6. Edit the OPPONENT roster before the game-setup screen.
+- [x] C6. Edit opponent roster from setup (v206): the New Game setup screen now has an "Edit <OPP>
+      roster" button (both layouts) that opens the opponent roster/lineup editor and returns to setup on
+      Back (luFromSetup flag). So you can enter their numbers/names before starting. Verified round-trip.
 
 ## D. Schedule / teams / setup
 - [ ] D1. Send a link to the game from the schedule window.

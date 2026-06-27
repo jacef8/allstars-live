@@ -704,7 +704,7 @@ const initGame=()=>({inning:1,half:"T",away:0,home:0,outs:0,balls:0,strikes:0,
   startedAt:null,  // wall-clock ms when the game ACTUALLY started (auto-set at first pitch / game start; editable in Game Setup) — drives the game timer
   lineup:{ order:[0,1,2,3,4,5,6,7,8],   // batting order: 9-12 entries (slots 10+ = extra hitters)
            pos:{P:0,C:1,"1B":2,"2B":3,"3B":4,SS:5,LF:6,CF:7,RF:8} }});
-let G=initGame(),hist=[],mode="home",tap=null,contact=null,result=null,plan=null,toast=null,toastTimer=null,curResults=[],showAll=false,showZones=false,editSlot=null,confirmAct=null,gameActive=false,lineupTab="us",newgameFrom="home",brSheet=false,correctOpen=false,correctOpenAt=0,lineupView="list",fieldAssign=null,fieldHold=null,fieldDisplaced=null,lineEditSlot=null;
+let G=initGame(),hist=[],mode="home",tap=null,contact=null,result=null,plan=null,toast=null,toastTimer=null,curResults=[],showAll=false,showZones=false,editSlot=null,confirmAct=null,gameActive=false,lineupTab="us",newgameFrom="home",brSheet=false,correctOpen=false,correctOpenAt=0,lineupView="list",fieldAssign=null,fieldHold=null,fieldDisplaced=null,lineEditSlot=null,luFromSetup=false;
 // Resume the last in-progress game (saved by saveGame) across reloads/app updates, so the
 // lineup/score is never lost. Stays on the home screen → shows "Resume". Re-links ROSTER
 // to the saved team so the lineup's player indices resolve correctly.
@@ -3304,7 +3304,7 @@ function actionArea(){
       return `<div style="min-height:100%;display:flex;flex-direction:column;gap:14px;justify-content:safe center">
           ${header}
           <div style="width:100%;max-width:1180px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start">
-            <div style="display:flex;flex-direction:column;gap:12px">${teamRow("Your team",OUR.name,OUR.short,OUR.color,"pickour")}${teamRow("Opponent",OPP.name,OPP.short,OPP.color,"pickopp")}${sideSel}<div style="display:flex;gap:12px"><div style="flex:1;min-width:0">${runCapCard}</div><div style="flex:1;min-width:0">${hittersCard}</div></div></div>
+            <div style="display:flex;flex-direction:column;gap:12px">${teamRow("Your team",OUR.name,OUR.short,OUR.color,"pickour")}${teamRow("Opponent",OPP.name,OPP.short,OPP.color,"pickopp")}<button data-act="editopproster" style="${ghost};display:flex;align-items:center;justify-content:center;gap:8px;width:100%;flex:none;margin-top:-6px">${IC('users',16)} Edit ${(OPP.short||"opponent").replace(/</g,"&lt;")} roster &rsaquo;</button>${sideSel}<div style="display:flex;gap:12px"><div style="flex:1;min-width:0">${runCapCard}</div><div style="flex:1;min-width:0">${hittersCard}</div></div></div>
             <div style="display:flex;flex-direction:column;gap:12px">${leagueCard}${alertsCard}${pitchCatchCard}${pitchTypeCard}${detailedCard}${startCard}</div>
           </div>
           <div style="width:100%;max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:10px">${lineupCardBtn}</div>
@@ -3315,6 +3315,7 @@ function actionArea(){
         ${header}
         ${teamRow("Your team",OUR.name,OUR.short,OUR.color,"pickour")}
         ${teamRow("Opponent",OPP.name,OPP.short,OPP.color,"pickopp")}
+        <button data-act="editopproster" style="${ghost};display:flex;align-items:center;justify-content:center;gap:8px;width:100%;flex:none;margin-top:-6px">${IC('users',16)} Edit ${(OPP.short||"opponent").replace(/</g,"&lt;")} roster &rsaquo;</button>
         ${sideSel}${ruleCards}${lineupCardBtn}
       </div>`;
   }
@@ -4190,7 +4191,8 @@ document.getElementById("app").addEventListener("click",e=>{
     try{ const url=appBaseUrl()+"?invite="+encodeURIComponent(openTeamId); if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(url); }catch(e){}
     flash("✓ "+v+" is a co-owner — they get access when they sign in with that email (invite link copied)"); render(); return; }
   if(act==="rmcoowner"){ const t=teamById(openTeamId); if(t&&Array.isArray(t.coOwners)){ t.coOwners=t.coOwners.filter(x=>x!==arg); } if(window.cloudRemoveCoOwner)window.cloudRemoveCoOwner(openTeamId,arg); render(); return; }
-  if(act==="lineupback"){ mode=gameActive?"idle":"home"; render(); return; }
+  if(act==="editopproster"){ luFromSetup=true; lineupTab="opp"; mode="lineup"; render(); return; }   // C6: edit opponent roster from setup
+  if(act==="lineupback"){ if(luFromSetup){ luFromSetup=false; mode="newgame"; } else { mode=gameActive?"idle":"home"; } render(); return; }
   if(act==="closerules"){ closeRules(); return; }
   if(act==="viewrulebook"){ openRulebookEntry(arg); return; }
   if(act==="setrulebook"){ const t=teamById(openTeamId); if(t){ t.rulebookId=arg; saveDB(); render(); } return; }
@@ -4246,7 +4248,7 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="dest"){const[i,c]=arg.split(":");setDest(+i,+c);}
   else if(act==="confirm")commit(result,plan);
   else if(act==="lineup"){mode="lineup";render();}
-  else if(act==="lineupdone"){ gameActive=true;mode="idle";render();broadcast(); }   // timer starts on first pitch (see recordPitch)
+  else if(act==="lineupdone"){ luFromSetup=false; gameActive=true;mode="idle";render();broadcast(); }   // timer starts on first pitch (see recordPitch)
   else if(act==="lutab"){lineupTab=arg;lineEditSlot=null;render();}
   else if(act==="luview"){ lineupView=arg; fieldAssign=null; fieldHold=null; fieldDisplaced=null; lineEditSlot=null; render(); }   // batting-order list ↔ field map (C2)
   else if(act==="fieldpos"){ fieldAssign=(fieldAssign===arg?null:arg); render(); }        // tap a position → choose who plays it
@@ -4800,7 +4802,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v205";
+var APP_VERSION="v206";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
