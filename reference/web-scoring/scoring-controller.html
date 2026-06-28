@@ -2953,7 +2953,7 @@ function actionArea(){
         ${open?`<div style="padding:0 14px 14px">${content}</div>`:""}</div>`;
     // Split: teams you OWN/manage (your kids' teams) vs teams you only WATCH (external — competitors
     // you followed from the public directory). They were mixed into one list, which felt lost.
-    const ownedTeams=list.filter(t=>!t.external), watchedTeams=list.filter(t=>t.external);
+    const ownedTeams=list.filter(t=>!t.external && !t.archived), watchedTeams=list.filter(t=>t.external);
     const teamsBlock = ownedTeams.length
       ? drawer("toggleteams","My teams ("+ownedTeams.length+")",teamsOpen,`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;align-content:start">${ownedTeams.map(card).join("")}</div>`)
       : "";
@@ -3072,10 +3072,11 @@ function actionArea(){
           <span style="display:flex;align-items:center;gap:9px;font-family:${MONO};font-weight:800;font-size:19px;letter-spacing:.5px"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${PLAYP}</svg>Resume game</span>
           <span style="font-family:${MONO};font-size:13px;font-weight:700;color:${T.navy}">${(OUR.short||"US").replace(/</g,"")} ${ourRuns()} &middot; ${(OPP.short||"OPP").replace(/</g,"")} ${oppRuns()} &nbsp;—&nbsp; ${G.half==="T"?"Top":"Bot"} ${ordinal(G.inning)}</span></button>`:"";
       const actionsRow=`<div style="flex:none;display:flex;gap:12px;flex-wrap:wrap;align-items:stretch">${resumeWide}${aBtn("newgamestart","New Game",T.lime,"#fff",PLAYP,1.3,"rgba(225,29,46,.34)")}${aBtn("gototeams","Manage Teams",T.surface2,T.ink,PEOPLE,1)}</div>`;
-      const teamsArea=(showTeams&&DB.teams.length)
+      const _activeTeams=list.filter(t=>!t.archived);   // ended-season teams drop off Home (still in Manage Teams)
+      const teamsArea=(showTeams&&_activeTeams.length)
         ? `<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px">
-             <div style="font-size:13px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:${T.lime};flex:none">My teams (${DB.teams.length})</div>
-             <div style="flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;display:grid;grid-template-columns:repeat(auto-fill,minmax(248px,1fr));gap:12px;align-content:start;padding-right:2px">${list.map(card).join("")}</div></div>`
+             <div style="font-size:13px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:${T.lime};flex:none">My teams (${_activeTeams.length})</div>
+             <div style="flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;display:grid;grid-template-columns:repeat(auto-fill,minmax(248px,1fr));gap:12px;align-content:start;padding-right:2px">${_activeTeams.map(card).join("")}</div></div>`
         : `<div style="flex:1;min-height:0;display:flex;align-items:center;justify-content:center;color:${T.sageDim};font-size:14px;border:1px dashed ${T.line};border-radius:14px">No teams yet — tap Manage Teams to create your first.</div>`;
       return `<div style="position:relative;height:100%;overflow:hidden;display:flex;flex-direction:column;align-items:center;padding:clamp(10px,calc(var(--avh) * 2),22px) 14px">
           ${settingsGear}
@@ -3093,22 +3094,25 @@ function actionArea(){
   }
   if(mode==="teams"){
     const sorted=DB.teams.slice().sort((a,b)=>(b.fav?1:0)-(a.fav?1:0));
-    const cards=sorted.map(t=>{const R=teamRec(t);const rec=`${R.w}-${R.l}${R.t?"-"+R.t:""}`;const games=R.w+R.l+R.t;
-      const sub=(()=>{const n=new Date(),today=n.getFullYear()+"-"+String(n.getMonth()+1).padStart(2,"0")+"-"+String(n.getDate()).padStart(2,"0");const up=(t.schedule||[]).filter(s=>s.date&&s.date>=today).sort((a,b)=>((a.date+(a.time||""))<(b.date+(b.time||""))?-1:1))[0];if(up){try{return "Next · "+new Date(up.date+"T00:00").toLocaleDateString(undefined,{month:"short",day:"numeric"});}catch(e){return "Next game set";}}return games?(games+" game"+(games===1?"":"s")):"New season";})();
-      return `<div style="display:flex;align-items:center;gap:8px;background:${T.surface};border:2px solid ${t.color};border-left:7px solid ${t.color};border-radius:12px;padding:11px 13px;box-shadow:0 6px 16px rgba(0,0,0,.35)">
+    const mkCard=t=>{const R=teamRec(t);const rec=`${R.w}-${R.l}${R.t?"-"+R.t:""}`;const games=R.w+R.l+R.t;const ended=!!t.archived;
+      const sub=(()=>{ if(ended)return "Season ended"; const n=new Date(),today=n.getFullYear()+"-"+String(n.getMonth()+1).padStart(2,"0")+"-"+String(n.getDate()).padStart(2,"0");const up=(t.schedule||[]).filter(s=>s.date&&s.date>=today).sort((a,b)=>((a.date+(a.time||""))<(b.date+(b.time||""))?-1:1))[0];if(up){try{return "Next · "+new Date(up.date+"T00:00").toLocaleDateString(undefined,{month:"short",day:"numeric"});}catch(e){return "Next game set";}}return games?(games+" game"+(games===1?"":"s")):"New season";})();
+      return `<div style="display:flex;align-items:center;gap:8px;background:${T.surface};border:2px solid ${t.color};border-left:7px solid ${t.color};border-radius:12px;padding:11px 13px;box-shadow:0 6px 16px rgba(0,0,0,.35)${ended?";opacity:.74":""}">
         ${(window.cloudIsScorer&&window.cloudIsScorer(t))?"":`<button data-act="favteam" data-arg="${t.id}" title="Follow this team" style="background:none;border:none;color:${t.fav?T.amber:T.sageDim};font-size:25px;line-height:1;padding:2px 4px;cursor:pointer">${t.fav?IC('starFill',23):IC('star',23)}</button>`}
         <button data-act="opent" data-arg="${t.id}" style="flex:1;min-width:0;display:flex;align-items:center;gap:10px;text-align:left;background:none;border:none;padding:6px 2px;cursor:pointer">
           <div style="flex:1;min-width:0">
-            <div style="font-family:${MONO};font-size:22px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.name}</div>
+            <div style="font-family:${MONO};font-size:22px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.name}${ended?` <span style="font-family:${SANS};font-size:11px;font-weight:800;letter-spacing:.5px;color:${T.sageDim};background:${T.surface2};border:1px solid ${T.line};border-radius:6px;padding:2px 7px;vertical-align:middle">ENDED</span>`:""}</div>
             <div style="display:flex;align-items:baseline;gap:9px;margin-top:5px"><span style="font-family:${MONO};font-size:26px;font-weight:800;color:${t.color};line-height:1">${rec}</span><span style="font-size:13px;color:${T.sage}">${sub}</span></div></div>
-          <span style="color:${t.color};font-weight:800;font-size:15px;letter-spacing:.5px;white-space:nowrap">MANAGE &rsaquo;</span></button></div>`;}).join("")
-      ||`<div style="color:${T.sage};font-size:15px;text-align:center;padding:24px 8px;border:1px dashed ${T.line};border-radius:12px">No teams yet — create one to start tracking rosters &amp; season stats.</div>`;
+          <span style="color:${t.color};font-weight:800;font-size:15px;letter-spacing:.5px;white-space:nowrap">MANAGE &rsaquo;</span></button></div>`;};
+    const activeCards=sorted.filter(t=>!t.archived).map(mkCard).join("")
+      ||`<div style="color:${T.sage};font-size:15px;text-align:center;padding:24px 8px;border:1px dashed ${T.line};border-radius:12px">No active teams — create one, or reopen an ended season below.</div>`;
+    const endedCards=sorted.filter(t=>t.archived).map(mkCard).join("");
     return `<div style="display:flex;flex-direction:column;gap:14px">
         <div class="frost-card" style="display:flex;align-items:center;gap:10px;background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:12px 14px">
           <button data-act="gohome" style="${ghost};padding:9px 11px">&lsaquo; Home</button>
           <div style="font-family:${MONO};font-size:23px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:${T.lime}">Teams</div></div>
         <div style="font-size:12px;color:${T.sage};margin-top:-6px">Manage rosters &amp; season stats.</div>
-        <div style="display:flex;flex-direction:column;gap:8px">${cards}</div>
+        <div style="display:flex;flex-direction:column;gap:8px">${activeCards}</div>
+        ${endedCards?`<div style="font-size:13px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:${T.sageDim};margin-top:8px">Ended seasons</div><div style="font-size:11.5px;color:${T.sageDim};margin-top:-4px">Hidden from Home. Open one to view its stats, or reopen it from Team management.</div><div style="display:flex;flex-direction:column;gap:8px">${endedCards}</div>`:""}
         <button data-act="newteam" style="${bigBtn(OUR.color)}">${IC('<path d="M12 5v14M5 12h14"/>')} New team</button>
         ${(window.Cloud&&window.Cloud.enabled)?`<button data-act="opendirectory" style="${ghost};display:flex;align-items:center;justify-content:center;gap:9px">${ICN.search} Browse public teams to follow</button>`:""}
         <div style="display:flex;gap:8px"><button data-act="importteam" style="${ghost};flex:1">&#8682; Import team</button><button data-act="importgame" style="${ghost};flex:1">&#8682; Import game</button></div>
@@ -3393,7 +3397,15 @@ function actionArea(){
           ${dRow("Logo",logoCtl)}
           <div style="font-size:11px;color:${T.sageDim};line-height:1.4;padding:8px 2px 0">The logo shows on team cards, the lineup card &amp; (soon) the scoreboard. A square PNG with a transparent background looks best.</div>
         </div>`;
-      return secWrap(`${secHdr("Team management")}${detailsBlock}${rulebookSection}${scorersSection}${discoverySection}`);
+      const seasonSection=`<div class="frost-card" style="background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:9px">
+          <div style="font-size:13.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime}">Season</div>
+          ${t.archived
+            ? `<div style="font-size:12.5px;color:${T.sage}">This team's season is <b style="color:${T.ink}">ended</b> — it's hidden from the Home screen. Its record &amp; stats are kept.</div>
+               <button data-act="reopenseason" data-arg="${t.id}" style="${bigBtn(T.safe,'')};display:flex;align-items:center;justify-content:center;gap:9px">${IC('refresh',17)} Reopen season &middot; show on Home</button>`
+            : `<div style="font-size:12.5px;color:${T.sage}">When the season's over, end it to move this team off the Home screen. Nothing is deleted — the record &amp; stats stay, and you can reopen it anytime.</div>
+               <button data-act="endseason" data-arg="${t.id}" style="background:none;border:2px solid ${T.clay};color:${T.clay};border-radius:11px;padding:13px;font-family:${MONO};font-weight:800;font-size:14px;letter-spacing:.5px;display:flex;align-items:center;justify-content:center;gap:9px">${IC('flag',16)} End season</button>`}
+        </div>`;
+      return secWrap(`${secHdr("Team management")}${detailsBlock}${rulebookSection}${scorersSection}${discoverySection}${seasonSection}`);
     }
     if(teamTab==="schedule") return `<div style="width:100%;max-width:1080px;margin:0 auto;display:flex;flex-direction:column;gap:14px">${secHdr("Schedule")}${scheduleSection}</div>`;
     if(teamTab==="gameview"){
@@ -4826,6 +4838,8 @@ document.getElementById("app").addEventListener("click",e=>{
   if(act==="delphoto"){ const t=teamById(openTeamId); if(!t)return; const pid=arg; confirmAct={title:"Delete this photo?",msg:"It will be removed from the team gallery for everyone.",yes:"Delete",danger:true,run:function(){ if(window.cloudDeletePhoto)window.cloudDeletePhoto(t.id,pid); photoZoom=null; photoListTeam=null; render(); }}; render(); return; }
   if(act==="rewatchgame"){ const u="https://www.youtube.com/watch?v="+encodeURIComponent(arg); if(IS_APP&&window.AllStars&&window.AllStars.openExternal)AllStars.openExternal(u); else window.open(u,"_blank","noopener"); return; }
   if(act==="recomputeseason"){ const t=teamById(openTeamId); if(!t)return; confirmAct={title:"Recompute season stats?",msg:"Rebuilds this team's season batting totals from the finished games in the log — fixes drifted totals or resets to only the games actually recorded.",yes:"Recompute",run:function(){ recomputeSeasonFromGames(t); render(); flash("Season stats rebuilt from the game log"); }}; render(); return; }
+  if(act==="endseason"){ const t=teamById(arg)||teamById(openTeamId); if(!t)return; confirmAct={title:"End season for "+(t.name||"this team")+"?",msg:"It moves off the Home screen (kept under Teams → Ended seasons). The record &amp; stats stay, and you can reopen it anytime.",yes:"End season",run:function(){ t.archived=true; t.updatedAt=Date.now(); saveDB(); try{ if(window.cloudSaveTeam)cloudSaveTeam(t,true); }catch(e){} flash("Season ended — "+(t.name||"team")+" moved off Home"); teamTab="manage"; render(); }}; render(); return; }
+  if(act==="reopenseason"){ const t=teamById(arg)||teamById(openTeamId); if(!t)return; t.archived=false; t.updatedAt=Date.now(); saveDB(); try{ if(window.cloudSaveTeam)cloudSaveTeam(t,true); }catch(e){} flash((t.name||"Team")+" is active again"); render(); return; }
   if(act==="delgame"){ const t=teamById(openTeamId); if(!t)return; if(window.Cloud&&window.Cloud.enabled&&window.Cloud.user&&window.cloudCanManage&&!window.cloudCanManage(t)){flash("Only the owner can delete a game");return;} const g=(t.games||[]).find(x=>x.id===arg); confirmAct={title:"Delete this game?",msg:"Permanently removes this game from the record AND subtracts its player stats from the season totals.",yes:"Delete game + stats",danger:true,run:function(){ try{ removeGameFromSeason(t,g); }catch(e){} t.games=(t.games||[]).filter(x=>x.id!==arg); t.record=teamRec(t); saveDB(); teamTab="schedule"; viewGameId=null; render(); }}; render(); return; }
   if(act==="swapviewer"){ viewerRight=viewerRight==="field"?"feed":"field"; try{localStorage.setItem("al-viewer-right",viewerRight);}catch(e){} render(); return; }
   if(act==="viewerphone"){ viewerPhone=(arg==="field"||arg==="feed")?arg:"both"; try{localStorage.setItem("al-viewer-phone",viewerPhone);}catch(e){} render(); return; }
@@ -5635,7 +5649,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v243";
+var APP_VERSION="v244";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;

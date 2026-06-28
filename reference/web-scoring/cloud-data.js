@@ -35,6 +35,7 @@
       lastMsgAt: t.lastMsgAt || 0,                        // newest chat ts → powers home unread badge
       games: t.games || [],                               // finished-game log (Recent games list)
       logo: t.logo || "",                                 // team logo data URL (downscaled ≤240px)
+      archived: !!t.archived,                             // season ended → hidden from Home (still in Teams)
     };
   }
 
