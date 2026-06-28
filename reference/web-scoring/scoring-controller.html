@@ -4250,6 +4250,17 @@ function restoreScroll(){ var m=window._scrollMemo||{}; for(var id in m){ if(m[i
 /* Paint new HTML into #content and put the scroll positions back (no jump-to-top). */
 function paintContent(html){ var c=document.getElementById("content"); if(!c) return; c.innerHTML=html; restoreScroll(); }
 
+/* Bases drawn as a real infield DIAMOND (2B top, 3B left, 1B right — home is the empty bottom point),
+   not a flat row. `s` = each base's size in px. Lit = runner aboard. Used by the broadcast bugs. */
+function baseDiamond(b,s){
+  s=s||12; b=b||{}; const hoff=Math.round(s*0.78), W=Math.round(s*0.78*2+s*1.05), topY=Math.round(s*0.55), midY=Math.round(s*1.7), H=midY+Math.round(s*0.78);
+  const pip=(on,pos)=>`<span style="position:absolute;${pos};width:${s}px;height:${s}px;transform:translate(-50%,-50%) rotate(45deg);background:${on?"#F4B233":"transparent"};border:2px solid ${on?"#F4B233":"rgba(255,255,255,.6)"};box-shadow:${on?"0 0 7px rgba(244,178,51,.7)":"none"}"></span>`;
+  return `<span style="position:relative;display:inline-block;width:${W}px;height:${H}px;vertical-align:middle">
+      ${pip(b[2],`top:${topY}px;left:50%`)}
+      ${pip(b[3],`top:${midY}px;left:${hoff}px`)}
+      ${pip(b[1],`top:${midY}px;left:${W-hoff}px`)}
+    </span>`;
+}
 // Clean broadcast scorebug for OBS overlay mode (H1) — transparent page, just this bug, fed by the
 // ?watch= subscription. Top-left lower-third; nothing renders until a game is live.
 function overlayBug(){
@@ -4258,14 +4269,14 @@ function overlayBug(){
       <span style="font-family:${MONO};font-weight:800;font-size:19px;letter-spacing:.5px;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.6);white-space:nowrap">${TEAMS[t].short||(t==="away"?"AWAY":"HOME")}</span>
       ${act?`<span style="width:8px;height:8px;border-radius:50%;background:#fff;box-shadow:0 0 8px #fff;flex:none"></span>`:""}
       <span style="margin-left:auto;font-weight:800;font-size:30px;line-height:1;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.7)">${val}</span></div>`;};
-  const b=G.bases||{}, base=(on)=>`<span style="display:inline-block;width:10px;height:10px;transform:rotate(45deg);background:${on?"#F4B233":"transparent"};border:2px solid ${on?"#F4B233":"rgba(255,255,255,.55)"}"></span>`;
+  const b=G.bases||{};
   return `<div style="position:fixed;top:20px;left:20px;display:inline-flex;flex-direction:column;border-radius:11px;overflow:hidden;box-shadow:0 10px 34px rgba(0,0,0,.65);font-family:${SANS};min-width:240px">
       ${tw("away",G.half==="T")}<div style="height:1.5px;background:rgba(255,255,255,.22)"></div>${tw("home",G.half==="B")}
       <div style="display:flex;align-items:center;justify-content:space-between;gap:13px;background:rgba(8,11,16,.96);padding:8px 15px;color:#fff">
         <span style="font-family:${MONO};font-weight:800;font-size:17px">${G.half==="T"?"▲":"▼"}${G.inning}</span>
         <span style="font-family:${MONO};font-weight:800;font-size:17px">${G.balls}-${G.strikes}</span>
         <span style="font-family:${MONO};font-weight:800;font-size:17px">${G.outs}<span style="color:rgba(255,255,255,.6);font-size:10px;margin-left:2px">OUT</span></span>
-        <span style="display:inline-flex;gap:9px;align-items:center">${base(b[3])}${base(b[2])}${base(b[1])}</span>
+        ${baseDiamond(b,11)}
       </div></div>`;
 }
 /* TV-mode lower-third scorebug — same data as overlayBug, but anchored bottom-left and sized up so it
@@ -4277,14 +4288,14 @@ function tvBug(){
       <span style="font-family:${MONO};font-weight:800;font-size:26px;letter-spacing:.5px;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.6);white-space:nowrap">${TEAMS[t].short||(t==="away"?"AWAY":"HOME")}</span>
       ${act?`<span style="width:11px;height:11px;border-radius:50%;background:#fff;box-shadow:0 0 9px #fff;flex:none"></span>`:""}
       <span style="margin-left:auto;font-weight:800;font-size:42px;line-height:1;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.7);padding-left:22px">${val}</span></div>`;};
-  const b=G.bases||{}, base=(on)=>`<span style="display:inline-block;width:14px;height:14px;transform:rotate(45deg);background:${on?"#F4B233":"transparent"};border:2.5px solid ${on?"#F4B233":"rgba(255,255,255,.55)"}"></span>`;
+  const b=G.bases||{};
   return `<div style="display:inline-flex;flex-direction:column;border-radius:13px;overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,.7);font-family:${SANS};min-width:340px">
       ${tw("away",G.half==="T")}<div style="height:2px;background:rgba(255,255,255,.22)"></div>${tw("home",G.half==="B")}
       <div style="display:flex;align-items:center;justify-content:space-between;gap:18px;background:rgba(8,11,16,.96);padding:11px 20px;color:#fff">
         <span style="font-family:${MONO};font-weight:800;font-size:24px">${G.half==="T"?"▲":"▼"}${G.inning}</span>
         <span style="font-family:${MONO};font-weight:800;font-size:24px">${G.balls}-${G.strikes}</span>
         <span style="font-family:${MONO};font-weight:800;font-size:24px">${G.outs}<span style="color:rgba(255,255,255,.6);font-size:13px;margin-left:3px">OUT</span></span>
-        <span style="display:inline-flex;gap:12px;align-items:center">${base(b[3])}${base(b[2])}${base(b[1])}</span>
+        ${baseDiamond(b,15)}
       </div></div>`;
 }
 /* Fullscreen TV pane: the pasted/streamed video filling the screen with the lower-third bug on top and
@@ -5505,7 +5516,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v238";
+var APP_VERSION="v239";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;

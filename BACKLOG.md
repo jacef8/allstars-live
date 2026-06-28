@@ -119,6 +119,18 @@ Status: [ ] todo · [~] in progress · [x] done. Grouped by theme; recurring/met
       correctly hidden on validated cellular. FIELD test owed: on the Mevo Wi-Fi confirm the warning
       shows + Go Live succeeds over cellular. NOTE: tablet USB dropped repeatedly today (check cable).
 
+## H3. TV mode — cast/mirror the viewer to a TV (NEW 2026-06-28)
+- [x] H3. jford: "can we allow the viewer screen to be casted to a tv?" Built v238: a fullscreen, no-chrome
+      lean-back view = the pasted/streamed video filling the screen + a BIG lower-third broadcast bug
+      (`tvBug()`, bottom-left, sized to read across a room). Reachable two ways: a "TV" button in the viewer
+      monitor / the Watch-with-scorebug sheet (`tventer` → also requests browser Fullscreen), OR open
+      `?tv=1` directly on a smart-TV / Chromecast browser (boot flag forces viewerLocked+viewer). `tvMode`
+      short-circuits render() like OVERLAY. Controls: Video (reopen paste/delay sheet), Fullscreen (`tvcast`
+      toggles Fullscreen API + a cast/mirror hint), Exit TV. Honest limit: a true one-tap Google Cast SDK
+      button is a FOLLOW-UP — YouTube iframe + HTML overlay can't be cast as one element, so v1 is
+      fullscreen + screen-mirroring (or open the ?tv link on the TV). Verified in preview: video fills,
+      bug shows RAY 3 / HAW 5 with correct count/outs/bases + LIVE·+8s delay tag.
+
 ## H2. Watch-with-scorebug — paste any live link (NEW 2026-06-28)
 - [x] H2. jford's idea: instead of streaming video THROUGH our app, a viewer pastes a link to someone
       else's YouTube-live of the game and our app overlays the live scorebug on top (no second stream).
