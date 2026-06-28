@@ -554,6 +554,42 @@ function seasonStatsFor(t,sel){
 }
 function teamRecForSeason(t,sel){ let w=0,l=0,tt=0; (t&&t.games||[]).forEach(g=>{ if(sel!=="all"&&gameSeason(g)!==sel)return; if(g.result==="W")w++;else if(g.result==="L")l++;else if(g.result==="T")tt++; }); return {w:w,l:l,t:tt}; }
 window.setStatsSeason=function(v){ statsSeason=v; render(); };
+/* Add a PAST game (scored elsewhere, e.g. GameChanger) straight into a team's log so it counts toward
+   the record + season stats. INTERNAL helper — no UI/button. Payload: {teamId?,id?,date,opp,oppShort,
+   us,them,ourSide?,oppHits?,bat:[{num,name,ab,r,h,rbi,bb,k,sb,cs}],pitch?:[...]}. Builds the same compact
+   game-box shape endGame() stores so it displays + rolls up identically. */
+window.addPastGame=function(obj){
+  try{
+    if(typeof obj==="string") obj=JSON.parse(obj);
+    const t=obj.teamId?teamById(obj.teamId):teamById(openTeamId); if(!t) return false;
+    if(!obj||!Array.isArray(obj.bat)) return false;
+    const us=+obj.us||0, them=+obj.them||0;
+    const ourSide=(obj.ourSide==="away")?"away":"home", oppSide=ourSide==="home"?"away":"home";
+    const ourBat=obj.bat.map((r,i)=>({num:String(r.num==null?"":r.num),name:r.name||("#"+r.num),ab:+r.ab||0,r:+r.r||0,h:+r.h||0,rbi:+r.rbi||0,bb:+r.bb||0,k:+r.k||0,sb:+r.sb||0,cs:+r.cs||0,slot:i}));
+    const sumH=ourBat.reduce((a,b)=>a+(b.h||0),0);
+    const bat={away:[],home:[]}; bat[ourSide]=ourBat;
+    const pitch={away:[],home:[]}; pitch[ourSide]=(obj.pitch||[]).map(p=>({name:p.name||"Pitcher",ip:p.ip||"0.0",pc:+p.pc||0,h:+p.h||0,r:+p.r||0,bb:+p.bb||0,k:+p.k||0,outs:+p.outs||0}));
+    const totals={away:{r:0,h:0,e:0},home:{r:0,h:0,e:0}};
+    totals[ourSide]={r:us,h:sumH,e:0}; totals[oppSide]={r:them,h:+obj.oppHits||0,e:0};
+    const g=Object.assign({
+      id:(obj.id||("g"+Date.now().toString(36))), date:obj.date||todayLocal(),
+      opp:obj.opp||"Opponent", oppShort:(obj.oppShort||"OPP"),
+      us:us, them:them, result:(us>them?"W":us<them?"L":"T"), yt:"",
+      ourSide:ourSide, maxI:(+obj.maxI||1),
+      awayShort:(ourSide==="away"?(t.short||"US"):(obj.oppShort||"OPP")),
+      homeShort:(ourSide==="home"?(t.short||"US"):(obj.oppShort||"OPP")),
+      awayName:(ourSide==="away"?t.name:obj.opp), homeName:(ourSide==="home"?t.name:obj.opp),
+      awayColor:(ourSide==="away"?t.color:"#8893a7"), homeColor:(ourSide==="home"?t.color:"#8893a7"),
+      line:{away:[],home:[]}, totals:totals, bat:bat, pitch:pitch, lineupLog:[], imported:true
+    });
+    if(!Array.isArray(t.games))t.games=[];
+    t.games.unshift(g); t.record=teamRec(t);
+    try{ recomputeSeasonFromGames(t); }catch(e){}
+    t.updatedAt=Date.now(); saveDB();
+    try{ if(window.cloudSaveTeam)window.cloudSaveTeam(t,true); }catch(e){}
+    return true;
+  }catch(e){ return false; }
+};
 window.teamPNum=function(id,v){const t=teamById(openTeamId);if(!t)return;const p=t.players.find(p=>p.id===id);if(p){p.num=v;saveDB();}};
 window.teamPFirst=function(id,v){const t=teamById(openTeamId);if(!t)return;const p=t.players.find(p=>p.id===id);if(p){p.first=v;ensureName(p);saveDB();}};
 window.teamPLast=function(id,v){const t=teamById(openTeamId);if(!t)return;const p=t.players.find(p=>p.id===id);if(p){p.last=v;ensureName(p);saveDB();}};
@@ -5523,6 +5559,39 @@ function applySetupParams(){
 
 applySetupParams();
 render();broadcast();
+// ===== ONE-TIME IMPORT (REMOVE AFTER CONFIRMED): the 2026-06-28 GameChanger game vs AAA FC All Stars
+// 2026, added to the LC "AAA" team's record + season stats. No UI — runs once (gated by the fixed id),
+// then this block is to be deleted in a later deploy. Matches the AAA team by name (won't hit the AA team).
+try{
+  const _aaa=(DB.teams||[]).find(t=>/AAA/.test((t.name||"").toUpperCase()));
+  const _gid="imp-lcaaa-20260628";
+  if(_aaa && !(_aaa.games||[]).some(g=>g.id===_gid)){
+    window.addPastGame({ id:_gid, teamId:_aaa.id, date:"2026-06-28",
+      opp:"AAA FC All Stars 2026", oppShort:"AFC", us:6, them:7, oppHits:9, maxI:7,
+      bat:[
+        {num:"00",name:"H. Hill",ab:4,r:1,h:2,rbi:0,bb:0,k:2,sb:1},
+        {num:"37",name:"K. Schaefer",ab:3,r:1,h:2,rbi:0,bb:0,k:0,sb:0},
+        {num:"2", name:"C. Brock",ab:3,r:0,h:1,rbi:2,bb:0,k:1,sb:0},
+        {num:"7", name:"M. Reece",ab:3,r:1,h:1,rbi:1,bb:1,k:1,sb:0},
+        {num:"27",name:"T. Brown",ab:2,r:1,h:1,rbi:0,bb:1,k:1,sb:0},
+        {num:"10",name:"C. Byler",ab:1,r:0,h:0,rbi:0,bb:1,k:1,sb:1},
+        {num:"8", name:"J. Ford",ab:3,r:0,h:0,rbi:0,bb:0,k:2,sb:0,cs:1},
+        {num:"9", name:"K. Grant",ab:2,r:1,h:0,rbi:0,bb:2,k:0,sb:3},
+        {num:"15",name:"M. Murphy",ab:1,r:0,h:0,rbi:0,bb:1,k:1,sb:0},
+        {num:"11",name:"P. Wahlstrom",ab:3,r:0,h:0,rbi:0,bb:0,k:2,sb:0},
+        {num:"3", name:"R. Stoutamire",ab:3,r:1,h:0,rbi:0,bb:1,k:2,sb:0,cs:1},
+        {num:"1", name:"T. Kirkpatrick",ab:1,r:0,h:0,rbi:0,bb:1,k:0,sb:0,cs:1}
+      ],
+      pitch:[
+        {name:"#8 J. Ford",ip:"2.1",pc:40,h:2,r:3,bb:2,k:5,outs:7},
+        {name:"#00 H. Hill",ip:"2.0",pc:40,h:4,r:2,bb:2,k:3,outs:6},
+        {name:"#10 C. Byler",ip:"1.2",pc:28,h:1,r:1,bb:1,k:5,outs:5},
+        {name:"#3 R. Stoutamire",ip:"1.2",pc:34,h:2,r:1,bb:0,k:2,outs:5}
+      ]
+    });
+    try{ render(); }catch(e){}
+  }
+}catch(e){}
 // Persistent watch link (?watch=<gameId>): subscribe to the cloud game doc and follow it live —
 // works even after the scorer's device goes offline. Public-read by rules; no sign-in needed.
 (function(){ var id; try{id=new URLSearchParams(location.search).get("watch");}catch(e){} if(!id)return;
@@ -5566,7 +5635,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v242";
+var APP_VERSION="v243";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
