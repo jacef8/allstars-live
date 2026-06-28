@@ -532,6 +532,12 @@ function recomputeSeasonFromGames(t){
 window.teamPNum=function(id,v){const t=teamById(openTeamId);if(!t)return;const p=t.players.find(p=>p.id===id);if(p){p.num=v;saveDB();}};
 window.teamPFirst=function(id,v){const t=teamById(openTeamId);if(!t)return;const p=t.players.find(p=>p.id===id);if(p){p.first=v;ensureName(p);saveDB();}};
 window.teamPLast=function(id,v){const t=teamById(openTeamId);if(!t)return;const p=t.players.find(p=>p.id===id);if(p){p.last=v;ensureName(p);saveDB();}};
+// Single full-name setter (consistency: one Name field everywhere, not separate First/Last). Re-derives
+// first/last from the typed name so the scorebug abbreviation (pBug = "F. Last") keeps working.
+function _setFullName(p,v){ if(!p)return; p.name=v; p.first=undefined; p.last=undefined; ensureName(p); }
+window.teamPName=function(id,v){const t=teamById(openTeamId);if(!t)return;const p=t.players.find(p=>p.id===id);if(p){_setFullName(p,v);saveDB();}};
+window.luPName=function(slot,v){const ri=G.lineup.order[+slot]; if(ROSTER[ri]){_setFullName(ROSTER[ri],v); saveDB();}};
+window.edName=function(v){const ri=G.lineup.order[editSlot]; if(ROSTER[ri]){_setFullName(ROSTER[ri],v); saveDB();}};
 window.luName=function(v){const t=teamById(openTeamId);const lu=t&&lineupById(t,editLineupId);if(lu){lu.name=(v||"").trim()||"Lineup";saveDB();}};
 window.applySavedLineup=function(id){ if(!id)return; const t=curTeam(); const lu=t&&lineupById(t,id); const idx=lu&&lineupToIdx(t,lu);
   if(idx&&idx.order.length>=9){ G.lineup={order:idx.order.slice(),pos:Object.assign({},idx.pos)}; t.activeLineupId=id; saveDB(); render(); try{broadcast();}catch(e){} }
@@ -2891,8 +2897,7 @@ function actionArea(){
     const roster=t.players.map((p,i)=>`<div style="display:flex;align-items:center;gap:8px;padding:8px 0;${i>0?`border-top:1.5px solid ${T.line};`:""}">
         <span title="Player ${i+1} of ${t.players.length}" style="flex:none;width:26px;text-align:center;font-family:${MONO};font-size:16px;font-weight:800;color:${T.sageDim}">${i+1}</span>
         <input value="${(p.num||"").replace(/"/g,"&quot;")}" oninput="teamPNum('${p.id}',this.value)" inputmode="numeric" maxlength="3" style="${cell};width:54px;text-align:center;font-family:${MONO};font-weight:800;font-size:18px">
-        <input value="${(p.first||"").replace(/"/g,"&quot;")}" oninput="teamPFirst('${p.id}',this.value)" placeholder="First" style="${cell};flex:1 1 130px;max-width:250px;min-width:0;font-size:18px">
-        <input value="${(p.last||"").replace(/"/g,"&quot;")}" oninput="teamPLast('${p.id}',this.value)" placeholder="Last" style="${cell};flex:1 1 130px;max-width:250px;min-width:0;font-size:18px">
+        <input value="${(p.name||"").replace(/"/g,"&quot;")}" oninput="teamPName('${p.id}',this.value)" placeholder="Player name" style="${cell};flex:1 1 200px;min-width:0;font-size:18px">
         <div style="flex:1;min-width:0"></div>
         <button data-act="openplayer" data-arg="${t.id}:${p.id}" title="View / follow player" style="background:${T.surface2};border:2px solid ${T.line};color:${isFollowingPlayer(t.id,p.id)?T.amber:T.lime};border-radius:9px;min-width:48px;height:46px;display:inline-flex;align-items:center;justify-content:center;font-size:24px;font-weight:800;flex:none;line-height:1">${isFollowingPlayer(t.id,p.id)?IC('starFill',22):"&rsaquo;"}</button>
         <button data-act="rmteamp" data-arg="${p.id}" title="Remove player" style="background:none;border:2px solid ${T.out}66;color:${T.out};border-radius:9px;min-width:48px;height:46px;display:inline-flex;align-items:center;justify-content:center;font-size:26px;font-weight:800;flex:none;line-height:1"${t.players.length<=9?" disabled":""}>&times;</button></div>`).join("");
@@ -3646,8 +3651,7 @@ function actionArea(){
       if(lineEditSlot===slot) return `<div data-row data-ri="${ri}" style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;background:rgba(225,29,46,.10);border:2px solid ${T.lime};border-radius:10px;padding:9px 9px">
         <span style="font-family:${MONO};font-size:17px;font-weight:800;color:${T.lime};width:18px;text-align:center;flex:none">${slot+1}</span>
         <input value="${(p.num||"").replace(/"/g,"&quot;")}" oninput="luPNum(${slot},this.value)" inputmode="numeric" maxlength="3" style="${eCell};width:52px;text-align:center;font-family:${MONO};font-weight:800;flex:none">
-        <input value="${(p.first||"").replace(/"/g,"&quot;")}" oninput="luPFirst(${slot},this.value)" placeholder="First" style="${eCell};flex:1 1 90px;min-width:0">
-        <input value="${(p.last||"").replace(/"/g,"&quot;")}" oninput="luPLast(${slot},this.value)" placeholder="Last" style="${eCell};flex:1 1 90px;min-width:0">
+        <input value="${(p.name||"").replace(/"/g,"&quot;")}" oninput="luPName(${slot},this.value)" placeholder="Player name" style="${eCell};flex:1 1 150px;min-width:0">
         <button data-act="pickpos" data-arg="${slot}" style="background:${isP?OUR.color:T.surface2};border:2px solid ${isP?OUR.color:T.line};color:${isP?"#FFFFFF":T.chalk};border-radius:7px;padding:8px 12px;font-family:${MONO};font-size:15px;font-weight:800;flex:none">${pos}</button>
         <button data-act="editplayer" data-arg="${slot}" style="background:${T.lime};border:2px solid ${T.lime};color:#fff;border-radius:8px;padding:9px 15px;font-family:${SANS};font-size:14px;font-weight:800;flex:none">Done</button></div>`;
       if(narrow) return `<div data-row data-ri="${ri}" style="display:flex;align-items:center;gap:9px;background:${_cur?"rgba(225,29,46,.12)":T.surface2};border:2px solid ${_cur?T.lime:T.line};border-radius:10px;padding:10px 9px">
@@ -3717,15 +3721,13 @@ function actionArea(){
     const ri=G.lineup.order[editSlot],p=ROSTER[ri]||{num:"",first:"",last:""};
     const fld=`background:${T.surface};border:2px solid ${T.line};color:${T.ink};border-radius:10px;padding:14px 16px;font-family:${SANS};font-size:16px;font-weight:700;outline:none;width:100%`;
     const lb=`font-size:13.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin:0 2px 6px`;
-    return step("Edit player",`Batting ${editSlot+1} &middot; set number, first &amp; last name.`,
+    return step("Edit player",`Batting ${editSlot+1} &middot; set number &amp; name.`,
       (`<div style="display:flex;flex-direction:column;gap:12px">
         <div style="display:flex;gap:10px">
           <div style="flex:none;width:92px"><div style="${lb}">Number</div>
             <input type="text" inputmode="numeric" maxlength="3" value="${(p.num||"").replace(/"/g,"&quot;")}" oninput="edNum(this.value)" style="${fld};text-align:center;font-family:${MONO};font-weight:800"></div>
-          <div style="flex:1"><div style="${lb}">First name</div>
-            <input type="text" value="${(p.first||"").replace(/"/g,"&quot;")}" placeholder="First" oninput="edFirst(this.value)" style="${fld}"></div></div>
-        <div><div style="${lb}">Last name</div>
-          <input type="text" value="${(p.last||"").replace(/"/g,"&quot;")}" placeholder="Last" oninput="edLast(this.value)" style="${fld}"></div>
+          <div style="flex:1"><div style="${lb}">Player name</div>
+            <input type="text" value="${(p.name||"").replace(/"/g,"&quot;")}" placeholder="Player name" oninput="edName(this.value)" style="${fld}"></div></div>
         <button data-act="backlineup" style="${bigBtn(OUR.color)}">Done</button>
       </div>`),"backlineup");
   }
@@ -5245,7 +5247,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v230";
+var APP_VERSION="v231";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
