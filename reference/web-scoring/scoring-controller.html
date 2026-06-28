@@ -712,7 +712,7 @@ const initGame=()=>({inning:1,half:"T",away:0,home:0,outs:0,balls:0,strikes:0,
   startedAt:null,  // wall-clock ms when the game ACTUALLY started (auto-set at first pitch / game start; editable in Game Setup) — drives the game timer
   lineup:{ order:[0,1,2,3,4,5,6,7,8],   // batting order: 9-12 entries (slots 10+ = extra hitters)
            pos:{P:0,C:1,"1B":2,"2B":3,"3B":4,SS:5,LF:6,CF:7,RF:8} }});
-let G=initGame(),hist=[],mode="home",tap=null,contact=null,result=null,plan=null,toast=null,toastTimer=null,curResults=[],showAll=false,showZones=false,editSlot=null,confirmAct=null,gameActive=false,lineupTab="us",newgameFrom="home",brSheet=false,correctOpen=false,correctOpenAt=0,lineupView="list",fieldAssign=null,fieldHold=null,fieldDisplaced=null,lineEditSlot=null,luFromSetup=false,koPick=null,oppFieldSel=null,gcArrange=false,bugPreview=false,barEdit=false;
+let G=initGame(),hist=[],mode="home",tap=null,contact=null,result=null,plan=null,toast=null,toastTimer=null,curResults=[],showAll=false,showZones=false,editSlot=null,confirmAct=null,gameActive=false,lineupTab="us",newgameFrom="home",brSheet=false,correctOpen=false,correctOpenAt=0,lineupView="list",fieldAssign=null,fieldHold=null,fieldDisplaced=null,lineEditSlot=null,luFromSetup=false,koPick=null,oppFieldSel=null,gcArrange=false,bugPreview=false,barEdit=false,editAB=null,gameEdit=null;
 // Resume the last in-progress game (saved by saveGame) across reloads/app updates, so the
 // lineup/score is never lost. Stays on the home screen → shows "Resume". Re-links ROSTER
 // to the saved team so the lineup's player indices resolve correctly.
@@ -1332,6 +1332,70 @@ function correctModal(){
         ${step("pitch","Pitch count",_corrPC,_corrPName)}
       </div></div>`;
 }
+/* ===== Edit a COMPLETED at-bat from the game feed (live game) =====
+   Two paths: (1) "Change the call" reclassifies the result and adjusts the batter's box-score
+   line (AB/H/BB/K) — a fast fix for "that single was really a double". (2) "Rewind to this play"
+   uses the snapshot stack to roll the whole game back to just before the play, for any change that
+   touches runners / score / outs (which a stat-only edit can't reconstruct). */
+function kindStat(kind){ return {
+  ab: ["walk","hbp","sacfly","sacbunt","ci"].includes(kind)?0:1,   // these don't count as an at-bat
+  h:  HIT_KINDS.includes(kind)?1:0,
+  bb: kind==="walk"?1:0,
+  k:  kind==="strikeout"?1:0 }; }
+function reclassAB(eid,newKind){
+  const e=gameFeed.find(x=>x.id===eid); if(!e)return; const s=e.bk&&G.stats&&G.stats[e.bk]; if(!s)return;
+  snapshot();
+  const o=kindStat(e.kind),n=kindStat(newKind);
+  s.ab=Math.max(0,(s.ab||0)+(n.ab-o.ab));
+  s.h =Math.max(0,(s.h ||0)+(n.h -o.h));
+  s.bb=Math.max(0,(s.bb||0)+(n.bb-o.bb));
+  s.k =Math.max(0,(s.k ||0)+(n.k -o.k));
+  e.kind=newKind; e.head=PLAYHEAD[newKind]||newKind.toUpperCase();   // relabel the feed line
+  render(); broadcast();
+}
+function adjustABRbi(eid,d){
+  const e=gameFeed.find(x=>x.id===eid); if(!e)return; const s=e.bk&&G.stats&&G.stats[e.bk]; if(!s)return;
+  snapshot(); s.rbi=Math.max(0,(s.rbi||0)+d); render(); broadcast();
+}
+function rewindToEvent(eid){
+  const idx=gameFeed.findIndex(e=>e.id===eid); if(idx<0)return;
+  // The most recent snapshot taken at/before this feed line existed = the state just before the play.
+  let found=-1; for(let i=hist.length-1;i>=0;i--){ if(hist[i].fl<=idx){ found=i; break; } }
+  if(found<0){ editAB=null; flash("That play is too far back to rewind to."); render(); return; }
+  const snap=hist[found];
+  hist.length=found;                                              // drop this snapshot + everything after
+  G=snap.g;                                                       // restore (snapshot() stored a deep copy)
+  if(Array.isArray(gameFeed))gameFeed.length=Math.min(gameFeed.length,snap.fl);
+  editAB=null; resetUI(); render(); broadcast(); flash("Rewound to that play — re-enter it.");
+}
+function abEditSheet(){
+  const e=gameFeed.find(x=>x.id===editAB); if(!e){ editAB=null; return ""; }
+  const s=(e.bk&&G.stats&&G.stats[e.bk])||null;
+  const nm=s?(s.name||("#"+s.num)):"Batter";
+  const KINDS=[["single","1B"],["double","2B"],["triple","3B"],["hr","HR"],["out1","GO"],["flyout","FO"],["lineout","LO"],["popout","PO"],["strikeout","K"],["walk","BB"],["hbp","HBP"],["fc","FC"],["error","E"],["sacfly","SF"],["sacbunt","SAC"]];
+  const opt=(k,l)=>`<button data-act="abreclass" data-arg="${e.id}:${k}" style="background:${e.kind===k?T.lime:T.surface2};color:${e.kind===k?"#fff":T.chalk};border:2px solid ${e.kind===k?T.lime:T.line};border-radius:10px;padding:11px 4px;font-family:${MONO};font-weight:800;font-size:14px">${l}</button>`;
+  const sBtn=`background:${T.surface};border:2px solid ${T.line};color:${T.chalk};border-radius:10px;width:46px;height:46px;font-size:24px;font-weight:800;line-height:1;flex:none`;
+  return `<div data-act="abeditclose" style="position:fixed;left:0;right:0;top:0;height:calc(var(--avh) * 100);z-index:121;background:rgba(8,11,16,.8);display:flex;align-items:center;justify-content:center;padding:16px">
+    <div data-act="noop" style="width:100%;max-width:470px;max-height:calc(var(--avh) * 92);overflow-y:auto;-webkit-overflow-scrolling:touch;background:${T.surface};border:2px solid ${T.line};border-radius:18px;padding:16px;display:flex;flex-direction:column;gap:11px;box-shadow:0 18px 54px rgba(0,0,0,.6)">
+      <div style="display:flex;align-items:center;gap:10px"><div style="flex:1;font-family:${MONO};font-size:17px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:${T.lime}">Edit this at-bat</div>
+        <button data-act="abeditclose" style="${ghost};padding:8px 14px;flex:none">Done</button></div>
+      <div style="background:${T.surface2};border:2px solid ${T.line};border-radius:12px;padding:10px 12px">
+        <div style="font-weight:800;color:${T.ink};font-size:15px">${nm} &middot; ${e.half==="T"?"Top":"Bot"} ${e.inn}</div>
+        <div style="font-size:12px;color:${T.sageDim};margin-top:2px">${e.head}${e.sub?" — "+e.sub:""}</div></div>
+      ${s?`<div style="font-size:10px;font-weight:800;letter-spacing:1px;color:${T.sageDim};margin:2px 2px -3px">CHANGE THE CALL &middot; adjusts the box score</div>
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:7px">${KINDS.map(k=>opt(k[0],k[1])).join("")}</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;font-family:${MONO};font-size:13px;color:${T.sage};margin:2px 2px 0"><span>AB ${s.ab||0}</span><span>H ${s.h||0}</span><span>BB ${s.bb||0}</span><span>K ${s.k||0}</span><span>R ${s.r||0}</span><span>RBI ${s.rbi||0}</span></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;background:${T.surface2};border:2px solid ${T.line};border-radius:12px;padding:10px 12px">
+        <div style="font-weight:700;color:${T.ink};font-size:15px">RBI on this play</div>
+        <div style="display:flex;align-items:center;gap:12px;flex:none">
+          <button data-act="abrbi" data-arg="${e.id}:-1" style="${sBtn}">&minus;</button>
+          <span style="font-family:${MONO};font-size:24px;font-weight:800;min-width:30px;text-align:center">${s.rbi||0}</span>
+          <button data-act="abrbi" data-arg="${e.id}:1" style="${sBtn}">+</button></div></div>`:`<div style="font-size:12px;color:${T.sageDim}">This feed line isn't tied to a batter's stat line, so only Rewind is available.</div>`}
+      <div style="font-size:10px;font-weight:800;letter-spacing:1px;color:${T.sageDim};margin:4px 2px -3px">RUNNERS / SCORE / OUTS CHANGED?</div>
+      <button data-act="abrewind" data-arg="${e.id}" style="background:${T.amber};color:#1a1206;border:none;border-radius:12px;padding:13px;font-family:${MONO};font-weight:800;font-size:14px;letter-spacing:.4px">&#8624; Rewind to this play &amp; re-score it</button>
+      <div style="font-size:11px;color:${T.sageDim};margin-top:-4px">Use this when the fix affects runners, the score, or outs — it rolls the game back to just before this play so you can re-enter it correctly. Plays after it are cleared.</div>
+    </div></div>`;
+}
 /* Long-press any [data-longpress] element (re-bound after each render). Currently the scoreboard
    → opens the correction sheet. */
 function setupLongPress(){
@@ -1540,12 +1604,13 @@ const PLAYHEAD={single:"SINGLE",double:"DOUBLE",triple:"TRIPLE",hr:"HOME RUN",er
   dp:"DOUBLE PLAY",sacfly:"SAC FLY",sacbunt:"SAC BUNT",walk:"WALK",hbp:"HIT BY PITCH",strikeout:"STRIKEOUT"};
 // Plays that record an out — the feed shows the resulting out count after these (B2).
 const OUT_KINDS=["out1","flyout","lineout","popout","dp","sacfly","sacbunt","strikeout","fc"];
-function bcastEvent(kind,sub,team){
+function bcastEvent(kind,sub,team,bk){
   const head=PLAYHEAD[kind]||kind.toUpperCase();
   _event={id:++_eventId,head,sub:sub||"",team};
   // Append to the live game feed (play-by-play) shown to viewers. Carry kind + the post-play out
   // count so the feed can tag out-making plays with "· N out" (relevant context for that play).
-  gameFeed.push({id:_eventId,inn:G.inning,half:G.half,type:"play",kind:kind,outs:(G.outs|0),head,sub:sub||"",away:G.away,home:G.home});
+  // bk = the batter's stat key (e.g. "o3"/"p5") so a completed at-bat can be edited from the feed.
+  gameFeed.push({id:_eventId,inn:G.inning,half:G.half,type:"play",kind:kind,outs:(G.outs|0),head,sub:sub||"",away:G.away,home:G.home,bk:bk||null});
   if(gameFeed.length>220)gameFeed.shift();
 }
 /* Assemble the live box score (per-batter rows + R/H/E totals), mapped to away/home. */
@@ -1603,14 +1668,14 @@ function broadcast(){
 function pitch(type){
   try{ if(navigator.vibrate) navigator.vibrate(12); }catch(e){}   // short, light haptic confirm on each pitch tap
   koPick=null;   // a new pitch dismisses any pending "looking / swinging?" prompt (skippable, B4)
-  snapshot();const k0=battingKey(),b0=batter(),bn=b0.name,bnum=b0.num;_pitch=type;recordPitch(type);
+  snapshot();const k0=battingKey(),b0=batter(),bn=b0.name,bnum=b0.num,bk0=batterKeyOf(b0);_pitch=type;recordPitch(type);
   const pt=(advPitch&&pitchType)?" "+pitchType:"";   // pitch type tag (if advanced tracking on)
-  if(type==="ball"){G.balls++;try{Snd.pip("ball");}catch(e){}feedPitch("Ball"+pt,"#"+bnum+" · "+G.balls+"-"+G.strikes);if(G.balls>=4){applyPlanInline("walk");flash("Walk");bcastEvent("walk","Ball four · "+bn,k0);}}
-  else if(type==="strike"){G.strikes++;feedPitch("Strike"+pt,"#"+bnum+" · "+G.balls+"-"+G.strikes);if(G.strikes>=3){G.outs++;creditBatter("strikeout",0);nextBatter();flipIfNeeded();flash("Strikeout");bcastEvent("strikeout",bn,k0);koPick=_eventId;G.anim={id:((G.anim&&G.anim.id)||0)+1,ts:Date.now(),sfx:"whiff"};}else{try{Snd.pip("strike");}catch(e){}}}
+  if(type==="ball"){G.balls++;try{Snd.pip("ball");}catch(e){}feedPitch("Ball"+pt,"#"+bnum+" · "+G.balls+"-"+G.strikes);if(G.balls>=4){applyPlanInline("walk");flash("Walk");bcastEvent("walk","Ball four · "+bn,k0,bk0);}}
+  else if(type==="strike"){G.strikes++;feedPitch("Strike"+pt,"#"+bnum+" · "+G.balls+"-"+G.strikes);if(G.strikes>=3){G.outs++;creditBatter("strikeout",0);nextBatter();flipIfNeeded();flash("Strikeout");bcastEvent("strikeout",bn,k0,bk0);koPick=_eventId;G.anim={id:((G.anim&&G.anim.id)||0)+1,ts:Date.now(),sfx:"whiff"};}else{try{Snd.pip("strike");}catch(e){}}}
   else if(type==="foul"){if(G.strikes<2)G.strikes++;try{Snd.pip("foul");}catch(e){}feedPitch("Foul"+pt,"#"+bnum+" · "+G.balls+"-"+G.strikes);}
   render();broadcast();try{triggerAnim(G.anim);}catch(e){}
 }
-function manual(kind,label){snapshot();const k0=battingKey(),bn=batter().name;if(kind==="hbp")recordPitch("hbp");applyPlanInline(kind);bcastEvent(kind,bn,k0);flash(label);render();broadcast();}
+function manual(kind,label){snapshot();const k0=battingKey(),bn=batter().name,bk0=batterKeyOf(batter());if(kind==="hbp")recordPitch("hbp");applyPlanInline(kind);bcastEvent(kind,bn,k0,bk0);flash(label);render();broadcast();}
 function startInPlay(){mode="locate";tap=null;render();}
 function onFieldTap(x,y){const z=zoneFromPoint(x,y);tap={x,y,pos:z.pos,zone:z.zone};contact=defaultContact(z.pos);mode="contact";render();}
 function chooseContact(c){contact=c;showAll=false;mode="result";render();}
@@ -1664,7 +1729,7 @@ function commit(r,movers){
     }
     G.anim={ id:((G.anim&&G.anim.id)||0)+1, ts:Date.now(), hit:(tap?{x:tap.x,y:tap.y}:null), k:r.kind, hr:(r.kind==="hr"), contact:contact||"", outKind:(outsFromKind(r.kind)>0), throws:_throws, paths:_ap.map(p=>({pts:p.pts,color:p.color,scored:!!p.scored,out:!!p.out})) };
   }catch(e){}
-  const k0=battingKey(),bn=batter().name;
+  const k0=battingKey(),bn=batter().name,bk0=batterKeyOf(batter());
   const runs=resolve(movers,outs);                 // capped runs that actually count
   const rbi=rbiEligible(r.kind)?runs:0;
   if(r.kind==="error") G.errors[k0==="away"?"home":"away"]++;   // error charged to the fielding team
@@ -1676,7 +1741,7 @@ function commit(r,movers){
   const _ord={1:"1st",2:"2nd",3:"3rd"};
   const _scd=movers.filter(m=>!m.out&&m.dest===4&&!m.isBatter).map(m=>((m.name||m.label||"Runner")+(_ord[m.start]?" scores from "+_ord[m.start]:" scores")));
   const _loc=(tap&&tap.zone)?(" "+tap.zone):"";   // where it was hit, e.g. "to left field" (B5 — name the hitter + where)
-  bcastEvent(r.kind, bn+_loc+(_scd.length?"; "+_scd.join(", "):"")+(rbi?` · ${rbi} RBI`:""), k0);
+  bcastEvent(r.kind, bn+_loc+(_scd.length?"; "+_scd.join(", "):"")+(rbi?` · ${rbi} RBI`:""), k0, bk0);
   flash(r.note+(runs?` · ${runs} run${runs>1?"s":""}`:"")+(rbi?` · ${rbi} RBI`:"")+(capped?" · run cap":""));resetUI();render();broadcast();
   try{ triggerAnim(G.anim); }catch(e){}
 }
@@ -2418,25 +2483,34 @@ function feedPanel(){
   // At-bat view = plays, PLUS any pitch-type entry that scored (e.g. a wild pitch/passed ball/steal that
   // brought a run home) so scoring plays are never hidden behind the Pitch filter.
   const items=gameFeed.filter(e=> feedView==="pitch" ? true : (e.type!=="pitch" || _chg[e.id]));
+  // Feed density (S/M/L) — scales the feed text so the user can fit more or read bigger (replaces a
+  // drag-resize, which would fight the flexbox layout this panel lives in across the various views).
+  const fzKey=(()=>{try{return localStorage.getItem("al-feed-size")||"m";}catch(e){return "m";}})();
+  const fz=fzKey==="s"?0.86:fzKey==="l"?1.2:1, fpx=n=>Math.round(n*fz);
+  const _editable=(typeof viewMode==="undefined"||viewMode==="scorer")&&!G.final;   // only the scorer edits; never a finished game
   const rows=items.slice(-70).reverse().map(e=>{
     // End-of-inning marker: a centered divider line so it visibly breaks the feed between innings.
     if(e.kind==="inningend"){
       return `<div style="display:flex;align-items:center;gap:10px;padding:8px 15px;background:rgba(225,29,46,.07)">
         <div style="flex:1;height:1px;background:${T.line};opacity:.22"></div>
-        <span style="font-family:${MONO};font-size:12.5px;font-weight:800;letter-spacing:.5px;color:${T.lime};white-space:nowrap;text-transform:uppercase">${e.head} &middot; ${e.sub}</span>
+        <span style="font-family:${MONO};font-size:${fpx(12)}px;font-weight:800;letter-spacing:.5px;color:${T.lime};white-space:nowrap;text-transform:uppercase">${e.head} &middot; ${e.sub}</span>
         <div style="flex:1;height:1px;background:${T.line};opacity:.22"></div></div>`;
     }
     const pit=e.type==="pitch";
-    return `<div style="display:flex;align-items:baseline;gap:12px;padding:${pit?"6px 15px":"11px 15px"};border-bottom:1.5px solid ${pit?";background:rgba(255,255,255,.02)":""}">
-      <span style="font-family:${MONO};font-size:${pit?"13px":"15px"};font-weight:800;color:${pit?T.sageDim:T.lime};min-width:38px">${e.half==="T"?"▲":"▼"}${e.inn}</span>
-      <span style="flex:1;min-width:0;color:${pit?T.sage:T.chalk};font-size:${pit?"14px":"17px"};font-weight:${pit?"600":"700"}">${e.head}${e.sub?` <span style="color:${T.sageDim};font-weight:600">— ${e.sub}</span>`:""}${(!pit&&OUT_KINDS.includes(e.kind)&&e.outs!=null)?` <span style="font-family:${MONO};font-size:12px;font-weight:800;color:${e.outs>=3?T.lime:T.sageDim};white-space:nowrap">&middot; ${e.outs} OUT${e.outs===1?"":"S"}</span>`:""}</span>
-      ${_chg[e.id]?`<span style="font-family:${MONO};font-size:15px;font-weight:800;color:${T.lime};white-space:nowrap;background:rgba(225,29,46,.12);border-radius:6px;padding:2px 8px">${TEAMS.away.short} ${e.away}-${e.home} ${TEAMS.home.short}</span>`:""}
+    return `<div style="display:flex;align-items:baseline;gap:10px;padding:${pit?"6px 15px":"11px 15px"};border-bottom:1.5px solid rgba(255,255,255,.06);${pit?"background:rgba(255,255,255,.02)":""}">
+      <span style="font-family:${MONO};font-size:${pit?fpx(13):fpx(15)}px;font-weight:800;color:${pit?T.sageDim:T.lime};min-width:38px">${e.half==="T"?"▲":"▼"}${e.inn}</span>
+      <span style="flex:1;min-width:0;color:${pit?T.sage:T.chalk};font-size:${pit?fpx(14):fpx(17)}px;font-weight:${pit?"600":"700"}">${e.head}${e.sub?` <span style="color:${T.sageDim};font-weight:600">— ${e.sub}</span>`:""}${(!pit&&OUT_KINDS.includes(e.kind)&&e.outs!=null)?` <span style="font-family:${MONO};font-size:${fpx(12)}px;font-weight:800;color:${e.outs>=3?T.lime:T.sageDim};white-space:nowrap">&middot; ${e.outs} OUT${e.outs===1?"":"S"}</span>`:""}</span>
+      ${_chg[e.id]?`<span style="font-family:${MONO};font-size:${fpx(15)}px;font-weight:800;color:${T.lime};white-space:nowrap;background:rgba(225,29,46,.12);border-radius:6px;padding:2px 8px">${TEAMS.away.short} ${e.away}-${e.home} ${TEAMS.home.short}</span>`:""}
+      ${(_editable&&!pit&&e.kind!=="inningend")?`<button data-act="abedit" data-arg="${e.id}" title="Edit this at-bat" style="flex:none;background:${T.surface2};border:1.5px solid ${T.line};color:${T.sage};border-radius:7px;padding:3px 9px;font-family:${MONO};font-size:11px;font-weight:800;letter-spacing:.5px;cursor:pointer">EDIT</button>`:""}
     </div>`;}).join("");
   const seg=(v,lbl)=>`<button data-act="feedview" data-arg="${v}" style="padding:5px 11px;border:none;font-family:${MONO};font-weight:800;font-size:11px;letter-spacing:.4px;cursor:pointer;background:${feedView===v?T.lime:"transparent"};color:${feedView===v?"#fff":T.sage}">${lbl}</button>`;
+  const ssz=(v,lbl)=>`<button data-act="feedsize" data-arg="${v}" style="padding:5px 9px;border:none;font-family:${MONO};font-weight:800;font-size:11px;cursor:pointer;background:${fzKey===v?T.lime:"transparent"};color:${fzKey===v?"#fff":T.sage}">${lbl}</button>`;
   return `<div style="flex:1;min-height:0;display:flex;flex-direction:column;background:${T.surface};border:2px solid ${T.line};border-radius:12px;overflow:hidden">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 13px;border-bottom:1.5px solid ${T.line};flex:none">
-        <span style="font-family:${MONO};font-weight:800;font-size:15px;letter-spacing:1.4px;color:${T.lime}">GAME FEED</span>
-        <div style="display:inline-flex;background:${T.surface2};border:2px solid ${T.line};border-radius:8px;overflow:hidden">${seg("play","At-bat")}${seg("pitch","Pitch")}</div></div>
+        <span style="font-family:${MONO};font-weight:800;font-size:14px;letter-spacing:1px;color:${T.lime}">GAME FEED</span>
+        <div style="display:flex;align-items:center;gap:6px">
+          <div style="display:inline-flex;background:${T.surface2};border:2px solid ${T.line};border-radius:8px;overflow:hidden" title="Feed text size">${ssz("s","S")}${ssz("m","M")}${ssz("l","L")}</div>
+          <div style="display:inline-flex;background:${T.surface2};border:2px solid ${T.line};border-radius:8px;overflow:hidden">${seg("play","At-bat")}${seg("pitch","Pitch")}</div></div></div>
       <div style="flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch">${rows||`<div style="padding:16px;color:${T.sageDim};font-size:13px">Plays show here as the game happens.</div>`}</div>
     </div>`;
 }
@@ -3187,6 +3261,26 @@ function actionArea(){
       const g=(t.games||[]).find(x=>x.id===viewGameId);
       const esc=s=>(s==null?"":String(s)).replace(/</g,"&lt;");
       if(!g) return secWrap(`${secHdr("Game")}<div style="font-size:13px;color:${T.sage};padding:8px">Game not found.</div>`);
+      const _canEdit = !(window.Cloud&&window.Cloud.enabled&&window.Cloud.user) || (window.cloudCanManage&&window.cloudCanManage(t));
+      // ===== EDIT a finished game: fix the final score, opponent, date, and the per-batter box score.
+      // Saving recomputes the W-L-T record + season stats from the game log and syncs to followers.
+      if(gameEdit===g.id && _canEdit){
+        const card2=(inner)=>`<div class="frost-card" style="overflow-x:auto;background:${T.surface};border:2px solid ${T.line};border-radius:12px;padding:8px 10px">${inner}</div>`;
+        const sideName2=(side)=> side==="away"?(g.ourSide==="away"?t.name:g.opp):(g.ourSide==="home"?t.name:g.opp);
+        const inp=(id,val,w,type)=>{const t2=type||"number";const im=t2==="number"?' inputmode="numeric"':'';return `<input id="${id}" type="${t2}"${im} value="${esc(val==null?"":val)}" style="width:${w||"46px"};box-sizing:border-box;background:${T.surface2};border:2px solid ${T.line};color:${T.ink};border-radius:8px;padding:8px 6px;font-family:${MONO};font-size:15px;text-align:center;font-weight:700">`;};
+        const scoreHead=`<div class="frost-card" style="background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;gap:12px">
+          <div style="font-family:${MONO};font-size:15px;font-weight:800;letter-spacing:1px;color:${T.lime};text-transform:uppercase">Edit game</div>
+          <div style="display:flex;align-items:flex-end;justify-content:center;gap:12px">
+            <div style="text-align:center"><div style="font-size:11px;color:${T.sageDim};margin-bottom:4px;max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(t.name||"Us")}</div>${inp("ge-us",g.us,"64px")}</div>
+            <div style="font-size:22px;color:${T.sageDim};padding-bottom:8px">&ndash;</div>
+            <div style="text-align:center"><div style="font-size:11px;color:${T.sageDim};margin-bottom:4px">Them</div>${inp("ge-them",g.them,"64px")}</div></div>
+          <div><div style="font-size:11px;color:${T.sageDim};margin-bottom:4px">Opponent name</div>${inp("ge-opp",g.opp||"","100%","text")}</div>
+          <div><div style="font-size:11px;color:${T.sageDim};margin-bottom:4px">Date</div>${inp("ge-date",g.date||"","100%","date")}</div></div>`;
+        const beTbl=(side)=>{const rows=((g.bat&&g.bat[side])||[]).map((b,ri)=>`<tr style="border-top:1.5px solid ${T.line}"><td style="text-align:left;padding:6px;font-weight:700;white-space:nowrap;font-size:13px">#${esc(b.num)} ${esc(b.name)}</td>${["ab","r","h","rbi","bb","k"].map(st=>`<td style="padding:4px 3px">${inp("ge-"+side+"-"+ri+"-"+st,b[st]||0,"42px")}</td>`).join("")}</tr>`).join("");
+          return card2(`<div style="font-size:13px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:${T.lime};margin:0 0 8px">${esc(sideName2(side))} &mdash; batting</div><table style="width:100%;border-collapse:collapse;font-family:${MONO};font-size:14px;text-align:center;color:${T.chalk}"><thead><tr style="color:${T.sageDim};font-size:11px"><th style="text-align:left;padding:4px 6px">Batter</th><th>AB</th><th>R</th><th>H</th><th>RBI</th><th>BB</th><th>K</th></tr></thead><tbody>${rows||`<tr><td colspan="7" style="padding:8px;color:${T.sageDim}">No at-bats recorded for this game.</td></tr>`}</tbody></table>`);};
+        const saveRow=`<div style="display:flex;gap:10px;margin-top:2px"><button data-act="gecancel" style="${ghost};flex:1">Cancel</button><button data-act="gesave" data-arg="${g.id}" style="${bigBtn(T.lime,'')};flex:2">Save changes</button></div>`;
+        return secWrap(`${secHdr("Edit game")}${scoreHead}${g.bat?beTbl("away")+beTbl("home"):""}${saveRow}<div style="font-size:11px;color:${T.sageDim};text-align:center;margin-top:2px">Saving recomputes the team record &amp; season stats from the game log and syncs to anyone following.</div>`);
+      }
       const dt=(()=>{try{return new Date((g.date||"")+"T00:00").toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric"});}catch(e){return g.date||"";}})();
       const resCol=g.result==="W"?T.lime:(g.result==="L"?T.out:T.sage), resWord=g.result==="W"?"WIN":(g.result==="L"?"LOSS":"TIE");
       const head=`<div class="frost-card" style="text-align:center;background:${T.surface};border:2px solid ${T.line};border-left:6px solid ${resCol};border-radius:14px;padding:14px 16px">
@@ -3210,7 +3304,8 @@ function actionArea(){
       const pitchTbl=(side)=>{const list=(g.pitch&&g.pitch[side])||[];if(!list.length)return "";const rows=list.map(x=>`<tr style="border-top:1.5px solid ${T.line}"><td style="text-align:left;padding:6px;font-weight:700;white-space:nowrap">${esc(x.name)}</td><td style="padding:9px 6px">${x.ip}</td><td>${x.pc}</td><td>${x.h}</td><td>${x.r}</td><td>${x.bb}</td><td>${x.k}</td></tr>`).join("");
         return card(`<div style="font-size:13.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin:0 0 8px">${esc(sideName(side))} &mdash; pitching</div><table style="width:100%;border-collapse:collapse;font-family:${MONO};font-size:16px;text-align:center;color:${T.chalk}"><thead><tr style="color:${T.sageDim};font-size:12px"><th style="text-align:left;padding:4px 6px">Pitcher</th><th>IP</th><th>P</th><th>H</th><th>R</th><th>BB</th><th>K</th></tr></thead><tbody>${rows}</tbody></table>`);};
       const scoreBtn=`<button data-act="storedcard" data-arg="${g.id}" style="${bigBtn(T.lime,'')};display:flex;align-items:center;justify-content:center;gap:9px">&#128196; Game scorecard (PDF)</button>`;
-      return secWrap(`${secHdr("Game")}${head}${lineTbl}${batTbl("away")}${batTbl("home")}${pitchTbl("away")}${pitchTbl("home")}${scoreBtn}${ytBtn}${delBtn}`);
+      const editBtn = _canEdit ? `<button data-act="geedit" data-arg="${g.id}" style="${ghost};display:flex;align-items:center;justify-content:center;gap:9px">&#9998; Edit game (score &amp; stats)</button>` : "";
+      return secWrap(`${secHdr("Game")}${head}${lineTbl}${batTbl("away")}${batTbl("home")}${pitchTbl("away")}${pitchTbl("home")}${editBtn}${scoreBtn}${ytBtn}${delBtn}`);
     }
     const recomputeBtn=`<button data-act="recomputeseason" style="${ghost};display:flex;align-items:center;justify-content:center;gap:9px;width:100%">${IC('refresh',17)} Recompute season stats from the game log</button>
         <div style="font-size:11px;color:${T.sageDim};text-align:center;margin-top:-4px">Rebuilds the season totals to match exactly the finished games above.</div>`;
@@ -4342,6 +4437,7 @@ function render(){
     ${reviewInn?inningLogModal():""}
     ${brSheet?baseRunModal():""}
     ${correctOpen?correctModal():""}
+    ${editAB!=null?abEditSheet():""}
     ${(pickerModal&&wide)?`<div style="${sheetWrap}">
         <div id="action-area" style="${sheetCard};overflow-y:auto;-webkit-overflow-scrolling:touch;background:${T.surface};padding:16px;display:flex;flex-direction:column;gap:8px">${actionArea()}</div></div>`:""}
     ${(koPick!=null&&viewMode==="scorer"&&gameActive&&mode==="idle")?koPrompt():""}
@@ -4417,6 +4513,12 @@ document.getElementById("app").addEventListener("click",e=>{
     else if(f==="pitch"){ if(!G.pitches)G.pitches={}; const k=currentPitcherKey(); G.pitches[k]=Math.max(0,(G.pitches[k]||0)+d); G.halfPitches=Math.max(0,(G.halfPitches||0)+d); }
     else if(f==="batter"){ const k=G.half==="T"?"awayPtr":"homePtr"; G[k]=Math.max(0,(G[k]||0)+d); G.balls=0; G.strikes=0; G.ab={pitches:[],loc:null}; }   // skip / go back a batter (C3) — fresh count
     render(); broadcast(); return; }
+  if(act==="abedit"){ editAB=+arg; render(); return; }
+  if(act==="abeditclose"){ editAB=null; render(); return; }
+  if(act==="abreclass"){ const i=arg.indexOf(":"); reclassAB(+arg.slice(0,i), arg.slice(i+1)); return; }
+  if(act==="abrbi"){ const i=arg.indexOf(":"); adjustABRbi(+arg.slice(0,i), +arg.slice(i+1)); return; }
+  if(act==="abrewind"){ rewindToEvent(+arg); return; }
+  if(act==="feedsize"){ try{localStorage.setItem("al-feed-size",arg);}catch(e){} render(); return; }
   if(act==="brsteal"){ brSteal(+arg); return; }
   if(act==="bradv"){ brAdvance(+arg); return; }
   if(act==="brscore"){ brScore(+arg); return; }
@@ -4495,7 +4597,28 @@ document.getElementById("app").addEventListener("click",e=>{
   if(act==="pane"){ phonePane=arg; render(); return; }
   if(act==="feedview"){ feedView=(arg==="pitch"?"pitch":"play"); try{localStorage.setItem("al-feed-view",feedView);}catch(e){} render(); return; }
   if(act==="sumteam"){ summaryTeam=(arg==="opp"?"opp":"us"); render(); return; }
-  if(act==="opengame"){ viewGameId=arg; teamTab="gameview"; render(); return; }
+  if(act==="opengame"){ viewGameId=arg; teamTab="gameview"; gameEdit=null; render(); return; }
+  if(act==="geedit"){ gameEdit=arg; render(); return; }
+  if(act==="gecancel"){ gameEdit=null; render(); return; }
+  if(act==="gesave"){ const t=teamById(openTeamId); if(!t){gameEdit=null;render();return;}
+    if(window.Cloud&&window.Cloud.enabled&&window.Cloud.user&&window.cloudCanManage&&!window.cloudCanManage(t)){flash("Only the owner can edit a game");gameEdit=null;render();return;}
+    const g=(t.games||[]).find(x=>x.id===arg); if(!g){gameEdit=null;render();return;}
+    const gv=id=>{const el=document.getElementById(id);return el?el.value:null;};
+    const gn=id=>{const el=document.getElementById(id);return el?Math.max(0,parseInt(el.value,10)||0):null;};
+    const us=gn("ge-us"),them=gn("ge-them"); if(us!=null)g.us=us; if(them!=null)g.them=them;
+    const opp=gv("ge-opp"); if(opp!=null&&opp.trim())g.opp=opp.trim();
+    const d2=gv("ge-date"); if(d2)g.date=d2;
+    ["away","home"].forEach(side=>{ ((g.bat&&g.bat[side])||[]).forEach((b,ri)=>{ ["ab","r","h","rbi","bb","k"].forEach(st=>{ const v=gn("ge-"+side+"-"+ri+"-"+st); if(v!=null)b[st]=v; }); }); });
+    // Keep the box-score totals + W-L-T result in lockstep with the edited numbers.
+    const sum=(a,f)=>(a||[]).reduce((x,b)=>x+(b[f]||0),0), oppSide=g.ourSide==="away"?"home":"away";
+    if(!g.totals)g.totals={away:{},home:{}}; g.totals[g.ourSide]=g.totals[g.ourSide]||{}; g.totals[oppSide]=g.totals[oppSide]||{};
+    g.totals[g.ourSide].r=g.us; g.totals[oppSide].r=g.them;
+    if(g.bat){ g.totals.away.h=sum(g.bat.away,"h"); g.totals.home.h=sum(g.bat.home,"h"); }
+    g.result=g.us>g.them?"W":g.us<g.them?"L":"T";
+    t.record=teamRec(t); try{ recomputeSeasonFromGames(t); }catch(e){}
+    t.updatedAt=Date.now(); saveDB();
+    try{ if(window.cloudSaveTeam)window.cloudSaveTeam(t,true); }catch(e){}
+    gameEdit=null; flash("Game updated"); render(); return; }
   if(act==="storedcard"){ const t=teamById(openTeamId); const g=t&&(t.games||[]).find(x=>x.id===arg); if(g)printStoredGameCard(g,t); return; }
   if(act==="photozoom"){ photoZoom=arg; render(); return; }
   if(act==="photoclose"){ photoZoom=null; render(); return; }
@@ -5274,7 +5397,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v235";
+var APP_VERSION="v236";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
