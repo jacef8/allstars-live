@@ -119,6 +119,19 @@ Status: [ ] todo · [~] in progress · [x] done. Grouped by theme; recurring/met
       correctly hidden on validated cellular. FIELD test owed: on the Mevo Wi-Fi confirm the warning
       shows + Go Live succeeds over cellular. NOTE: tablet USB dropped repeatedly today (check cable).
 
+## H2. Watch-with-scorebug — paste any live link (NEW 2026-06-28)
+- [x] H2. jford's idea: instead of streaming video THROUGH our app, a viewer pastes a link to someone
+      else's YouTube-live of the game and our app overlays the live scorebug on top (no second stream).
+      Built v237: viewer monitor (monitorPane) shows a "Paste live video link" button; `watchVidModal()`
+      takes a YT link (parseYouTubeId) → `viewerVid` (localStorage al-watch-yt). A viewer-embed branch at
+      the TOP of monitorPane (before the IS_APP native branch, so it works on the native app too) renders
+      the youtube-nocookie iframe + statusBar() bug overlay. SYNC: `bugDelay` (al-bug-delay, ±1/±5s, 0–60)
+      lags the bug/feed to match the stream's ~10–30s latency — applied as a setTimeout on the live-doc
+      apply (watchlive action) AND on the shared-link applyRemote path; `_watchGen` guard drops stragglers
+      after leaving. Answer to "streamed twice?": NO — overlay is client-side per viewer; the burn-in path
+      (server re-encode) was the only double-stream option and we did NOT take it. OBS source overlay
+      (?overlay=1, H1) remains the "everyone sees it at the source" path.
+
 ## H. Remote scorebug overlay (NEW 2026-06-27)
 - [x] H1. Remote scorebug overlay (v210): ?overlay=1 on a watch link renders ONLY a clean broadcast
       scorebug (team colours, score, inning, count, outs, bases) on a TRANSPARENT page — drop it into an

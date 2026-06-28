@@ -1420,6 +1420,7 @@ function watchVidModal(){
       <div style="display:flex;gap:10px">
         ${viewerVid?`<button data-act="watchvidclear" style="${ghost};flex:1">Remove video</button>`:""}
         <button data-act="watchvidset" style="${bigBtn(T.lime,'')};flex:2">Show video + scorebug</button></div>
+      ${viewerVid?`<button data-act="tventer" style="${ghost};display:flex;align-items:center;justify-content:center;gap:8px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="14" rx="2"/><path d="M8 21h8"/></svg>Full-screen TV mode</button>`:""}
     </div></div>`;
 }
 /* Long-press any [data-longpress] element (re-bound after each render). Currently the scoreboard
@@ -1592,6 +1593,11 @@ let watchVidOpen=false,_watchGen=0;
 // even though the video is on a different device. Forces transparent background everywhere.
 const OVERLAY=(()=>{try{ return new URLSearchParams(location.search).get("overlay")==="1"; }catch(e){ return false; }})();
 if(OVERLAY){ try{ var _st=document.createElement("style"); _st.textContent="html,body,#wrap,#app{background:transparent !important;}"; document.head.appendChild(_st); }catch(e){} }
+// TV MODE: a lean-back, fullscreen video + broadcast scorebug with NO app chrome — built for the big
+// screen. Reachable by a "TV mode" button in the viewer (tvMode toggle) or by opening ?tv=1 directly on
+// a smart-TV / Chromecast browser. Mirror the tablet to a TV, or open the ?tv link on the TV itself.
+let tvMode=(()=>{try{ return new URLSearchParams(location.search).get("tv")==="1"; }catch(e){ return false; }})();
+if(tvMode){ viewerLocked=true; viewMode="viewer"; }
 // May the current user actually SCORE right now? Used to grey the Scorer toggle + hide scoring
 // for followers/viewers. Intentionally permissive so it NEVER bumps a legit scorer out:
 //  • watch-link viewer → no
@@ -2307,7 +2313,7 @@ function monitorPane(){
     return `<div id="monitor" style="position:relative;width:100%;flex:1;min-height:0;background:#0b0f15;border:2px solid ${T.line};border-radius:14px;overflow:hidden;box-shadow:0 6px 22px rgba(0,0,0,.4)">
         <iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(viewerVid)}?autoplay=1&mute=1&playsinline=1&modestbranding=1&rel=0" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen style="position:absolute;inset:0;width:100%;height:100%;border:0"></iframe>
         <div style="position:absolute;top:9px;left:10px;display:flex;align-items:center;gap:6px;background:rgba(8,11,16,.62);border-radius:999px;padding:4px 11px;z-index:3"><span style="width:8px;height:8px;border-radius:50%;background:${T.live};box-shadow:0 0 8px ${T.live}"></span><span style="font-family:${MONO};font-weight:800;font-size:11px;letter-spacing:1.6px;color:#fff">LIVE</span>${bugDelay?`<span style="font-family:${MONO};font-size:10px;font-weight:800;color:${T.amber};margin-left:3px">+${bugDelay}s</span>`:""}</div>
-        <div style="position:absolute;top:9px;right:10px;display:flex;gap:6px;z-index:3"><button data-act="watchvidopen" title="Change video link / scorebug delay" style="${_mb}">${_linkIco}</button></div>
+        <div style="position:absolute;top:9px;right:10px;display:flex;gap:6px;z-index:3"><button data-act="tventer" title="Full-screen TV mode" style="${_mb};width:auto;padding:0 11px;font-family:${MONO};font-weight:800;font-size:12px;letter-spacing:1px">TV</button><button data-act="watchvidopen" title="Change video link / scorebug delay" style="${_mb}">${_linkIco}</button></div>
         <div style="position:absolute;left:8px;right:8px;bottom:8px;z-index:2;pointer-events:none">${statusBar()}</div>
       </div>`;
   }
@@ -4262,8 +4268,49 @@ function overlayBug(){
         <span style="display:inline-flex;gap:9px;align-items:center">${base(b[3])}${base(b[2])}${base(b[1])}</span>
       </div></div>`;
 }
+/* TV-mode lower-third scorebug — same data as overlayBug, but anchored bottom-left and sized up so it
+   reads from across a room. Empty until a game is live. */
+function tvBug(){
+  if(!(gameActive||_remoteLive)) return "";
+  const tw=(t,act)=>{const c=TEAMS[t].color,val=(t==="away")?G.away:G.home,lg=(TEAMS[t].logo)||null;return `<div style="display:flex;align-items:center;gap:14px;padding:11px 20px;background:${act?c:"rgba(13,19,32,.95)"};border-left:9px solid ${c}">
+      ${lg?`<img src="${lg}" alt="" style="width:34px;height:34px;object-fit:contain;border-radius:6px;background:#fff;flex:none">`:""}
+      <span style="font-family:${MONO};font-weight:800;font-size:26px;letter-spacing:.5px;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.6);white-space:nowrap">${TEAMS[t].short||(t==="away"?"AWAY":"HOME")}</span>
+      ${act?`<span style="width:11px;height:11px;border-radius:50%;background:#fff;box-shadow:0 0 9px #fff;flex:none"></span>`:""}
+      <span style="margin-left:auto;font-weight:800;font-size:42px;line-height:1;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.7);padding-left:22px">${val}</span></div>`;};
+  const b=G.bases||{}, base=(on)=>`<span style="display:inline-block;width:14px;height:14px;transform:rotate(45deg);background:${on?"#F4B233":"transparent"};border:2.5px solid ${on?"#F4B233":"rgba(255,255,255,.55)"}"></span>`;
+  return `<div style="display:inline-flex;flex-direction:column;border-radius:13px;overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,.7);font-family:${SANS};min-width:340px">
+      ${tw("away",G.half==="T")}<div style="height:2px;background:rgba(255,255,255,.22)"></div>${tw("home",G.half==="B")}
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:18px;background:rgba(8,11,16,.96);padding:11px 20px;color:#fff">
+        <span style="font-family:${MONO};font-weight:800;font-size:24px">${G.half==="T"?"▲":"▼"}${G.inning}</span>
+        <span style="font-family:${MONO};font-weight:800;font-size:24px">${G.balls}-${G.strikes}</span>
+        <span style="font-family:${MONO};font-weight:800;font-size:24px">${G.outs}<span style="color:rgba(255,255,255,.6);font-size:13px;margin-left:3px">OUT</span></span>
+        <span style="display:inline-flex;gap:12px;align-items:center">${base(b[3])}${base(b[2])}${base(b[1])}</span>
+      </div></div>`;
+}
+/* Fullscreen TV pane: the pasted/streamed video filling the screen with the lower-third bug on top and
+   minimal auto-styled controls. Mirror the device to a TV, or open ?tv=1 on the TV's own browser. */
+function tvPane(){
+  const yt=viewerVid||streamYt(), live=(gameActive||_remoteLive);
+  const tvBtn="height:40px;border-radius:10px;background:rgba(8,11,16,.66);border:1px solid rgba(255,255,255,.25);color:#fff;display:inline-flex;align-items:center;gap:7px;padding:0 14px;font-family:"+SANS+";font-weight:800;font-size:14px;cursor:pointer";
+  const vid=yt
+    ? `<iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(yt)}?autoplay=1&mute=1&playsinline=1&modestbranding=1&rel=0&controls=0" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen style="position:absolute;inset:0;width:100%;height:100%;border:0"></iframe>`
+    : `<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;background:radial-gradient(circle at 50% 38%,#16202e,#05080c);text-align:center;padding:0 24px">
+        <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="${T.sageDim}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+        <div style="font-family:${MONO};font-weight:800;letter-spacing:2px;color:${T.sage};font-size:18px">${live?"WAITING FOR VIDEO":"NO LIVE GAME YET"}</div>
+        <button data-act="watchvidopen" style="${tvBtn};background:${T.lime};border-color:${T.lime}">Paste live video link</button></div>`;
+  return `<div style="position:fixed;inset:0;z-index:200;background:#000;overflow:hidden">
+      ${vid}
+      ${live?`<div style="position:absolute;left:26px;bottom:26px;z-index:3">${tvBug()}</div>`:""}
+      <div style="position:absolute;top:16px;right:16px;z-index:5;display:flex;gap:9px">
+        ${yt?`<button data-act="watchvidopen" title="Change video / scorebug delay" style="${tvBtn}">Video</button>`:""}
+        <button data-act="tvcast" title="Fullscreen / Cast" style="${tvBtn}">&#9974; Fullscreen</button>
+        <button data-act="tvexit" style="${tvBtn}">&#10005; Exit TV</button></div>
+      ${live?`<div style="position:absolute;top:16px;left:16px;z-index:5;display:flex;align-items:center;gap:8px;background:rgba(8,11,16,.6);border-radius:999px;padding:6px 14px"><span style="width:9px;height:9px;border-radius:50%;background:${T.live};box-shadow:0 0 8px ${T.live}"></span><span style="font-family:${MONO};font-weight:800;font-size:12px;letter-spacing:1.5px;color:#fff">LIVE${bugDelay?` &middot; +${bugDelay}s`:""}</span></div>`:""}
+    </div>`;
+}
 function render(){
   if(OVERLAY){ try{ var _oc=document.getElementById("content"); if(_oc)_oc.innerHTML=overlayBug(); }catch(e){} return; }   // H1: OBS overlay = bug only
+  if(tvMode){ try{ var _tc=document.getElementById("content"); if(_tc)_tc.innerHTML=tvPane(); }catch(e){} return; }          // TV mode = fullscreen video + bug
   // Watch-link viewer, but no live game yet → show a friendly lobby instead of the Home screen
   // (a fan opening "Invite to watch" before first pitch shouldn't land on New Game / Manage Teams).
   // It auto-switches to the live game the moment the scorer's broadcast arrives (see applyRemote).
@@ -4562,6 +4609,9 @@ document.getElementById("app").addEventListener("click",e=>{
     else if(f==="pitch"){ if(!G.pitches)G.pitches={}; const k=currentPitcherKey(); G.pitches[k]=Math.max(0,(G.pitches[k]||0)+d); G.halfPitches=Math.max(0,(G.halfPitches||0)+d); }
     else if(f==="batter"){ const k=G.half==="T"?"awayPtr":"homePtr"; G[k]=Math.max(0,(G[k]||0)+d); G.balls=0; G.strikes=0; G.ab={pitches:[],loc:null}; }   // skip / go back a batter (C3) — fresh count
     render(); broadcast(); return; }
+  if(act==="tventer"){ tvMode=true; watchVidOpen=false; render(); try{ const el=document.documentElement; if(el.requestFullscreen) el.requestFullscreen().catch(function(){}); }catch(e){} return; }
+  if(act==="tvexit"){ tvMode=false; try{ if(document.fullscreenElement&&document.exitFullscreen) document.exitFullscreen().catch(function(){}); }catch(e){} render(); return; }
+  if(act==="tvcast"){ try{ const el=document.documentElement; if(document.fullscreenElement){ if(document.exitFullscreen)document.exitFullscreen().catch(function(){}); } else if(el.requestFullscreen){ el.requestFullscreen().catch(function(){}); } }catch(e){} flash("Fullscreen on. To cast to a TV: use your phone/tablet's Screen Cast / mirror, or in Chrome tap ⋮ → Cast."); return; }
   if(act==="watchvidopen"){ watchVidOpen=true; render(); return; }
   if(act==="watchvidclose"){ watchVidOpen=false; render(); return; }
   if(act==="watchdelay"){ bugDelay=Math.max(0,Math.min(60,bugDelay+(+arg))); try{localStorage.setItem("al-bug-delay",bugDelay);}catch(e){} render(); return; }
@@ -5455,7 +5505,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v237";
+var APP_VERSION="v238";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
