@@ -1417,6 +1417,9 @@ function watchVidModal(){
           <div style="flex:1"></div>
           <button data-act="watchdelay" data-arg="1" style="${stepBtn}">+1</button>
           <button data-act="watchdelay" data-arg="5" style="${stepBtn}">+5</button></div></div>
+      <button data-act="watch360" style="display:flex;align-items:center;gap:11px;background:${T.surface2};border:2px solid ${viewer360?T.safe:T.line};border-radius:12px;padding:11px 13px;text-align:left;cursor:pointer">
+        <span style="width:22px;height:22px;border-radius:6px;border:2px solid ${viewer360?T.safe:T.sageDim};background:${viewer360?T.safe:"transparent"};display:inline-flex;align-items:center;justify-content:center;flex:none;color:#fff;font-weight:900;font-size:14px">${viewer360?"✓":""}</span>
+        <span style="min-width:0"><span style="font-weight:700;color:${T.ink};font-size:14px">This is a 360° video</span><br><span style="font-size:11px;color:${T.sageDim}">Lets viewers drag (or tilt the phone) to look around the field. Only check this if the stream is an actual YouTube 360 broadcast.</span></span></button>
       <div style="display:flex;gap:10px">
         ${viewerVid?`<button data-act="watchvidclear" style="${ghost};flex:1">Remove video</button>`:""}
         <button data-act="watchvidset" style="${bigBtn(T.lime,'')};flex:2">Show video + scorebug</button></div>
@@ -1587,7 +1590,12 @@ let viewerLocked=(()=>{try{ const p=new URLSearchParams(location.search); return
 // latency. watchVidOpen = the paste/delay sheet. _watchGen invalidates delayed updates after leaving.
 let viewerVid=(()=>{try{return localStorage.getItem("al-watch-yt")||"";}catch(e){return "";}})();
 let bugDelay=(()=>{try{return Math.max(0,Math.min(60,parseInt(localStorage.getItem("al-bug-delay"),10)||0));}catch(e){return 0;}})();
+// 360° video: when the pasted stream is a YouTube 360 live, the YT player itself handles drag/tilt
+// look-around — we just enable the gyroscope perms on the iframe + show a "drag to look" hint.
+let viewer360=(()=>{try{return localStorage.getItem("al-watch-360")==="1";}catch(e){return false;}})();
 let watchVidOpen=false,_watchGen=0;
+// iframe permissions for the embedded YouTube player; accelerometer+gyroscope enable 360 phone-tilt.
+const YT_ALLOW="autoplay; encrypted-media; picture-in-picture; accelerometer; gyroscope";
 // OBS/broadcast OVERLAY mode (H1): ?overlay=1 on a watch link renders ONLY a clean scorebug on a
 // transparent page, so a streamer can drop the URL into a browser source and burn in the live score —
 // even though the video is on a different device. Forces transparent background everywhere.
@@ -2311,8 +2319,8 @@ function monitorPane(){
     const _mb="width:34px;height:34px;border-radius:9px;background:rgba(8,11,16,.66);border:1px solid rgba(255,255,255,.22);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer";
     const _linkIco=`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>`;
     return `<div id="monitor" style="position:relative;width:100%;flex:1;min-height:0;background:#0b0f15;border:2px solid ${T.line};border-radius:14px;overflow:hidden;box-shadow:0 6px 22px rgba(0,0,0,.4)">
-        <iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(viewerVid)}?autoplay=1&mute=1&playsinline=1&modestbranding=1&rel=0" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen style="position:absolute;inset:0;width:100%;height:100%;border:0"></iframe>
-        <div style="position:absolute;top:9px;left:10px;display:flex;align-items:center;gap:6px;background:rgba(8,11,16,.62);border-radius:999px;padding:4px 11px;z-index:3"><span style="width:8px;height:8px;border-radius:50%;background:${T.live};box-shadow:0 0 8px ${T.live}"></span><span style="font-family:${MONO};font-weight:800;font-size:11px;letter-spacing:1.6px;color:#fff">LIVE</span>${bugDelay?`<span style="font-family:${MONO};font-size:10px;font-weight:800;color:${T.amber};margin-left:3px">+${bugDelay}s</span>`:""}</div>
+        <iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(viewerVid)}?autoplay=1&mute=1&playsinline=1&modestbranding=1&rel=0" allow="${YT_ALLOW}" allowfullscreen style="position:absolute;inset:0;width:100%;height:100%;border:0"></iframe>
+        <div style="position:absolute;top:9px;left:10px;display:flex;align-items:center;gap:6px;background:rgba(8,11,16,.62);border-radius:999px;padding:4px 11px;z-index:3"><span style="width:8px;height:8px;border-radius:50%;background:${T.live};box-shadow:0 0 8px ${T.live}"></span><span style="font-family:${MONO};font-weight:800;font-size:11px;letter-spacing:1.6px;color:#fff">LIVE</span>${bugDelay?`<span style="font-family:${MONO};font-size:10px;font-weight:800;color:${T.amber};margin-left:3px">+${bugDelay}s</span>`:""}${viewer360?`<span style="font-family:${MONO};font-size:10px;font-weight:800;color:#7CC4FF;margin-left:3px">360° · drag</span>`:""}</div>
         <div style="position:absolute;top:9px;right:10px;display:flex;gap:6px;z-index:3"><button data-act="tventer" title="Full-screen TV mode" style="${_mb};width:auto;padding:0 11px;font-family:${MONO};font-weight:800;font-size:12px;letter-spacing:1px">TV</button><button data-act="watchvidopen" title="Change video link / scorebug delay" style="${_mb}">${_linkIco}</button></div>
         <div style="position:absolute;left:8px;right:8px;bottom:8px;z-index:2;pointer-events:none">${statusBar()}</div>
       </div>`;
@@ -2343,7 +2351,7 @@ function monitorPane(){
   // Browser prototype (not the app): embed the YouTube player as before.
   const yt=(IS_APP && window.__bcastPhase!=="LIVE")?"":streamYt();
   const feed=yt
-    ? `<iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(yt)}?autoplay=1&mute=1&playsinline=1&modestbranding=1&rel=0" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen style="position:absolute;inset:0;width:100%;height:100%;border:0"></iframe>`
+    ? `<iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(yt)}?autoplay=1&mute=1&playsinline=1&modestbranding=1&rel=0" allow="${YT_ALLOW}" allowfullscreen style="position:absolute;inset:0;width:100%;height:100%;border:0"></iframe>`
     : `<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;padding:0 20px 104px;background:radial-gradient(circle at 50% 34%, #16202e, #0b0f15)">
         <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="${T.sageDim}" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
         <div style="font-family:${MONO};font-weight:800;letter-spacing:2px;font-size:14px;color:${T.sage}">${(viewerLocked||viewMode==="viewer")?"WAITING FOR VIDEO":"CAMERA FEED"}</div>
@@ -4304,7 +4312,7 @@ function tvPane(){
   const yt=viewerVid||streamYt(), live=(gameActive||_remoteLive);
   const tvBtn="height:40px;border-radius:10px;background:rgba(8,11,16,.66);border:1px solid rgba(255,255,255,.25);color:#fff;display:inline-flex;align-items:center;gap:7px;padding:0 14px;font-family:"+SANS+";font-weight:800;font-size:14px;cursor:pointer";
   const vid=yt
-    ? `<iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(yt)}?autoplay=1&mute=1&playsinline=1&modestbranding=1&rel=0&controls=0" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen style="position:absolute;inset:0;width:100%;height:100%;border:0"></iframe>`
+    ? `<iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(yt)}?autoplay=1&mute=1&playsinline=1&modestbranding=1&rel=0&controls=${viewer360?1:0}" allow="${YT_ALLOW}" allowfullscreen style="position:absolute;inset:0;width:100%;height:100%;border:0"></iframe>`
     : `<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;background:radial-gradient(circle at 50% 38%,#16202e,#05080c);text-align:center;padding:0 24px">
         <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="${T.sageDim}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
         <div style="font-family:${MONO};font-weight:800;letter-spacing:2px;color:${T.sage};font-size:18px">${live?"WAITING FOR VIDEO":"NO LIVE GAME YET"}</div>
@@ -4316,7 +4324,7 @@ function tvPane(){
         ${yt?`<button data-act="watchvidopen" title="Change video / scorebug delay" style="${tvBtn}">Video</button>`:""}
         <button data-act="tvcast" title="Fullscreen / Cast" style="${tvBtn}">&#9974; Fullscreen</button>
         <button data-act="tvexit" style="${tvBtn}">&#10005; Exit TV</button></div>
-      ${live?`<div style="position:absolute;top:16px;left:16px;z-index:5;display:flex;align-items:center;gap:8px;background:rgba(8,11,16,.6);border-radius:999px;padding:6px 14px"><span style="width:9px;height:9px;border-radius:50%;background:${T.live};box-shadow:0 0 8px ${T.live}"></span><span style="font-family:${MONO};font-weight:800;font-size:12px;letter-spacing:1.5px;color:#fff">LIVE${bugDelay?` &middot; +${bugDelay}s`:""}</span></div>`:""}
+      ${live?`<div style="position:absolute;top:16px;left:16px;z-index:5;display:flex;align-items:center;gap:8px;background:rgba(8,11,16,.6);border-radius:999px;padding:6px 14px"><span style="width:9px;height:9px;border-radius:50%;background:${T.live};box-shadow:0 0 8px ${T.live}"></span><span style="font-family:${MONO};font-weight:800;font-size:12px;letter-spacing:1.5px;color:#fff">LIVE${bugDelay?` &middot; +${bugDelay}s`:""}${viewer360?` &middot; 360°`:""}</span></div>`:""}
     </div>`;
 }
 function render(){
@@ -4626,6 +4634,7 @@ document.getElementById("app").addEventListener("click",e=>{
   if(act==="watchvidopen"){ watchVidOpen=true; render(); return; }
   if(act==="watchvidclose"){ watchVidOpen=false; render(); return; }
   if(act==="watchdelay"){ bugDelay=Math.max(0,Math.min(60,bugDelay+(+arg))); try{localStorage.setItem("al-bug-delay",bugDelay);}catch(e){} render(); return; }
+  if(act==="watch360"){ viewer360=!viewer360; try{localStorage.setItem("al-watch-360",viewer360?"1":"0");}catch(e){} render(); return; }
   if(act==="watchvidset"){ const el=document.getElementById("watchVidInput"); const id=el?parseYouTubeId(el.value):""; if(!id){ const h=document.getElementById("watchVidHint"); if(h)h.textContent="Couldn't read a YouTube link — paste the full watch?v=… / youtu.be/… / live/… URL."; return; } viewerVid=id; try{localStorage.setItem("al-watch-yt",id);}catch(e){} watchVidOpen=false; render(); return; }
   if(act==="watchvidclear"){ viewerVid=""; try{localStorage.removeItem("al-watch-yt");}catch(e){} watchVidOpen=false; render(); return; }
   if(act==="abedit"){ editAB=+arg; render(); return; }
@@ -5516,7 +5525,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v239";
+var APP_VERSION="v240";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
