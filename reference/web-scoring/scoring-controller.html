@@ -529,6 +529,31 @@ function recomputeSeasonFromGames(t){
     ["ab","r","h","rbi","bb","k","sb","cs"].forEach(k=>{ sr[k]=(sr[k]||0)+(b[k]||0); }); }); });
   saveDB();
 }
+/* ===== Seasons: a game's season is the YEAR of its date (zero-migration — every game already has a
+   date). The stats page groups these as CURRENT (this calendar year) vs HISTORICAL (earlier years) in a
+   single dropdown, and filters the stat table + game log + record to the chosen season. ===== */
+function gameSeason(g){ const d=(g&&g.date)||""; const y=(/^(\d{4})/.exec(d)||[])[1]; return y||"Undated"; }
+function curSeasonKey(){ try{ return String(new Date().getFullYear()); }catch(e){ return "Undated"; } }
+/* Distinct seasons present in the log, newest first; always includes the current year so "Current" is
+   never empty. Returns [{key, count, current}]. */
+function teamSeasons(t){
+  const counts={}; (t&&t.games||[]).forEach(g=>{ const k=gameSeason(g); counts[k]=(counts[k]||0)+1; });
+  const cur=curSeasonKey(); if(!(cur in counts)) counts[cur]=0;
+  return Object.keys(counts).sort((a,b)=>b<a?-1:b>a?1:0).map(k=>({key:k,count:counts[k],current:(k>=cur&&k!=="Undated")}));
+}
+/* Per-player batting totals for a season filter ("all" or a year key), computed from the game log so it
+   never mutates t.season. Returns pid -> {ab,r,h,rbi,bb,k,sb,cs}. */
+function seasonStatsFor(t,sel){
+  const map={};
+  (t&&t.games||[]).forEach(g=>{ if(sel!=="all" && gameSeason(g)!==sel) return;
+    const rows=(g.bat&&g.bat[g.ourSide])||[];
+    rows.forEach(b=>{ const p=(t.players||[]).find(x=>String(x.num)===String(b.num)); if(!p)return;
+      const m=map[p.id]||(map[p.id]={ab:0,r:0,h:0,rbi:0,bb:0,k:0,sb:0,cs:0});
+      ["ab","r","h","rbi","bb","k","sb","cs"].forEach(k=>m[k]+=(b[k]||0)); }); });
+  return map;
+}
+function teamRecForSeason(t,sel){ let w=0,l=0,tt=0; (t&&t.games||[]).forEach(g=>{ if(sel!=="all"&&gameSeason(g)!==sel)return; if(g.result==="W")w++;else if(g.result==="L")l++;else if(g.result==="T")tt++; }); return {w:w,l:l,t:tt}; }
+window.setStatsSeason=function(v){ statsSeason=v; render(); };
 window.teamPNum=function(id,v){const t=teamById(openTeamId);if(!t)return;const p=t.players.find(p=>p.id===id);if(p){p.num=v;saveDB();}};
 window.teamPFirst=function(id,v){const t=teamById(openTeamId);if(!t)return;const p=t.players.find(p=>p.id===id);if(p){p.first=v;ensureName(p);saveDB();}};
 window.teamPLast=function(id,v){const t=teamById(openTeamId);if(!t)return;const p=t.players.find(p=>p.id===id);if(p){p.last=v;ensureName(p);saveDB();}};
@@ -712,7 +737,7 @@ const initGame=()=>({inning:1,half:"T",away:0,home:0,outs:0,balls:0,strikes:0,
   startedAt:null,  // wall-clock ms when the game ACTUALLY started (auto-set at first pitch / game start; editable in Game Setup) — drives the game timer
   lineup:{ order:[0,1,2,3,4,5,6,7,8],   // batting order: 9-12 entries (slots 10+ = extra hitters)
            pos:{P:0,C:1,"1B":2,"2B":3,"3B":4,SS:5,LF:6,CF:7,RF:8} }});
-let G=initGame(),hist=[],mode="home",tap=null,contact=null,result=null,plan=null,toast=null,toastTimer=null,curResults=[],showAll=false,showZones=false,editSlot=null,confirmAct=null,gameActive=false,lineupTab="us",newgameFrom="home",brSheet=false,correctOpen=false,correctOpenAt=0,lineupView="list",fieldAssign=null,fieldHold=null,fieldDisplaced=null,lineEditSlot=null,luFromSetup=false,koPick=null,oppFieldSel=null,gcArrange=false,bugPreview=false,barEdit=false,editAB=null,gameEdit=null;
+let G=initGame(),hist=[],mode="home",tap=null,contact=null,result=null,plan=null,toast=null,toastTimer=null,curResults=[],showAll=false,showZones=false,editSlot=null,confirmAct=null,gameActive=false,lineupTab="us",newgameFrom="home",brSheet=false,correctOpen=false,correctOpenAt=0,lineupView="list",fieldAssign=null,fieldHold=null,fieldDisplaced=null,lineEditSlot=null,luFromSetup=false,koPick=null,oppFieldSel=null,gcArrange=false,bugPreview=false,barEdit=false,editAB=null,gameEdit=null,statsSeason="all";
 // Resume the last in-progress game (saved by saveGame) across reloads/app updates, so the
 // lineup/score is never lost. Stays on the home screen → shows "Resume". Re-links ROSTER
 // to the saved team so the lineup's player indices resolve correctly.
@@ -3062,15 +3087,30 @@ function actionArea(){
         <div style="flex:1;min-width:0"></div>
         <button data-act="openplayer" data-arg="${t.id}:${p.id}" title="View / follow player" style="background:${T.surface2};border:2px solid ${T.line};color:${isFollowingPlayer(t.id,p.id)?T.amber:T.lime};border-radius:9px;min-width:48px;height:46px;display:inline-flex;align-items:center;justify-content:center;font-size:24px;font-weight:800;flex:none;line-height:1">${isFollowingPlayer(t.id,p.id)?IC('starFill',22):"&rsaquo;"}</button>
         <button data-act="rmteamp" data-arg="${p.id}" title="Remove player" style="background:none;border:2px solid ${T.out}66;color:${T.out};border-radius:9px;min-width:48px;height:46px;display:inline-flex;align-items:center;justify-content:center;font-size:26px;font-weight:800;flex:none;line-height:1"${t.players.length<=9?" disabled":""}>&times;</button></div>`).join("");
+    // ===== Season filter: CURRENT (this year) vs HISTORICAL (earlier years), grouped in one dropdown.
+    const _sel=statsSeason||"all";
+    const _seasons=teamSeasons(t), _cur=_seasons.filter(s=>s.current), _hist=_seasons.filter(s=>!s.current);
+    const _smap=_sel==="all"?null:seasonStatsFor(t,_sel);
+    const _statOf=(pid)=> _sel==="all" ? ((t.season[pid]||{}).bat||{}) : (_smap[pid]||{});
+    const _seasonLabel=_sel==="all"?"ALL-TIME":(_sel==="Undated"?"UNDATED":_sel);
+    const _opt=(s)=>`<option value="${s.key}" ${_sel===s.key?"selected":""}>${s.key==="Undated"?"Undated":s.key}${s.count?" · "+s.count+" game"+(s.count===1?"":"s"):" · no games"}</option>`;
+    const seasonPicker=`<div class="frost-card" style="background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:12px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <div style="font-size:13.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime}">Season</div>
+        <select onchange="window.setStatsSeason(this.value)" style="${cell};flex:1;min-width:170px;font-family:${MONO};font-weight:800;font-size:16px;cursor:pointer">
+          <option value="all" ${_sel==="all"?"selected":""}>All-time (every season)</option>
+          ${_cur.length?`<optgroup label="Current">${_cur.map(_opt).join("")}</optgroup>`:""}
+          ${_hist.length?`<optgroup label="Historical">${_hist.map(_opt).join("")}</optgroup>`:""}
+        </select></div>`;
     const _vd="border-left:1px solid rgba(255,255,255,.14)";   // vertical column dividers for the stat table
-    const sRows=t.players.map(p=>{const s=(t.season[p.id]||{}).bat||{};const ab=s.ab||0,h=s.h||0;const avg=ab?(h/ab).toFixed(3).replace(/^0/,""):"—";
+    const sRows=t.players.map(p=>{const s=_statOf(p.id);const ab=s.ab||0,h=s.h||0;const avg=ab?(h/ab).toFixed(3).replace(/^0/,""):"—";
       return `<tr style="border-top:1.5px solid ${T.line}"><td style="text-align:left;padding:10px 8px;font-weight:700;white-space:nowrap">#${p.num} ${p.name}</td><td style="padding:10px 6px;${_vd}">${ab}</td><td style="padding:10px 6px;${_vd}">${s.r||0}</td><td style="padding:10px 6px;${_vd}">${h}</td><td style="padding:10px 6px;${_vd}">${s.rbi||0}</td><td style="padding:10px 6px;${_vd}">${s.bb||0}</td><td style="padding:10px 6px;${_vd}">${s.k||0}</td><td style="padding:10px 6px;${_vd};font-weight:800">${avg}</td></tr>`;}).join("");
     const statTable=`<div class="frost-card" style="background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:14px 18px;overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-family:${MONO};font-size:18px;color:${T.chalk};text-align:center">
-        <thead><tr style="color:${T.sageDim};font-size:14px;letter-spacing:.5px"><th style="text-align:left;padding:0 8px 10px">SEASON · BATTING</th><th style="${_vd}">AB</th><th style="${_vd}">R</th><th style="${_vd}">H</th><th style="${_vd}">RBI</th><th style="${_vd}">BB</th><th style="${_vd}">K</th><th style="${_vd}">AVG</th></tr></thead>
+        <thead><tr style="color:${T.sageDim};font-size:14px;letter-spacing:.5px"><th style="text-align:left;padding:0 8px 10px">${_seasonLabel} · BATTING</th><th style="${_vd}">AB</th><th style="${_vd}">R</th><th style="${_vd}">H</th><th style="${_vd}">RBI</th><th style="${_vd}">BB</th><th style="${_vd}">K</th><th style="${_vd}">AVG</th></tr></thead>
         <tbody>${sRows}</tbody></table>
       <div style="font-size:12px;color:${T.sageDim};margin-top:10px;padding:0 4px">Pitching &amp; fielding season stats are stored too — they fill in as in-game tracking expands.</div></div>`;
-    // Recent games — the finished-game log, newest first (archived when a game ends).
-    const gamesList=(t.games||[]).slice(0,25).map(g=>{const rc=g.result==="W"?T.lime:(g.result==="L"?T.out:T.sage);
+    // Recent games — the finished-game log, newest first (archived when a game ends), filtered to the season.
+    const _games=(t.games||[]).filter(g=>_sel==="all"||gameSeason(g)===_sel);
+    const gamesList=_games.slice(0,25).map(g=>{const rc=g.result==="W"?T.lime:(g.result==="L"?T.out:T.sage);
       const dt=(()=>{try{return new Date((g.date||"")+"T00:00").toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"});}catch(e){return g.date||"";}})();
       return `<button data-act="opengame" data-arg="${g.id}" style="display:flex;align-items:center;gap:12px;width:100%;text-align:left;padding:10px 2px;border:none;border-top:1.5px solid ${T.line};background:none;cursor:pointer">
           <span style="width:28px;height:28px;flex:none;display:flex;align-items:center;justify-content:center;border-radius:7px;background:${rc};color:${T.field};font-family:${MONO};font-weight:800;font-size:14px">${g.result||""}</span>
@@ -3078,11 +3118,11 @@ function actionArea(){
           <div style="font-family:${MONO};font-weight:800;font-size:19px;color:${T.chalk}">${g.us}&ndash;${g.them}</div>
           <span style="color:${T.lime};font-weight:800;font-size:16px">&rsaquo;</span></button>`;}).join("");
     const gamesBlock=`<div class="frost-card" style="background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:12px 16px">
-        <div style="font-size:13.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin-bottom:2px">Recent games</div>
-        ${gamesList||`<div style="font-size:12px;color:${T.sageDim};padding:8px 0">No finished games yet — each game appears here once you end it.</div>`}</div>`;
-    // Read-only W-L-T record, DERIVED from the finished-game log above — so it can never disagree
-    // with the games shown. (No manual editing: the record simply reflects the games played.)
-    const REC=teamRec(t);
+        <div style="font-size:13.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin-bottom:2px">${_sel==="all"?"Recent games":(_seasonLabel+" games")}</div>
+        ${gamesList||`<div style="font-size:12px;color:${T.sageDim};padding:8px 0">${_sel==="all"?"No finished games yet — each game appears here once you end it.":"No games recorded in "+_seasonLabel+"."}</div>`}</div>`;
+    // Read-only W-L-T record, DERIVED from the finished-game log (filtered to the chosen season) — so it
+    // can never disagree with the games shown. (No manual editing: it simply reflects the games played.)
+    const REC=_sel==="all"?teamRec(t):teamRecForSeason(t,_sel);
     const recCell=(v,label)=>`<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:5px">
         <div style="font-size:13.5px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:${T.sageDim}">${label}</div>
         <span style="font-family:${MONO};font-size:30px;font-weight:800;color:${T.ink}">${v}</span></div>`;
@@ -3371,7 +3411,7 @@ function actionArea(){
     }
     const recomputeBtn=`<button data-act="recomputeseason" style="${ghost};display:flex;align-items:center;justify-content:center;gap:9px;width:100%">${IC('refresh',17)} Recompute season stats from the game log</button>
         <div style="font-size:11px;color:${T.sageDim};text-align:center;margin-top:-4px">Rebuilds the season totals to match exactly the finished games above.</div>`;
-    if(teamTab==="stats") return secWrap(`${secHdr("Stats &amp; games")}${recEditor}${gamesBlock}${statTable}${recomputeBtn}`);
+    if(teamTab==="stats") return secWrap(`${secHdr("Stats &amp; games")}${seasonPicker}${recEditor}${gamesBlock}${statTable}${recomputeBtn}`);
     if(teamTab==="access"){ teamTab="manage"; return actionArea(); }   // access folded into Team management
     if(teamTab==="rules"){ teamTab="manage"; return actionArea(); }     // rules folded into Team management
     if(teamTab==="photos"&&!PHOTOS_ENABLED){ teamTab="hub"; return actionArea(); }   // gallery gated off
@@ -5525,7 +5565,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v240";
+var APP_VERSION="v241";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
