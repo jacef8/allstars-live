@@ -927,6 +927,9 @@ function endInning(){snapshot();doFlip();resetUI();flash("Inning ended");render(
 /* Mark the game final (toggle) so the viewer shows its Final summary. Undoable. */
 function endGame(){snapshot();G.final=true;
   try{ if(window.AllStars&&window.AllStars.stopStreamNow)window.AllStars.stopStreamNow(); }catch(e){}   // ending the game auto-ends the YouTube broadcast
+  // Recover the team if the game lost its link (curTeamId cleared/stale): match by our team name so the
+  // record still saves instead of the game silently dropping.
+  if(!curTeam() && OUR && OUR.name){ const _m=(DB.teams||[]).find(x=>(x.name||"").toLowerCase()===(OUR.name||"").toLowerCase()); if(_m)curTeamId=_m.id; }
   if(curTeam()&&!G.rolledUp){rollupSeason();const t=curTeam(),o=ourRuns(),p=oppRuns();
     // Archive this game (final score, opponent, date) — the W-L-T record is DERIVED from this
     // log via teamRec(), so the record can never disagree with the games shown below it.
@@ -934,7 +937,10 @@ function endGame(){snapshot();G.final=true;
     t.games.unshift(Object.assign({id:"g"+Date.now().toString(36),date:(G.schedDate||todayLocal()),schedId:(G.schedId||undefined),opp:(OPP.name||"Opponent"),oppShort:OPP.short||"OPP",us:o,them:p,result:(o>p?"W":o<p?"L":"T"),yt:(streamYt()||"")}, liveGameBox()));
     if(t.games.length>60)t.games=t.games.slice(0,60);   // cap (each carries a compact box score)
     t.record=teamRec(t);          // keep the stored/synced record in lockstep with the log
-    saveDB();G.rolledUp=true;}
+    t.updatedAt=Date.now();       // the finished game must WIN any cloud merge (else a stale sync reverts it)
+    saveDB();G.rolledUp=true;
+    try{ if(window.cloudSaveTeam)window.cloudSaveTeam(t,true); }catch(e){}   // push the finished game to the cloud NOW so a sync can't revert the record
+  } else if(!curTeam() && !G.rolledUp){ try{ flash("Game ended — but no team was attached, so the record couldn't be saved."); }catch(e){} }
   resetUI();mode="summary";render();broadcast();}
 /* The team's W-L-T record, computed from its finished-game log so the two are always consistent. */
 function teamRec(t){const g=(t&&t.games)||[];let w=0,l=0,ti=0;for(const x of g){if(x.result==="W")w++;else if(x.result==="L")l++;else if(x.result==="T")ti++;}return {w:w,l:l,t:ti};}
@@ -5258,7 +5264,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v232";
+var APP_VERSION="v233";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
