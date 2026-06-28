@@ -927,6 +927,9 @@ function endInning(){snapshot();doFlip();resetUI();flash("Inning ended");render(
 /* Mark the game final (toggle) so the viewer shows its Final summary. Undoable. */
 function endGame(){snapshot();G.final=true;
   try{ if(window.AllStars&&window.AllStars.stopStreamNow)window.AllStars.stopStreamNow(); }catch(e){}   // ending the game auto-ends the YouTube broadcast
+  // Mark the live game ENDED in the cloud immediately (not the debounced publish) so other devices stop
+  // showing it "in progress" — even if this device sleeps right after End game.
+  try{ const _cid=G.cloudId||(curTeamId?curTeamId+"-live":null); if(_cid&&window.cloudEndGame)window.cloudEndGame(_cid); }catch(e){}
   // Recover the team if the game lost its link (curTeamId cleared/stale): match by our team name so the
   // record still saves instead of the game silently dropping.
   if(!curTeam() && OUR && OUR.name){ const _m=(DB.teams||[]).find(x=>(x.name||"").toLowerCase()===(OUR.name||"").toLowerCase()); if(_m)curTeamId=_m.id; }
@@ -5264,7 +5267,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v233";
+var APP_VERSION="v234";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;

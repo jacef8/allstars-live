@@ -441,6 +441,16 @@
   // Cancel a pending debounced publish (used when relinquishing scoring, so a stale write can't
   // re-claim the active slot after another device took over).
   window.cloudCancelPublish = function () { clearTimeout(_gp); };
+  // Mark a live game ENDED, IMMEDIATELY (not debounced) — so other devices' Home stops showing it
+  // "in progress" even if this device sleeps/backgrounds right after End game. Cancels any pending
+  // debounced publish first so it can't re-open the game, and clears the active-scorer slot.
+  window.cloudEndGame = function (id) {
+    var d = fdb(), u = myUid(); if (!d || !u || !id) return Promise.resolve();
+    clearTimeout(_gp);
+    return d.collection("games").doc(id)
+      .set({ final: true, activeUid: null, updatedAt: Date.now() }, { merge: true })
+      .catch(function (e) { console.warn("cloudEndGame:", e.message); });
+  };
   // Claim the ACTIVE-scorer slot immediately (take-over) — not debounced, so the handoff is instant.
   window.cloudClaimScoring = function (id, name) {
     var d = fdb(), u = myUid(); if (!d || !u || !id) return Promise.resolve();
