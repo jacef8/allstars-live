@@ -974,7 +974,8 @@ function endGame(){snapshot();G.final=true;
     _t.updatedAt=Date.now(); saveDB();
     try{ if(window.cloudSaveTeam)window.cloudSaveTeam(_t,true); }catch(e){}
   } else if(!G.rolledUp){ try{ flash("Game ended — but no team was attached, so the record couldn't be saved."); }catch(e){} }
-  resetUI();mode="summary";render();broadcast();}
+  gameActive=false;   // the game is OVER — clear the active flag so Home stops offering "Resume game"
+  resetUI();mode="summary";render();broadcast();}   // broadcast() persists gameActive:false via saveGame()
 /* The team's W-L-T record, computed from its finished-game log so the two are always consistent. */
 function teamRec(t){const g=(t&&t.games)||[];let w=0,l=0,ti=0;for(const x of g){if(x.result==="W")w++;else if(x.result==="L")l++;else if(x.result==="T")ti++;}return {w:w,l:l,t:ti};}
 // Pick readable text (dark or white) for a swatch/badge filled with `hex`.
@@ -2947,7 +2948,7 @@ function actionArea(){
             onerror="if(this.src.indexOf('logo-mark')<0){this.src='icons/logo-mark.png';}else{this.style.display='none';}"
             style="height:clamp(112px,calc(var(--avh) * 20),156px);width:auto;display:block;filter:drop-shadow(0 8px 18px rgba(0,0,0,.6))">
           <div style="font-family:${MONO};font-size:clamp(26px,3.6vw,42px);font-weight:800;letter-spacing:1.5px;line-height:1;color:#fff">ALL-STARS <span style="color:${T.lime}">LIVE</span></div></div>`;
-    const resumeBtn = gameActive?`<button data-act="resume" style="${bigBtn("#FFFFFF","border:1px solid rgba(0,0,0,.10)",T.field)};font-size:16px;padding:14px 16px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px">
+    const resumeBtn = (gameActive&&!(G&&G.final))?`<button data-act="resume" style="${bigBtn("#FFFFFF","border:1px solid rgba(0,0,0,.10)",T.field)};font-size:16px;padding:14px 16px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px">
         <span style="display:flex;align-items:center;gap:8px;font-weight:800">${IC(PLAY)} Resume game</span>
         <span style="font-size:13px;font-weight:700;color:${T.navy}">${(OUR.short||"US").replace(/</g,"")} ${ourRuns()} &middot; ${(OPP.short||"OPP").replace(/</g,"")} ${oppRuns()} &nbsp;—&nbsp; ${G.half==="T"?"Top":"Bot"} ${ordinal(G.inning)}</span></button>`:"";
     // Games live on ANOTHER device for a team I score → "in progress · take over" (cross-device handoff).
@@ -3031,7 +3032,7 @@ function actionArea(){
       const PLAYP='<path d="M8 5l11 7-11 7z" fill="currentColor" stroke="none"/>';
       const PEOPLE='<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>';
       // Resume shows WHICH game (matchup · score · inning) so it's never just a bare "Resume".
-      const resumeWide=gameActive?`<button data-act="resume" style="flex:1;min-width:200px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;background:#FFFFFF;color:${T.field};border:1px solid ${T.line};border-radius:14px;padding:11px 18px;box-shadow:0 6px 16px rgba(0,0,0,.3)">
+      const resumeWide=(gameActive&&!(G&&G.final))?`<button data-act="resume" style="flex:1;min-width:200px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;background:#FFFFFF;color:${T.field};border:1px solid ${T.line};border-radius:14px;padding:11px 18px;box-shadow:0 6px 16px rgba(0,0,0,.3)">
           <span style="display:flex;align-items:center;gap:9px;font-family:${MONO};font-weight:800;font-size:19px;letter-spacing:.5px"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${PLAYP}</svg>Resume game</span>
           <span style="font-family:${MONO};font-size:13px;font-weight:700;color:${T.navy}">${(OUR.short||"US").replace(/</g,"")} ${ourRuns()} &middot; ${(OPP.short||"OPP").replace(/</g,"")} ${oppRuns()} &nbsp;—&nbsp; ${G.half==="T"?"Top":"Bot"} ${ordinal(G.inning)}</span></button>`:"";
       const actionsRow=`<div style="flex:none;display:flex;gap:12px;flex-wrap:wrap;align-items:stretch">${resumeWide}${aBtn("newgamestart","New Game",T.lime,"#fff",PLAYP,1.3,"rgba(225,29,46,.34)")}${aBtn("gototeams","Manage Teams",T.surface2,T.ink,PEOPLE,1)}</div>`;
@@ -4944,7 +4945,7 @@ document.getElementById("app").addEventListener("click",e=>{
       }catch(e){ flash("Couldn't load that game"); }
     });
   }
-  else if(act==="resumegame"){G.final=false;mode="idle";render();broadcast();}
+  else if(act==="resumegame"){G.final=false;gameActive=true;mode="idle";render();broadcast();}   // un-end → game is live again
   else if(act==="summary-done"){gameActive=false;mode="teams";render();broadcast();}
   else if(act==="pickplayer"){editSlot=+arg;mode="pickplayer";render();}
   else if(act==="pickpos"){editSlot=+arg;mode="pickpos";render();}
@@ -5565,7 +5566,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v241";
+var APP_VERSION="v242";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
