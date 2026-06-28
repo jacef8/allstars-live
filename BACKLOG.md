@@ -39,7 +39,20 @@ Status: [ ] todo · [~] in progress · [x] done. Grouped by theme; recurring/met
       "Caught steal" (catcher threw out) vs "Picked off" so the two methods are clear in the feed.
 - [x] B7. End-of-inning notification in the feed (v193): doFlip adds a centered divider line
       "End of Top 3 · 3 outs · TEAM 2 runs, 3 hits" (reason = 3 outs vs run cap). Verified.
-- [ ] B8. Update the batter display after his at-bat completes.
+- [x] B8. Update the batter display after his at-bat completes — satisfied by architecture: batterCard()/
+      batterStrip() are fully derived from live G (batter()/battingSlot()/batterLineParts()) and render()
+      runs after every commit()/nextBatter(), so the card shows the next batter the instant an AB completes.
+- [x] B12. EDIT A COMPLETED AT-BAT (v236): every play line in the game feed has an EDIT button (scorer only,
+      live game). Opens a sheet to (a) "change the call" — reclassify the result, adjusting that batter's
+      box-score line AB/H/BB/K (kindStat deltas), (b) RBI ± stepper, (c) "Rewind to this play" which uses
+      the snapshot stack (hist) to roll the whole game back to just before the play for any change that
+      touches runners/score/outs. bcastEvent now stamps each play's batter key (bk) so the edit knows whom
+      to credit. Feed also got an S/M/L density toggle (al-feed-size) — practical "resize" that doesn't
+      fight the flex layout.
+- [x] B13. EDIT A FINISHED GAME (v236): the finished-game detail (teamTab=gameview) has an "Edit game"
+      button (owner/manager). Editable: final score (us/them), opponent name, date, and the per-batter
+      box score (AB/R/H/RBI/BB/K, both sides) as inputs. Save recomputes g.totals + W-L-T result, then
+      teamRec() + recomputeSeasonFromGames() and cloudSaveTeam(force) so the record + season + followers sync.
 - [x] B9. Pitch controls (v209): Ball/Strike/Foul are now white BASEBALLS — red stitching + the B/S/F
       letter (strike S in red) — so the call reads at a glance instead of a red icon lost on a dark circle.
       In Play stays the lime primary button.
