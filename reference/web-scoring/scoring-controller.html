@@ -933,17 +933,22 @@ function endGame(){snapshot();G.final=true;
   // Recover the team if the game lost its link (curTeamId cleared/stale): match by our team name so the
   // record still saves instead of the game silently dropping.
   if(!curTeam() && OUR && OUR.name){ const _m=(DB.teams||[]).find(x=>(x.name||"").toLowerCase()===(OUR.name||"").toLowerCase()); if(_m)curTeamId=_m.id; }
-  if(curTeam()&&!G.rolledUp){rollupSeason();const t=curTeam(),o=ourRuns(),p=oppRuns();
-    // Archive this game (final score, opponent, date) — the W-L-T record is DERIVED from this
-    // log via teamRec(), so the record can never disagree with the games shown below it.
-    if(!Array.isArray(t.games))t.games=[];
-    t.games.unshift(Object.assign({id:"g"+Date.now().toString(36),date:(G.schedDate||todayLocal()),schedId:(G.schedId||undefined),opp:(OPP.name||"Opponent"),oppShort:OPP.short||"OPP",us:o,them:p,result:(o>p?"W":o<p?"L":"T"),yt:(streamYt()||"")}, liveGameBox()));
-    if(t.games.length>60)t.games=t.games.slice(0,60);   // cap (each carries a compact box score)
-    t.record=teamRec(t);          // keep the stored/synced record in lockstep with the log
-    t.updatedAt=Date.now();       // the finished game must WIN any cloud merge (else a stale sync reverts it)
-    saveDB();G.rolledUp=true;
-    try{ if(window.cloudSaveTeam)window.cloudSaveTeam(t,true); }catch(e){}   // push the finished game to the cloud NOW so a sync can't revert the record
-  } else if(!curTeam() && !G.rolledUp){ try{ flash("Game ended — but no team was attached, so the record couldn't be saved."); }catch(e){} }
+  const _t=curTeam();
+  if(_t){
+    if(!G.rolledUp){ rollupSeason(); const o=ourRuns(),p=oppRuns();
+      // Archive this game (final score, opponent, date) — the W-L-T record is DERIVED from this log via
+      // teamRec(), so the record can never disagree with the games shown below it.
+      if(!Array.isArray(_t.games))_t.games=[];
+      _t.games.unshift(Object.assign({id:"g"+Date.now().toString(36),date:(G.schedDate||todayLocal()),schedId:(G.schedId||undefined),opp:(OPP.name||"Opponent"),oppShort:OPP.short||"OPP",us:o,them:p,result:(o>p?"W":o<p?"L":"T"),yt:(streamYt()||"")}, liveGameBox()));
+      if(_t.games.length>60)_t.games=_t.games.slice(0,60);   // cap (each carries a compact box score)
+      _t.record=teamRec(_t);          // keep the stored/synced record in lockstep with the log
+      G.rolledUp=true;
+    }
+    // ALWAYS push on End game (even a re-end): if a prior end archived the game locally but never reached
+    // the cloud, this re-syncs it so other devices' records update. Bump updatedAt so it wins any merge.
+    _t.updatedAt=Date.now(); saveDB();
+    try{ if(window.cloudSaveTeam)window.cloudSaveTeam(_t,true); }catch(e){}
+  } else if(!G.rolledUp){ try{ flash("Game ended — but no team was attached, so the record couldn't be saved."); }catch(e){} }
   resetUI();mode="summary";render();broadcast();}
 /* The team's W-L-T record, computed from its finished-game log so the two are always consistent. */
 function teamRec(t){const g=(t&&t.games)||[];let w=0,l=0,ti=0;for(const x of g){if(x.result==="W")w++;else if(x.result==="L")l++;else if(x.result==="T")ti++;}return {w:w,l:l,t:ti};}
@@ -3324,9 +3329,11 @@ function actionArea(){
     let statBlock;
     if(sp){
       const rows=players.map(p=>{const s=(season[p.id]||{}).bat||{};const ab=s.ab||0,h=s.h||0;const avg=ab?(h/ab).toFixed(3).replace(/^0/,""):"—";
-        return `<tr style="border-top:1.5px solid ${T.line}"><td style="text-align:left;padding:9px 8px;font-weight:700;white-space:nowrap">#${p.num} ${(p.name||'').replace(/</g,'&lt;')}</td><td style="padding:9px 6px">${ab}</td><td style="padding:9px 6px">${s.r||0}</td><td style="padding:9px 6px">${h}</td><td style="padding:9px 6px">${s.rbi||0}</td><td style="padding:9px 6px">${s.bb||0}</td><td style="padding:9px 6px">${s.k||0}</td><td style="padding:9px 6px;font-weight:800">${avg}</td></tr>`;}).join("");
+        const _vd="border-left:1px solid rgba(255,255,255,.14)";
+        return `<tr style="border-top:1.5px solid ${T.line}"><td style="text-align:left;padding:9px 8px;font-weight:700;white-space:nowrap">#${p.num} ${(p.name||'').replace(/</g,'&lt;')}</td><td style="padding:9px 6px;${_vd}">${ab}</td><td style="padding:9px 6px;${_vd}">${s.r||0}</td><td style="padding:9px 6px;${_vd}">${h}</td><td style="padding:9px 6px;${_vd}">${s.rbi||0}</td><td style="padding:9px 6px;${_vd}">${s.bb||0}</td><td style="padding:9px 6px;${_vd}">${s.k||0}</td><td style="padding:9px 6px;font-weight:800;${_vd}">${avg}</td></tr>`;}).join("");
+      const _vd="border-left:1px solid rgba(255,255,255,.14)";
       statBlock=`<div style="background:${T.surface};border:2px solid ${T.line};border-radius:12px;padding:12px 14px"><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-family:${MONO};font-size:15px;color:${T.chalk};text-align:center">
-          <thead><tr style="color:${T.sageDim};font-size:12px;letter-spacing:.5px"><th style="text-align:left;padding:0 8px 6px">SEASON &middot; BATTING</th><th>AB</th><th>R</th><th>H</th><th>RBI</th><th>BB</th><th>K</th><th>AVG</th></tr></thead>
+          <thead><tr style="color:${T.sageDim};font-size:12px;letter-spacing:.5px"><th style="text-align:left;padding:0 8px 6px">SEASON &middot; BATTING</th><th style="${_vd}">AB</th><th style="${_vd}">R</th><th style="${_vd}">H</th><th style="${_vd}">RBI</th><th style="${_vd}">BB</th><th style="${_vd}">K</th><th style="${_vd}">AVG</th></tr></thead>
           <tbody>${rows||`<tr><td colspan="8" style="padding:8px;color:${T.sageDim}">No stats yet.</td></tr>`}</tbody></table></div></div>`;
     } else {
       statBlock=`<div style="font-size:12px;color:${T.sageDim};text-align:center;padding:14px;border:1px dashed ${T.line};border-radius:12px">This team keeps its season stats private.</div>`;
@@ -5267,7 +5274,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v234";
+var APP_VERSION="v235";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
