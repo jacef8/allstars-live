@@ -730,6 +730,14 @@ window.oppEditName=function(v){const e=G.oppLineup&&G.oppLineup[editSlot];if(e){
    .num/.name for the bug, so positions/bench are record-keeping that doesn't affect scoring. */
 function oppList(){ if(!Array.isArray(G.oppLineup))G.oppLineup=[]; return G.oppLineup; }
 function oppBenchList(){ if(!Array.isArray(G.oppBench))G.oppBench=[]; return G.oppBench; }
+// Build the opponent's lineup from the CURRENT opponent (their roster if it's a saved/public team, else a
+// blank generic order). Called whenever the opponent CHANGES, so a new opponent never inherits the last
+// opponent's lineup. (jford bug: new game's opp lineup was the previous opponent's.)
+function resetOppLineup(){ const ot=oppTeamId&&teamById(oppTeamId);
+  const all = ot ? ot.players.map(p=>({num:p.num,name:p.name})) : Array.from({length:Math.max(1,G.oppBatters||9)},(_,i)=>({num:String(i+1),name:""}));
+  G.oppLineup = all.slice(0,12); G.oppBench = all.slice(12); if(ot)G.oppBatters=G.oppLineup.length; try{ oppDefaultPositions(); }catch(e){} }
+// Clear the opponent entirely (start a new game with a blank opponent so nothing carries over).
+function resetOpponent(){ oppTeamId=null; OPP.name="Opponent"; OPP.short="OPP"; OPP.color="#E11D2E"; OPP.logo=null; G.oppLineup=[]; G.oppBench=[]; }
 function oppAtPos(P){ return oppList().findIndex(e=>e&&e.pos===P); }
 function oppPitcher(){ const i=oppAtPos("P"); return i>=0?oppList()[i]:null; }
 function oppAssignPos(i,P){ const L=oppList(); if(!L[i])return; const prev=L[i].pos||null; const other=oppAtPos(P); if(other>=0&&other!==i)L[other].pos=prev; L[i].pos=P; }
@@ -935,17 +943,20 @@ function idealText(hex){try{hex=(hex||"").replace("#","");if(hex.length===3)hex=
 /* New Game: reset scores/innings/in-play state but keep the chosen rules, side, and lineup. */
 function startNewGame(){
   const keep={runCap:G.runCap,oppBatters:G.oppBatters,ourSide:G.ourSide,innings:G.innings,lineup:JSON.parse(JSON.stringify(G.lineup)),
-    league:G.league,mercy:G.mercy,pitchMax:G.pitchMax,alerts:G.alerts};
+    league:G.league,mercy:G.mercy,pitchMax:G.pitchMax,alerts:G.alerts,
+    oppLineup:(Array.isArray(G.oppLineup)?JSON.parse(JSON.stringify(G.oppLineup)):null),
+    oppBench:(Array.isArray(G.oppBench)?JSON.parse(JSON.stringify(G.oppBench)):null)};
   G=initGame();
   // Run cap follows the LEAGUE (not a stale carry-over) so it defaults OFF for no-cap leagues
   // (custom / DYB AAA / Majors / OZone = 0) instead of perpetuating an old game's 5.
   G.runCap=leagueById(keep.league).runCap; G.oppBatters=keep.oppBatters; G.ourSide=keep.ourSide; G.innings=keep.innings; G.lineup=keep.lineup;
   G.league=keep.league; G.mercy=keep.mercy; G.pitchMax=keep.pitchMax; if(keep.alerts)G.alerts=keep.alerts;
-  const ot=oppTeamId&&teamById(oppTeamId);
-  const _allOpp = ot ? ot.players.map(p=>({num:p.num,name:p.name})) : Array.from({length:Math.max(1,G.oppBatters)},(_,i)=>({num:String(i+1),name:""}));
-  G.oppLineup = _allOpp.slice(0,12); G.oppBench = _allOpp.slice(12);   // 12 bat (continuous); extras → bench
-  if(ot) G.oppBatters=G.oppLineup.length;
-  oppDefaultPositions();
+  // Keep the opponent lineup the user set up in this New Game (a team's roster OR names they typed) — only
+  // build a fresh one if none was set, so Start never wipes the entered opponent.
+  if(keep.oppLineup && keep.oppLineup.length){ G.oppLineup=keep.oppLineup; G.oppBench=keep.oppBench||[]; G.oppBatters=G.oppLineup.length; if(!G.oppLineup.some(e=>e&&e.pos))oppDefaultPositions(); }
+  else { const ot=oppTeamId&&teamById(oppTeamId);
+    const _allOpp = ot ? ot.players.map(p=>({num:p.num,name:p.name})) : Array.from({length:Math.max(1,G.oppBatters)},(_,i)=>({num:String(i+1),name:""}));
+    G.oppLineup = _allOpp.slice(0,12); G.oppBench = _allOpp.slice(12); if(ot) G.oppBatters=G.oppLineup.length; oppDefaultPositions(); }
   settingsMode=false; resetAlerts();
   amActiveScorer=true; _myClaimAt=Date.now();   // starting a fresh game → I'm the active scorer
   lineupTab="us"; hist=[]; gameFeed=[]; resetUI(); mode="lineup"; render(); broadcast();
@@ -4419,13 +4430,13 @@ document.getElementById("app").addEventListener("click",e=>{
     openShareLink({ url:url, title:"SHARE THE GAME", sub:'Opens the live scoreboard &amp; play-by-play — no login. Shows a "waiting" screen until you start, then goes live.',
       subject:"Watch "+nm+opp+" live", body:"Watch "+nm+opp+" live on All-Stars Live — no app or login needed, just tap the link:" }); return; }
   if(act==="schedstart"){ const t=teamById(openTeamId); if(!t)return; const s=(t.schedule||[]).find(x=>x.id===arg);
-    newgameFrom="team"; selectTeam(t.id); G=initGame(); loadTeamLineup(teamById(curTeamId)); hist=[]; resetUI();
+    newgameFrom="team"; selectTeam(t.id); G=initGame(); loadTeamLineup(teamById(curTeamId)); hist=[]; resetUI(); resetOpponent();
     if(s){ G.schedId=s.id; G.schedDate=s.date||null; }   // remember WHICH scheduled game this is, so end-game marks it played for sure
     if(s&&s.opp){ const m=(DB.teams||[]).find(x=>x.id!==t.id && (x.name||"").toLowerCase()===(s.opp||"").toLowerCase());
       if(m){ oppTeamId=m.id; OPP.name=m.name; OPP.short=m.short; OPP.color=m.color; OPP.logo=m.logo||null; }
       else { oppTeamId=null; OPP.name=s.opp; OPP.short=(s.opp||"OPP").slice(0,3).toUpperCase(); OPP.color="#E11D2E"; OPP.logo=null; }
       try{ recordRecentOpp(OPP); }catch(e){} }
-    mode="newgame"; render(); broadcast(); return; }
+    resetOppLineup(); mode="newgame"; render(); broadcast(); return; }
   if(act==="ngdatetoggle"){ ngDateOpen=!ngDateOpen; if(ngDateOpen)ngDateYM=null; render(); return; }
   if(act==="ngmonth"){ if(!ngDateYM){const d=new Date();ngDateYM={y:d.getFullYear(),m:d.getMonth()};} let mm=ngDateYM.m+(+arg),yy=ngDateYM.y; while(mm<0){mm+=12;yy--;} while(mm>11){mm-=12;yy++;} ngDateYM={y:yy,m:mm}; render(); return; }
   if(act==="ngday"){ ngDateVal=arg; ngDateOpen=false; render(); return; }   // tap a day = selected, no OK step
@@ -4661,7 +4672,7 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="apprefresh"){ flash("Refreshing…"); try{ if(navigator.serviceWorker&&navigator.serviceWorker.getRegistrations) navigator.serviceWorker.getRegistrations().then(function(rs){rs.forEach(function(r){try{r.update();}catch(e){}});}); }catch(e){} try{ if(window.cloudSyncTeams)cloudSyncTeams(); }catch(e){} setTimeout(function(){ try{ location.reload(); }catch(e){} }, 500); }
   else if(act==="settings"){mode="settings";render();}
   else if(act==="opencamera"){ try{ if(window.AllStars&&window.AllStars.openVideo)AllStars.openVideo(); }catch(e){} }
-  else if(act==="newgamestart"){newgameFrom="home";mode="newgame";render();}
+  else if(act==="newgamestart"){newgameFrom="home";resetOpponent();mode="newgame";render();}
   else if(act==="gototeams"){mode="teams";render();}
   else if(act==="opent"){openTeamId=arg;teamTab="hub";openTeamFrom=(mode==="home"?"home":"teams");mode="team";render();}
   else if(act==="teamtab"){teamTab=arg;render();}
@@ -4701,7 +4712,7 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="sortnum"){ const t=teamById(openTeamId); if(t){ t.players.sort((a,b)=>(parseInt(a.num,10)||999)-(parseInt(b.num,10)||999)); saveDB(); render(); } }
   else if(act==="sortname"){ const t=teamById(openTeamId); if(t){ t.players.sort((a,b)=>((a.last||a.name||"")+a.first).localeCompare((b.last||b.name||"")+b.first)); saveDB(); render(); } }
   else if(act==="pasteplayers"){ const t=teamById(openTeamId); if(t){ let txt=""; try{txt=prompt("Paste players — one per line. Each line: number then name, e.g.\n12 John Smith\n7 Maria Diaz");}catch(e){} if(txt){ let added=0; txt.split(/\r?\n/).forEach(line=>{ line=line.trim(); if(!line)return; if(t.players.length>=20)return; const m=line.match(/^(\d{1,3})\s+(.*)$/); let num="",nm=line; if(m){num=m[1];nm=m[2].trim();} const parts=nm.split(/\s+/).filter(Boolean); const first=parts.length>1?parts.slice(0,-1).join(" "):(parts[0]||""); const last=parts.length>1?parts[parts.length-1]:""; const p={id:nextId("p"),num:num,first:first,last:last,name:""}; ensureName(p); t.players.push(p); added++; }); if(added){saveDB();render();} else {try{alert("No players found — check the format.");}catch(e){}} } } }
-  else if(act==="startteam"){newgameFrom="team";selectTeam(openTeamId);G=initGame();loadTeamLineup(teamById(curTeamId));hist=[];resetUI();mode="newgame";render();broadcast();}
+  else if(act==="startteam"){newgameFrom="team";selectTeam(openTeamId);G=initGame();loadTeamLineup(teamById(curTeamId));hist=[];resetUI();resetOpponent();mode="newgame";render();broadcast();}
   else if(act==="pickour"){pickFor="our";mode="pickteam";render();}
   else if(act==="pickopp"){pickFor="opp";finderResults=null;window._finderQ="";
     // Seed the recent-opponent quick-picks from the team's SCHEDULE (which syncs across devices), so a
@@ -4720,12 +4731,12 @@ document.getElementById("app").addEventListener("click",e=>{
       try{ _vtLiveUnsub=window.cloudSubscribeGameDoc(arg+"-live",function(doc){ vtLive=(doc&&!doc.final&&doc.summary&&doc.activeUid)?doc.summary:null; if(mode==="teamstats")render(); }); }catch(e){}
     }); }
   else if(act==="favpublicteam"){ if(!viewTeam)return; const ex=DB.teams.find(x=>x.id===viewTeam.id); if(ex){ DB.teams=DB.teams.filter(x=>x.id!==viewTeam.id); saveDB(); flash("Removed from your home"); } else { const copy=JSON.parse(JSON.stringify(viewTeam)); copy.fav=true; copy.external=true; if(!Array.isArray(copy.players))copy.players=[]; DB.teams.push(copy); saveDB(); flash("Added to your home — watch them from the Home screen"); } render(); }
-  else if(act==="setpubopp"){ const r=finderResults&&finderResults[+arg]; if(r){ oppTeamId=r.id; OPP.name=r.name; OPP.short=r.short||(r.name||"OPP").slice(0,3).toUpperCase(); OPP.color=r.color; OPP.logo=r.logo||null; recordRecentOpp(OPP); } finderResults=null; mode="newgame"; render(); broadcast(); }
-  else if(act==="setrecentopp"){ const o=getRecentOpps()[+arg]; if(o){ oppTeamId=null; OPP.name=o.name; OPP.short=o.short||(o.name||"OPP").slice(0,3).toUpperCase(); OPP.color=o.color||"#E11D2E"; recordRecentOpp(OPP); } mode="newgame"; render(); broadcast(); }
-  else if(act==="setteam"){const id=arg;if(pickFor==="our"){selectTeam(id);}else{const t=teamById(id);oppTeamId=id;if(t){OPP.name=t.name;OPP.short=t.short;OPP.color=t.color;OPP.logo=t.logo||null;recordRecentOpp(OPP);}}mode="newgame";render();broadcast();}
-  else if(act==="newteampick"){const t=newTeam("");if(pickFor==="our"){selectTeam(t.id);}else{oppTeamId=t.id;OPP.name=t.name;OPP.short=t.short;OPP.color=t.color;OPP.logo=null;}mode="newgame";render();broadcast();}
-  else if(act==="oppnoroster"){oppTeamId=null;OPP.name="Opponent";OPP.short="OPP";OPP.color="#E11D2E";mode="newgame";render();broadcast();}
-  else if(act==="oppusetyped"){ const e=document.getElementById("oppNameInput"); const nm=(e?(e.value||""):(window._finderQ||"")).trim(); if(!nm){flash("Type an opponent name first");return;} oppTeamId=null; OPP.name=nm; OPP.short=(nm.replace(/[^A-Za-z0-9]/g,"").slice(0,3).toUpperCase())||"OPP"; OPP.color="#E11D2E"; OPP.logo=null; recordRecentOpp(OPP); finderResults=null; mode="newgame"; render(); broadcast(); }
+  else if(act==="setpubopp"){ const r=finderResults&&finderResults[+arg]; if(r){ oppTeamId=r.id; OPP.name=r.name; OPP.short=r.short||(r.name||"OPP").slice(0,3).toUpperCase(); OPP.color=r.color; OPP.logo=r.logo||null; recordRecentOpp(OPP); } finderResults=null; resetOppLineup(); mode="newgame"; render(); broadcast(); }
+  else if(act==="setrecentopp"){ const o=getRecentOpps()[+arg]; if(o){ oppTeamId=null; OPP.name=o.name; OPP.short=o.short||(o.name||"OPP").slice(0,3).toUpperCase(); OPP.color=o.color||"#E11D2E"; recordRecentOpp(OPP); } resetOppLineup(); mode="newgame"; render(); broadcast(); }
+  else if(act==="setteam"){const id=arg;if(pickFor==="our"){selectTeam(id);}else{const t=teamById(id);oppTeamId=id;if(t){OPP.name=t.name;OPP.short=t.short;OPP.color=t.color;OPP.logo=t.logo||null;recordRecentOpp(OPP);}resetOppLineup();}mode="newgame";render();broadcast();}
+  else if(act==="newteampick"){const t=newTeam("");if(pickFor==="our"){selectTeam(t.id);}else{oppTeamId=t.id;OPP.name=t.name;OPP.short=t.short;OPP.color=t.color;OPP.logo=null;resetOppLineup();}mode="newgame";render();broadcast();}
+  else if(act==="oppnoroster"){oppTeamId=null;OPP.name="Opponent";OPP.short="OPP";OPP.color="#E11D2E";resetOppLineup();mode="newgame";render();broadcast();}
+  else if(act==="oppusetyped"){ const e=document.getElementById("oppNameInput"); const nm=(e?(e.value||""):(window._finderQ||"")).trim(); if(!nm){flash("Type an opponent name first");return;} oppTeamId=null; OPP.name=nm; OPP.short=(nm.replace(/[^A-Za-z0-9]/g,"").slice(0,3).toUpperCase())||"OPP"; OPP.color="#E11D2E"; OPP.logo=null; recordRecentOpp(OPP); finderResults=null; resetOppLineup(); mode="newgame"; render(); broadcast(); }
   else if(act==="ngback"){mode="newgame";render();}
   else if(act==="ng-side"){G.ourSide=arg;render();broadcast();}
   else if(act==="ng-start")startNewGame();
@@ -5247,7 +5258,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v231";
+var APP_VERSION="v232";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
