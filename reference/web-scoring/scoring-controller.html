@@ -3121,7 +3121,6 @@ function actionArea(){
           : `<div style="font-size:12px;color:${T.sageDim};padding:12px 14px;border:1px dashed ${T.line};border-radius:12px">No past teams yet. When a team's season wraps up, open it &rarr; <b style="color:${T.sage}">Team management</b> &rarr; <b style="color:${T.sage}">End season</b> to retire it here (off your Home screen). Nothing is deleted — its record &amp; stats are kept, and you can reopen it anytime.</div>`}
         <button data-act="newteam" style="${bigBtn(OUR.color)}">${IC('<path d="M12 5v14M5 12h14"/>')} New team</button>
         ${(window.Cloud&&window.Cloud.enabled)?`<button data-act="opendirectory" style="${ghost};display:flex;align-items:center;justify-content:center;gap:9px">${ICN.search} Browse public teams to follow</button>`:""}
-        <div style="display:flex;gap:8px"><button data-act="importteam" style="${ghost};flex:1">&#8682; Import team</button><button data-act="importgame" style="${ghost};flex:1">&#8682; Import game</button></div>
       </div>`;
   }
   if(mode==="team"){
@@ -5673,7 +5672,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v253";
+var APP_VERSION="v254";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
