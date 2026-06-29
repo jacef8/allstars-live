@@ -3077,7 +3077,10 @@ function actionArea(){
       const _activeTeams=list.filter(t=>!t.archived);   // ended-season teams drop off Home (still in Manage Teams)
       const teamsArea=(showTeams&&_activeTeams.length)
         ? `<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px">
-             <div style="font-size:13px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:${T.lime};flex:none">My teams (${_activeTeams.length})</div>
+             <div style="display:flex;align-items:center;gap:12px;flex:none">
+               <span style="font-size:19px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:${T.ink}">My teams</span>
+               <span style="font-family:${MONO};font-size:13px;font-weight:800;color:#fff;background:${T.lime};border-radius:999px;padding:2px 11px;line-height:1.5">${_activeTeams.length}</span>
+               <span style="flex:1;height:2px;background:rgba(255,255,255,.14);border-radius:2px"></span></div>
              <div style="flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;display:flex;flex-wrap:wrap;justify-content:center;align-content:start;gap:14px;padding-right:2px">${_activeTeams.map(card).join("")}</div></div>`
         : `<div style="flex:1;min-height:0;display:flex;align-items:center;justify-content:center;color:${T.sageDim};font-size:14px;border:1px dashed ${T.line};border-radius:14px">No teams yet — tap Manage Teams to create your first.</div>`;
       return `<div style="position:relative;height:100%;overflow:hidden;display:flex;flex-direction:column;align-items:center;padding:clamp(10px,calc(var(--avh) * 2),22px) 14px">
@@ -5672,7 +5675,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v255";
+var APP_VERSION="v256";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
