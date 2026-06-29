@@ -131,13 +131,12 @@
   /* Tablet in landscape: use the width — wider column so the field is big and the
      event picker can sit as a side panel (no scrolling). Phones/portrait stay narrow. */
   @media (min-width:760px) and (orientation:landscape){ #app{max-width:1280px;} }
-  /* Big monitors: the menu/stat pages (home, summary, teams, lineup…) carry fixed
-     tablet-sized fonts that look tiny on a large screen, so scale those pages up. The
-     live console is excluded (it must stay no-scroll). width:calc(100%/zoom) cancels the
-     horizontal growth zoom adds, so nothing clips sideways — only the vertical grows (and
-     those pages already scroll). Wider #app too so the bigger UI has room. */
-  @media (min-width:1500px){ #app{max-width:1480px;} .page-zoom{zoom:1.18;width:calc(100% / 1.18);margin-left:auto;margin-right:auto;} }
-  @media (min-width:1920px){ #app{max-width:1680px;} .page-zoom{zoom:1.32;width:calc(100% / 1.32);margin-left:auto;margin-right:auto;} }
+  /* Big monitors: a wider content column so the menu/stat pages have room. The ACTUAL sizing is done
+     per-page by fitPage() (JS): it enlarges a short page to fill the screen + vertically centers it, and
+     shrinks a slightly-too-tall page just enough that no scrolling is needed — keeping everything as large
+     as fits. The live console is excluded (it stays a fixed no-scroll layout). */
+  @media (min-width:1500px){ #app{max-width:1480px;} }
+  @media (min-width:1920px){ #app{max-width:1680px;} }
 
   /* Monitor slide in/out (wide layout) — hide the video for distraction-free scoring.
      Toggling .video-off on #console-row animates the monitor column away; the scorer
@@ -4373,6 +4372,28 @@ document.addEventListener("focusin", function(e){
 function restoreScroll(){ var m=window._scrollMemo||{}; for(var id in m){ if(m[id]>0){ var el=document.getElementById(id); if(el) el.scrollTop=m[id]; } } }
 /* Paint new HTML into #content and put the scroll positions back (no jump-to-top). */
 function paintContent(html){ var c=document.getElementById("content"); if(!c) return; c.innerHTML=html; restoreScroll(); }
+/* Auto-fit a scroll page to the screen: measure the content's natural height vs the visible area, then
+   ENLARGE a short page to fill (capped — bigger screens only) and VERTICALLY CENTER it, or SHRINK a
+   slightly-too-tall page just enough that no scrolling is needed (down to a readable floor). Beyond that
+   floor it stays scrollable. Zoom is applied to the inner wrapper so the outer's clientHeight stays a
+   stable reference. */
+function fitPage(){
+  try{
+    var outer=document.querySelector("#content > div.page-zoom"); if(!outer) return;
+    var inner=outer.querySelector(":scope > .page-fit-inner"); if(!inner) return;
+    inner.style.zoom="1"; outer.style.justifyContent="flex-start";
+    var avail=outer.clientHeight, need=inner.scrollHeight;
+    if(!avail||!need) return;
+    var big=(window.innerWidth>=1500);
+    var MAXZ=big?1.30:1.0;   // only enlarge on big screens; never blow up a phone page
+    var MINZ=0.84;           // readable floor — below this we let it scroll instead of shrinking more
+    var z=avail/need;
+    if(z>MAXZ)z=MAXZ; if(z<MINZ)z=MINZ;
+    if(Math.abs(z-1)<0.02)z=1;
+    inner.style.zoom=(z===1?"":String(z));
+    outer.style.justifyContent=((need*z)<=avail+1)?"center":"flex-start";   // center only when it actually fits
+  }catch(e){}
+}
 
 /* Bases drawn as a real infield DIAMOND (2B top, 3B left, 1B right — home is the empty bottom point),
    not a flat row. `s` = each base's size in px. Lit = runner aboard. Used by the broadcast bugs. */
@@ -4495,8 +4516,11 @@ function render(){
     // Picker sub-steps (position / player / pitcher / edit) appear instantly — the slide/fade
     // transition reads as a jarring "flash" when you're just popping a quick chooser open.
     const stepModes=["pickplayer","pickpos","editplayer","opppickpos","opppickpitch","oppeditplayer"];
-    const cls=`${(mode!==_lastMode&&!stepModes.includes(mode))?"screen-in ":""}${(scroll&&!building)?"page-zoom":""}`;
-    paintContent(`<div class="${cls}" style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px;${scroll?"overflow-y:auto;-webkit-overflow-scrolling:touch":""}">${actionArea()}</div>${confirmOverlay()}${bugPreview?bugPreviewOverlay():""}`);
+    const _fit=(scroll&&!building);   // auto-fit pages: enlarge to fill + center, or shrink to avoid a little scroll
+    const cls=`${(mode!==_lastMode&&!stepModes.includes(mode))?"screen-in ":""}${_fit?"page-zoom":""}`;
+    const _body=_fit?`<div class="page-fit-inner" style="display:flex;flex-direction:column;gap:8px">${actionArea()}</div>`:actionArea();
+    paintContent(`<div class="${cls}" style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px;${scroll?"overflow-y:auto;-webkit-overflow-scrolling:touch":""}">${_body}</div>${confirmOverlay()}${bugPreview?bugPreviewOverlay():""}`);
+    if(_fit){ try{ fitPage(); setTimeout(fitPage,120); }catch(e){} }   // 2nd pass after web-font swap settles the height
     _lastMode=mode; _lastSubTab=subTab;
     try{ const _sk=mode+"|"+subTab; if(scroll&&_scrollMem[_sk]!=null){ const c=document.querySelector("#content > div"); if(c)c.scrollTop=_scrollMem[_sk]; }
          if(mode==="lineup"&&_scrollMem["__lineup"]!=null){ const l=document.getElementById("lineup-list"); if(l)l.scrollTop=_scrollMem["__lineup"]; } }catch(e){}
@@ -5651,9 +5675,9 @@ window.addEventListener("resize",function(){
   clearTimeout(_rsz);
   _rsz=setTimeout(function(){
     const ae=document.activeElement;
-    if(ae && (ae.tagName==="INPUT"||ae.tagName==="TEXTAREA"||ae.tagName==="SELECT")) return;  // typing → leave it alone
+    if(ae && (ae.tagName==="INPUT"||ae.tagName==="TEXTAREA"||ae.tagName==="SELECT")){ try{fitPage();}catch(e){} return; }  // typing → leave layout, just re-fit
     const w=isWide();
-    if(w===_lastWide) return;   // same layout → no re-render needed (CSS handles minor resizes)
+    if(w===_lastWide){ try{fitPage();}catch(e){} return; }   // same layout → no re-render, but re-fit the page to the new height
     _lastWide=w; render();
   },200);
 });
@@ -5675,7 +5699,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v257";
+var APP_VERSION="v258";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
