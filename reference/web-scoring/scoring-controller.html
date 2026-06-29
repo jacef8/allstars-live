@@ -2934,7 +2934,7 @@ function actionArea(){
     const card=t=>{const R=teamRec(t);const rec=`${R.w}-${R.l}${R.t?"-"+R.t:""}`;const games=R.w+R.l+R.t;
       const sub=(()=>{const n=new Date(),today=n.getFullYear()+"-"+String(n.getMonth()+1).padStart(2,"0")+"-"+String(n.getDate()).padStart(2,"0");const up=(t.schedule||[]).filter(s=>s.date&&s.date>=today).sort((a,b)=>((a.date+(a.time||""))<(b.date+(b.time||""))?-1:1))[0];if(up){try{return "Next · "+new Date(up.date+"T00:00").toLocaleDateString(undefined,{month:"short",day:"numeric"});}catch(e){return "Next game set";}}return games?(games+" game"+(games===1?"":"s")):"New season";})();
       const unread=teamHasUnread(t);
-      return `<div data-act="opent" data-arg="${t.id}" style="position:relative;background:${T.surface};border:2px solid ${t.color};border-left:7px solid ${t.color};border-radius:14px;padding:14px;box-shadow:0 0 0 1px rgba(0,0,0,.35), 0 8px 20px rgba(0,0,0,.4);cursor:pointer">
+      return `<div data-act="opent" data-arg="${t.id}" style="position:relative;width:300px;max-width:100%;background:${T.surface};border:2px solid ${t.color};border-left:7px solid ${t.color};border-radius:14px;padding:14px;box-shadow:0 0 0 1px rgba(0,0,0,.35), 0 8px 20px rgba(0,0,0,.4);cursor:pointer">
           ${unread?`<span title="New chat messages" style="position:absolute;top:11px;left:11px;display:flex;align-items:center;gap:5px;background:${T.amber};color:${T.field};border-radius:999px;padding:3px 9px;font-family:${MONO};font-weight:800;font-size:11px;letter-spacing:.4px">${IC('chat',12)} NEW</span>`:""}
           ${(window.cloudIsScorer&&window.cloudIsScorer(t))?"":`<button data-act="favteam" data-arg="${t.id}" title="Follow this team" style="position:absolute;top:9px;right:11px;background:none;border:none;color:${t.fav?T.amber:T.sageDim};font-size:24px;line-height:1;padding:0;cursor:pointer">${t.fav?IC('starFill',23):IC('star',23)}</button>`}
           <div style="display:flex;align-items:center;gap:10px;padding-right:30px">
@@ -3078,7 +3078,7 @@ function actionArea(){
       const teamsArea=(showTeams&&_activeTeams.length)
         ? `<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px">
              <div style="font-size:13px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:${T.lime};flex:none">My teams (${_activeTeams.length})</div>
-             <div style="flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;display:grid;grid-template-columns:repeat(auto-fill,minmax(248px,1fr));gap:12px;align-content:start;padding-right:2px">${_activeTeams.map(card).join("")}</div></div>`
+             <div style="flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;display:flex;flex-wrap:wrap;justify-content:center;align-content:start;gap:14px;padding-right:2px">${_activeTeams.map(card).join("")}</div></div>`
         : `<div style="flex:1;min-height:0;display:flex;align-items:center;justify-content:center;color:${T.sageDim};font-size:14px;border:1px dashed ${T.line};border-radius:14px">No teams yet — tap Manage Teams to create your first.</div>`;
       return `<div style="position:relative;height:100%;overflow:hidden;display:flex;flex-direction:column;align-items:center;padding:clamp(10px,calc(var(--avh) * 2),22px) 14px">
           ${settingsGear}
@@ -5672,7 +5672,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v254";
+var APP_VERSION="v255";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
