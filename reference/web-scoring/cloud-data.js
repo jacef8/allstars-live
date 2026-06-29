@@ -153,8 +153,11 @@
   // "Sync now" button on the Diagnostics page. Bump-changed-then-force so genuinely edited teams carry
   // a fresh updatedAt while unchanged ones still carry their real (older) one (server arbitrates).
   window.cloudSyncNow = function () {
-    try { window.cloudTouchChanged(); } catch (e) {}
-    try { (DB.teams || []).forEach(function (t) { window.cloudSaveTeam(t, true); }); } catch (e) {}
+    // PULL the latest and converge. cloudSyncTeams re-subscribes (re-running the team merge, which UNIONS
+    // game logs so nothing is lost) and uploads only teams the cloud is MISSING. We deliberately do NOT
+    // blanket force-push every local team anymore — THAT is what let a device with a stale record shove its
+    // old copy over everyone else's when the user hit "Sync now".
+    try { window.cloudSyncTeams(); } catch (e) {}
     try { window.cloudRefreshFollowed(); } catch (e) {}
   };
 
