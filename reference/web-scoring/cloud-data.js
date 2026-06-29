@@ -30,6 +30,8 @@
       rulebookId: t.rulebookId || null,
       ownerUid: t.ownerUid || myUid(), ownerEmail: t.ownerEmail || myEmail(),
       scorers: t.scorers || [], followers: t.followers || [], coOwners: t.coOwners || [],
+      members: t.members || [],                           // APPROVED members (emails) → team chat + photos
+      memberRequests: t.memberRequests || [],             // pending join requests awaiting owner approval
       updatedAt: t.updatedAt || Date.now(),
       public: !!t.public, statsPublic: !!t.statsPublic,   // owner-controlled discoverability
       lastMsgAt: t.lastMsgAt || 0,                        // newest chat ts → powers home unread badge
@@ -364,16 +366,50 @@
   window.cloudIsScorer = function (t) {
     var em = myEmail(); return !!(t && (window.cloudIsOwner(t) || window.cloudIsCoOwner(t) || (Array.isArray(t.scorers) && t.scorers.indexOf(em) >= 0)));
   };
+  // MEMBER = owner / co-owner / scorer / approved member. Members get team chat + photos + full updates.
+  // (Used to include any follower; now followers are casual fans — scores/stats/viewer only — and a
+  // parent must be APPROVED into `members` for the private team info.)
   window.cloudIsMember = function (t) {
-    var em = myEmail(); return !!(t && (window.cloudIsScorer(t) || (Array.isArray(t.followers) && t.followers.indexOf(em) >= 0)));
+    var em = myEmail(); return !!(t && (window.cloudIsScorer(t) || (Array.isArray(t.members) && t.members.indexOf(em) >= 0)));
+  };
+  window.cloudIsPendingMember = function (t) {
+    var em = myEmail(); return !!(t && Array.isArray(t.memberRequests) && t.memberRequests.indexOf(em) >= 0);
+  };
+  // A signed-in fan asks to become a member (rules allow appending ONLY your own email to memberRequests).
+  window.cloudRequestMembership = function (teamId) {
+    var d = fdb(), em = myEmail(); if (!d || !em || !teamId) return Promise.resolve(false);
+    return d.collection("teams").doc(teamId)
+      .update({ memberRequests: firebase.firestore.FieldValue.arrayUnion(em), updatedAt: Date.now() })
+      .then(function () { ctoast("Request sent — the team owner will approve you."); return true; })
+      .catch(function (e) { ctoast("Couldn't send request: " + e.message); return false; });
+  };
+  // Owner / co-owner approves: move the email from memberRequests → members.
+  window.cloudApproveMember = function (teamId, email) {
+    var d = fdb(); email = (email || "").toLowerCase(); if (!d || !teamId || !email) return Promise.resolve();
+    return d.collection("teams").doc(teamId).update({
+      members: firebase.firestore.FieldValue.arrayUnion(email),
+      memberRequests: firebase.firestore.FieldValue.arrayRemove(email), updatedAt: Date.now()
+    }).catch(function (e) { ctoast("Couldn't approve: " + e.message); });
+  };
+  window.cloudDenyMember = function (teamId, email) {
+    var d = fdb(); email = (email || "").toLowerCase(); if (!d || !teamId || !email) return Promise.resolve();
+    return d.collection("teams").doc(teamId)
+      .update({ memberRequests: firebase.firestore.FieldValue.arrayRemove(email), updatedAt: Date.now() })
+      .catch(function (e) { ctoast("Couldn't deny: " + e.message); });
+  };
+  window.cloudRemoveMember = function (teamId, email) {
+    var d = fdb(); email = (email || "").toLowerCase(); if (!d || !teamId || !email) return Promise.resolve();
+    return d.collection("teams").doc(teamId)
+      .update({ members: firebase.firestore.FieldValue.arrayRemove(email), updatedAt: Date.now() })
+      .catch(function (e) { ctoast("Couldn't remove member: " + e.message); });
   };
 
-  // Follow a team to read/post its chat (parents/fans) — NOT a scorer. From a ?follow=<teamId> link.
+  // Follow a team as a FAN (scores / stats / live viewer) — NOT a member, NOT a scorer. ?follow=<teamId>.
   window.cloudFollowTeam = function (teamId) {
     var d = fdb(), em = myEmail(); if (!d || !em || !teamId) return Promise.resolve();
     return d.collection("teams").doc(teamId)
       .update({ followers: firebase.firestore.FieldValue.arrayUnion(em), updatedAt: Date.now() })
-      .then(function () { window._joinTeamId = teamId; ctoast("You're now following this team."); })
+      .then(function () { window._joinTeamId = teamId; ctoast("You're now following this team's scores."); })
       .catch(function (e) { ctoast("Couldn't follow team: " + e.message); });
   };
   window.cloudClaimFollow = function () {

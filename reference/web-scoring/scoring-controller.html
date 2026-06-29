@@ -3304,6 +3304,25 @@ function actionArea(){
         ${toggleRow("togglepublic",!!t.public,"Public team","Anyone can search for this team by name and add it as an opponent in a new game.")}
         ${toggleRow("togglestatspublic",!!t.statsPublic,"Public season stats","Let people who find your team also see its season stats.")}
       </div>` : "";
+    // Owner-only: approve parents/players as MEMBERS (team chat + photos + full updates). Fans who follow
+    // only see scores/stats/viewer. Pending requests come in here for Approve / Deny.
+    const membersSection = (owner && C&&C.enabled) ? (function(){
+      const esc=s=>(s==null?"":String(s)).replace(/</g,"&lt;");
+      const reqs=(t.memberRequests||[]), mems=(t.members||[]);
+      const reqRows=reqs.map(em=>`<div style="display:flex;align-items:center;gap:8px;background:${T.surface2};border:2px solid ${T.amber};border-radius:10px;padding:9px 12px">
+          <span style="flex:1;min-width:0;font-size:13px;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(em)}</span>
+          <button data-act="approvemember" data-arg="${esc(em)}" style="background:${T.safe};color:#fff;border:none;border-radius:8px;padding:8px 14px;font-weight:800;font-size:12px;cursor:pointer">Approve</button>
+          <button data-act="denymember" data-arg="${esc(em)}" style="background:rgba(225,29,46,.18);border:1.5px solid ${T.out};color:#fff;border-radius:8px;padding:7px 12px;font-weight:800;font-size:12px;cursor:pointer">Deny</button></div>`).join("");
+      const memRows=mems.map(em=>`<div style="display:flex;align-items:center;gap:8px;padding:8px 2px;border-top:1.5px solid ${T.line}">
+          <span style="flex:1;min-width:0;font-size:13px;color:${T.sage};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(em)}</span>
+          <button data-act="removemember" data-arg="${esc(em)}" style="background:none;border:1.5px solid ${T.line};color:${T.sageDim};border-radius:7px;padding:6px 11px;font-weight:700;font-size:11px;cursor:pointer">Remove</button></div>`).join("");
+      return `<div style="${cardCss}">
+          <div style="font-size:13.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin-bottom:4px">Members &amp; requests</div>
+          <div style="font-size:11.5px;color:${T.sageDim};line-height:1.4;margin-bottom:9px">Approved members get <b style="color:${T.sage}">team chat, photos &amp; full updates</b>. Fans who follow only see scores, stats &amp; the live viewer.</div>
+          ${reqs.length?`<div style="font-size:11px;font-weight:800;letter-spacing:.6px;color:${T.amber};margin:2px 2px 6px">PENDING REQUESTS (${reqs.length})</div><div style="display:flex;flex-direction:column;gap:7px">${reqRows}</div>`:`<div style="font-size:12px;color:${T.sageDim};padding:2px 2px 4px">No pending requests.</div>`}
+          ${mems.length?`<div style="font-size:11px;font-weight:800;letter-spacing:.6px;color:${T.sageDim};margin:13px 2px 2px">MEMBERS (${mems.length})</div>${memRows}`:""}
+        </div>`;
+    })() : "";
     // ----- section sub-pages (reached from the hub grid); each has a back-to-hub header -----
     const secHdr=(title)=>`<div class="frost-card" style="display:flex;align-items:center;gap:12px;background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:12px 14px">
         <button data-act="teamhub" title="Back" style="${ghost};padding:9px 13px;flex:none;font-size:15px">&lsaquo; Back</button>
@@ -3411,7 +3430,7 @@ function actionArea(){
             : `<div style="font-size:12.5px;color:${T.sage}">When the season's over, end it to move this team off the Home screen. Nothing is deleted — the record &amp; stats stay, and you can reopen it anytime.</div>
                <button data-act="endseason" data-arg="${t.id}" style="background:none;border:2px solid ${T.clay};color:${T.clay};border-radius:11px;padding:13px;font-family:${MONO};font-weight:800;font-size:14px;letter-spacing:.5px;display:flex;align-items:center;justify-content:center;gap:9px">${IC('flag',16)} End season</button>`}
         </div>`;
-      return secWrap(`${secHdr("Team management")}${detailsBlock}${rulebookSection}${scorersSection}${discoverySection}${seasonSection}`);
+      return secWrap(`${secHdr("Team management")}${detailsBlock}${rulebookSection}${scorersSection}${membersSection}${discoverySection}${seasonSection}`);
     }
     if(teamTab==="schedule") return `<div style="width:100%;max-width:1080px;margin:0 auto;display:flex;flex-direction:column;gap:14px">${secHdr("Schedule")}${scheduleSection}</div>`;
     if(teamTab==="gameview"){
@@ -4846,6 +4865,12 @@ document.getElementById("app").addEventListener("click",e=>{
   if(act==="recomputeseason"){ const t=teamById(openTeamId); if(!t)return; confirmAct={title:"Recompute season stats?",msg:"Rebuilds this team's season batting totals from the finished games in the log — fixes drifted totals or resets to only the games actually recorded.",yes:"Recompute",run:function(){ recomputeSeasonFromGames(t); render(); flash("Season stats rebuilt from the game log"); }}; render(); return; }
   if(act==="endseason"){ const t=teamById(arg)||teamById(openTeamId); if(!t)return; confirmAct={title:"End season for "+(t.name||"this team")+"?",msg:"It moves off the Home screen (kept under Teams → Ended seasons). The record &amp; stats stay, and you can reopen it anytime.",yes:"End season",run:function(){ t.archived=true; t.updatedAt=Date.now(); saveDB(); try{ if(window.cloudSaveTeam)cloudSaveTeam(t,true); }catch(e){} flash("Season ended — "+(t.name||"team")+" moved off Home"); teamTab="manage"; render(); }}; render(); return; }
   if(act==="reopenseason"){ const t=teamById(arg)||teamById(openTeamId); if(!t)return; t.archived=false; t.updatedAt=Date.now(); saveDB(); try{ if(window.cloudSaveTeam)cloudSaveTeam(t,true); }catch(e){} flash((t.name||"Team")+" is active again"); render(); return; }
+  // ===== Membership approvals (owner). ATOMIC cloud array writes (arrayUnion/arrayRemove) so a concurrent
+  // fan request can't be clobbered by a whole-doc push; optimistic in-memory update keeps the UI snappy
+  // (the onSnapshot pulls the authoritative copy back and persists it). =====
+  if(act==="approvemember"){ const t=teamById(openTeamId); if(!t)return; const em=(arg||"").toLowerCase(); if(!Array.isArray(t.members))t.members=[]; if(!Array.isArray(t.memberRequests))t.memberRequests=[]; if(t.members.indexOf(em)<0)t.members.push(em); t.memberRequests=t.memberRequests.filter(x=>(x||"").toLowerCase()!==em); try{ if(window.cloudApproveMember)cloudApproveMember(t.id,em); }catch(e){} flash(em+" is now a member"); render(); return; }
+  if(act==="denymember"){ const t=teamById(openTeamId); if(!t)return; const em=(arg||"").toLowerCase(); if(Array.isArray(t.memberRequests))t.memberRequests=t.memberRequests.filter(x=>(x||"").toLowerCase()!==em); try{ if(window.cloudDenyMember)cloudDenyMember(t.id,em); }catch(e){} render(); return; }
+  if(act==="removemember"){ const t=teamById(openTeamId); if(!t)return; const em=(arg||"").toLowerCase(); confirmAct={title:"Remove member?",msg:em+" will lose access to team chat &amp; photos. They can request to join again.",yes:"Remove",run:function(){ if(Array.isArray(t.members))t.members=t.members.filter(x=>(x||"").toLowerCase()!==em); try{ if(window.cloudRemoveMember)cloudRemoveMember(t.id,em); }catch(e){} render(); }}; render(); return; }
   if(act==="delgame"){ const t=teamById(openTeamId); if(!t)return; if(window.Cloud&&window.Cloud.enabled&&window.Cloud.user&&window.cloudCanManage&&!window.cloudCanManage(t)){flash("Only the owner can delete a game");return;} const g=(t.games||[]).find(x=>x.id===arg); confirmAct={title:"Delete this game?",msg:"Permanently removes this game from the record AND subtracts its player stats from the season totals.",yes:"Delete game + stats",danger:true,run:function(){ try{ removeGameFromSeason(t,g); }catch(e){} t.games=(t.games||[]).filter(x=>x.id!==arg);
       // TOMBSTONE the game id (synced via the team doc) so the additive cross-device merge can't
       // resurrect it from another device's copy. Capped so the list can't grow without bound.
@@ -5326,6 +5351,12 @@ function openChat(teamId){
   if(!(C&&C.enabled)){ flash("Team chat needs the web app (sign-in)"); return; }
   if(!C.user){ flash("Sign in to use team chat"); return; }
   if(!teamId) return;
+  const _ct=teamById(teamId);
+  // Members-only: team chat is for APPROVED members. A fan (follower) gets a request-to-join prompt.
+  if(_ct && window.cloudIsMember && !window.cloudIsMember(_ct)){
+    if(window.cloudIsPendingMember && window.cloudIsPendingMember(_ct)){ flash("Your request to join is pending — the team owner will approve you."); return; }
+    confirmAct={title:"Members only",msg:"Team chat &amp; photos are for approved members (parents &amp; players). Request to join? The team owner will approve you, and then you'll get chat + full updates. Fans can still follow scores, stats &amp; the live viewer.",yes:"Request to join",run:function(){ if(window.cloudRequestMembership)window.cloudRequestMembership(teamId).then(function(){ try{render();}catch(e){} }); }}; render(); return;
+  }
   chatTeamId=teamId; chatMsgs=[];
   markSeenChat(teamId);   // opening chat clears the home "NEW" badge for this team
   const t=teamById(teamId); const title=document.getElementById("chatTitle"); if(title)title.textContent=((t&&t.name)?t.name:"Team")+" chat";
@@ -5668,7 +5699,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v251";
+var APP_VERSION="v252";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;

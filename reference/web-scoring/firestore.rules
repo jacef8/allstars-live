@@ -17,6 +17,9 @@ service cloud.firestore {
       // outright). Team docs always create scorers/followers as [], so the field always exists.
       function isScorer()   { return request.auth != null && (request.auth.token.email in resource.data.scorers); }
       function isFollower() { return request.auth != null && (request.auth.token.email in resource.data.followers); }
+      // MEMBER = approved parent/player (email in `members`) — gets team chat + photos. Guard existence
+      // (older docs predate the field). Followers are now just fans (scores/stats), NOT chat members.
+      function isApprovedMember() { return request.auth != null && ('members' in resource.data) && (request.auth.token.email in resource.data.members); }
       // Co-owners get full management access (like a second owner) but can't change ownerUid or
       // the coOwners list themselves. Guard the field existence — older docs have no coOwners.
       function isCoOwner()  { return request.auth != null && ('coOwners' in resource.data) && (request.auth.token.email in resource.data.coOwners); }
@@ -32,7 +35,7 @@ service cloud.firestore {
 
       // Public teams (owner set public:true) are readable by anyone — powers the searchable
       // team directory. The `where('public','==',true)` query authorizes against this clause.
-      allow read: if isOwner() || isCoOwner() || isScorer() || isFollower() || resource.data.public == true;
+      allow read: if isOwner() || isCoOwner() || isScorer() || isFollower() || isApprovedMember() || resource.data.public == true;
 
       // Create: must stamp yourself as the owner.
       allow create: if request.auth != null && request.resource.data.ownerUid == request.auth.uid;
@@ -69,9 +72,18 @@ service cloud.firestore {
           (request.auth.token.email in request.resource.data.followers) &&
           request.resource.data.followers.size() == resource.data.followers.size() + 1
         )
-        // Any member may bump ONLY the chat-activity stamp (powers home unread badges).
+        // Self-REQUEST membership: append ONLY your own email to memberRequests (owner approves later).
+        // Size must grow by exactly 1 and your email must be newly added — can't tamper with others'.
         || (
-          (isOwner() || isCoOwner() || isScorer() || isFollower()) &&
+          request.auth != null &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberRequests', 'updatedAt']) &&
+          (request.auth.token.email in request.resource.data.memberRequests) &&
+          !(('memberRequests' in resource.data) && (request.auth.token.email in resource.data.memberRequests)) &&
+          request.resource.data.memberRequests.size() == (('memberRequests' in resource.data) ? resource.data.memberRequests.size() : 0) + 1
+        )
+        // A MEMBER (or scorer/owner) may bump ONLY the chat-activity stamp (powers home unread badges).
+        || (
+          (isOwner() || isCoOwner() || isScorer() || isApprovedMember()) &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastMsgAt', 'updatedAt'])
         )
       );
@@ -86,7 +98,7 @@ service cloud.firestore {
             team().ownerUid == request.auth.uid ||
             (team().coOwners is list && (request.auth.token.email in team().coOwners)) ||
             (team().scorers is list && (request.auth.token.email in team().scorers)) ||
-            (team().followers is list && (request.auth.token.email in team().followers))
+            (team().members is list && (request.auth.token.email in team().members))
           );
         }
         allow read:   if isMemberOfTeam();
@@ -104,7 +116,7 @@ service cloud.firestore {
             pteam().ownerUid == request.auth.uid ||
             (pteam().coOwners is list && (request.auth.token.email in pteam().coOwners)) ||
             (pteam().scorers is list && (request.auth.token.email in pteam().scorers)) ||
-            (pteam().followers is list && (request.auth.token.email in pteam().followers))
+            (pteam().members is list && (request.auth.token.email in pteam().members))
           );
         }
         allow read:   if isMember();
