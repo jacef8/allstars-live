@@ -47,6 +47,21 @@
   var _sig = {};
   function teamSig(t) { try { var d = teamDoc(t); delete d.updatedAt; return JSON.stringify(d); } catch (e) { return ""; } }
   function markClean(t) { if (t && t.id) _sig[t.id] = teamSig(t); }   // baseline = current content
+  // Union two game logs by id so neither device ever loses a game it scored (the log is append-mostly).
+  // On an id collision keep the RICHER copy (the one with a per-game box score). Newest-first, capped 60.
+  // This is what makes the record CONVERGE across devices instead of one device's stale whole-doc push
+  // clobbering games scored on another. Game-level deletes aren't tombstoned yet (additive by design).
+  function unionGames(a, b) {
+    a = Array.isArray(a) ? a : []; b = Array.isArray(b) ? b : [];
+    var byId = {}, order = [];
+    function add(g) { if (!g || !g.id) return;
+      if (!(g.id in byId)) { byId[g.id] = g; order.push(g.id); }
+      else if (!byId[g.id].bat && g.bat) byId[g.id] = g; }   // keep the one with a box score
+    a.forEach(add); b.forEach(add);
+    var out = order.map(function (id) { return byId[id]; });
+    out.sort(function (x, y) { var dx = x.date || "", dy = y.date || ""; return dx < dy ? 1 : dx > dy ? -1 : 0; });
+    return out.slice(0, 60);
+  }
   // Called from saveDB (NOT while applying an inbound snapshot): bump updatedAt for any team whose
   // content actually changed vs its synced baseline. Teams with no baseline yet (never synced this
   // session) are left alone — we don't know they changed, so we must not stamp them "now" and risk
@@ -250,27 +265,37 @@
     function sansTimestamp(o) { var x = Object.assign({}, o); delete x.updatedAt; return JSON.stringify(x); }
     function merge(docs) {
       window._lastCloudPull = Date.now();
-      var changed = false;
+      var changed = false, convergedIds = {};
       var dead = deletedSet();
       docs.forEach(function (doc) {
         var c = doc.data(); if (!c || !c.id) return;
         if (dead.indexOf(c.id) >= 0) return;   // user deleted this team — never re-add it
         var i = (DB.teams || []).findIndex(function (x) { return x.id === c.id; });
-        if (i < 0) { DB.teams.push(c); markClean(c); changed = true; }
-        else {
-          // Only take the cloud copy when it's actually NEWER than ours. A stale snapshot (e.g.
-          // arriving before our own just-edited push commits) must NOT clobber local edits — that's
-          // what was silently deleting freshly-added schedule games on reload. Local edits bump
-          // updatedAt (see touchTeam), so unpushed local changes always win until they're pushed.
-          var lTs = DB.teams[i].updatedAt || 0, cTs = c.updatedAt || 0;
-          if (cTs > lTs) {
-            var merged = Object.assign({}, DB.teams[i], c);
-            if (sansTimestamp(merged) !== sansTimestamp(DB.teams[i])) { DB.teams[i] = merged; changed = true; }
-            markClean(DB.teams[i]);                 // we're now in sync with cloud → don't echo it back
-          } else if (cTs === lTs) {
-            markClean(DB.teams[i]);                 // already in sync → baseline = current (no needless re-push)
-          }
-          // cTs < lTs: we hold a newer un-pushed local edit — leave the baseline so cloudPushSoon uploads it.
+        if (i < 0) { DB.teams.push(c); markClean(c); changed = true; return; }
+        var loc = DB.teams[i];
+        var lTs = loc.updatedAt || 0, cTs = c.updatedAt || 0;
+        if (loc.external) {
+          // Followed team — we don't edit it; take the cloud copy when newer (refreshFollowed also pulls it).
+          if (cTs > lTs) { var m = Object.assign({}, loc, c, { external: true });
+            if (sansTimestamp(m) !== sansTimestamp(loc)) { DB.teams[i] = m; changed = true; } }
+          markClean(DB.teams[i]); return;
+        }
+        // OUR team (owned / scorer / co-owner): CONVERGE instead of whole-doc last-write-wins.
+        //  • the game LOG is additive — unioned by id, so neither device ever loses a game it scored
+        //    (this is the real fix for "the record never updates across devices");
+        //  • scalar config (name/color/players/schedule/archived…) follows the newer timestamp;
+        //  • the RECORD is DERIVED from the unioned log, so it can't disagree with the games.
+        var unioned = unionGames(loc.games, c.games);
+        var gamesGrew = unioned.length !== ((loc.games || []).length);
+        var next = (cTs > lTs) ? Object.assign({}, loc, c) : Object.assign({}, loc);   // local scalars stay if we're newer
+        next.games = unioned;
+        try { if (typeof teamRec === "function") next.record = teamRec(next); } catch (e) {}
+        if (sansTimestamp(next) !== sansTimestamp(loc)) {
+          if (gamesGrew || cTs > lTs) next.updatedAt = Math.max(lTs, cTs) + 1;   // monotonic bump → the converged doc re-pushes & wins
+          DB.teams[i] = next; changed = true; convergedIds[next.id] = true;
+        } else if (cTs >= lTs) {
+          markClean(DB.teams[i]);   // identical & cloud not behind → in sync, don't echo back
+          // cTs < lTs with identical content: keep the baseline dirty so an un-pushed local edit still uploads.
         }
       });
       // A just-accepted texted invite: jump to that team's management page + favorite it (follow).
@@ -287,8 +312,18 @@
       }
       if (!changed) return;
       window._cloudApplying = true;
-      try { saveDB(); } catch (e) {}   // persist locally WITHOUT re-pushing (guarded above)
+      try {
+        // Recompute season stats from the (now unioned) game log for any team whose games changed, then
+        // re-baseline so we don't needlessly echo. Runs under _cloudApplying so its saveDB doesn't push.
+        Object.keys(convergedIds).forEach(function (id) {
+          var t = (DB.teams || []).find(function (x) { return x.id === id; });
+          if (t) { try { if (typeof recomputeSeasonFromGames === "function") recomputeSeasonFromGames(t); } catch (e) {} markClean(t); }
+        });
+        saveDB();   // persist locally WITHOUT re-pushing (guarded)
+      } catch (e) {}
       window._cloudApplying = false;
+      // Push the converged docs so the cloud + every other device adopt the unioned log (idempotent once settled).
+      try { Object.keys(convergedIds).forEach(function (id) { var t = (DB.teams || []).find(function (x) { return x.id === id; }); if (t && window.cloudSaveTeam) window.cloudSaveTeam(t, true); }); } catch (e) {}
       cloudRenderSoon();               // deferred + interaction-aware (won't kill an open dropdown)
     }
     _unsub.push(d.collection("teams").where("ownerUid", "==", u)
