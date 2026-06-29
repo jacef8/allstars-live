@@ -3467,7 +3467,7 @@ function actionArea(){
       // Actions: scorecard PDF, rewatch on YouTube (if streamed), delete (owner/co-owner only).
       const canDel = !(window.Cloud&&window.Cloud.enabled&&window.Cloud.user) || (window.cloudCanManage&&window.cloudCanManage(t));
       const ytBtn = g.yt ? `<button data-act="rewatchgame" data-arg="${g.yt}" style="${ghost};display:flex;align-items:center;justify-content:center;gap:9px;border:1px solid #FF3B5C;color:#FF6B6B">&#9654; Rewatch on YouTube</button>` : "";
-      const delBtn = canDel ? `<div style="display:flex;justify-content:flex-end;margin-top:2px"><button data-act="delgame" data-arg="${g.id}" style="background:rgba(225,29,46,.22);border:2px solid ${T.out};color:#fff;border-radius:9px;padding:10px 16px;font-family:${MONO};font-size:12px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;box-shadow:0 3px 10px rgba(225,29,46,.3)">&#x1F5D1; Delete game</button></div>` : "";
+      const delBtn = canDel ? `<div style="display:flex;justify-content:flex-end;margin-top:2px"><button data-act="delgame" data-arg="${g.id}" style="background:${T.out};border:2px solid #fff;color:#fff;border-radius:9px;padding:11px 18px;font-family:${MONO};font-size:13px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;box-shadow:0 4px 14px rgba(0,0,0,.5)">&#x1F5D1; Delete game</button></div>` : "";
       if(!g.bat){ return secWrap(`${secHdr("Game")}${head}<div style="font-size:12px;color:${T.sageDim};text-align:center;padding:14px;border:1px dashed ${T.line};border-radius:12px">Per-game stats weren't recorded for this game (it finished before by-game stat tracking). The final score is above.</div>${ytBtn}${delBtn}`); }
       const maxI=g.maxI||((g.line&&g.line.away&&g.line.away.length)||1);
       const card=(inner)=>`<div class="frost-card" style="overflow-x:auto;background:${T.surface};border:2px solid ${T.line};border-radius:12px;padding:8px 10px">${inner}</div>`;
@@ -3537,7 +3537,7 @@ function actionArea(){
         <button data-act="startteam" style="${bigBtn(t.color)}">${IC('<path d="M8 5l11 7-11 7z" fill="currentColor" stroke="none"/>')} Start game with ${t.short}</button>
         <button data-act="lineupcard" style="${ghost};display:flex;align-items:center;justify-content:center;gap:9px">${ICN.doc} Lineup card (PDF)</button>
         <div style="display:flex;justify-content:flex-end;margin-top:2px">
-          <button data-act="deleteteam" style="background:rgba(225,29,46,.22);border:2px solid ${T.out};color:#fff;border-radius:9px;padding:10px 16px;font-family:${MONO};font-size:12px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;box-shadow:0 3px 10px rgba(225,29,46,.3)">${IC('trash',14)} Delete team</button></div>
+          <button data-act="deleteteam" style="background:${T.out};border:2px solid #fff;color:#fff;border-radius:9px;padding:11px 18px;font-family:${MONO};font-size:13px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;box-shadow:0 4px 14px rgba(0,0,0,.5)">${IC('trash',14)} Delete team</button></div>
       `);
   }
   if(mode==="pickteam"){
@@ -5699,7 +5699,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v258";
+var APP_VERSION="v259";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
