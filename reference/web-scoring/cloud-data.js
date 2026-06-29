@@ -34,6 +34,7 @@
       public: !!t.public, statsPublic: !!t.statsPublic,   // owner-controlled discoverability
       lastMsgAt: t.lastMsgAt || 0,                        // newest chat ts → powers home unread badge
       games: t.games || [],                               // finished-game log (Recent games list)
+      deletedGames: t.deletedGames || [],                 // tombstoned game ids → additive merge won't resurrect a deleted game
       logo: t.logo || "",                                 // team logo data URL (downscaled ≤240px)
       archived: !!t.archived,                             // season ended → hidden from Home (still in Teams)
     };
@@ -51,10 +52,10 @@
   // On an id collision keep the RICHER copy (the one with a per-game box score). Newest-first, capped 60.
   // This is what makes the record CONVERGE across devices instead of one device's stale whole-doc push
   // clobbering games scored on another. Game-level deletes aren't tombstoned yet (additive by design).
-  function unionGames(a, b) {
-    a = Array.isArray(a) ? a : []; b = Array.isArray(b) ? b : [];
+  function unionGames(a, b, dead) {
+    a = Array.isArray(a) ? a : []; b = Array.isArray(b) ? b : []; dead = dead || {};
     var byId = {}, order = [];
-    function add(g) { if (!g || !g.id) return;
+    function add(g) { if (!g || !g.id || dead[g.id]) return;   // skip tombstoned (deleted) games
       if (!(g.id in byId)) { byId[g.id] = g; order.push(g.id); }
       else if (!byId[g.id].bat && g.bat) byId[g.id] = g; }   // keep the one with a box score
     a.forEach(add); b.forEach(add);
@@ -285,10 +286,16 @@
         //    (this is the real fix for "the record never updates across devices");
         //  • scalar config (name/color/players/schedule/archived…) follows the newer timestamp;
         //  • the RECORD is DERIVED from the unioned log, so it can't disagree with the games.
-        var unioned = unionGames(loc.games, c.games);
+        // Merge the game tombstones (union — a delete on EITHER device wins and propagates via the doc),
+        // and exclude tombstoned ids from the unioned log so a deleted game can't resurrect.
+        var deadG = {};
+        (loc.deletedGames || []).forEach(function (id) { deadG[id] = 1; });
+        (c.deletedGames || []).forEach(function (id) { deadG[id] = 1; });
+        var unioned = unionGames(loc.games, c.games, deadG);
         var gamesGrew = unioned.length !== ((loc.games || []).length);
         var next = (cTs > lTs) ? Object.assign({}, loc, c) : Object.assign({}, loc);   // local scalars stay if we're newer
         next.games = unioned;
+        next.deletedGames = Object.keys(deadG).slice(-200);   // carry the merged tombstone set
         try { if (typeof teamRec === "function") next.record = teamRec(next); } catch (e) {}
         if (sansTimestamp(next) !== sansTimestamp(loc)) {
           if (gamesGrew || cTs > lTs) next.updatedAt = Math.max(lTs, cTs) + 1;   // monotonic bump → the converged doc re-pushes & wins

@@ -4846,7 +4846,11 @@ document.getElementById("app").addEventListener("click",e=>{
   if(act==="recomputeseason"){ const t=teamById(openTeamId); if(!t)return; confirmAct={title:"Recompute season stats?",msg:"Rebuilds this team's season batting totals from the finished games in the log — fixes drifted totals or resets to only the games actually recorded.",yes:"Recompute",run:function(){ recomputeSeasonFromGames(t); render(); flash("Season stats rebuilt from the game log"); }}; render(); return; }
   if(act==="endseason"){ const t=teamById(arg)||teamById(openTeamId); if(!t)return; confirmAct={title:"End season for "+(t.name||"this team")+"?",msg:"It moves off the Home screen (kept under Teams → Ended seasons). The record &amp; stats stay, and you can reopen it anytime.",yes:"End season",run:function(){ t.archived=true; t.updatedAt=Date.now(); saveDB(); try{ if(window.cloudSaveTeam)cloudSaveTeam(t,true); }catch(e){} flash("Season ended — "+(t.name||"team")+" moved off Home"); teamTab="manage"; render(); }}; render(); return; }
   if(act==="reopenseason"){ const t=teamById(arg)||teamById(openTeamId); if(!t)return; t.archived=false; t.updatedAt=Date.now(); saveDB(); try{ if(window.cloudSaveTeam)cloudSaveTeam(t,true); }catch(e){} flash((t.name||"Team")+" is active again"); render(); return; }
-  if(act==="delgame"){ const t=teamById(openTeamId); if(!t)return; if(window.Cloud&&window.Cloud.enabled&&window.Cloud.user&&window.cloudCanManage&&!window.cloudCanManage(t)){flash("Only the owner can delete a game");return;} const g=(t.games||[]).find(x=>x.id===arg); confirmAct={title:"Delete this game?",msg:"Permanently removes this game from the record AND subtracts its player stats from the season totals.",yes:"Delete game + stats",danger:true,run:function(){ try{ removeGameFromSeason(t,g); }catch(e){} t.games=(t.games||[]).filter(x=>x.id!==arg); t.record=teamRec(t); saveDB(); teamTab="schedule"; viewGameId=null; render(); }}; render(); return; }
+  if(act==="delgame"){ const t=teamById(openTeamId); if(!t)return; if(window.Cloud&&window.Cloud.enabled&&window.Cloud.user&&window.cloudCanManage&&!window.cloudCanManage(t)){flash("Only the owner can delete a game");return;} const g=(t.games||[]).find(x=>x.id===arg); confirmAct={title:"Delete this game?",msg:"Permanently removes this game from the record AND subtracts its player stats from the season totals.",yes:"Delete game + stats",danger:true,run:function(){ try{ removeGameFromSeason(t,g); }catch(e){} t.games=(t.games||[]).filter(x=>x.id!==arg);
+      // TOMBSTONE the game id (synced via the team doc) so the additive cross-device merge can't
+      // resurrect it from another device's copy. Capped so the list can't grow without bound.
+      if(!Array.isArray(t.deletedGames))t.deletedGames=[]; if(t.deletedGames.indexOf(arg)<0)t.deletedGames.push(arg); if(t.deletedGames.length>200)t.deletedGames=t.deletedGames.slice(-200);
+      t.record=teamRec(t); t.updatedAt=Date.now(); saveDB(); try{ if(window.cloudSaveTeam)cloudSaveTeam(t,true); }catch(e){} teamTab="schedule"; viewGameId=null; render(); }}; render(); return; }
   if(act==="swapviewer"){ viewerRight=viewerRight==="field"?"feed":"field"; try{localStorage.setItem("al-viewer-right",viewerRight);}catch(e){} render(); return; }
   if(act==="viewerphone"){ viewerPhone=(arg==="field"||arg==="feed")?arg:"both"; try{localStorage.setItem("al-viewer-phone",viewerPhone);}catch(e){} render(); return; }
   if(act==="soundtoggle"){ Snd.setOn(!Snd.isOn()); if(Snd.isOn())Snd.crack(); renderToolbar(); return; }
@@ -5664,7 +5668,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v249";
+var APP_VERSION="v250";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
