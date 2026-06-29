@@ -31,7 +31,7 @@
     --clay:#E0974F; --chalk:#F2F5FA; --grass:#1F5C3A; --grassLt:#2C7D4E;
     --safe:#2E6BE6; --out:#E11D2E; --sage:#FFFFFF; --sageDim:#DDE5F1; --amber:#F0B43E;
     --live:#FF3B5C; --navy:#1D3A66; --lime:#E11D2E;
-    --mono:"Saira Condensed",system-ui,-apple-system,sans-serif;
+    --mono:"Barlow",system-ui,-apple-system,sans-serif;
     --sans:"Barlow",system-ui,-apple-system,sans-serif;
     --ease:cubic-bezier(.16,1,.3,1); --ease-soft:cubic-bezier(.4,0,.2,1);
   }
@@ -136,8 +136,8 @@
      live console is excluded (it must stay no-scroll). width:calc(100%/zoom) cancels the
      horizontal growth zoom adds, so nothing clips sideways — only the vertical grows (and
      those pages already scroll). Wider #app too so the bigger UI has room. */
-  @media (min-width:1500px){ #app{max-width:1480px;} .page-zoom{zoom:1.18;width:calc(100% / 1.18);} }
-  @media (min-width:1920px){ #app{max-width:1680px;} .page-zoom{zoom:1.32;width:calc(100% / 1.32);} }
+  @media (min-width:1500px){ #app{max-width:1480px;} .page-zoom{zoom:1.18;width:calc(100% / 1.18);margin-left:auto;margin-right:auto;} }
+  @media (min-width:1920px){ #app{max-width:1680px;} .page-zoom{zoom:1.32;width:calc(100% / 1.32);margin-left:auto;margin-right:auto;} }
 
   /* Monitor slide in/out (wide layout) — hide the video for distraction-free scoring.
      Toggling .video-off on #console-row animates the monitor column away; the scorer
@@ -160,7 +160,7 @@
 <!-- Share / QR modal: fans scan to open the live viewer -->
 <div id="qrmodal" style="display:none;position:fixed;inset:0;z-index:200;background:rgba(8,11,16,.84);align-items:center;justify-content:center;padding:20px">
   <div style="max-width:330px;width:100%;background:#212A38;border:2px solid #FFFFFF;border-radius:18px;padding:20px;text-align:center;box-shadow:0 24px 60px rgba(0,0,0,.6)">
-    <div id="qrTitle" style="font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:20px;letter-spacing:.5px;color:#EAEDF2">SHARE THE GAME</div>
+    <div id="qrTitle" style="font-family:'Barlow',sans-serif;font-weight:800;font-size:20px;letter-spacing:.5px;color:#EAEDF2">SHARE THE GAME</div>
     <div id="qrSub" style="font-size:12px;color:#B7C2D6;margin:3px 0 12px">Nearby? Have them <b style="color:#E11D2E">scan</b>. Far away? Send the link.</div>
     <div id="shareToggle"></div>
     <div id="qrbox" style="background:#fff;border-radius:12px;padding:12px;width:244px;height:244px;margin:0 auto;display:flex;align-items:center;justify-content:center;color:#677281;font-size:12px"></div>
@@ -183,7 +183,7 @@
   <div style="max-width:390px;width:100%;background:#212A38;border:2px solid #FFFFFF;border-radius:18px;padding:20px;box-shadow:0 24px 60px rgba(0,0,0,.6)">
     <div style="display:flex;align-items:center;gap:9px">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="#FF0000"><path d="M23 7.5a3 3 0 0 0-2.1-2.1C19 5 12 5 12 5s-7 0-8.9.4A3 3 0 0 0 1 7.5 31 31 0 0 0 .6 12 31 31 0 0 0 1 16.5a3 3 0 0 0 2.1 2.1C5 19 12 19 12 19s7 0 8.9-.4a3 3 0 0 0 2.1-2.1A31 31 0 0 0 23.4 12 31 31 0 0 0 23 7.5z"/><path d="M9.8 15.3V8.7l5.7 3.3z" fill="#212A38"/></svg>
-      <div style="font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:20px;letter-spacing:.5px;color:#EAEDF2">CONNECT YOUR STREAM</div>
+      <div style="font-family:'Barlow',sans-serif;font-weight:800;font-size:20px;letter-spacing:.5px;color:#EAEDF2">CONNECT YOUR STREAM</div>
     </div>
     <div style="font-size:12px;color:#B7C2D6;margin:7px 0 14px;line-height:1.5">Paste your <b style="color:#EAEDF2">YouTube Live</b> link or video ID. It plays in the monitor and becomes the link you share with fans. Saved on this device.</div>
     <label style="display:block;font-size:11px;font-weight:700;letter-spacing:.5px;color:#B7C2D6;margin-bottom:5px">YOUTUBE LINK OR VIDEO ID</label>
@@ -202,7 +202,7 @@
 <div id="rulesmodal" style="display:none;position:fixed;left:0;right:0;top:0;height:calc(var(--avh) * 100);z-index:200;background:rgba(8,11,16,.84);align-items:center;justify-content:center;padding:14px">
   <div style="max-width:680px;width:100%;height:min(calc(var(--avh) * 90),820px);display:flex;flex-direction:column;background:#0E1420;border:2px solid #FFFFFF;border-radius:18px;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,.6)">
     <div style="display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid #2A3650;flex:none">
-      <div id="rulesTitle" style="font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:19px;letter-spacing:.5px;color:#EAEDF2;flex:1"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none;vertical-align:middle"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg> Rulebook</div>
+      <div id="rulesTitle" style="font-family:'Barlow',sans-serif;font-weight:800;font-size:19px;letter-spacing:.5px;color:#EAEDF2;flex:1"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none;vertical-align:middle"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg> Rulebook</div>
       <button data-act="closerules" style="background:#1A2233;border:1px solid #2A3650;color:#B7C2D6;border-radius:8px;padding:7px 11px;font-weight:700;font-size:13px;cursor:pointer">&times;</button>
     </div>
     <div style="padding:10px 14px;border-bottom:1px solid #2A3650;flex:none;display:flex;gap:8px;align-items:center">
@@ -217,7 +217,7 @@
 <div id="chatmodal" style="display:none;position:fixed;left:0;right:0;top:0;height:calc(var(--avh) * 100);z-index:200;background:rgba(8,11,16,.84);align-items:center;justify-content:center;padding:14px">
   <div style="max-width:460px;width:100%;height:min(calc(var(--avh) * 82),660px);display:flex;flex-direction:column;background:#0E1420;border:2px solid #FFFFFF;border-radius:18px;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,.6)">
     <div style="display:flex;align-items:center;gap:8px;padding:13px 15px;border-bottom:1px solid #2A3650;flex:none">
-      <div id="chatTitle" style="font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:19px;letter-spacing:.5px;color:#EAEDF2;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Team chat</div>
+      <div id="chatTitle" style="font-family:'Barlow',sans-serif;font-weight:800;font-size:19px;letter-spacing:.5px;color:#EAEDF2;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Team chat</div>
       <button data-act="closechat" aria-label="Close chat" style="flex:none;background:#1A2233;border:1px solid #2A3650;color:#EAEDF2;border-radius:10px;width:40px;height:40px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:26px;line-height:1;cursor:pointer">&times;</button>
     </div>
     <div id="chatList" style="flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px 14px;display:flex;flex-direction:column;gap:8px"></div>
@@ -243,7 +243,7 @@ const T={field:"#10141A",ink:"#F2F5FA",surface:"#212A38",surface2:"#324056",line
   out:"#E11D2E",sage:"#FFFFFF",sageDim:"#DDE5F1",amber:"#F0B43E",live:"#FF3B5C",
   navy:"#1D3A66",lime:"#E11D2E"};
 const FIELDLINE="#F4F8FC";  // white chalk for the field graphic (stays light on the green diamond)
-const MONO="'Saira Condensed',system-ui,-apple-system,sans-serif";  // condensed display — scoreboard numbers & headers
+const MONO="'Barlow',system-ui,-apple-system,sans-serif";  // display — headers & scoreboard (was Saira Condensed; jford picked Barlow for readability)
 const SANS="'Barlow',system-ui,-apple-system,sans-serif";           // body / UI text
 const BATTER_GREEN="#3BE85A";
 const POSNUM={P:1,C:2,"1B":3,"2B":4,"3B":5,SS:6,LF:7,CF:8,RF:9};
@@ -5675,13 +5675,13 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v256";
+var APP_VERSION="v257";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
   // Bottom-LEFT, inset past the safe area so rounded phone corners / the home indicator don't clip
   // it (and clear of the bottom-right "Windows" toggle). env() falls back to 0 on devices without it.
-  _vb.setAttribute("style","position:fixed;left:calc(env(safe-area-inset-left,0px) + 12px);bottom:calc(env(safe-area-inset-bottom,0px) + 10px);z-index:9998;font:700 11px 'Saira Condensed',system-ui,sans-serif;color:rgba(255,255,255,.32);letter-spacing:.5px;pointer-events:none");
+  _vb.setAttribute("style","position:fixed;left:calc(env(safe-area-inset-left,0px) + 12px);bottom:calc(env(safe-area-inset-bottom,0px) + 10px);z-index:9998;font:700 11px 'Barlow',system-ui,sans-serif;color:rgba(255,255,255,.32);letter-spacing:.5px;pointer-events:none");
   document.addEventListener("DOMContentLoaded",function(){ try{document.body.appendChild(_vb);}catch(e){} });
   if(document.body){ document.body.appendChild(_vb); }
 }catch(e){}
