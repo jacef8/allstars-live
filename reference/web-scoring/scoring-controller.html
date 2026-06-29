@@ -5442,7 +5442,7 @@ window.rulesSearch=function(q){
   body.innerHTML = hits.length ? hits.map(p=>`<p style="margin:0 0 12px">${esc(p).replace(re,'<mark style="background:#E11D2E;color:#fff">$1</mark>')}</p>`).join("") : `<div style="color:#8290AC;text-align:center;padding:24px">No rule text matches &ldquo;${esc(q)}&rdquo;.</div>`;
   if(cnt)cnt.textContent=hits.length+" match"+(hits.length===1?"":"es"); body.scrollTop=0;
 };
-(function(){ const rm=document.getElementById("rulesmodal"); if(rm)rm.addEventListener("click",e=>{ if(e.target.id==="rulesmodal")closeRules(); }); })();
+(function(){ const rm=document.getElementById("rulesmodal"); if(rm)rm.addEventListener("click",e=>{ if(e.target.id==="rulesmodal"||(e.target.closest&&e.target.closest('[data-act="closerules"]')))closeRules(); }); })();   // #rulesmodal lives OUTSIDE #app, so the #app data-act delegation never sees its × button — handle it here (backdrop OR the close button)
 (function(){ const cm=document.getElementById("chatmodal"); if(cm)cm.addEventListener("click",e=>{
     // The chat modal lives OUTSIDE #app, so the main data-act delegation never sees its buttons —
     // route them here (close / send / delete), then fall through to the backdrop-close.
@@ -5699,7 +5699,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v259";
+var APP_VERSION="v260";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
