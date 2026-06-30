@@ -248,7 +248,7 @@ Status: [ ] todo · [~] in progress · [x] done. Grouped by theme; recurring/met
       on-device iOS confirmation.
 
 ## N. Paste an external YouTube link into the app while scoring (NEW 2026-06-30, jford single-device)
-- [ ] N1. Scenario: ONE device (tablet), camera streams DIRECTLY to YouTube (DJI Mimo), so the app is NOT
+- [x] N1 (v282, NATIVE PATH NEEDS ON-DEVICE TEST). Scenario: ONE device (tablet), camera streams DIRECTLY to YouTube (DJI Mimo), so the app is NOT
       doing the streaming. jford wants to paste that YouTube link into the app so the live video shows in
       the monitor ALONGSIDE the game feed + score (no bug burned into the video — bug stays app-side).
       What EXISTS: the "CONNECT YOUR STREAM" modal (`openStream`/`ytmodal`, `streamYt()` from `?yt=` or
