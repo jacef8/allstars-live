@@ -2954,8 +2954,13 @@ function actionArea(){
     // Split: teams you OWN/manage (your kids' teams) vs teams you only WATCH (external — competitors
     // you followed from the public directory). They were mixed into one list, which felt lost.
     const ownedTeams=list.filter(t=>!t.external && !t.archived), watchedTeams=list.filter(t=>t.external);
+    // Phone: cap the open "My teams" list so several teams scroll INSIDE the drawer instead of
+    // pushing the Following drawer off the bottom of the screen (jford couldn't see Following on
+    // his phone). Use a JS px height — `vh`/`--avh` resolve to 0 in the Android WebView (see the
+    // wide teamsMaxH note). Wide ignores teamsBlock entirely, so this only affects the phone stack.
+    const _phTeamsMaxH = Math.max(180, Math.round((window.innerHeight||700)*0.34));
     const teamsBlock = ownedTeams.length
-      ? drawer("toggleteams","My teams ("+ownedTeams.length+")",teamsOpen,`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;align-content:start">${ownedTeams.map(card).join("")}</div>`)
+      ? drawer("toggleteams","My teams ("+ownedTeams.length+")",teamsOpen,`<div style="max-height:${_phTeamsMaxH}px;overflow-y:auto;-webkit-overflow-scrolling:touch;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;align-content:start;padding-right:2px">${ownedTeams.map(card).join("")}</div>`)
       : "";
     // "Following" = watch-only teams (e.g. the competition) + individual players you follow.
     const _fps=followedPlayers();
@@ -2974,11 +2979,11 @@ function actionArea(){
 
     // Home header = the transparent "A" logo floating over the turf (no banner box).
     // Falls back to the text wordmark until icons/logo-mark.png (transparent) is added.
-    const hero = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:6px 0 2px;flex:none">
+    const hero = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:4px 0 2px;flex:none">
           <img src="icons/logo-emblem.png" alt=""
             onerror="if(this.src.indexOf('logo-mark')<0){this.src='icons/logo-mark.png';}else{this.style.display='none';}"
-            style="height:clamp(150px,calc(var(--avh) * 30),300px);width:auto;display:block;filter:drop-shadow(0 8px 18px rgba(0,0,0,.6))">
-          <div style="font-family:${MONO};font-size:clamp(26px,4.2vw,46px);font-weight:800;letter-spacing:1.5px;line-height:1;color:#fff">ALL-STARS <span style="color:${T.lime}">LIVE</span></div></div>`;
+            style="height:clamp(120px,calc(var(--avh) * 21),200px);width:auto;display:block;filter:drop-shadow(0 8px 18px rgba(0,0,0,.6))">
+          <div style="font-family:${MONO};font-size:clamp(24px,4vw,40px);font-weight:800;letter-spacing:1.5px;line-height:1;color:#fff">ALL-STARS <span style="color:${T.lime}">LIVE</span></div></div>`;
     // Hero for the WIDE (tablet) home — same stacked look as the phone, just a touch smaller so a
     // full row of team cards fits without scrolling (the wide home can't page-scroll).
     const heroWide = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:4px 0 2px;flex:none">
@@ -5765,7 +5770,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v269";
+var APP_VERSION="v270";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
