@@ -2252,7 +2252,14 @@ window.applyCloudPrefs=function(p){ if(!p)return;
   try{ if(Array.isArray(p.followPlayers)){ var cloudAt=+p.followAt||0, localAt=+(localStorage.getItem("al-follow-at")||0);
       if(cloudAt>=localAt){ localStorage.setItem("al-follow-players",JSON.stringify(p.followPlayers)); localStorage.setItem("al-follow-at",String(cloudAt)); } } }catch(e){}
 };
-function loadCloudFloat(){ try{ if(!window.cloudLoadPrefs)return; window.cloudLoadPrefs().then(function(p){ if(!p)return; window.applyCloudPrefs(p); try{ render(); }catch(e){} }); }catch(e){} }
+function loadCloudFloat(){ try{ if(!window.cloudLoadPrefs)return; window.cloudLoadPrefs().then(function(p){
+    window.applyCloudPrefs(p);   // applies cloud→local when present + newer (safe on null)
+    // One-time SEED / migration: players you followed BEFORE follow-sync existed live only in this
+    // device's localStorage and were never uploaded. If your account has no follow list yet but this
+    // device DOES have local follows, push them up once so your other devices (the phone) receive them.
+    try{ var hasCloudList = p && Array.isArray(p.followPlayers); var loc=followKeys();
+         if(!hasCloudList && loc.length){ setFollowKeys(loc); } }catch(e){}
+    try{ render(); }catch(e){} }); }catch(e){} }
 function floatGeo(id,def){ const g=FLOAT[id]||{}; return {x:g.x!=null?g.x:def.x, y:g.y!=null?g.y:def.y, w:g.w!=null?g.w:def.w, h:g.h!=null?g.h:def.h}; }
 function floatWindow(id,title,inner,def){
   const g=floatGeo(id,def);
@@ -5781,7 +5788,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v272";
+var APP_VERSION="v273";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
