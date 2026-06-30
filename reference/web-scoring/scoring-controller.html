@@ -3084,14 +3084,22 @@ function actionArea(){
                <span style="flex:1;height:2px;background:rgba(255,255,255,.14);border-radius:2px"></span></div>
              <div style="flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;display:flex;flex-wrap:wrap;justify-content:center;align-content:start;gap:14px;padding-right:2px">${_activeTeams.map(card).join("")}</div></div>`
         : `<div style="flex:1;min-height:0;display:flex;align-items:center;justify-content:center;color:${T.sageDim};font-size:14px;border:1px dashed ${T.line};border-radius:14px">No teams yet — tap Manage Teams to create your first.</div>`;
+      // Two-column home when there's a Following block to place: TEAMS stack down the left, watched
+      // teams + followed players stack down the right — so neither gets squeezed into a thin bottom strip.
+      // Falls back to the single centered column when there's nothing to put on the right.
+      const _twoCol=!!followingBlock;
+      const _mid=_twoCol
+        ? `<div style="flex:1;min-height:0;display:flex;gap:18px;align-items:stretch">
+             <div style="flex:1;min-width:0;display:flex;flex-direction:column;min-height:0">${teamsArea}</div>
+             <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:10px;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch">${liveRows?`<div style="flex:none;display:flex;flex-direction:column;gap:8px">${liveRows}</div>`:""}${followingBlock}</div>
+           </div>`
+        : `${liveRows?`<div style="flex:none;display:flex;flex-direction:column;gap:8px">${liveRows}</div>`:""}${teamsArea}`;
       return `<div style="position:relative;height:100%;overflow:hidden;display:flex;flex-direction:column;align-items:center;padding:clamp(10px,calc(var(--avh) * 2),22px) 14px">
           ${settingsGear}
-          <div style="width:100%;max-width:1120px;flex:1;min-height:0;display:flex;flex-direction:column;gap:13px">
+          <div style="width:100%;max-width:${_twoCol?1340:1120}px;flex:1;min-height:0;display:flex;flex-direction:column;gap:13px">
             ${heroWide}
             ${actionsRow}
-            ${liveRows?`<div style="flex:none;display:flex;flex-direction:column;gap:8px">${liveRows}</div>`:""}
-            ${teamsArea}
-            ${followingBlock?`<div style="flex:none">${followingBlock}</div>`:""}
+            ${_mid}
             <div style="flex:none;display:flex;flex-direction:column;gap:8px"><div style="display:flex;gap:2px;background:${T.line};border:2px solid ${T.line};border-radius:11px;overflow:hidden">${shareBtnHome}${shareAppBtn}</div>${authBar}</div>
           </div>
         </div>`;
@@ -5726,7 +5734,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v262";
+var APP_VERSION="v263";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
