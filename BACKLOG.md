@@ -264,6 +264,25 @@ Status: [ ] todo · [~] in progress · [x] done. Grouped by theme; recurring/met
       [[allstars-watch-with-scorebug]], [[allstars-live-operator-ux-no-backend]]. Touches native monitor
       gating — verify it doesn't break the app's own streaming path.
 
+## O. Day / Night mode toggle (NEW 2026-06-30, jford — daytime/sunlight readability)
+- [ ] O1. Settings toggle (al-day-mode). DAY = light backgrounds + DARK text; jford wants EVERYTHING light
+      incl. the video monitor + on-air scorebug (confirmed). Approach: make `T` swappable (dark/light
+      palettes) + `applyTheme()` re-render; ICN is fine (icons use `currentColor`). ⚠️ HARD PART — the `T`
+      keys are OVERLOADED: `T.line` = white BORDERS *and* white TEXT on red/colored buttons; `T.sage` = white
+      text in spots. A naive swap → dark text on red buttons + invisible borders. Must SPLIT overloaded keys
+      (e.g. add `T.onAccent` for button text, separate `T.border` from any "needs-to-stay-white" use) before
+      flipping. Also a sweep of HARDCODED darks (`rgba(13,19,32,…)`, `#0B0E13`, `#10141A`, gradients in the
+      scoreboard/monitor) → theme-aware. VERIFY every screen in BOTH modes (home, scorer, lineup/field map,
+      stats, modals, scorebug, monitor). Keep the field graphic green/clay. Relates to [[allstars-brand-rwb]],
+      [[allstars-recurring-ux-rules]] (thick borders rule = borders, not literally white in day mode).
+
+## P. Sync clarity — different-account confusion (NEW 2026-06-30)
+- [ ] P1. jford hit "games scored on device A don't show on device B" — ROOT CAUSE was the two devices on
+      DIFFERENT Google accounts (teams/live games sync within ONE account, or via shared scorer/follower).
+      Not a bug. CONSIDER a UX nudge: Diagnostics already shows the account; maybe surface a clearer hint
+      when a shared/live game can't be found ("this team isn't on this account — sign in as <owner> or get
+      invited as a scorer"). Low priority; the real fix is same-account or a scorer invite.
+
 ---
 Done earlier this session: edit/correction ghost-click fix (v185), grid-button sweep (v184),
 window-border consistency (v185–v188), cross-device stale-write protection (v188).

@@ -3524,7 +3524,19 @@ function actionArea(){
             : `<div style="font-size:12.5px;color:${T.sage}">When the season's over, end it to move this team off the Home screen. Nothing is deleted — the record &amp; stats stay, and you can reopen it anytime.</div>
                <button data-act="endseason" data-arg="${t.id}" style="background:none;border:2px solid ${T.clay};color:${T.clay};border-radius:11px;padding:13px;font-family:${MONO};font-weight:800;font-size:14px;letter-spacing:.5px;display:flex;align-items:center;justify-content:center;gap:9px">${IC('flag',16)} End season</button>`}
         </div>`;
-      return secWrap(`${secHdr("Team management")}${detailsBlock}${rulebookSection}${scorersSection}${membersSection}${discoverySection}${seasonSection}`);
+      // A live/in-progress game for THIS team → a "View current game" button right here (mirrors Home).
+      const _meH=String(""), _le=x=>String(x==null?"":x).replace(/</g,"&lt;");
+      const _myHere=gameActive&&curTeamId===t.id&&!(G&&G.final);
+      const _liveT=_liveGames[t.id];
+      const mgmtLiveBtn=_myHere
+        ? `<button data-act="resume" style="background:#FFFFFF;color:${T.field};border:2px solid ${T.lime};border-radius:13px;padding:14px 18px;display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.25)">
+            <span style="display:flex;align-items:center;gap:10px;min-width:0"><span style="width:10px;height:10px;border-radius:50%;flex:none;background:#E11D2E;box-shadow:0 0 7px #E11D2E"></span><span style="font-weight:800;font-size:16px">${IC('<path d="M8 5l11 7-11 7z" fill="currentColor" stroke="none"/>',18)} View current game</span></span>
+            <span style="font-family:${MONO};font-weight:800;font-size:13.5px;color:${T.navy};white-space:nowrap">${(OUR.short||"US").replace(/</g,"")} ${ourRuns()}–${oppRuns()} ${(OPP.short||"OPP").replace(/</g,"")} · ${G.half==="T"?"Top":"Bot"} ${ordinal(G.inning)}</span></button>`
+        : (_liveT?(function(){ const s=_liveT.summary||{}; const canScore=!!(window.cloudIsScorer&&window.cloudIsScorer(t)); const act=canScore?"takeoverlive":"watchlive"; const cta=canScore?"Take over &rsaquo;":"Watch live &rsaquo;";
+            return `<button data-act="${act}" data-arg="${t.id}" style="background:${T.surface};border:2px solid ${T.lime};color:${T.ink};border-radius:13px;padding:14px 18px;display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;cursor:pointer">
+              <span style="display:flex;align-items:center;gap:10px;min-width:0"><span style="width:10px;height:10px;border-radius:50%;flex:none;background:#E11D2E;box-shadow:0 0 7px #E11D2E"></span><span style="font-weight:800;font-size:16px">View current game</span></span>
+              <span style="font-family:${MONO};font-weight:800;font-size:13.5px;color:${T.sage};white-space:nowrap">${_le(s.a||"")} ${s.as|0}–${s.hs|0} ${_le(s.h||"")} · ${cta}</span></button>`; })():"");
+      return secWrap(`${secHdr("Team management")}${mgmtLiveBtn}${detailsBlock}${rulebookSection}${scorersSection}${membersSection}${discoverySection}${seasonSection}`);
     }
     if(teamTab==="schedule") return `<div style="width:100%;max-width:1080px;margin:0 auto;display:flex;flex-direction:column;gap:14px">${secHdr("Schedule")}${scheduleSection}</div>`;
     if(teamTab==="gameview"){
@@ -5894,7 +5906,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v283";
+var APP_VERSION="v284";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
