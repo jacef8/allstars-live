@@ -3785,6 +3785,7 @@ function actionArea(){
         <div style="flex:1;min-width:0;border-left:5px solid ${t.color};padding-left:10px">
           <div style="font-family:${MONO};font-size:20px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">#${p.num||"–"} ${(p.name||"").replace(/</g,"&lt;")}</div>
           <div style="font-size:12px;color:${T.sage}">${(t.name||"").replace(/</g,"&lt;")}</div></div>
+        <button data-act="shareplayer" data-arg="${t.id}:${p.id}" title="Share this player" style="background:none;border:none;color:${T.sage};line-height:1;padding:4px;cursor:pointer">${IC('share',24)}</button>
         <button data-act="followplayer" data-arg="${t.id}:${p.id}" title="${following?"Following":"Follow this player"}" style="background:none;border:none;color:${following?T.amber:T.sageDim};line-height:1;padding:4px;cursor:pointer">${following?IC('starFill',26):IC('star',26)}</button></div>`;
     const tab=(id,lbl)=>`<button data-act="playertab" data-arg="${id}" style="flex:1;background:${playerTab===id?T.lime:T.surface2};color:${playerTab===id?"#fff":T.sage};border:2px solid ${playerTab===id?T.lime:T.line};border-radius:9px;padding:10px;font-family:${MONO};font-weight:800;font-size:14px;letter-spacing:.4px;text-transform:uppercase">${lbl}</button>`;
     const tabs=`<div style="display:flex;gap:8px">${tab("stats","Stats")}${tab("schedule","Schedule")}</div>`;
@@ -5118,6 +5119,7 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="toggleteams"){teamsOpen=!teamsOpen;try{localStorage.setItem("al-teams-open",teamsOpen?"1":"0");}catch(e){}render();}
   else if(act==="togglefollow"){followOpen=!followOpen;try{localStorage.setItem("al-follow-open",followOpen?"1":"0");}catch(e){}render();}
   else if(act==="openplayer"){const i=arg.indexOf(":");openPlayer={teamId:arg.slice(0,i),pid:arg.slice(i+1)};openPlayerFrom=(mode==="team"?"team":"home");playerTab="stats";mode="player";render();}
+  else if(act==="shareplayer"){ const i=arg.indexOf(":"); const tt=teamById(arg.slice(0,i)); const pp=tt&&(tt.players||[]).find(x=>x.id===arg.slice(i+1)); const nm=pp?(("#"+(pp.num||"")+" "+(pp.name||"Player")).trim()):"this player"; openShareLink({ url:appBaseUrl()+"?player="+encodeURIComponent(arg), title:"SHARE PLAYER", sub:"Opens "+nm.replace(/</g,"&lt;")+"&#39;s stats. The team must be Public (Team management &rarr; Discovery) for others to open it." }); }
   else if(act==="playerback"){mode=(openPlayerFrom==="team"?"team":"home");if(mode==="team")teamTab="roster";render();}
   else if(act==="playertab"){playerTab=(arg==="schedule"?"schedule":"stats");render();}
   else if(act==="followplayer"){const i=arg.indexOf(":");toggleFollowPlayer(arg.slice(0,i),arg.slice(i+1));render();}
@@ -5553,7 +5555,7 @@ function shareUrl(){
   // sat on the "no game in progress" lobby even though the game was live.) Make sure the id exists for
   // a signed-in scorer so the link is valid even if they share before the first pitch.
   try{ if(gameActive && !G.cloudId && window.Cloud && window.Cloud.user && curTeamId){ const ct=teamById(curTeamId);
-      if(ct && window.cloudIsScorer && window.cloudIsScorer(ct)){ G.cloudId=curTeamId+"-"+Date.now().toString(36); try{ broadcast(); }catch(e){} } } }catch(e){}
+      if(ct && window.cloudIsScorer && window.cloudIsScorer(ct)){ G.cloudId=curTeamId+"-live"; try{ broadcast(); }catch(e){} } } }catch(e){}   // stable per-team live doc — matches where broadcast() publishes
   const watchQ=(gameActive && G && G.cloudId)?("&watch="+encodeURIComponent(G.cloudId)):"";
   if(shareMode==="video"){ const yt=streamYt(); if(yt) return base+"?view=viewer&yt="+encodeURIComponent(yt)+watchQ+teamQ; }
   return base+"?view=viewer&feed=1"+watchQ+teamQ;   // feed-only viewer
@@ -5616,8 +5618,12 @@ document.getElementById("qrmodal").addEventListener("click",e=>{
     const done=()=>{ const o=a.innerHTML; a.innerHTML="Copied &#10003;"; setTimeout(()=>{ a.innerHTML=o; },1500); };
     if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(u).then(done).catch(done); } else { done(); }
   }
-  else if(a.dataset.act==="shareoverlay"){   // H1: the transparent OBS overlay link = watch link + &overlay=1
-    let u=curShareUrl(); if(!u)return; u=u+(u.indexOf("?")>=0?"&":"?")+"overlay=1";
+  else if(a.dataset.act==="shareoverlay"){   // H1: the transparent OBS overlay = JUST the live data + overlay=1
+    let u=curShareUrl(); if(!u)return;
+    // The overlay renders only the scorebug, so strip the viewer/feed/video params — keep just ?watch= +
+    // overlay=1 for a short, reliable URL (no pointless YouTube id riding along).
+    try{ const _u=new URL(u); const w=_u.searchParams.get("watch"); u=_u.origin+_u.pathname+"?"+(w?("watch="+encodeURIComponent(w)+"&"):"")+"overlay=1"; }
+    catch(e){ u=u+(u.indexOf("?")>=0?"&":"?")+"overlay=1"; }
     const done=()=>{ const o=a.innerHTML; a.innerHTML="Overlay link copied &#10003;"; setTimeout(()=>{ a.innerHTML=o; },1700); };
     if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(u).then(done).catch(done); } else { done(); }
   }
@@ -5712,6 +5718,19 @@ render();broadcast();
       return; }
     if(tries++<40) setTimeout(wait,300); })();
 })();
+// Shared player link (?player=<teamId>:<pid>): land on that player's stats page. If the team isn't on
+// this device, pull its PUBLIC doc so the link works for anyone; else a friendly "not shared" message.
+(function(){ var pq; try{pq=new URLSearchParams(location.search).get("player");}catch(e){} if(!pq)return;
+  var ci=pq.indexOf(":"); if(ci<0)return; var tId=pq.slice(0,ci), pId=pq.slice(ci+1);
+  function openIt(){ openPlayer={teamId:tId,pid:pId}; openPlayerFrom="home"; playerTab="stats"; mode="player"; try{render();}catch(e){} }
+  if(teamById(tId)){ openIt(); return; }
+  var tries=0;
+  (function wait(){ if(window.cloudGetTeam && window.Cloud && window.Cloud.db){
+      window.cloudGetTeam(tId).then(function(ct){ if(ct && ct.players){ ct.external=true; if(!DB.teams.some(function(x){return x.id===ct.id;})){ DB.teams.push(ct); try{saveDB();}catch(e){} } openIt(); }
+        else { try{flash("That player's team isn't shared publicly.");}catch(e){} } }).catch(function(){ try{flash("Couldn't open that player.");}catch(e){} });
+      return; }
+    if(tries++<40) setTimeout(wait,300); })();
+})();
 setTimeout(function(){var s=document.getElementById("splash");if(s)s.remove();},2000);
 // Re-render on rotate/resize so the event picker swaps between bottom-sheet and side panel.
 // Re-render on resize ONLY when the wide/narrow breakpoint actually flips (e.g. rotation) — and
@@ -5746,7 +5765,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v268";
+var APP_VERSION="v269";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
