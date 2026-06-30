@@ -6,7 +6,7 @@
 <!-- The Android WebView resolves CSS `vh` to 0 (vw is fine). Maintain a real px-per-1vh value in
      --avh from window.innerHeight so styles use calc(var(--avh)*N) instead of Nvh. Updated on resize
      (keyboard open/close) and rotation. Runs before first paint so modals/containers size correctly. -->
-<script>(function(){function setAvh(){try{var h=(window.visualViewport&&window.visualViewport.height)||window.innerHeight;document.documentElement.style.setProperty("--avh",(h*0.01)+"px");}catch(e){}}setAvh();window.addEventListener("resize",setAvh);window.addEventListener("orientationchange",setAvh);if(window.visualViewport){window.visualViewport.addEventListener("resize",setAvh);window.visualViewport.addEventListener("scroll",setAvh);}}());</script>
+<script>(function(){var last=0;function setAvh(){try{var h=(window.visualViewport&&window.visualViewport.height)||window.innerHeight;if(Math.abs(h-last)<10)return;last=h;document.documentElement.style.setProperty("--avh",(h*0.01)+"px");}catch(e){}}setAvh();window.addEventListener("resize",setAvh);window.addEventListener("orientationchange",function(){last=0;setAvh();});if(window.visualViewport){window.visualViewport.addEventListener("resize",setAvh);}}());</script><!-- iOS: do NOT recompute --avh on visualViewport "scroll" — it fired every frame as Safari's address bar slid, resizing every calc(var(--avh)*N) element so the page lurched instead of scrolling. Only big changes (keyboard/rotation) update it now (10px threshold). -->
 <title>All-Stars Live</title>
 <!-- PWA: installable, app-like, offline-resilient (see manifest.webmanifest + sw.js). -->
 <meta name="description" content="Live youth baseball — scorebug, play-by-play, and the game stream." />
@@ -4644,8 +4644,9 @@ function render(){
       <button data-act="undo" style="${_fb};background:transparent;color:${hist.length?T.chalk:T.sageDim}">${ICN.undo} Undo</button>
       ${mode==="idle"?`<button data-act="home" style="${_fb};background:${T.surface}">${ICN.home} Home</button>
       <button data-act="lineup" style="${_fb}">Lineup</button>
+      <button data-act="correctopen" title="Fix the count/outs/score/inning &amp; skip / go back a batter" style="${_fb};color:${T.lime};border-color:${T.lime}">&#9998; Fix/Skip</button>
       <button data-act="ingamesettings" style="${_fb}">${ICN.gear} Setup</button>
-      <button data-act="endgame" style="${_fb};background:transparent;border-color:${T.out};color:${T.out}">End game</button>`:""}</div>`;
+      <button data-act="endgame" style="${_fb};background:transparent;border-color:${T.out};color:${T.out}">End</button>`:""}</div>`;
   // All-in-one console. Large screen (tablet/PC, wide) = monitor + scorebug BESIDE the
   // scoring tools on one page. Phone (narrow) = too small for both, so PAGE between a
   // Video page and a Scoring page with a toggle (phonePane).
@@ -5436,7 +5437,7 @@ function renderToolbar(){
   // No "drag anywhere" hint label here — it pushed the narrow phone row into a horizontal scroll; the
   // flash on entering edit mode says it instead.
   tb.innerHTML=`<div style="display:flex;align-items:center;gap:${isWide()?"8px":"6px"};padding:4px 2px 2px;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none">
-    <div style="flex:none;min-width:0;font-family:${MONO};font-weight:700;font-size:16px;letter-spacing:.5px;color:${T.chalk};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${chip}</div>
+    <div style="flex:0 1 auto;min-width:0;font-family:${MONO};font-weight:700;font-size:16px;letter-spacing:.5px;color:${T.chalk};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${chip}</div>
     ${barHtml}
     ${bErr}
     <div style="flex:1;min-width:8px"></div>
@@ -5841,7 +5842,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v278";
+var APP_VERSION="v279";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;

@@ -214,7 +214,7 @@ Status: [ ] todo · [~] in progress · [x] done. Grouped by theme; recurring/met
 ## L. Share-access landing + clarity (NEW 2026-06-30, jford: "lots of issues sharing access")
 - [x] L0. Share > Text dropped the link on iPhone (sms:?body= → iOS needs &body=). Fixed v277: prefer
       navigator.share (carries the link into Messages), platform-aware sms: fallback. All share types.
-- [~] L1. **Recipient lands on the wrong screen / is asked to sign in or create a team.** Root cause:
+- [x] L1 (v278). **Recipient lands on the wrong screen / is asked to sign in or create a team.** Root cause:
       `cloudClaimFollow` + `cloudClaimInvite` both `if(!em)return` when the recipient isn't signed in — so
       a `?follow=`/`?invite=` link dumps them on the generic home ("create your first team" + sign-in) with
       NO context, and the invite is silently lost (only completes IF they happen to sign in; the auth
