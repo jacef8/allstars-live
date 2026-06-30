@@ -211,6 +211,24 @@ Status: [ ] todo · [~] in progress · [x] done. Grouped by theme; recurring/met
       - **Clear demotion banner** on the device that lost it: "Someone took over scoring — you're watching now."
       Relates to [[allstars-cross-device-live-game]], [[allstars-live-access-control]]. Requires signed-in scorer.
 
+## L. Share-access landing + clarity (NEW 2026-06-30, jford: "lots of issues sharing access")
+- [x] L0. Share > Text dropped the link on iPhone (sms:?body= → iOS needs &body=). Fixed v277: prefer
+      navigator.share (carries the link into Messages), platform-aware sms: fallback. All share types.
+- [~] L1. **Recipient lands on the wrong screen / is asked to sign in or create a team.** Root cause:
+      `cloudClaimFollow` + `cloudClaimInvite` both `if(!em)return` when the recipient isn't signed in — so
+      a `?follow=`/`?invite=` link dumps them on the generic home ("create your first team" + sign-in) with
+      NO context, and the invite is silently lost (only completes IF they happen to sign in; the auth
+      handler re-runs claim after sign-in). Fix (v278): a focused INVITE LANDING when `?follow`/`?invite`
+      is present and signed-out — names the team (cloudGetTeam) + "Sign in to follow / score" + the sign-in
+      buttons, instead of the default home. After sign-in the existing claim completes + `_joinTeamId`
+      navigates to the team.
+- [ ] L2. **Too many share buttons, unclear which to send** (Share game vs Share & invite team vs Share
+      player vs scorer invite vs Share app). Consolidate/clarify: one obvious "Share team" (fan follow) +
+      a clearly separate "Invite a scorer" (access), with one-line "what this does" on each. Consider a
+      single smart link that lands on a public team page (scores/schedule/roster, no sign-in) with opt-in
+      Follow / Request-to-score buttons. Design pass needed. Relates to [[allstars-membership-tiers]],
+      [[allstars-live-access-control]].
+
 ---
 Done earlier this session: edit/correction ghost-click fix (v185), grid-button sweep (v184),
 window-border consistency (v185–v188), cross-device stale-write protection (v188).
