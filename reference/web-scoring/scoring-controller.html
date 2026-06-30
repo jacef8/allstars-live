@@ -3100,11 +3100,13 @@ function actionArea(){
       // Share moved to a small button in the empty top strip (mirrors the Settings gear on the right).
       const _shareSvg=`<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="19" r="2.6"/><path d="M8.3 10.8 15.7 6.4M8.3 13.2l7.4 4.4"/></svg>`;
       const _topIcoBtn=`background:rgba(13,19,32,.72);border:2px solid ${T.line};color:${T.chalk};border-radius:11px;width:44px;height:44px;display:flex;align-items:center;justify-content:center;cursor:pointer`;
-      const topShare=`<div style="position:absolute;top:8px;left:10px;z-index:6;display:flex;gap:8px">
+      // Share sits in the top-right cluster, right next to the Settings gear.
+      const topRight=`<div style="position:absolute;top:8px;right:10px;z-index:6;display:flex;gap:8px">
           ${gameActive?`<button data-act="share" title="Share this game" style="${_topIcoBtn}">${_shareSvg}</button>`:""}
-          <button data-act="shareapp" title="Share All-Stars Live" style="${_topIcoBtn}">${_shareSvg}</button></div>`;
+          <button data-act="shareapp" title="Share All-Stars Live" style="${_topIcoBtn}">${_shareSvg}</button>
+          ${gBtn("settings",IC('gear',20),"Settings")}</div>`;
       return `<div style="position:relative;height:100%;overflow:hidden;display:flex;flex-direction:column;align-items:center;padding:clamp(10px,calc(var(--avh) * 2),22px) 14px">
-          ${topShare}${settingsGear}
+          ${topRight}
           <div style="width:100%;max-width:${_twoCol?1340:1120}px;flex:1;min-height:0;display:flex;flex-direction:column;gap:13px">
             ${heroWide}
             ${actionsRow}
@@ -5744,7 +5746,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v267";
+var APP_VERSION="v268";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
