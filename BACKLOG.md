@@ -229,6 +229,24 @@ Status: [ ] todo · [~] in progress · [x] done. Grouped by theme; recurring/met
       Follow / Request-to-score buttons. Design pass needed. Relates to [[allstars-membership-tiers]],
       [[allstars-live-access-control]].
 
+## M. Phone scorer control reachability + iOS scroll (NEW 2026-06-30, jford)
+- [x] M1 (v279). **Skip batter unreachable on phone.** The visible EDIT pencil (→ Correct-the-game, which
+      holds the "SKIP / GO BACK" / "At-bat spot" stepper) is `fieldOverlays()` = WIDE-ONLY; phone's only
+      path was an undiscoverable long-press on the `statusbar`/`scorebar` (which is the ON-AIR scorebug —
+      can't put a control there). Added a visible **"✎ Fix/Skip"** button to the phone footer (between
+      Lineup and Setup) → `correctopen`. NOTE the footer (Undo/Home/Lineup/Fix-Skip/Setup/End) only shows
+      when `mode==="idle" && !playing` — hidden mid-at-bat. **Edit lineup = the footer "Lineup" button**
+      (→ mode="lineup"); it's there, just only between plays.
+- [x] M2 (v279). **"Edit window" (toolbar drag-edit toggle `togglebaredit`, ⊢ glyph) ran off the right edge
+      on phones.** The batter `chip` in the top toolbar was `flex:none` so a long name pushed the row wide
+      (overflow-x:auto) and the toggle scrolled off. Made the chip `flex:0 1 auto` (ellipsis). No more
+      horizontal overflow; toggle stays on-screen.
+- [x] M3 (v279). **iOS "screen moves around instead of scrolling."** `--avh` was recomputed on every
+      `visualViewport "scroll"` event → Safari's sliding address bar resized every `calc(var(--avh)*N)`
+      element mid-scroll → lurch. Removed the scroll listener + added a 10px threshold; only keyboard/
+      rotation update `--avh` now. ⚠️ DON'T reintroduce the visualViewport scroll→setAvh listener. Needs
+      on-device iOS confirmation.
+
 ---
 Done earlier this session: edit/correction ghost-click fix (v185), grid-button sweep (v184),
 window-border consistency (v185–v188), cross-device stale-write protection (v188).
