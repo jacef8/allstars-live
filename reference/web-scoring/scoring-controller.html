@@ -878,14 +878,15 @@ function fieldPlace(ri,pos){ ri=+ri;
    spot, pick another spot, or bench him) — so you control the whole chain, all visible on the field. */
 function fieldMapHtml(){
   const first=n=>(n||"").split(" ")[0];
-  const FXY={P:[50,64],C:[50,92],"1B":[71,63],"2B":[61,51],SS:[39,51],"3B":[29,63],LF:[24,30],CF:[50,19],RF:[76,30]};
+  const FXY={P:[50,63],C:[50,91],"1B":[79,60],"2B":[62,47],SS:[38,47],"3B":[21,60],LF:[18,27],CF:[50,15],RF:[82,27]};
+  const _narrow=window.innerWidth<430;   // phone: smaller spot pills so the infielders don't overlap / run text
   const placing=(fieldHold!=null);
   const spot=(P)=>{ const ri=G.lineup.pos[P], pl=(ri!=null)?ROSTER[ri]:null, sel=(fieldAssign===P), open=(ri==null), xy=FXY[P];
     // While holding a bumped player, every spot is a drop target (open ones glow amber).
     const bd=sel?"#fff":(placing?(open?T.amber:OUR.color):(pl?OUR.color:T.line));
-    return `<button data-act="${placing?"fieldplacepos":"fieldpos"}" data-arg="${P}" data-fieldspot="${P}" ${fieldDisplaced?"disabled":""} style="position:absolute;left:${xy[0]}%;top:${xy[1]}%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:1px;background:${sel?OUR.color:"rgba(13,19,32,.92)"};border:2px solid ${bd};border-radius:9px;padding:5px 7px;min-width:46px;cursor:${pl?"grab":"pointer"};touch-action:none;box-shadow:0 2px 9px rgba(0,0,0,.55);z-index:2;${fieldDisplaced?"opacity:.6":""}">
-        <span style="font-family:${MONO};font-size:14px;font-weight:800;color:${sel?"#fff":T.lime};line-height:1">${P}</span>
-        <span style="font-size:11px;font-weight:700;color:${sel?"#fff":(pl?T.chalk:T.sageDim)};max-width:74px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.1">${pl?("#"+pl.num+" "+first(pl.name)):"—"}</span></button>`; };
+    return `<button data-act="${placing?"fieldplacepos":"fieldpos"}" data-arg="${P}" data-fieldspot="${P}" ${fieldDisplaced?"disabled":""} style="position:absolute;left:${xy[0]}%;top:${xy[1]}%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:0;background:${sel?OUR.color:"rgba(13,19,32,.92)"};border:2px solid ${bd};border-radius:8px;padding:${_narrow?"2px 4px":"5px 7px"};min-width:${_narrow?"34px":"46px"};max-width:${_narrow?"62px":"84px"};cursor:${pl?"grab":"pointer"};touch-action:none;box-shadow:0 2px 9px rgba(0,0,0,.55);z-index:2;${fieldDisplaced?"opacity:.6":""}">
+        <span style="font-family:${MONO};font-size:${_narrow?"11px":"14px"};font-weight:800;color:${sel?"#fff":T.lime};line-height:1.05">${P}</span>
+        <span style="font-size:${_narrow?"9px":"11px"};font-weight:700;color:${sel?"#fff":(pl?T.chalk:T.sageDim)};max-width:${_narrow?"56px":"78px"};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.1">${pl?("#"+pl.num+" "+first(pl.name)):"—"}</span></button>`; };
   const diamond=`<svg viewBox="0 0 300 280" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" style="display:block;position:absolute;inset:0">
       <path d="M150,250 L292,108 Q150,-12 8,108 Z" fill="${T.grass}"/>
       <path d="M150,250 L246,154 Q150,70 54,154 Z" fill="${T.grassLt}" opacity="0.45"/>
@@ -5885,7 +5886,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v280";
+var APP_VERSION="v281";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
