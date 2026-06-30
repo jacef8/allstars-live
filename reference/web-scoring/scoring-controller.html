@@ -3075,7 +3075,7 @@ function actionArea(){
           <span style="display:flex;align-items:center;gap:9px;font-family:${MONO};font-weight:800;font-size:19px;letter-spacing:.5px"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${PLAYP}</svg>Resume game</span>
           <span style="font-family:${MONO};font-size:13px;font-weight:700;color:${T.navy}">${(OUR.short||"US").replace(/</g,"")} ${ourRuns()} &middot; ${(OPP.short||"OPP").replace(/</g,"")} ${oppRuns()} &nbsp;—&nbsp; ${G.half==="T"?"Top":"Bot"} ${ordinal(G.inning)}</span></button>
           <button data-act="discardgame" title="Discard this in-progress game" style="position:absolute;top:8px;right:8px;width:34px;height:34px;border-radius:9px;background:rgba(225,29,46,.16);border:1.5px solid ${T.out};color:${T.out};font-weight:800;font-size:18px;line-height:1;display:flex;align-items:center;justify-content:center;cursor:pointer">&times;</button></div>`:"";
-      const actionsRow=`<div style="flex:none;display:flex;gap:12px;flex-wrap:wrap;align-items:stretch">${resumeWide}${aBtn("newgamestart","New Game",T.lime,"#fff",PLAYP,1.3,"rgba(225,29,46,.34)")}${aBtn("gototeams","Manage Teams",T.surface2,T.ink,PEOPLE,1)}</div>`;
+      const actionsRow=`<div style="flex:none;display:flex;gap:12px;flex-wrap:wrap;align-items:stretch">${resumeWide}${aBtn("newgamestart","New Game",T.lime,"#fff",PLAYP,1,"rgba(225,29,46,.34)")}${aBtn("gototeams","Manage Teams",T.surface2,T.ink,PEOPLE,1)}</div>`;
       const _activeTeams=list.filter(t=>!t.archived);   // ended-season teams drop off Home (still in Manage Teams)
       const teamsArea=(showTeams&&_activeTeams.length)
         ? `<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px">
@@ -5741,7 +5741,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v265";
+var APP_VERSION="v266";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
