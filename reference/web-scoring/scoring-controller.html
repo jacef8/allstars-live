@@ -2935,7 +2935,7 @@ function actionArea(){
       const unread=teamHasUnread(t);
       return `<div data-act="opent" data-arg="${t.id}" style="position:relative;width:${full?"100%":"300px"};max-width:${full?"none":"100%"};background:${T.surface};border:2px solid ${t.color};border-left:7px solid ${t.color};border-radius:14px;padding:14px;box-shadow:0 0 0 1px rgba(0,0,0,.35), 0 8px 20px rgba(0,0,0,.4);cursor:pointer">
           ${unread?`<span title="New chat messages" style="position:absolute;top:11px;left:11px;display:flex;align-items:center;gap:5px;background:${T.amber};color:${T.field};border-radius:999px;padding:3px 9px;font-family:${MONO};font-weight:800;font-size:11px;letter-spacing:.4px">${IC('chat',12)} NEW</span>`:""}
-          ${(window.cloudIsScorer&&window.cloudIsScorer(t))?"":`<button data-act="favteam" data-arg="${t.id}" title="Follow this team" style="position:absolute;top:9px;right:11px;background:none;border:none;color:${t.fav?T.amber:T.sageDim};font-size:24px;line-height:1;padding:0;cursor:pointer">${t.fav?IC('starFill',23):IC('star',23)}</button>`}
+          ${t.external?`<button data-act="favteam" data-arg="${t.id}" title="Following — tap to remove" style="position:absolute;top:9px;right:11px;background:none;border:none;color:${t.fav?T.amber:T.sageDim};font-size:24px;line-height:1;padding:0;cursor:pointer">${t.fav?IC('starFill',23):IC('star',23)}</button>`:""}
           <div style="display:flex;align-items:center;gap:10px;padding-right:30px">
             ${t.logo?`<img src="${t.logo}" alt="" style="width:36px;height:36px;flex:none;border-radius:8px;object-fit:contain;background:#fff;box-shadow:0 0 0 1px ${T.line}">`:""}
             <div style="font-family:${MONO};font-size:23px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0">${t.name}</div></div>
@@ -3085,12 +3085,16 @@ function actionArea(){
                <span style="flex:1;height:2px;background:rgba(255,255,255,.14);border-radius:2px"></span></div>
              <div style="flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;display:flex;${_twoCol?"flex-direction:column;gap:12px":"flex-wrap:wrap;justify-content:center;gap:14px"};align-content:start;padding-right:2px">${_activeTeams.map(t=>card(t,_twoCol)).join("")}</div></div>`
         : `<div style="flex:1;min-height:0;display:flex;align-items:center;justify-content:center;color:${T.sageDim};font-size:14px;border:1px dashed ${T.line};border-radius:14px">No teams yet — tap Manage Teams to create your first.</div>`;
-      // Two-column home: TEAMS stack down the left, watched teams + followed players down the right — so
-      // neither gets squeezed into a thin bottom strip. Falls back to the single centered column otherwise.
+      // Two-column home: TEAMS down the left, watched teams + followed players down the right. BOTH are the
+      // same collapsible drawer (matching tops + the same dropdown chevron), each sitting at the top of its
+      // column (align-items:flex-start) so the window tops line up. Falls back to the single centered column.
+      const _teamsDrawer=(showTeams&&_activeTeams.length)
+        ? drawer("toggleteams","My teams ("+_activeTeams.length+")",teamsOpen,`<div style="display:flex;flex-direction:column;gap:12px">${_activeTeams.map(t=>card(t,true)).join("")}</div>`)
+        : `<div style="background:rgba(13,19,32,.55);border:2px solid ${T.line};border-radius:14px;padding:24px;text-align:center;color:${T.sageDim};font-size:14px">No teams yet — tap Manage Teams to create your first.</div>`;
       const _mid=_twoCol
-        ? `<div style="flex:1;min-height:0;display:flex;gap:18px;align-items:stretch">
-             <div style="flex:1;min-width:0;display:flex;flex-direction:column;min-height:0">${teamsArea}</div>
-             <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:10px;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch">${liveRows?`<div style="flex:none;display:flex;flex-direction:column;gap:8px">${liveRows}</div>`:""}${followingBlock}</div>
+        ? `<div style="flex:1;min-height:0;display:flex;gap:18px;align-items:flex-start">
+             <div style="flex:1;min-width:0;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch">${_teamsDrawer}</div>
+             <div style="flex:1;min-width:0;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;display:flex;flex-direction:column;gap:10px">${liveRows?`<div style="flex:none;display:flex;flex-direction:column;gap:8px">${liveRows}</div>`:""}${followingBlock}</div>
            </div>`
         : `${liveRows?`<div style="flex:none;display:flex;flex-direction:column;gap:8px">${liveRows}</div>`:""}${teamsArea}`;
       // Share moved to a small button in the empty top strip (mirrors the Settings gear on the right).
@@ -5737,7 +5741,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v264";
+var APP_VERSION="v265";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
