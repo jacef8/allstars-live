@@ -102,6 +102,13 @@
   @keyframes basePop{0%{filter:drop-shadow(0 0 0 rgba(244,178,51,0));}
     50%{filter:drop-shadow(0 0 7px rgba(244,178,51,.95));}100%{filter:drop-shadow(0 0 2px rgba(244,178,51,.4));}}
 
+  /* Collapsible "My teams" / "Following" header bar — the WHOLE bar toggles (not just the arrow).
+     Hover/active highlight makes it read as a button; a roomy min-height gives a forgiving click target. */
+  .drawer-bar{min-height:54px;transition:background .12s;}
+  .drawer-bar:hover{background:rgba(255,255,255,.06);}
+  .drawer-bar:active{background:rgba(255,255,255,.11);}
+  .drawer-bar .chev{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.08);}
+
   /* gentle fade when the action screen changes — smooth, not janky */
   .screen-in{animation:screenIn .28s var(--ease) both;}
   @keyframes screenIn{0%{opacity:0;transform:translateY(7px);}100%{opacity:1;transform:translateY(0);}}
@@ -2965,9 +2972,9 @@ function actionArea(){
     // not a separate little toggle box above the cards.
     const _w=isWide();   // bigger labels/cards on PC/tablet so the Following block isn't tiny on large screens
     const drawer=(act,label,open,content)=>`<div style="background:rgba(13,19,32,.55);border:2px solid ${T.line};border-radius:14px;overflow:hidden;margin-top:2px">
-        <button data-act="${act}" style="display:flex;align-items:center;justify-content:space-between;width:100%;background:none;border:none;padding:${_w?"16px 18px":"13px 16px"};cursor:pointer">
-          <span style="font-size:${_w?18:14}px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:${T.lime}">${label}</span>
-          <span style="color:${T.lime};font-size:${_w?22:18}px;display:inline-block;transition:transform .2s;transform:rotate(${open?90:0}deg)">&rsaquo;</span></button>
+        <button data-act="${act}" class="drawer-bar" style="display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;background:none;border:none;padding:${_w?"14px 16px":"11px 14px"};cursor:pointer">
+          <span style="font-size:${_w?18:14}px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:${T.lime};text-align:left">${label}</span>
+          <span class="chev" style="color:${T.lime};font-size:${_w?24:20}px;flex:none;transition:transform .2s;transform:rotate(${open?90:0}deg)">&rsaquo;</span></button>
         ${open?`<div style="padding:0 ${_w?16:14}px ${_w?16:14}px">${content}</div>`:""}</div>`;
     // Split: teams you OWN/manage (your kids' teams) vs teams you only WATCH (external — competitors
     // you followed from the public directory). They were mixed into one list, which felt lost.
@@ -5793,7 +5800,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v274";
+var APP_VERSION="v275";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
