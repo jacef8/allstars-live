@@ -165,11 +165,14 @@
   // follows them across devices and into their next game. Stored at userPrefs/{uid}. =====
   var _prefsTimer = null, _pendingPrefs = null;
   window.cloudSavePrefs = function (prefs) {
-    _pendingPrefs = prefs;
+    // Accumulate fields across calls (e.g. a follow change + a float-layout change within the debounce
+    // window) so the later call can't drop the earlier one. Cleared after each write.
+    _pendingPrefs = Object.assign(_pendingPrefs || {}, prefs || {});
     var d = fdb(), u = myUid(); if (!d || !u) return;
     if (_prefsTimer) clearTimeout(_prefsTimer);
     _prefsTimer = setTimeout(function () {
-      try { d.collection("userPrefs").doc(u).set(_pendingPrefs || {}, { merge: true }).catch(function () {}); } catch (e) {}
+      var payload = _pendingPrefs || {}; _pendingPrefs = null;
+      try { d.collection("userPrefs").doc(u).set(payload, { merge: true }).catch(function () {}); } catch (e) {}
     }, 900);
   };
   window.cloudLoadPrefs = function () {
@@ -347,6 +350,12 @@
       .onSnapshot(function (s) { merge(s.docs); }, function (e) { console.warn("teams(follower):", e.message); }));
     if (em) _unsub.push(d.collection("teams").where("coOwners", "array-contains", em)
       .onSnapshot(function (s) { merge(s.docs); }, function (e) { console.warn("teams(coOwner):", e.message); }));
+    // Live-sync this user's personal prefs (followed players + floating-window layout) across every
+    // device they're signed into. applyCloudPrefs does the last-write-wins merge into local state;
+    // cloudRenderSoon repaints without disrupting an active interaction.
+    _unsub.push(d.collection("userPrefs").doc(u)
+      .onSnapshot(function (doc) { if (doc.exists && typeof window.applyCloudPrefs === "function") { try { window.applyCloudPrefs(doc.data()); } catch (e) {} cloudRenderSoon(); } },
+                  function (e) { console.warn("userPrefs:", e.message); }));
     // Followed public teams aren't covered by the member queries above — refresh them on sign-in,
     // when the app regains focus, and on a slow timer.
     try { window.cloudRefreshFollowed(); } catch (e) {}
