@@ -247,6 +247,23 @@ Status: [ ] todo · [~] in progress · [x] done. Grouped by theme; recurring/met
       rotation update `--avh` now. ⚠️ DON'T reintroduce the visualViewport scroll→setAvh listener. Needs
       on-device iOS confirmation.
 
+## N. Paste an external YouTube link into the app while scoring (NEW 2026-06-30, jford single-device)
+- [ ] N1. Scenario: ONE device (tablet), camera streams DIRECTLY to YouTube (DJI Mimo), so the app is NOT
+      doing the streaming. jford wants to paste that YouTube link into the app so the live video shows in
+      the monitor ALONGSIDE the game feed + score (no bug burned into the video — bug stays app-side).
+      What EXISTS: the "CONNECT YOUR STREAM" modal (`openStream`/`ytmodal`, `streamYt()` from `?yt=` or
+      `al-stream-yt`) + the viewer "watch with scorebug" (`watchvidopen` → paste link → video + scorebug;
+      becomes the shared `&yt=` link). So web + viewers already do this.
+      THE GAP: in the NATIVE app the monitor IGNORES a pasted link unless the app's OWN broadcast is live —
+      `const yt=(IS_APP && window.__bcastPhase!=="LIVE")?"":streamYt();` (line ~2445). So a scorer using
+      Mimo (app not self-broadcasting) can't see/paste an external link in the monitor. FIX: let the native
+      app show a pasted EXTERNAL `streamYt()` in the monitor when it isn't self-broadcasting (distinguish
+      "external pasted link" from "the app's own published stream" so we don't override the real broadcast),
+      and surface a "Paste a YouTube link" entry in the scorer monitor (not just viewer mode). Make sure the
+      shared follower link carries that `&yt=` so fans see video + score too. Relates to
+      [[allstars-watch-with-scorebug]], [[allstars-live-operator-ux-no-backend]]. Touches native monitor
+      gating — verify it doesn't break the app's own streaming path.
+
 ---
 Done earlier this session: edit/correction ghost-click fix (v185), grid-button sweep (v184),
 window-border consistency (v185–v188), cross-device stale-write protection (v188).
