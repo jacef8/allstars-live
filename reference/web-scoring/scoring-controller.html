@@ -3038,7 +3038,7 @@ function actionArea(){
         <span style="font-family:${MONO};font-size:15px;font-weight:800;color:${T.lime};white-space:nowrap">${cta}</span></button>`; }).join("");
     const newGameBtn = `<button data-act="newgamestart" style="${bigBtn(T.lime,"font-size:21px;padding:17px;border:2px solid rgba(255,255,255,.92);box-shadow:0 8px 22px rgba(225,29,46,.34)")}">${IC(PLAY)} New Game</button>`;
     const manageBtn = DB.teams.length
-      ? `<button data-act="gototeams" style="${ghost};padding:17px;font-size:17px;border:2px solid rgba(255,255,255,.55);color:${T.ink};display:flex;align-items:center;justify-content:center;gap:9px">${IC('<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>')} Manage teams &amp; rosters</button>`
+      ? `<button data-act="gototeams" style="${ghost};width:100%;padding:17px;font-size:17px;border:2px solid rgba(255,255,255,.55);color:${T.ink};display:flex;align-items:center;justify-content:center;gap:9px">${IC('<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>')} Manage teams &amp; rosters</button>`
       : `<button data-act="gototeams" style="${bigBtn(T.lime,"font-size:19px;padding:17px;border:2px solid rgba(255,255,255,.92);box-shadow:0 8px 22px rgba(225,29,46,.34)")}">${IC('<path d="M12 5v14M5 12h14"/>')} Create Your First Team</button>`;
     // Share only makes sense once a game (and its stream link) exists.
     // "Share game link" only makes sense once a game is live (it shares the viewer/watch link).
@@ -5800,7 +5800,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v275";
+var APP_VERSION="v276";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
