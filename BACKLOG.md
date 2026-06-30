@@ -177,6 +177,40 @@ Status: [ ] todo · [~] in progress · [x] done. Grouped by theme; recurring/met
       NOTE: any other window.confirm() added later will silently fail on the tablet — use confirmAct or a
       two-tap inline confirm, never confirm()/alert() for control flow on native.
 
+## J. Coach-pitch league mode — separate scoring screen (NEW 2026-06-30, requested by jford)
+- [ ] J1. A distinct league/scoring MODE for coach-pitch (coach pitches to their own batters). Picked per
+      team/league like the existing DYB presets. When active, the scorer screen changes:
+      - **No balls.** Balls don't exist — REMOVE walks (BB) and hit-by-pitch (HBP) entirely. No ball button.
+      - **5-pitch limit per batter:** a batter gets a total of **5 pitches**. If not put in play or struck
+        out by the 5th, the at-bat ends (out / next batter). **EXCEPTION: fouling it off extends** — a foul
+        on the last pitch does NOT end the at-bat (like a foul on 2 strikes in regular rules); keep pitching
+        until they put it in play, swing-and-miss out, or stop fouling.
+      - **Remove pitcher-specific tracking:** no pitch counts / pitcher pitch limits (pitchMax), no
+        pitcher-centric stats. (Coach is pitching, not a player.)
+      - **KEEP / track:** strikes, **total number of pitches** seen (per at-bat), and **where they hit it**
+        (hit location / spray) — with simpler pitch outcomes, batted-ball location is the main data to log.
+      - **Defense: FOUR outfielders** for this league (≈10 fielders). Add the 4th OF to the positions list +
+        the field diagram / position picker when coach-pitch mode is on.
+      Open Qs for build time: exact "5 pitches" UI (counter + foul handling), whether strikeouts still apply
+      (swing-and-miss on the 5th?), and how the 4-OF layout maps on the spray field. Relates to
+      [[allstars-league-rules]] (DYB presets), positions UX in section C.
+
+## K. Two scorers on one live game — concurrency lock (NEW 2026-06-30, jford hit this in the field)
+- [ ] K1. jford was able to sign in and START scoring a game that someone ELSE was already actively
+      scoring — both live at once. Today's model (v152/153) is last-claim-wins + a "Take over" handoff
+      (`watchLiveTakeover` watches `games/<teamId>-live`; a newer `activeUid/activeAt` demotes the other to
+      read-only). It only coordinates IF the 2nd person goes through "Take over." If they just resume/score
+      directly (in-progress row not synced yet, or fresh New Game), there's NO hard lock → both write to the
+      same live doc, last-write-wins clobbers, plays double/diverge. Fix direction:
+      - **Heartbeat lease:** active scorer writes `activeAt` every ~10–15s; "fresh" = within ~30–45s, else stale/claimable.
+      - **Warn on entry, don't silently score:** when a signed-in scorer opens/starts a team whose live doc
+        has a FRESH lease from another uid, block silent scoring → modal "⚠️ <name> is scoring this game
+        right now. Take over?" Explicit takeover only (no accidental double-scoring).
+      - **Write-guard every action:** before each scoring write, verify `activeUid==me`; if not, STOP and
+        flip to read-only with a toast. Stops the demoted device double-writing during the tug-of-war.
+      - **Clear demotion banner** on the device that lost it: "Someone took over scoring — you're watching now."
+      Relates to [[allstars-cross-device-live-game]], [[allstars-live-access-control]]. Requires signed-in scorer.
+
 ---
 Done earlier this session: edit/correction ghost-click fix (v185), grid-button sweep (v184),
 window-border consistency (v185–v188), cross-device stale-write protection (v188).

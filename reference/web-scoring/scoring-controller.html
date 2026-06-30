@@ -5642,10 +5642,14 @@ document.getElementById("qrmodal").addEventListener("click",e=>{
   else if(a.dataset.act==="sharetext"){
     const u=curShareUrl(); if(!u)return;
     const mt=(OUR.name||"Our team")+" vs "+(OPP.name||"Opponent");
-    const body=shareCtx
-      ? ((shareCtx.body?shareCtx.body+"\n":"")+u)
-      : ("Watch "+mt+" live on All-Stars Live (free youth-baseball scoreboard):\n"+u);
-    location.href="sms:?body="+encodeURIComponent(body);
+    const lead=shareCtx ? (shareCtx.body||"") : ("Watch "+mt+" live on All-Stars Live (free youth-baseball scoreboard):");
+    const body=(lead?lead+"\n":"")+u;
+    // Prefer the OS share sheet — it carries the LINK into Messages/any app reliably (the raw sms: URI
+    // drops the body on some phones). Fall back to a PLATFORM-AWARE sms: link: iOS Messages needs
+    // `&body=`, Android needs `?body=` — using ?body= on iOS was why the link wasn't coming through.
+    if(navigator.share){ navigator.share({ title:(shareCtx?(shareCtx.title||"All-Stars Live"):mt), text:lead, url:u }).catch(function(){}); return; }
+    const isIOS=/iP(hone|ad|od)/.test(navigator.userAgent||"")||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
+    location.href="sms:"+(isIOS?"&":"?")+"body="+encodeURIComponent(body);
   }
   else if(a.dataset.act==="sharemode"){ shareMode=a.dataset.arg; openShare(); return; }
   else if(a.dataset.act==="sharecopy"){
@@ -5800,7 +5804,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v276";
+var APP_VERSION="v277";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
