@@ -2991,8 +2991,13 @@ function actionArea(){
     const _twoCol = _w && _followCount>0;   // wide screens with something to follow → side-by-side teams|following
     const _subHd=`font-size:${_w?14:11}px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.sageDim};margin:0 2px ${_w?9:7}px`;
     const _followContent=`${watchedTeams.length?`<div style="${_subHd}">Teams I'm watching</div><div style="display:flex;flex-direction:column;gap:10px;margin-bottom:${_fps.length?12:0}px">${watchedTeams.map(t=>card(t,true)).join("")}</div>`:""}${_fps.length?`<div style="${_subHd}">Players I'm following</div><div style="display:flex;flex-direction:column;gap:${_w?10:8}px">${_fps.map(followCard).join("")}<button data-act="openfollowcal" style="${ghost};display:flex;align-items:center;justify-content:center;gap:9px;margin-top:2px;${_w?"font-size:15px;padding:13px":""}">${IC('calendar',_w?20:18)} Players calendar</button></div>`:""}`;
+    // Phone: cap the open Following drawer so a long watched-teams + followed-players list scrolls INSIDE
+    // it (jford's wasn't scrolling). JS px — vh/--avh resolve to 0 in the Android WebView. Wide keeps the
+    // full list (it scrolls in its own right-hand column).
+    const _phFollowMaxH = Math.max(170, Math.round((window.innerHeight||700)*0.40));
+    const _followBody = _w ? _followContent : `<div style="max-height:${_phFollowMaxH}px;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-right:2px">${_followContent}</div>`;
     const followingBlock = _followCount
-      ? drawer("togglefollow","Following ("+_followCount+")",followOpen,_followContent)
+      ? drawer("togglefollow","Following ("+_followCount+")",followOpen,_followBody)
       : "";
 
     // Home header = the transparent "A" logo floating over the turf (no banner box).
@@ -3138,7 +3143,7 @@ function actionArea(){
           </div>
         </div>`;
     }
-    return `<div style="position:relative;min-height:100%;display:flex;flex-direction:column;justify-content:safe center;gap:14px;padding:6px 0">${settingsGear}${hero}${resumeBtn}${liveRows}${newGameBtn}${showTeams?`<div style="flex:none">${teamsBlock}</div>`:""}${showTeams?manageBtn:""}${followingBlock}<div style="display:flex;gap:2px;background:${T.line};border:2px solid ${T.line};border-radius:11px;overflow:hidden">${shareBtnHome}${shareAppBtn}</div>${authBar}</div>`;
+    return `<div style="position:relative;min-height:100%;display:flex;flex-direction:column;justify-content:safe center;gap:14px;padding:6px 0">${settingsGear}${hero}${resumeBtn}${liveRows}${newGameBtn}${showTeams?`<div style="flex:none">${teamsBlock}</div>`:""}${followingBlock?`<div style="flex:none">${followingBlock}</div>`:""}${showTeams?`<div style="flex:none">${manageBtn}</div>`:""}<div style="display:flex;gap:2px;background:${T.line};border:2px solid ${T.line};border-radius:11px;overflow:hidden">${shareBtnHome}${shareAppBtn}</div>${authBar}</div>`;
   }
   if(mode==="teams"){
     const sorted=DB.teams.slice().sort((a,b)=>(b.fav?1:0)-(a.fav?1:0));
@@ -5788,7 +5793,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v273";
+var APP_VERSION="v274";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
