@@ -2241,7 +2241,12 @@ let floatOn=(()=>{ try{ return localStorage.getItem("al-float-on")==="1"; }catch
 let FLOAT=(()=>{ try{ return JSON.parse(localStorage.getItem("al-float")||"{}")||{}; }catch(e){ return {}; } })();
 function saveFloat(){ try{ localStorage.setItem("al-float",JSON.stringify(FLOAT)); localStorage.setItem("al-float-on",floatOn?"1":"0"); }catch(e){} try{ if(window.cloudSavePrefs)window.cloudSavePrefs({floatLayout:FLOAT, floatOn:floatOn}); }catch(e){} }
 // Pull the signed-in user's saved window layout from the cloud (follows them across devices/games).
-function loadCloudFloat(){ try{ if(!window.cloudLoadPrefs)return; window.cloudLoadPrefs().then(function(p){ if(!p)return; if(p.floatLayout&&typeof p.floatLayout==="object")FLOAT=p.floatLayout; if(typeof p.floatOn==="boolean")floatOn=p.floatOn; try{ localStorage.setItem("al-float",JSON.stringify(FLOAT)); localStorage.setItem("al-float-on",floatOn?"1":"0"); }catch(e){} try{ render(); }catch(e){} }); }catch(e){} }
+function loadCloudFloat(){ try{ if(!window.cloudLoadPrefs)return; window.cloudLoadPrefs().then(function(p){ if(!p)return; if(p.floatLayout&&typeof p.floatLayout==="object")FLOAT=p.floatLayout; if(typeof p.floatOn==="boolean")floatOn=p.floatOn; try{ localStorage.setItem("al-float",JSON.stringify(FLOAT)); localStorage.setItem("al-float-on",floatOn?"1":"0"); }catch(e){}
+    // Followed players sync across this user's devices: UNION the cloud list into the local one so a
+    // player you starred on the tablet/PC also shows under "Following" here on the phone. (Union, so a
+    // follow is never lost; an unfollow may need redoing on each device — acceptable for this feature.)
+    try{ if(Array.isArray(p.followPlayers)){ var loc=followKeys(), merged=loc.slice(), changed=false; p.followPlayers.forEach(function(k){ if(typeof k==="string"&&merged.indexOf(k)<0){ merged.push(k); changed=true; } }); if(changed)localStorage.setItem("al-follow-players",JSON.stringify(merged)); } }catch(e){}
+    try{ render(); }catch(e){} }); }catch(e){} }
 function floatGeo(id,def){ const g=FLOAT[id]||{}; return {x:g.x!=null?g.x:def.x, y:g.y!=null?g.y:def.y, w:g.w!=null?g.w:def.w, h:g.h!=null?g.h:def.h}; }
 function floatWindow(id,title,inner,def){
   const g=floatGeo(id,def);
@@ -2830,7 +2835,7 @@ let teamsOpen=(()=>{try{return localStorage.getItem("al-teams-open")!=="0";}catc
 let followOpen=(()=>{try{return localStorage.getItem("al-follow-open")!=="0";}catch(e){return true;}})();
 let followHidden=(()=>{try{return JSON.parse(localStorage.getItem("al-follow-hidden")||"{}");}catch(e){return {};}})();
 function followKeys(){try{return JSON.parse(localStorage.getItem("al-follow-players")||"[]");}catch(e){return [];}}
-function setFollowKeys(a){try{localStorage.setItem("al-follow-players",JSON.stringify(a));}catch(e){}}
+function setFollowKeys(a){try{localStorage.setItem("al-follow-players",JSON.stringify(a));}catch(e){} try{ if(window.cloudSavePrefs)window.cloudSavePrefs({followPlayers:a}); }catch(e){}}  // sync who you follow across your devices (same account)
 function isFollowingPlayer(tid,pid){return followKeys().indexOf(tid+":"+pid)>=0;}
 function toggleFollowPlayer(tid,pid){var k=tid+":"+pid,a=followKeys(),i=a.indexOf(k);if(i>=0)a.splice(i,1);else a.push(k);setFollowKeys(a);}
 function followedPlayers(){return followKeys().map(function(k){var i=k.indexOf(":"),t=teamById(k.slice(0,i));if(!t)return null;var p=(t.players||[]).find(function(x){return x.id===k.slice(i+1);});return p?{key:k,team:t,player:p}:null;}).filter(Boolean);}
@@ -5770,7 +5775,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v270";
+var APP_VERSION="v271";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
