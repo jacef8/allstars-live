@@ -31,10 +31,26 @@
     --clay:#E0974F; --chalk:#F2F5FA; --grass:#1F5C3A; --grassLt:#2C7D4E;
     --safe:#2E6BE6; --out:#E11D2E; --sage:#FFFFFF; --sageDim:#DDE5F1; --amber:#F0B43E;
     --live:#FF3B5C; --navy:#1D3A66; --lime:#E11D2E;
+    /* Extra semantic vars so the many HARD-CODED dark backgrounds / light text also flip in Day mode. */
+    --panel:#0D1320; --panel-hi:#16202e; --scrim:rgba(8,11,16,.72); --textdim:#B7C2D6; --textmid:#9AA6B8;
+    --frost:rgba(13,19,32,.82);   /* frosted-window backing (see the [style*=…] rule) */
+    --drawer:rgba(13,19,32,.55); --chip:rgba(13,19,32,.72);   /* Home drawers + top icon buttons */
     --mono:"Barlow",system-ui,-apple-system,sans-serif;
     --sans:"Barlow",system-ui,-apple-system,sans-serif;
     --ease:cubic-bezier(.16,1,.3,1); --ease-soft:cubic-bezier(.4,0,.2,1);
   }
+  /* ===== DAY MODE (light) — one class on <body> flips every var-driven color. Brand (out/safe/live/
+     lime), the field graphic (grass/clay), and modal scrims stay; everything else lightens. ===== */
+  body.day{
+    --field:#E9EEF5; --ink:#18222E; --surface:#FFFFFF; --surface2:#E7EDF5; --line:#C3CDDA;
+    --chalk:#18222E; --sage:#33415A; --sageDim:#5C6A7C; --amber:#B77A10; --navy:#2B4A7A;
+    --panel:#F4F7FB; --panel-hi:#E7EDF5; --textdim:#46536A; --textmid:#5C6A7C;
+    --frost:rgba(255,255,255,.86); --drawer:rgba(255,255,255,.72); --chip:rgba(255,255,255,.85);
+    --clay:#A85F1E; --amber:#9A6606;   /* darken warm accents so they read on white */
+  }
+  /* Day mode: lighten the turf backdrop so the page reads bright, and flip the native date/time pickers. */
+  body.day{ background:linear-gradient(rgba(255,255,255,.30),rgba(210,224,240,.55)), url("bg-turf.jpg") center center / cover no-repeat #E9EEF5; }
+  body.day input[type="date"],body.day input[type="time"],body.day input[type="datetime-local"]{color-scheme:light;}
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;scrollbar-width:none;}
   *::-webkit-scrollbar{width:0;height:0;display:none;}
   /* Native date/time picker glyphs render near-black by default — invisible on the dark theme.
@@ -54,8 +70,8 @@
   /* Frosted "windows": the inline solid card/panel surfaces become translucent with a blur
      INSIDE the window, so the text stays readable while the turf is blurred behind them and
      sharp everywhere outside. */
-  [style*="background:#212A38"],[style*="background:#324056"],[style*="background:#1D3A66"]{
-    background-color:rgba(13,19,32,.82)!important;
+  [style*="background:var(--surface)"],[style*="background:var(--surface2)"],[style*="background:var(--navy)"]{
+    background-color:var(--frost)!important;
     -webkit-backdrop-filter:blur(13px) saturate(1.1);backdrop-filter:blur(13px) saturate(1.1);}
   /* Team-color tinted cards (batter card, team tiles): same frosted dark backing so text is
      readable over the turf, with the team color kept as the left accent (set inline). */
@@ -156,6 +172,7 @@
 </style>
 </head>
 <body>
+<script>/* Day mode: apply the saved light/dark theme BEFORE first paint so there's no flash. */try{if(localStorage.getItem("al-day-mode")==="1")document.body.classList.add("day");}catch(e){}</script>
 <div id="splash"><img class="sp-a" src="icons/logo-emblem.png" alt="" onerror="if(this.src.indexOf('logo-mark')<0){this.src='icons/logo-mark.png';}else{this.style.display='none';}"><div class="sp-logo">ALL-STARS <span>LIVE</span></div></div>
 <script>/* Native shows the OS splash (star) already — hide the web splash instantly so it never flashes the badge fallback. */try{if(window.AllStars&&window.AllStars.isApp){var _s=document.getElementById("splash");if(_s)_s.parentNode.removeChild(_s);}}catch(e){}</script>
 <div id="wrap"><div id="app">
@@ -244,10 +261,12 @@
 /* ----------------------------------------------------------------------
    Field-as-input baseball scoring controller — interaction prototype
 ---------------------------------------------------------------------- */
-const T={field:"#10141A",ink:"#F2F5FA",surface:"#212A38",surface2:"#324056",line:"#FFFFFF",
-  clay:"#E0974F",chalk:"#F2F5FA",grass:"#1F5C3A",grassLt:"#2C7D4E",safe:"#2E6BE6",
-  out:"#E11D2E",sage:"#FFFFFF",sageDim:"#DDE5F1",amber:"#F0B43E",live:"#FF3B5C",
-  navy:"#1D3A66",lime:"#E11D2E"};
+/* Colors reference the CSS vars (defined in :root, overridden by body.day) so ONE class flips the whole
+   app — dark ⇄ light — without re-rendering. See the Day-mode <style> block. */
+const T={field:"var(--field)",ink:"var(--ink)",surface:"var(--surface)",surface2:"var(--surface2)",line:"var(--line)",
+  clay:"var(--clay)",chalk:"var(--chalk)",grass:"var(--grass)",grassLt:"var(--grassLt)",safe:"var(--safe)",
+  out:"var(--out)",sage:"var(--sage)",sageDim:"var(--sageDim)",amber:"var(--amber)",live:"var(--live)",
+  navy:"var(--navy)",lime:"var(--lime)"};
 const FIELDLINE="#F4F8FC";  // white chalk for the field graphic (stays light on the green diamond)
 const MONO="'Barlow',system-ui,-apple-system,sans-serif";  // display — headers & scoreboard (was Saira Condensed; jford picked Barlow for readability)
 const SANS="'Barlow',system-ui,-apple-system,sans-serif";           // body / UI text
@@ -1162,7 +1181,7 @@ function alertOverlay(){
           <div style="font-family:${MONO};font-size:20px;font-weight:800;color:${accent};letter-spacing:.4px">${a.title}</div></div>
         <div style="font-size:15px;color:${T.chalk};line-height:1.45">${a.msg}</div>
         <div style="display:flex;gap:8px;margin-top:16px">
-          <button data-act="alertdismiss" style="flex:1;background:${accent};color:${T.field};border:none;border-radius:10px;padding:12px;font-family:${MONO};font-weight:800;font-size:15px">Got it</button>
+          <button data-act="alertdismiss" style="flex:1;background:${accent};color:#10141A;border:none;border-radius:10px;padding:12px;font-family:${MONO};font-weight:800;font-size:15px">Got it</button>
           <button data-act="alertsilence" style="flex:none;background:transparent;border:2px solid ${T.line};color:${T.sage};border-radius:10px;padding:12px 14px;font-weight:700;font-size:13px">Don't show again</button>
         </div></div></div>`;
 }
@@ -2206,7 +2225,7 @@ function batterCard(){
   const sub=b.ours
     ? `${TEAMS[k].short}${b.pos?` · ${b.pos}`:""} &middot; ${ord} in order`
     : `${TEAMS[k].short||"OPP"} &middot; ${ord} batter`;   // include the team so it's unmistakable
-  return `<div data-act="reviewbatter" data-arg="${batterKeyOf(b)}" class="frost-card" style="display:flex;align-items:center;gap:13px;background:rgba(13,19,32,.82);border:2px solid ${c}66;border-left:5px solid ${c};border-radius:10px;padding:9px 14px;flex-shrink:0;cursor:pointer">
+  return `<div data-act="reviewbatter" data-arg="${batterKeyOf(b)}" class="frost-card" style="display:flex;align-items:center;gap:13px;background:var(--frost);border:2px solid ${c}66;border-left:5px solid ${c};border-radius:10px;padding:9px 14px;flex-shrink:0;cursor:pointer">
     <span style="font-family:${MONO};font-size:34px;font-weight:700;color:${c};line-height:1;min-width:46px;text-align:center">${big}</span>
     <div style="flex:1;min-width:0">
       <div style="display:inline-flex;align-items:center;gap:6px;background:${c};color:#fff;border-radius:999px;padding:2px 9px;font-family:${MONO};font-size:10px;font-weight:800;letter-spacing:1px;margin-bottom:4px">&#9678; AT BAT</div>
@@ -2236,7 +2255,7 @@ function batterStrip(){
   const nm=b.ours?pBug(b):(b.name||"").trim();
   const nameLine=nm||(b.num?("#"+b.num):"—");
   const abp=(G.ab&&G.ab.pitches)?G.ab.pitches.length:0;   // pitches to this batter this at-bat
-  return `<button data-act="reviewbatter" data-arg="${batterKeyOf(b)}" class="frost-card" style="flex:1 1 auto;width:100%;display:flex;align-items:center;gap:14px;background:rgba(13,19,32,.72);border:2px solid ${c}66;border-left:6px solid ${c};border-radius:10px;padding:8px 16px;cursor:pointer;max-width:100%;min-width:0">
+  return `<button data-act="reviewbatter" data-arg="${batterKeyOf(b)}" class="frost-card" style="flex:1 1 auto;width:100%;display:flex;align-items:center;gap:14px;background:var(--chip);border:2px solid ${c}66;border-left:6px solid ${c};border-radius:10px;padding:8px 16px;cursor:pointer;max-width:100%;min-width:0">
     <span title="Lineup spot" style="font-family:${MONO};font-size:30px;font-weight:800;color:${c};line-height:1;flex:none">${ord}</span>
     <div style="flex:1;min-width:0;text-align:left;display:flex;flex-direction:column;gap:3px">
       <div style="font-size:10px;letter-spacing:1.5px;font-weight:800;color:${T.sageDim};line-height:1">BATTING ${ordinal(ord)}</div>
@@ -2978,7 +2997,7 @@ function actionArea(){
           ${t.external?`<button data-act="favteam" data-arg="${t.id}" title="Following — tap to remove" style="position:absolute;top:9px;right:11px;background:none;border:none;color:${t.fav?T.amber:T.sageDim};font-size:24px;line-height:1;padding:0;cursor:pointer">${t.fav?IC('starFill',23):IC('star',23)}</button>`:""}
           <div style="display:flex;align-items:center;gap:9px;padding-right:${t.external?"30px":"2px"}">
             ${t.logo?`<img src="${t.logo}" alt="" style="width:36px;height:36px;flex:none;border-radius:8px;object-fit:contain;background:#fff;box-shadow:0 0 0 1px ${T.line}">`:""}
-            ${unread?`<span title="New chat messages" style="flex:none;display:inline-flex;align-items:center;gap:4px;background:${T.amber};color:${T.field};border-radius:999px;padding:3px 9px;font-family:${MONO};font-weight:800;font-size:11px;letter-spacing:.4px">${IC('chat',12)} NEW</span>`:""}
+            ${unread?`<span title="New chat messages" style="flex:none;display:inline-flex;align-items:center;gap:4px;background:${T.amber};color:#10141A;border-radius:999px;padding:3px 9px;font-family:${MONO};font-weight:800;font-size:11px;letter-spacing:.4px">${IC('chat',12)} NEW</span>`:""}
             <div style="font-family:${MONO};font-size:23px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1">${t.name}</div></div>
           <div style="display:flex;align-items:baseline;gap:9px;margin-top:7px">
             <span style="font-family:${MONO};font-size:28px;font-weight:800;color:${t.color};line-height:1">${rec}</span><span style="font-size:13px;color:${T.sage}">${sub}</span></div>
@@ -2987,7 +3006,7 @@ function actionArea(){
     // Collapsible drawer: the label is the HEADER of the box that holds the content (one window),
     // not a separate little toggle box above the cards.
     const _w=isWide();   // bigger labels/cards on PC/tablet so the Following block isn't tiny on large screens
-    const drawer=(act,label,open,content)=>`<div style="background:rgba(13,19,32,.55);border:2px solid ${T.line};border-radius:14px;overflow:hidden;margin-top:2px">
+    const drawer=(act,label,open,content)=>`<div style="background:var(--drawer);border:2px solid ${T.line};border-radius:14px;overflow:hidden;margin-top:2px">
         <button data-act="${act}" class="drawer-bar" style="display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;background:none;border:none;padding:${_w?"14px 16px":"11px 14px"};cursor:pointer">
           <span style="font-size:${_w?18:14}px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:${T.lime};text-align:left">${label}</span>
           <span class="chev" style="color:${T.lime};font-size:${_w?24:20}px;flex:none;transition:transform .2s;transform:rotate(${open?90:0}deg)">&rsaquo;</span></button>
@@ -3029,14 +3048,14 @@ function actionArea(){
           <img src="icons/logo-emblem.png" alt=""
             onerror="if(this.src.indexOf('logo-mark')<0){this.src='icons/logo-mark.png';}else{this.style.display='none';}"
             style="height:clamp(120px,calc(var(--avh) * 21),200px);width:auto;display:block;filter:drop-shadow(0 8px 18px rgba(0,0,0,.6))">
-          <div style="font-family:${MONO};font-size:clamp(24px,4vw,40px);font-weight:800;letter-spacing:1.5px;line-height:1;color:#fff">ALL-STARS <span style="color:${T.lime}">LIVE</span></div></div>`;
+          <div style="font-family:${MONO};font-size:clamp(24px,4vw,40px);font-weight:800;letter-spacing:1.5px;line-height:1;color:${T.ink}">ALL-STARS <span style="color:${T.lime}">LIVE</span></div></div>`;
     // Hero for the WIDE (tablet) home — same stacked look as the phone, just a touch smaller so a
     // full row of team cards fits without scrolling (the wide home can't page-scroll).
     const heroWide = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:4px 0 2px;flex:none">
           <img src="icons/logo-emblem.png" alt=""
             onerror="if(this.src.indexOf('logo-mark')<0){this.src='icons/logo-mark.png';}else{this.style.display='none';}"
             style="height:clamp(112px,calc(var(--avh) * 20),156px);width:auto;display:block;filter:drop-shadow(0 8px 18px rgba(0,0,0,.6))">
-          <div style="font-family:${MONO};font-size:clamp(26px,3.6vw,42px);font-weight:800;letter-spacing:1.5px;line-height:1;color:#fff">ALL-STARS <span style="color:${T.lime}">LIVE</span></div></div>`;
+          <div style="font-family:${MONO};font-size:clamp(26px,3.6vw,42px);font-weight:800;letter-spacing:1.5px;line-height:1;color:${T.ink}">ALL-STARS <span style="color:${T.lime}">LIVE</span></div></div>`;
     const resumeBtn = (gameActive&&!(G&&G.final))?`<div style="position:relative"><button data-act="resume" style="${bigBtn("#FFFFFF","border:1px solid rgba(0,0,0,.10)",T.field)};font-size:16px;padding:14px 16px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;width:100%">
         <span style="display:flex;align-items:center;gap:8px;font-weight:800">${IC(PLAY)} Resume game</span>
         <span style="font-size:13px;font-weight:700;color:${T.navy}">${(OUR.short||"US").replace(/</g,"")} ${ourRuns()} &middot; ${(OPP.short||"OPP").replace(/</g,"")} ${oppRuns()} &nbsp;—&nbsp; ${G.half==="T"?"Top":"Bot"} ${ordinal(G.inning)}</span></button>
@@ -3075,8 +3094,8 @@ function actionArea(){
     // "Signed in as …" is a compact TOP-LEFT chip now — the old bottom bar collided with the tablet's
     // two-column windows. The bottom authBar keeps ONLY the signed-OUT sign-in buttons.
     const authTopChip=_signedIn?`<div style="position:absolute;top:8px;left:10px;z-index:6;display:flex;align-items:center;gap:7px;max-width:calc(100% - 118px)">
-           <span style="font-size:12px;color:${T.sage};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:rgba(13,19,32,.72);border:2px solid ${T.line};border-radius:11px;padding:7px 11px;min-width:0;line-height:1.3">${isWide()?"Signed in as ":""}<b style="color:${T.chalk}">${(C.user.email||"account").replace(/</g,"")}</b></span>
-           <button data-act="signout" title="Sign out" style="flex:none;background:rgba(13,19,32,.72);border:2px solid ${T.line};color:${T.chalk};border-radius:11px;padding:7px 10px;font-weight:800;font-size:12px;white-space:nowrap;cursor:pointer">Sign out</button></div>`:"";
+           <span style="font-size:12px;color:${T.sage};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:var(--chip);border:2px solid ${T.line};border-radius:11px;padding:7px 11px;min-width:0;line-height:1.3">${isWide()?"Signed in as ":""}<b style="color:${T.chalk}">${(C.user.email||"account").replace(/</g,"")}</b></span>
+           <button data-act="signout" title="Sign out" style="flex:none;background:var(--chip);border:2px solid ${T.line};color:${T.chalk};border-radius:11px;padding:7px 10px;font-weight:800;font-size:12px;white-space:nowrap;cursor:pointer">Sign out</button></div>`:"";
     const authBar = (C&&C.enabled&&!C.user)
       ? `<div style="flex:none;display:flex;flex-direction:column;align-items:center;gap:9px">
                ${`<button data-act="signingoogle" style="display:flex;align-items:center;justify-content:center;gap:10px;background:#fff;color:#1f1f1f;border:1px solid #dadce0;border-radius:8px;padding:11px 18px;font-family:${SANS};font-weight:700;font-size:14px;min-width:240px">
@@ -3110,7 +3129,7 @@ function actionArea(){
         </div>`;
     }
     // Single Settings gear (top-right) — app/camera/account settings. Same on native + web.
-    const gBtn=(act,glyph,title)=>`<button data-act="${act}" title="${title}" style="background:rgba(13,19,32,.72);border:2px solid ${T.line};color:${T.chalk};border-radius:11px;width:44px;height:44px;display:flex;align-items:center;justify-content:center;font-size:20px;cursor:pointer">${glyph}</button>`;
+    const gBtn=(act,glyph,title)=>`<button data-act="${act}" title="${title}" style="background:var(--chip);border:2px solid ${T.line};color:${T.chalk};border-radius:11px;width:44px;height:44px;display:flex;align-items:center;justify-content:center;font-size:20px;cursor:pointer">${glyph}</button>`;
     const settingsGear=`<div style="position:absolute;top:8px;right:10px;z-index:6;display:flex;gap:8px">${gBtn("settings",IC('gear',20),"Settings")}</div>`;   // Refresh moved into Settings
     // Wide (tablet): two columns so the key actions fit without scrolling — only a long
     // team list scrolls, inside its own column. Narrow (phone): the classic vertical stack.
@@ -3146,7 +3165,7 @@ function actionArea(){
       const PLAYP='<path d="M8 5l11 7-11 7z" fill="currentColor" stroke="none"/>';
       const PEOPLE='<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>';
       // Resume shows WHICH game (matchup · score · inning) so it's never just a bare "Resume".
-      const resumeWide=(gameActive&&!(G&&G.final))?`<div style="position:relative;flex:1;min-width:200px;display:flex"><button data-act="resume" style="flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;background:#FFFFFF;color:${T.field};border:1px solid ${T.line};border-radius:14px;padding:11px 18px;box-shadow:0 6px 16px rgba(0,0,0,.3)">
+      const resumeWide=(gameActive&&!(G&&G.final))?`<div style="position:relative;flex:1;min-width:200px;display:flex"><button data-act="resume" style="flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;background:#FFFFFF;color:#10141A;border:1px solid ${T.line};border-radius:14px;padding:11px 18px;box-shadow:0 6px 16px rgba(0,0,0,.3)">
           <span style="display:flex;align-items:center;gap:9px;font-family:${MONO};font-weight:800;font-size:19px;letter-spacing:.5px"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${PLAYP}</svg>Resume game</span>
           <span style="font-family:${MONO};font-size:13px;font-weight:700;color:${T.navy}">${(OUR.short||"US").replace(/</g,"")} ${ourRuns()} &middot; ${(OPP.short||"OPP").replace(/</g,"")} ${oppRuns()} &nbsp;—&nbsp; ${G.half==="T"?"Top":"Bot"} ${ordinal(G.inning)}</span></button>
           <button data-act="discardgame" title="Discard this in-progress game" style="position:absolute;top:8px;right:8px;width:34px;height:34px;border-radius:9px;background:rgba(225,29,46,.16);border:1.5px solid ${T.out};color:${T.out};font-weight:800;font-size:18px;line-height:1;display:flex;align-items:center;justify-content:center;cursor:pointer">&times;</button></div>`:"";
@@ -3165,7 +3184,7 @@ function actionArea(){
       // column (align-items:flex-start) so the window tops line up. Falls back to the single centered column.
       const _teamsDrawer=(showTeams&&_activeTeams.length)
         ? drawer("toggleteams","My teams ("+_activeTeams.length+")",teamsOpen,`<div style="display:flex;flex-direction:column;gap:12px">${_activeTeams.map(t=>card(t,true)).join("")}</div>`)
-        : `<div style="background:rgba(13,19,32,.55);border:2px solid ${T.line};border-radius:14px;padding:24px;text-align:center;color:${T.sageDim};font-size:14px">No teams yet — tap Manage Teams to create your first.</div>`;
+        : `<div style="background:var(--drawer);border:2px solid ${T.line};border-radius:14px;padding:24px;text-align:center;color:${T.sageDim};font-size:14px">No teams yet — tap Manage Teams to create your first.</div>`;
       const _mid=_twoCol
         ? `<div style="flex:1;min-height:0;display:flex;gap:18px;align-items:flex-start">
              <div style="flex:1;min-width:0;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch">${_teamsDrawer}</div>
@@ -3174,7 +3193,7 @@ function actionArea(){
         : `${liveRows?`<div style="flex:none;display:flex;flex-direction:column;gap:8px">${liveRows}</div>`:""}${teamsArea}`;
       // Share moved to a small button in the empty top strip (mirrors the Settings gear on the right).
       const _shareSvg=`<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="19" r="2.6"/><path d="M8.3 10.8 15.7 6.4M8.3 13.2l7.4 4.4"/></svg>`;
-      const _topIcoBtn=`background:rgba(13,19,32,.72);border:2px solid ${T.line};color:${T.chalk};border-radius:11px;width:44px;height:44px;display:flex;align-items:center;justify-content:center;cursor:pointer`;
+      const _topIcoBtn=`background:var(--chip);border:2px solid ${T.line};color:${T.chalk};border-radius:11px;width:44px;height:44px;display:flex;align-items:center;justify-content:center;cursor:pointer`;
       // Share sits in the top-right cluster, right next to the Settings gear.
       const topRight=`<div style="position:absolute;top:8px;right:10px;z-index:6;display:flex;gap:8px">
           ${gameActive?`<button data-act="share" title="Share this game" style="${_topIcoBtn}">${_shareSvg}</button>`:""}
@@ -3257,7 +3276,7 @@ function actionArea(){
     const gamesList=_games.slice(0,25).map(g=>{const rc=g.result==="W"?T.lime:(g.result==="L"?T.out:T.sage);
       const dt=(()=>{try{return new Date((g.date||"")+"T00:00").toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"});}catch(e){return g.date||"";}})();
       return `<button data-act="opengame" data-arg="${g.id}" style="display:flex;align-items:center;gap:12px;width:100%;text-align:left;padding:10px 2px;border:none;border-top:1.5px solid ${T.line};background:none;cursor:pointer">
-          <span style="width:28px;height:28px;flex:none;display:flex;align-items:center;justify-content:center;border-radius:7px;background:${rc};color:${T.field};font-family:${MONO};font-weight:800;font-size:14px">${g.result||""}</span>
+          <span style="width:28px;height:28px;flex:none;display:flex;align-items:center;justify-content:center;border-radius:7px;background:${rc};color:#10141A;font-family:${MONO};font-weight:800;font-size:14px">${g.result||""}</span>
           <div style="flex:1;min-width:0"><div style="font-weight:800;color:${T.ink};font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">vs ${(g.opp||"Opponent").replace(/</g,"&lt;")}</div><div style="font-size:12px;color:${T.sage};margin-top:1px">${dt}</div></div>
           <div style="font-family:${MONO};font-weight:800;font-size:19px;color:${T.chalk}">${g.us}&ndash;${g.them}</div>
           <span style="color:${T.lime};font-weight:800;font-size:16px">&rsaquo;</span></button>`;}).join("");
@@ -3334,7 +3353,7 @@ function actionArea(){
       const gdt=(()=>{try{return new Date((g.date||"")+"T00:00").toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"});}catch(e){return g.date||"";}})();
       const resWord=g.result==="W"?"WON":(g.result==="L"?"LOST":"TIE");
       return `<button data-act="opengame" data-arg="${g.id}" style="display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:${T.surface2};border:2px solid ${T.line};border-left:6px solid ${rc};border-radius:11px;padding:12px 14px;cursor:pointer">
-          <span style="width:34px;height:34px;flex:none;display:flex;align-items:center;justify-content:center;border-radius:8px;background:${rc};color:${T.field};font-family:${MONO};font-weight:800;font-size:16px">${g.result||""}</span>
+          <span style="width:34px;height:34px;flex:none;display:flex;align-items:center;justify-content:center;border-radius:8px;background:${rc};color:#10141A;font-family:${MONO};font-weight:800;font-size:16px">${g.result||""}</span>
           <div style="flex:1;min-width:0"><div style="font-weight:800;color:${T.ink};font-size:18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">vs ${(g.opp||"Opponent").replace(/</g,"&lt;")}</div><div style="font-size:14px;color:${T.sage};margin-top:2px">${gdt}</div></div>
           <div style="text-align:right;flex:none;line-height:1.05"><div style="font-family:${MONO};font-size:9px;font-weight:800;letter-spacing:1.2px;color:${rc}">${resWord} &middot; FINAL</div>
             <div style="font-family:${MONO};font-weight:800;font-size:21px;color:${T.chalk}"><span title="${(t.short||'Us')}">${g.us}</span>&ndash;<span title="${(g.oppShort||g.opp||'Opp')}">${g.them}</span></div>
@@ -3540,7 +3559,7 @@ function actionArea(){
       const _myHere=gameActive&&curTeamId===t.id&&!(G&&G.final);
       const _liveT=_liveGames[t.id];
       const mgmtLiveBtn=_myHere
-        ? `<button data-act="resume" style="background:#FFFFFF;color:${T.field};border:2px solid ${T.lime};border-radius:13px;padding:14px 18px;display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.25)">
+        ? `<button data-act="resume" style="background:#FFFFFF;color:#10141A;border:2px solid ${T.lime};border-radius:13px;padding:14px 18px;display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.25)">
             <span style="display:flex;align-items:center;gap:10px;min-width:0"><span style="width:10px;height:10px;border-radius:50%;flex:none;background:#E11D2E;box-shadow:0 0 7px #E11D2E"></span><span style="font-weight:800;font-size:16px">${IC('<path d="M8 5l11 7-11 7z" fill="currentColor" stroke="none"/>',18)} View current game</span></span>
             <span style="font-family:${MONO};font-weight:800;font-size:13.5px;color:${T.navy};white-space:nowrap">${(OUR.short||"US").replace(/</g,"")} ${ourRuns()}–${oppRuns()} ${(OPP.short||"OPP").replace(/</g,"")} · ${G.half==="T"?"Top":"Bot"} ${ordinal(G.inning)}</span></button>`
         : (_liveT?(function(){ const s=_liveT.summary||{}; const canScore=!!(window.cloudIsScorer&&window.cloudIsScorer(t)); const act=canScore?"takeoverlive":"watchlive"; const cta=canScore?"Take over &rsaquo;":"Watch live &rsaquo;";
@@ -3641,7 +3660,7 @@ function actionArea(){
           <div style="flex:1;min-width:0;border-left:5px solid ${t.color};padding-left:10px">
             <div style="font-family:${MONO};font-size:22px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${(t.name||"Team").replace(/</g,"")}</div>
             <div style="font-family:${MONO};font-size:20px;font-weight:800;color:${t.color};margin-top:4px">${rec}</div></div></div>
-        <button data-act="teamchat" style="${bigBtn(T.lime,'')};font-size:17px;position:relative">${ICN.chat} Team chat${teamHasUnread(t)?`<span style="background:${T.amber};color:${T.field};border-radius:999px;padding:2px 10px;font-family:${MONO};font-weight:800;font-size:12px;letter-spacing:.5px;margin-left:9px">&#9679; NEW</span>`:""}</button>
+        <button data-act="teamchat" style="${bigBtn(T.lime,'')};font-size:17px;position:relative">${ICN.chat} Team chat${teamHasUnread(t)?`<span style="background:${T.amber};color:#10141A;border-radius:999px;padding:2px 10px;font-family:${MONO};font-weight:800;font-size:12px;letter-spacing:.5px;margin-left:9px">&#9679; NEW</span>`:""}</button>
         ${(()=>{const showManage=(!(C&&C.enabled)||(window.cloudIsScorer&&window.cloudIsScorer(t)));return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:2px;background:${T.line};border:2px solid ${T.line};border-radius:13px;overflow:hidden">
           ${hb("roster",IC('users',26),"Roster &amp; lineup")}
           ${hb("schedule",IC('calendar',26),"Schedule")}
@@ -3747,6 +3766,11 @@ function actionArea(){
         <div class="frost-card" style="display:flex;align-items:center;gap:10px;background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:12px 14px">
           <button data-act="gohome" style="${ghost};padding:9px 11px">&lsaquo; Home</button>
           <div style="font-family:${MONO};font-size:23px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:${T.lime}">Settings</div></div>
+        ${(()=>{const _day=(function(){try{return document.body.classList.contains("day");}catch(e){return false;}})();const _sun='<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>';const _moon='<path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z"/>';return `<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;background:${T.surface};border:2px solid ${T.line};border-radius:12px;padding:16px 18px">
+          <div style="display:flex;align-items:center;gap:14px;min-width:0"><span style="font-size:24px;color:${_day?T.amber:T.sage}">${IC(_day?_sun:_moon,23)}</span>
+            <div style="min-width:0"><div style="font-weight:800;color:${T.ink};font-size:18px">Day mode</div>
+              <div style="font-size:13px;color:${T.sage};margin-top:2px">${_day?"Light theme — easier to read in daylight":"Dark theme"}</div></div></div>
+          <button data-act="daymode" role="switch" aria-checked="${_day}" style="background:${_day?T.lime:T.surface2};border:2px solid ${_day?T.lime:T.line};color:${_day?"#fff":T.sage};border-radius:999px;padding:10px 18px;font-family:${MONO};font-weight:800;font-size:14px;min-width:84px">${_day?"DAY":"NIGHT"}</button></div>`;})()}
         ${IS_APP?item("opencamera",IC('video',24),"Camera &amp; stream setup","Connect your camera and go live"):`<div style="font-size:13px;color:${T.sageDim};background:${T.surface};border:1px dashed ${T.line};border-radius:12px;padding:16px 18px;line-height:1.5">${IC('video',15)} Camera &amp; streaming is available in the All-Stars Live app (Android/iOS). This web view is for watching shared games.</div>`}
         ${IS_APP?`<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;background:${T.surface};border:2px solid ${T.line};border-radius:12px;padding:16px 18px">
           <div style="min-width:0"><div style="font-weight:800;color:${T.ink};font-size:18px">Broadcast audio</div>
@@ -3917,7 +3941,7 @@ function actionArea(){
     const inpSm=`width:98px;flex:none;background:${T.surface2};border:2px solid ${T.line};color:${T.ink};border-radius:10px;padding:14px 10px;font-family:${MONO};font-size:27px;font-weight:800;text-align:center;outline:none`;
     const rowCard=`display:flex;align-items:center;justify-content:space-between;gap:12px;background:${T.surface};border:2px solid ${T.line};border-radius:12px;padding:18px 20px;box-shadow:0 2px 6px rgba(15,30,60,.07)`;
     const sideBtn=(s,lbl2)=>{const on=G.ourSide===s;return `<button data-act="ng-side" data-arg="${s}" style="flex:1;padding:18px;border:none;border-radius:0;font-family:${MONO};font-weight:800;font-size:19px;text-transform:uppercase;letter-spacing:.5px;background:${on?OUR.color:T.surface};color:${on?"#FFFFFF":T.ink}">${lbl2}</button>`;};
-    const teamRow=(who,name,short,color,act)=>`<button data-act="${act}" class="frost-card" style="display:flex;align-items:center;gap:14px;background:rgba(13,19,32,.82);border:2px solid ${color};border-left:11px solid ${color};border-radius:12px;padding:14px 16px;width:100%;text-align:left">
+    const teamRow=(who,name,short,color,act)=>`<button data-act="${act}" class="frost-card" style="display:flex;align-items:center;gap:14px;background:var(--frost);border:2px solid ${color};border-left:11px solid ${color};border-radius:12px;padding:14px 16px;width:100%;text-align:left">
         <span style="width:54px;height:54px;flex:none;border-radius:12px;background:${color};color:${idealText(color)};display:flex;align-items:center;justify-content:center;font-family:${MONO};font-weight:800;font-size:18px;letter-spacing:.5px;box-shadow:0 0 0 1px rgba(255,255,255,.2)">${((short||name||"?").slice(0,4)).toUpperCase()}</span>
         <div style="flex:1;min-width:0"><div style="${lbl};margin:0 0 4px">${who}</div><div style="font-family:${MONO};font-size:23px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${name}</div></div>
         <span style="color:${color};font-weight:800;font-size:14px;letter-spacing:.5px;flex:none">CHANGE &rsaquo;</span></button>`;
@@ -4633,7 +4657,7 @@ function render(){
     renderToolbar();
     const nm=(watchTeamName||"").replace(/</g,"");
     document.getElementById("content").innerHTML=`<div style="flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding:24px">
-        <div class="frost-card" style="max-width:440px;text-align:center;background:rgba(13,19,32,.82);border:2px solid ${T.line};border-radius:18px;padding:30px 26px">
+        <div class="frost-card" style="max-width:440px;text-align:center;background:var(--frost);border:2px solid ${T.line};border-radius:18px;padding:30px 26px">
           <div style="line-height:1;margin-bottom:10px">${IC('ball',46)}</div>
           <div style="font-family:${MONO};font-size:22px;font-weight:800;color:#fff;letter-spacing:.4px">${nm?nm+" — ":""}No game in progress</div>
           <div style="font-size:14px;color:${T.sage};margin-top:10px;line-height:1.5">The game hasn't started yet. This page switches to the live game automatically the moment the scorer begins — keep it open.</div>
@@ -4963,6 +4987,7 @@ document.getElementById("app").addEventListener("click",e=>{
   if(act==="closereview"){ reviewBatter=null; render(); return; }
   if(act==="inninglog"){ reviewInn=true; render(); return; }
   if(act==="closeinnlog"){ reviewInn=false; render(); return; }
+  if(act==="daymode"){ const on=!document.body.classList.contains("day"); document.body.classList.toggle("day",on); try{localStorage.setItem("al-day-mode",on?"1":"0");}catch(e){} render(); return; }   // light ⇄ dark theme
   if(act==="advtoggle"){ advPitch=!advPitch; try{localStorage.setItem("al-adv-pitch",advPitch?"1":"0");}catch(e){} render(); return; }
   if(act==="adveventstoggle"){ advEvents=!advEvents; try{localStorage.setItem("al-adv-events",advEvents?"1":"0");}catch(e){} render(); return; }
   if(act==="alerttoggle"){ const c=alertsCfg(); c[arg]=!c[arg]; if(arg==="pcRules"){try{localStorage.setItem("al-pc-rules",c.pcRules?"1":"0");}catch(e){}} render(); return; }
@@ -5920,7 +5945,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v287";
+var APP_VERSION="v288";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
