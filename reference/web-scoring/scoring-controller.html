@@ -42,9 +42,10 @@
   /* ===== DAY MODE (light) — one class on <body> flips every var-driven color. Brand (out/safe/live/
      lime), the field graphic (grass/clay), and modal scrims stay; everything else lightens. ===== */
   body.day{
-    --field:#E9EEF5; --ink:#18222E; --surface:#FFFFFF; --surface2:#E7EDF5; --line:#C3CDDA;
-    --chalk:#18222E; --sage:#33415A; --sageDim:#5C6A7C; --amber:#B77A10; --navy:#2B4A7A;
-    --panel:#F4F7FB; --panel-hi:#E7EDF5; --textdim:#46536A; --textmid:#5C6A7C;
+    --field:#E9EEF5; --ink:#18222E; --surface:#FFFFFF; --surface2:#E7EDF5; --line:#B9C4D3;
+    --chalk:#18222E; --sage:#2C3A4C; --sageDim:#414C5C; --amber:#B77A10; --navy:#2B4A7A;
+    --lime:#C21324;   /* deeper red so small accent text/headers read on white */
+    --panel:#F4F7FB; --panel-hi:#E7EDF5; --textdim:#38424F; --textmid:#414C5C;
     --frost:rgba(255,255,255,.86); --drawer:rgba(255,255,255,.72); --chip:rgba(255,255,255,.85);
     --clay:#A85F1E; --amber:#9A6606;   /* darken warm accents so they read on white */
   }
@@ -5950,7 +5951,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v292";
+var APP_VERSION="v293";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
