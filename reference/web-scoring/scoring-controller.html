@@ -906,7 +906,7 @@ function fieldMapHtml(){
   const spot=(P)=>{ const ri=G.lineup.pos[P], pl=(ri!=null)?ROSTER[ri]:null, sel=(fieldAssign===P), open=(ri==null), xy=FXY[P];
     // While holding a bumped player, every spot is a drop target (open ones glow amber).
     const bd=sel?"#fff":(placing?(open?T.amber:OUR.color):(pl?OUR.color:T.line));
-    return `<button data-act="${placing?"fieldplacepos":"fieldpos"}" data-arg="${P}" data-fieldspot="${P}" ${pl!=null?`data-fieldri="${ri}"`:""} ${fieldDisplaced?"disabled":""} style="position:absolute;left:${xy[0]}%;top:${xy[1]}%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:0;background:${sel?OUR.color:"var(--chip)"};border:2px solid ${bd};border-radius:8px;padding:${_narrow?"2px 5px":"5px 8px"};min-width:${_narrow?"40px":"52px"};max-width:${_narrow?"78px":"96px"};cursor:${pl?"grab":"pointer"};touch-action:none;box-shadow:0 2px 9px rgba(0,0,0,.55);z-index:2;${fieldDisplaced?"opacity:.6":""}">
+    return `<button data-act="${placing?"fieldplacepos":"fieldpos"}" data-arg="${P}" data-fieldspot="${P}" ${pl!=null?`data-fieldri="${ri}"`:""} ${fieldDisplaced?"disabled":""} style="position:absolute;left:${xy[0]}%;top:${xy[1]}%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:0;background:${sel?OUR.color:"var(--chip)"};border:2px solid ${bd};border-radius:8px;padding:${_narrow?"2px 5px":"5px 8px"};min-width:${_narrow?"40px":"52px"};max-width:${_narrow?"78px":"96px"};cursor:${pl?"grab":"pointer"};touch-action:none;user-select:none;-webkit-user-select:none;-webkit-user-drag:none;box-shadow:0 2px 9px rgba(0,0,0,.55);z-index:2;${fieldDisplaced?"opacity:.6":""}">
         <span style="font-family:${MONO};font-size:${_narrow?"11px":"14px"};font-weight:800;color:${sel?"#fff":T.lime};line-height:1.05">${P}</span>
         <span style="font-size:${_narrow?"10px":"12px"};font-weight:800;color:${sel?"#fff":(pl?T.chalk:T.sageDim)};max-width:${_narrow?"72px":"90px"};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.15">${pl?((pl.num?"#"+pl.num+" ":"")+lastnm(pl.name)):"—"}</span></button>`; };
   const diamond=`<svg viewBox="0 0 300 280" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" style="display:block;position:absolute;inset:0">
@@ -940,7 +940,7 @@ function fieldMapHtml(){
   const benchRow=`<div style="flex:none">
       <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.sageDim};margin:2px 2px 5px">Bench / extra hitters${bench.length?" — drag up to a spot":""}</div>
       <div id="fieldbench" style="display:flex;flex-wrap:wrap;gap:7px;min-height:46px;border:2px dashed ${T.line};border-radius:10px;padding:8px;background:${T.surface2};align-content:flex-start">
-        ${bench.length?bench.map(ri=>{const pl=ROSTER[ri];return `<button data-fieldbench="${ri}" title="Drag up to a position" style="background:${T.surface};border:2px solid ${T.line};color:${T.chalk};border-radius:9px;padding:8px 12px;font-family:${MONO};font-size:14px;font-weight:800;white-space:nowrap;cursor:grab;touch-action:none">${pl.num?"#"+pl.num+" ":""}${(pl.name||"").replace(/</g,"&lt;")}</button>`;}).join(""):`<span style="color:${T.sageDim};font-size:12px;align-self:center;padding:0 4px">Everyone's on the field. Drag a fielder here to bench him (still bats).</span>`}
+        ${bench.length?bench.map(ri=>{const pl=ROSTER[ri];return `<button data-fieldbench="${ri}" draggable="false" title="Drag up to a position" style="background:${T.surface};border:2px solid ${T.line};color:${T.chalk};border-radius:9px;padding:8px 12px;font-family:${MONO};font-size:14px;font-weight:800;white-space:nowrap;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-user-drag:none">${pl.num?"#"+pl.num+" ":""}${(pl.name||"").replace(/</g,"&lt;")}</button>`;}).join(""):`<span style="color:${T.sageDim};font-size:12px;align-self:center;padding:0 4px">Everyone's on the field. Drag a fielder here to bench him (still bats).</span>`}
       </div></div>`;
   return `<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px">
       <div style="position:relative;width:100%;max-width:400px;margin:0 auto;flex:none"><div id="fieldmap" style="position:relative;width:100%;height:0;padding-bottom:93.33%;border:2px solid ${T.line};border-radius:10px;overflow:hidden">${diamond}${POSLIST.map(spot).join("")}</div></div>
@@ -4457,16 +4457,20 @@ function setupFieldDrag(){
   const bind=(el,ri)=>{
     el.addEventListener('pointerdown',e=>{
       e.preventDefault();
+      // Capture the pointer to THIS element so move/up always reach us even off the element (buttons
+      // otherwise swallow the sequence on touch — that's why the bench chips felt "not draggable").
+      try{ el.setPointerCapture(e.pointerId); }catch(_){}
       const sx=e.clientX, sy=e.clientY; let dragging=false, ghost=null;
       const move=ev=>{
-        if(!dragging && Math.hypot(ev.clientX-sx,ev.clientY-sy)<6) return;
+        if(!dragging && Math.hypot(ev.clientX-sx,ev.clientY-sy)<5) return;
         if(!dragging){ dragging=true; el.style.opacity='0.3';
           ghost=el.cloneNode(true); Object.assign(ghost.style,{position:'fixed',zIndex:'9999',pointerEvents:'none',margin:'0',left:ev.clientX+'px',top:ev.clientY+'px',transform:'translate(-50%,-50%) scale(1.08)',boxShadow:'0 10px 24px rgba(0,0,0,.6)'}); document.body.appendChild(ghost); }
         ghost.style.left=ev.clientX+'px'; ghost.style.top=ev.clientY+'px';
         clear(); const t=target(ev.clientX,ev.clientY); if(t&&t!==el) t.style.outline='3px solid '+T.amber;
       };
       const up=ev=>{
-        window.removeEventListener('pointermove',move); window.removeEventListener('pointerup',up);
+        el.removeEventListener('pointermove',move); el.removeEventListener('pointerup',up); el.removeEventListener('pointercancel',up);
+        try{ el.releasePointerCapture(ev.pointerId); }catch(_){}
         if(ghost)ghost.remove(); clear(); el.style.opacity='';
         if(dragging){ _fieldJustDragged=Date.now();
           const t=target(ev.clientX,ev.clientY);
@@ -4475,7 +4479,7 @@ function setupFieldDrag(){
           render();   // dropped on nothing / itself — repaint (cancels the pending tap)
         }
       };
-      window.addEventListener('pointermove',move); window.addEventListener('pointerup',up);
+      el.addEventListener('pointermove',move); el.addEventListener('pointerup',up); el.addEventListener('pointercancel',up);
     });
   };
   wrap.querySelectorAll('[data-fieldri]').forEach(el=>bind(el, +el.getAttribute('data-fieldri')));
@@ -5951,7 +5955,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v293";
+var APP_VERSION="v294";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
