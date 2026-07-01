@@ -2974,11 +2974,11 @@ function actionArea(){
       const sub=(()=>{const n=new Date(),today=n.getFullYear()+"-"+String(n.getMonth()+1).padStart(2,"0")+"-"+String(n.getDate()).padStart(2,"0");const up=(t.schedule||[]).filter(s=>s.date&&s.date>=today).sort((a,b)=>((a.date+(a.time||""))<(b.date+(b.time||""))?-1:1))[0];if(up){try{return "Next · "+new Date(up.date+"T00:00").toLocaleDateString(undefined,{month:"short",day:"numeric"});}catch(e){return "Next game set";}}return games?(games+" game"+(games===1?"":"s")):"New season";})();
       const unread=teamHasUnread(t);
       return `<div data-act="opent" data-arg="${t.id}" style="position:relative;width:${full?"100%":"300px"};max-width:${full?"none":"100%"};background:${T.surface};border:2px solid ${t.color};border-left:7px solid ${t.color};border-radius:14px;padding:14px;box-shadow:0 0 0 1px rgba(0,0,0,.35), 0 8px 20px rgba(0,0,0,.4);cursor:pointer">
-          ${unread?`<span title="New chat messages" style="position:absolute;top:11px;left:11px;display:flex;align-items:center;gap:5px;background:${T.amber};color:${T.field};border-radius:999px;padding:3px 9px;font-family:${MONO};font-weight:800;font-size:11px;letter-spacing:.4px">${IC('chat',12)} NEW</span>`:""}
           ${t.external?`<button data-act="favteam" data-arg="${t.id}" title="Following — tap to remove" style="position:absolute;top:9px;right:11px;background:none;border:none;color:${t.fav?T.amber:T.sageDim};font-size:24px;line-height:1;padding:0;cursor:pointer">${t.fav?IC('starFill',23):IC('star',23)}</button>`:""}
-          <div style="display:flex;align-items:center;gap:10px;padding-right:30px">
+          <div style="display:flex;align-items:center;gap:9px;padding-right:${t.external?"30px":"2px"}">
             ${t.logo?`<img src="${t.logo}" alt="" style="width:36px;height:36px;flex:none;border-radius:8px;object-fit:contain;background:#fff;box-shadow:0 0 0 1px ${T.line}">`:""}
-            <div style="font-family:${MONO};font-size:23px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0">${t.name}</div></div>
+            ${unread?`<span title="New chat messages" style="flex:none;display:inline-flex;align-items:center;gap:4px;background:${T.amber};color:${T.field};border-radius:999px;padding:3px 9px;font-family:${MONO};font-weight:800;font-size:11px;letter-spacing:.4px">${IC('chat',12)} NEW</span>`:""}
+            <div style="font-family:${MONO};font-size:23px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1">${t.name}</div></div>
           <div style="display:flex;align-items:baseline;gap:9px;margin-top:7px">
             <span style="font-family:${MONO};font-size:28px;font-weight:800;color:${t.color};line-height:1">${rec}</span><span style="font-size:13px;color:${T.sage}">${sub}</span></div>
           <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:14px;background:${t.color};color:#fff;border-radius:9px;padding:13px;font-family:${MONO};font-weight:800;font-size:16px;letter-spacing:.8px;pointer-events:none">${IC(GEAR)} ${t.external?"VIEW TEAM":"MANAGE TEAM"}</div></div>`;};
@@ -5908,7 +5908,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v285";
+var APP_VERSION="v286";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
