@@ -3537,7 +3537,7 @@ function actionArea(){
     const leagueDefaultSection=`<div class="frost-card" style="background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:14px 16px">
         <div style="font-size:13.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin-bottom:4px">Default game rules</div>
         <div style="font-size:11px;color:${T.sageDim};margin-bottom:9px;line-height:1.45">Pick this team's league once — <b style="color:${T.sage}">every new game starts with these rules</b> (innings, run cap, mercy, pitch limit). You can still change them for a single game in New Game setup.</div>
-        ${themedSelect("edTeamLeagueSel",LEAGUES.map(l=>({v:l.id,label:l.name})),(t.league||"custom"),{onpick:"edTeamLeague",css:`width:100%;max-width:340px;background:${T.surface2};border:2px solid ${T.line};color:${T.ink};border-radius:10px;padding:12px;font-family:${MONO};font-size:15px;font-weight:800;outline:none;display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer;text-align:left`})}
+        ${themedSelect("edTeamLeagueSel",LEAGUES.map(l=>({v:l.id,label:l.name+(l.cp?" ★":"")})),(t.league||"custom"),{onpick:"edTeamLeague",css:`width:100%;max-width:340px;background:${T.surface2};border:2px solid ${T.line};color:${T.ink};border-radius:10px;padding:12px;font-family:${MONO};font-size:15px;font-weight:800;outline:none;display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer;text-align:left`})}
         <div style="font-size:12px;color:${T.sage};margin-top:8px;line-height:1.4">${_tl.note}</div></div>`;
     // Team access (cloud) — owner + authorized scorers. Only when signed in.
     const C=window.Cloud, signedIn=!!(C&&C.enabled&&C.user);
@@ -4114,7 +4114,7 @@ function actionArea(){
     const leagueCard=`<div style="${rowCard};flex-wrap:wrap">
           <div style="flex:1;min-width:150px"><div style="font-weight:800;color:${T.ink};font-size:19px">League</div>
             <div style="color:${T.sage};font-size:13px;margin-top:3px;line-height:1.35">${curL.note}</div></div>
-          <div style="flex:none;min-width:170px">${themedSelect("ngLeagueSel",LEAGUES.map(l=>({v:l.id,label:l.name})),G.league,{onpick:"_ngLeaguePick",css:selStyle+";width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer;text-align:left;max-width:none"})}</div></div>`;
+          <div style="flex:none;min-width:170px">${themedSelect("ngLeagueSel",LEAGUES.map(l=>({v:l.id,label:l.name+(l.cp?" ★":"")})),G.league,{onpick:"_ngLeaguePick",css:selStyle+";width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer;text-align:left;max-width:none"})}</div></div>`;
     // Rulebook for THIS game (defaults to the team's; viewable here for a dispute).
     const grb=(G.rulebookId)||(curTeam()&&curTeam().rulebookId)||"dyb";
     const rulebookCard=`<div style="${rowCard};flex-wrap:wrap">
@@ -6092,7 +6092,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v301";
+var APP_VERSION="v302";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
