@@ -194,6 +194,15 @@ Status: [ ] todo · [~] in progress · [x] done. Grouped by theme; recurring/met
       Open Qs for build time: exact "5 pitches" UI (counter + foul handling), whether strikeouts still apply
       (swing-and-miss on the 5th?), and how the 4-OF layout maps on the spray field. Relates to
       [[allstars-league-rules]] (DYB presets), positions UX in section C.
+- [ ] J2 (jford 2026-06-30, pairs with J1). **Set a team's game TYPE / default rules ON Team management so
+      EVERY game carries them as default** — incl. the coach-pitch type (4 OF, no balls, pitch-count-per-
+      hitter). What EXISTS: per-GAME league presets (`LEAGUES`, incl. "DYB Tee Ball" + "DYB 6U/8U Coach
+      Pitch") set innings/runCap/mercy/pitchMax via `ngLeague`, chosen in NEW-GAME setup (line ~3934) — NOT
+      on the team. BUILD: store `t.league` (+ coach-pitch flags) on the team; a "Default game rules" picker
+      in Team management (`teamTab==="manage"`); apply `t.league` at new-game start (default `G.league` from
+      the team then run the `ngLeague` logic). Standard rule-number defaults are easy; the 4-OF/no-balls/
+      pitch-count SCORING is J1 — build J1+J2 together so picking "Coach pitch" on a team actually changes
+      scoring, not just the rule numbers.
 
 ## K. Two scorers on one live game — concurrency lock (NEW 2026-06-30, jford hit this in the field)
 - [ ] K1. jford was able to sign in and START scoring a game that someone ELSE was already actively
@@ -282,6 +291,16 @@ Status: [ ] todo · [~] in progress · [x] done. Grouped by theme; recurring/met
       Not a bug. CONSIDER a UX nudge: Diagnostics already shows the account; maybe surface a clearer hint
       when a shared/live game can't be found ("this team isn't on this account — sign in as <owner> or get
       invited as a scorer"). Low priority; the real fix is same-account or a scorer invite.
+
+## R. YouTube live-chat window in the app (NEW 2026-06-30, jford — for later)
+- [ ] R1. Show the connected YouTube broadcast's LIVE CHAT inside the app, alongside the video monitor, so
+      viewers (and the scorer) can read/participate without leaving for the YouTube app. Approach: embed
+      `https://www.youtube.com/live_chat?v=<videoId>&embed_domain=<host>` in an iframe (toggle/side panel by
+      the monitor; only when a YouTube link is connected via `streamYt()`/`viewerVid`). ⚠️ `embed_domain`
+      MUST match the page host — web = `allstars-live.web.app`, native WebView = the Railway host
+      (web-production-77d34.up.railway.app); pass the right one per environment or chat won't load. Distinct
+      from the app's own TEAM chat (Firestore). Posting requires the viewer be signed into YouTube in that
+      webview. Pairs naturally with the paste-a-YouTube-link monitor work ([[allstars-watch-with-scorebug]]).
 
 ---
 Done earlier this session: edit/correction ghost-click fix (v185), grid-button sweep (v184),
