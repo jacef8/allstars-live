@@ -35,6 +35,7 @@
     --panel:#0D1320; --panel-hi:#16202e; --scrim:rgba(8,11,16,.72); --textdim:#B7C2D6; --textmid:#9AA6B8;
     --frost:rgba(13,19,32,.82);   /* frosted-window backing (see the [style*=…] rule) */
     --drawer:rgba(13,19,32,.55); --chip:rgba(13,19,32,.72);   /* Home drawers + top icon buttons */
+    --heroShadow:0 2px 8px rgba(0,0,0,.55);   /* ALL-STARS LIVE wordmark legibility on the turf photo */
     --mono:"Barlow",system-ui,-apple-system,sans-serif;
     --sans:"Barlow",system-ui,-apple-system,sans-serif;
     --ease:cubic-bezier(.16,1,.3,1); --ease-soft:cubic-bezier(.4,0,.2,1);
@@ -47,6 +48,7 @@
     --lime:#C21324;   /* deeper red so small accent text/headers read on white */
     --panel:#F4F7FB; --panel-hi:#E7EDF5; --textdim:#38424F; --textmid:#414C5C;
     --frost:rgba(255,255,255,.86); --drawer:rgba(255,255,255,.72); --chip:rgba(255,255,255,.85);
+    --heroShadow:0 1px 0 rgba(255,255,255,.8),0 2px 12px rgba(255,255,255,.55);   /* light halo so the dark wordmark reads on the day turf */
     --clay:#A85F1E; --amber:#9A6606;   /* darken warm accents so they read on white */
   }
   /* Day mode: lighten the turf backdrop so the page reads bright, and flip the native date/time pickers. */
@@ -3189,14 +3191,14 @@ function actionArea(){
           <img src="icons/logo-emblem.png" alt=""
             onerror="if(this.src.indexOf('logo-mark')<0){this.src='icons/logo-mark.png';}else{this.style.display='none';}"
             style="height:clamp(120px,calc(var(--avh) * 21),200px);width:auto;display:block;filter:drop-shadow(0 8px 18px rgba(0,0,0,.6))">
-          <div style="font-family:${MONO};font-size:clamp(24px,4vw,40px);font-weight:800;letter-spacing:1.5px;line-height:1;color:${T.ink}">ALL-STARS <span style="color:${T.lime}">LIVE</span></div></div>`;
+          <div style="font-family:${MONO};font-size:clamp(24px,4vw,40px);font-weight:800;letter-spacing:1.5px;line-height:1;color:${T.ink};text-shadow:var(--heroShadow)">ALL-STARS <span style="color:${T.lime}">LIVE</span></div></div>`;
     // Hero for the WIDE (tablet) home — same stacked look as the phone, just a touch smaller so a
     // full row of team cards fits without scrolling (the wide home can't page-scroll).
     const heroWide = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:4px 0 2px;flex:none">
           <img src="icons/logo-emblem.png" alt=""
             onerror="if(this.src.indexOf('logo-mark')<0){this.src='icons/logo-mark.png';}else{this.style.display='none';}"
             style="height:clamp(112px,calc(var(--avh) * 20),156px);width:auto;display:block;filter:drop-shadow(0 8px 18px rgba(0,0,0,.6))">
-          <div style="font-family:${MONO};font-size:clamp(26px,3.6vw,42px);font-weight:800;letter-spacing:1.5px;line-height:1;color:${T.ink}">ALL-STARS <span style="color:${T.lime}">LIVE</span></div></div>`;
+          <div style="font-family:${MONO};font-size:clamp(26px,3.6vw,42px);font-weight:800;letter-spacing:1.5px;line-height:1;color:${T.ink};text-shadow:var(--heroShadow)">ALL-STARS <span style="color:${T.lime}">LIVE</span></div></div>`;
     const resumeBtn = (gameActive&&!(G&&G.final))?`<div style="position:relative"><button data-act="resume" style="${bigBtn("#FFFFFF","border:1px solid rgba(0,0,0,.10)",T.field)};font-size:16px;padding:14px 16px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;width:100%">
         <span style="display:flex;align-items:center;gap:8px;font-weight:800">${IC(PLAY)} Resume game</span>
         <span style="font-size:13px;font-weight:700;color:${T.navy}">${(OUR.short||"US").replace(/</g,"")} ${ourRuns()} &middot; ${(OPP.short||"OPP").replace(/</g,"")} ${oppRuns()} &nbsp;—&nbsp; ${G.half==="T"?"Top":"Bot"} ${ordinal(G.inning)}</span></button>
@@ -3272,6 +3274,14 @@ function actionArea(){
     // Single Settings gear (top-right) — app/camera/account settings. Same on native + web.
     const gBtn=(act,glyph,title)=>`<button data-act="${act}" title="${title}" style="background:var(--chip);border:2px solid ${T.line};color:${T.chalk};border-radius:11px;width:44px;height:44px;display:flex;align-items:center;justify-content:center;font-size:20px;cursor:pointer">${glyph}</button>`;
     const settingsGear=`<div style="position:absolute;top:8px;right:10px;z-index:6;display:flex;gap:8px">${gBtn("settings",IC('gear',20),"Settings")}</div>`;   // Refresh moved into Settings
+    // PHONE top bar — a NORMAL-FLOW row (not absolute) so the star logo starts BELOW it. The old absolute
+    // email/Sign-out chip sat ON TOP of the emblem (overlap). Email flexes to fill the width; Sign out + gear
+    // sit on the right. Signed out → just the gear (right-aligned).
+    const topRowPhone=`<div style="flex:none;display:flex;align-items:center;gap:8px;width:100%;padding:0 12px;min-height:44px">
+        ${_signedIn?`<span style="flex:1;min-width:0;font-size:12.5px;color:${T.sage};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:var(--chip);border:2px solid ${T.line};border-radius:11px;padding:9px 12px;line-height:1.25">Signed in as <b style="color:${T.chalk}">${(C.user.email||"account").replace(/</g,"")}</b></span>
+          <button data-act="signout" title="Sign out" style="flex:none;background:var(--chip);border:2px solid ${T.line};color:${T.chalk};border-radius:11px;padding:9px 12px;font-weight:800;font-size:12.5px;white-space:nowrap;cursor:pointer">Sign out</button>`
+        :`<span style="flex:1"></span>`}
+        ${gBtn("settings",IC('gear',20),"Settings")}</div>`;
     // Wide (tablet): two columns so the key actions fit without scrolling — only a long
     // team list scrolls, inside its own column. Narrow (phone): the classic vertical stack.
     if(isWide()){
@@ -3350,7 +3360,7 @@ function actionArea(){
           </div>
         </div>`;
     }
-    return `<div style="position:relative;min-height:100%;display:flex;flex-direction:column;justify-content:safe center;gap:14px;padding:6px 0">${authTopChip}${settingsGear}${hero}${resumeBtn}${liveRows}${newGameBtn}${showTeams?`<div style="flex:none">${teamsBlock}</div>`:""}${followingBlock?`<div style="flex:none">${followingBlock}</div>`:""}${showTeams?`<div style="flex:none">${manageBtn}</div>`:""}<div style="flex:none;display:flex;gap:2px;background:${T.line};border:2px solid ${T.line};border-radius:11px;overflow:hidden">${shareBtnHome}${shareAppBtn}</div>${authBar}</div>`;
+    return `<div style="position:relative;min-height:100%;display:flex;flex-direction:column;padding:6px 0">${topRowPhone}<div style="flex:1;min-height:0;display:flex;flex-direction:column;justify-content:safe center;gap:14px;margin-top:8px">${hero}${resumeBtn}${liveRows}${newGameBtn}${showTeams?`<div style="flex:none">${teamsBlock}</div>`:""}${followingBlock?`<div style="flex:none">${followingBlock}</div>`:""}${showTeams?`<div style="flex:none">${manageBtn}</div>`:""}<div style="flex:none;display:flex;gap:2px;background:${T.line};border:2px solid ${T.line};border-radius:11px;overflow:hidden">${shareBtnHome}${shareAppBtn}</div>${authBar}</div></div>`;
   }
   if(mode==="teams"){
     const sorted=DB.teams.slice().sort((a,b)=>(b.fav?1:0)-(a.fav?1:0));
@@ -6092,7 +6102,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v302";
+var APP_VERSION="v303";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
