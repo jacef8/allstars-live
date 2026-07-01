@@ -347,6 +347,9 @@ function teamRemovePlayer(t,pid){if(t.players.length<=9)return;t.players=t.playe
 /* Make a saved team the active "our" team for a game. */
 function selectTeam(id){const t=teamById(id);if(!t)return;curTeamId=id;ROSTER=t.players;
   OUR.name=t.name;OUR.short=t.short||t.name.slice(0,3).toUpperCase();OUR.color=t.color||OUR.color;OUR.logo=t.logo||null;}
+/* J2: apply the CURRENT team's default league/rules (set in Team management) to the game being set up.
+   Call AFTER initGame() / selectTeam() so it isn't wiped back to "custom". No-op if no team default. */
+function applyTeamDefaultRules(){ try{ const t=teamById(curTeamId); if(t&&t.league){ const L=leagueById(t.league); G.league=L.id; G.innings=L.innings; G.runCap=L.runCap; G.mercy=L.mercy?{r15:L.mercy.r15,r10:L.mercy.r10}:null; G.pitchMax=L.pitch||0; } }catch(e){} }
 /* ===== saved lineups (multiple named batting orders per team, stored by player id) ===== */
 function teamLineups(t){ if(!t)return []; if(!Array.isArray(t.lineups))t.lineups=[]; return t.lineups; }
 function lineupById(t,id){ return teamLineups(t).find(l=>l.id===id)||null; }
@@ -5009,7 +5012,7 @@ document.getElementById("app").addEventListener("click",e=>{
     openShareLink({ url:url, title:"SHARE THE GAME", sub:'Opens the live scoreboard &amp; play-by-play — no login. Shows a "waiting" screen until you start, then goes live.',
       subject:"Watch "+nm+opp+" live", body:"Watch "+nm+opp+" live on All-Stars Live — no app or login needed, just tap the link:" }); return; }
   if(act==="schedstart"){ const t=teamById(openTeamId); if(!t)return; const s=(t.schedule||[]).find(x=>x.id===arg);
-    newgameFrom="team"; selectTeam(t.id); G=initGame(); loadTeamLineup(teamById(curTeamId)); hist=[]; resetUI(); resetOpponent();
+    newgameFrom="team"; selectTeam(t.id); G=initGame(); applyTeamDefaultRules(); loadTeamLineup(teamById(curTeamId)); hist=[]; resetUI(); resetOpponent();
     if(s){ G.schedId=s.id; G.schedDate=s.date||null; }   // remember WHICH scheduled game this is, so end-game marks it played for sure
     if(s&&s.opp){ const m=(DB.teams||[]).find(x=>x.id!==t.id && (x.name||"").toLowerCase()===(s.opp||"").toLowerCase());
       if(m){ oppTeamId=m.id; OPP.name=m.name; OPP.short=m.short; OPP.color=m.color; OPP.logo=m.logo||null; }
@@ -5303,10 +5306,7 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="apprefresh"){ flash("Refreshing…"); try{ if(navigator.serviceWorker&&navigator.serviceWorker.getRegistrations) navigator.serviceWorker.getRegistrations().then(function(rs){rs.forEach(function(r){try{r.update();}catch(e){}});}); }catch(e){} try{ if(window.cloudSyncTeams)cloudSyncTeams(); }catch(e){} setTimeout(function(){ try{ location.reload(); }catch(e){} }, 500); }
   else if(act==="settings"){mode="settings";render();}
   else if(act==="opencamera"){ try{ if(window.AllStars&&window.AllStars.openVideo)AllStars.openVideo(); }catch(e){} }
-  else if(act==="newgamestart"){newgameFrom="home";resetOpponent();
-    // J2: start a new game from THIS team's default league/rules (still overridable in the setup below).
-    try{ const _t=teamById(curTeamId); if(_t&&_t.league&&!gameActive){ const L=leagueById(_t.league); G.league=L.id; G.innings=L.innings; G.runCap=L.runCap; G.mercy=L.mercy?{r15:L.mercy.r15,r10:L.mercy.r10}:null; G.pitchMax=L.pitch||0; } }catch(e){}
-    mode="newgame";render();}
+  else if(act==="newgamestart"){newgameFrom="home";resetOpponent();if(!gameActive)applyTeamDefaultRules();mode="newgame";render();}
   else if(act==="gototeams"){mode="teams";render();}
   else if(act==="opent"){openTeamId=arg;teamTab="hub";openTeamFrom=(mode==="home"?"home":"teams");mode="team";render();}
   else if(act==="teamtab"){teamTab=arg;render();}
@@ -5346,7 +5346,7 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="sortnum"){ const t=teamById(openTeamId); if(t){ t.players.sort((a,b)=>(parseInt(a.num,10)||999)-(parseInt(b.num,10)||999)); saveDB(); render(); } }
   else if(act==="sortname"){ const t=teamById(openTeamId); if(t){ t.players.sort((a,b)=>((a.last||a.name||"")+a.first).localeCompare((b.last||b.name||"")+b.first)); saveDB(); render(); } }
   else if(act==="pasteplayers"){ const t=teamById(openTeamId); if(t){ let txt=""; try{txt=prompt("Paste players — one per line. Each line: number then name, e.g.\n12 John Smith\n7 Maria Diaz");}catch(e){} if(txt){ let added=0; txt.split(/\r?\n/).forEach(line=>{ line=line.trim(); if(!line)return; if(t.players.length>=20)return; const m=line.match(/^(\d{1,3})\s+(.*)$/); let num="",nm=line; if(m){num=m[1];nm=m[2].trim();} const parts=nm.split(/\s+/).filter(Boolean); const first=parts.length>1?parts.slice(0,-1).join(" "):(parts[0]||""); const last=parts.length>1?parts[parts.length-1]:""; const p={id:nextId("p"),num:num,first:first,last:last,name:""}; ensureName(p); t.players.push(p); added++; }); if(added){saveDB();render();} else {try{alert("No players found — check the format.");}catch(e){}} } } }
-  else if(act==="startteam"){newgameFrom="team";selectTeam(openTeamId);G=initGame();loadTeamLineup(teamById(curTeamId));hist=[];resetUI();resetOpponent();mode="newgame";render();broadcast();}
+  else if(act==="startteam"){newgameFrom="team";selectTeam(openTeamId);G=initGame();applyTeamDefaultRules();loadTeamLineup(teamById(curTeamId));hist=[];resetUI();resetOpponent();mode="newgame";render();broadcast();}
   else if(act==="pickour"){pickFor="our";mode="pickteam";render();}
   else if(act==="pickopp"){pickFor="opp";finderResults=null;window._finderQ="";
     // Seed the recent-opponent quick-picks from the team's SCHEDULE (which syncs across devices), so a
@@ -5367,7 +5367,7 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="favpublicteam"){ if(!viewTeam)return; const ex=DB.teams.find(x=>x.id===viewTeam.id); if(ex){ DB.teams=DB.teams.filter(x=>x.id!==viewTeam.id); saveDB(); flash("Removed from your home"); } else { const copy=JSON.parse(JSON.stringify(viewTeam)); copy.fav=true; copy.external=true; if(!Array.isArray(copy.players))copy.players=[]; DB.teams.push(copy); saveDB(); flash("Added to your home — watch them from the Home screen"); } render(); }
   else if(act==="setpubopp"){ const r=finderResults&&finderResults[+arg]; if(r){ oppTeamId=r.id; OPP.name=r.name; OPP.short=r.short||(r.name||"OPP").slice(0,3).toUpperCase(); OPP.color=r.color; OPP.logo=r.logo||null; recordRecentOpp(OPP); } finderResults=null; resetOppLineup(); mode="newgame"; render(); broadcast(); }
   else if(act==="setrecentopp"){ const o=getRecentOpps()[+arg]; if(o){ oppTeamId=null; OPP.name=o.name; OPP.short=o.short||(o.name||"OPP").slice(0,3).toUpperCase(); OPP.color=o.color||"#E11D2E"; recordRecentOpp(OPP); } resetOppLineup(); mode="newgame"; render(); broadcast(); }
-  else if(act==="setteam"){const id=arg;if(pickFor==="our"){selectTeam(id);}else{const t=teamById(id);oppTeamId=id;if(t){OPP.name=t.name;OPP.short=t.short;OPP.color=t.color;OPP.logo=t.logo||null;recordRecentOpp(OPP);}resetOppLineup();}mode="newgame";render();broadcast();}
+  else if(act==="setteam"){const id=arg;if(pickFor==="our"){selectTeam(id);if(!gameActive)applyTeamDefaultRules();}else{const t=teamById(id);oppTeamId=id;if(t){OPP.name=t.name;OPP.short=t.short;OPP.color=t.color;OPP.logo=t.logo||null;recordRecentOpp(OPP);}resetOppLineup();}mode="newgame";render();broadcast();}
   else if(act==="newteampick"){const t=newTeam("");if(pickFor==="our"){selectTeam(t.id);}else{oppTeamId=t.id;OPP.name=t.name;OPP.short=t.short;OPP.color=t.color;OPP.logo=null;resetOppLineup();}mode="newgame";render();broadcast();}
   else if(act==="oppnoroster"){oppTeamId=null;OPP.name="Opponent";OPP.short="OPP";OPP.color="#E11D2E";resetOppLineup();mode="newgame";render();broadcast();}
   else if(act==="oppusetyped"){ const e=document.getElementById("oppNameInput"); const nm=(e?(e.value||""):(window._finderQ||"")).trim(); if(!nm){flash("Type an opponent name first");return;} oppTeamId=null; OPP.name=nm; OPP.short=(nm.replace(/[^A-Za-z0-9]/g,"").slice(0,3).toUpperCase())||"OPP"; OPP.color="#E11D2E"; OPP.logo=null; recordRecentOpp(OPP); finderResults=null; resetOppLineup(); mode="newgame"; render(); broadcast(); }
@@ -5955,7 +5955,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v294";
+var APP_VERSION="v295";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
