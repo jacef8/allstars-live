@@ -995,7 +995,7 @@ function snapshot(){hist.push({g:JSON.parse(JSON.stringify(G)),fl:(Array.isArray
 function resetUI(){mode="idle";tap=null;contact=null;result=null;plan=null;showAll=false;reviewBatter=null;reviewInn=false;}
 function undo(){if(!hist.length)return;const e=hist.pop();G=(e&&e.g)?e.g:e;if(e&&typeof e.fl==="number"&&Array.isArray(gameFeed))gameFeed.length=Math.min(gameFeed.length,e.fl);resetUI();render();broadcast();}
 
-function nextBatter(){const k=G.half==="T"?"awayPtr":"homePtr";G[k]++;G.balls=0;G.strikes=0;}
+function nextBatter(){const k=G.half==="T"?"awayPtr":"homePtr";G[k]++;G.balls=0;G.strikes=0;G.abPitches=0;}
 /* Close the current half-inning: log its totals (for review), switch sides, bump inning
    on T->B->T, clear everything (count, bases, per-half tallies). */
 function doFlip(){
@@ -1095,14 +1095,17 @@ window.ngOppBatters=function(v){const n=parseInt(v,10); G.oppBatters=(isNaN(n)||
 /* ===== League presets (Diamond Youth Baseball 2026 + custom) — set default rules & alerts ===== */
 const LEAGUES=[
   {id:"custom",  name:"Custom (set manually)", innings:6, runCap:0, mercy:null,          pitch:0,  note:"Set every rule yourself · no run cap unless you set one."},
-  {id:"dyb-tb",  name:"DYB Tee Ball",          innings:4, runCap:5, mercy:null,          pitch:0,  note:"Tee/coach pitch · no pitch limits."},
-  {id:"dyb-cp",  name:"DYB 6U/8U Coach Pitch", innings:6, runCap:7, mercy:{r15:3,r10:4}, pitch:0,  note:"Coaches pitch · 7 runs/half-inning · 15-run after 3, 10-run after 4 innings."},
+  {id:"dyb-tb",  name:"DYB Tee Ball",          innings:4, runCap:5, mercy:null,          pitch:0,  cp:true, note:"Tee/coach pitch · no balls/walks · 5 pitches/batter · 4 outfielders."},
+  {id:"dyb-cp",  name:"DYB 6U/8U Coach Pitch", innings:6, runCap:7, mercy:{r15:3,r10:4}, pitch:0,  cp:true, note:"Coaches pitch · no balls/walks · 5 pitches/batter (fouls extend) · 4 outfielders · 7 runs/half."},
   {id:"dyb-a",   name:"DYB A / AA",            innings:6, runCap:7, mercy:{r15:3,r10:4}, pitch:75, note:"6 inn · 15-after-3 / 10-after-4 · opt. 7 runs/half · 75 pitches/day (≤10U)."},
   {id:"dyb-aaa", name:"DYB AAA (10U)",         innings:6, runCap:0, mercy:{r15:3,r10:4}, pitch:75, note:"6 inn · 15-after-3 / 10-after-4 · opt. 10 runs/half · 75 pitches/day."},
   {id:"dyb-maj", name:"DYB Majors (12U)",      innings:6, runCap:0, mercy:{r15:3,r10:4}, pitch:85, note:"6 inn · 15-after-3 / 10-after-4 · opt. 10 runs/half · 85 pitches/day (11-12U)."},
   {id:"dyb-oz",  name:"DYB \"O\"Zone",         innings:6, runCap:0, mercy:{r15:3,r10:4}, pitch:85, note:"6 inn · 15-after-3 / 10-after-4 · 85 pitches/day."},
 ];
 const leagueById=id=>LEAGUES.find(l=>l.id===id)||LEAGUES[0];
+/* Coach-pitch mode: the current game's league is a coach/tee-ball type → no balls/walks/HBP,
+   5 pitches per batter (fouls extend), no pitch-count limits, 4 outfielders. */
+function cpMode(){ try{ return !!(G&&leagueById(G.league).cp); }catch(e){ return false; } }
 /* ===== Rulebook repository — a library of leagues. DYB ships as searchable in-app text; the
    others link to their official rules pages. Users can add their own (name + URL). A team picks
    one (t.rulebookId), and it carries into each game so it's a tap away during a dispute. ===== */
@@ -1823,9 +1826,20 @@ function broadcast(){
 function pitch(type){
   try{ if(navigator.vibrate) navigator.vibrate(12); }catch(e){}   // short, light haptic confirm on each pitch tap
   koPick=null;   // a new pitch dismisses any pending "looking / swinging?" prompt (skippable, B4)
+  if(cpMode() && type==="ball") return;   // COACH PITCH: no balls (button is hidden anyway)
   snapshot();const k0=battingKey(),b0=batter(),bn=b0.name,bnum=b0.num,bk0=batterKeyOf(b0);_pitch=type;recordPitch(type);
   const pt=(advPitch&&pitchType)?" "+pitchType:"";   // pitch type tag (if advanced tracking on)
-  if(type==="ball"){G.balls++;try{Snd.pip("ball");}catch(e){}feedPitch("Ball"+pt,"#"+bnum+" · "+G.balls+"-"+G.strikes);if(G.balls>=4){applyPlanInline("walk");flash("Walk");bcastEvent("walk","Ball four · "+bn,k0,bk0);}}
+  if(cpMode()){
+    // COACH PITCH: 5 pitches per batter — out on the 5th miss OR 3 swinging strikes; a FOUL never ends
+    // the at-bat (extends past 5). No balls/walks. G.abPitches counts this at-bat's pitches.
+    G.abPitches=(G.abPitches||0)+1;
+    if(type==="foul"){ if(G.strikes<2)G.strikes++; try{Snd.pip("foul");}catch(e){} feedPitch("Foul"+pt,"#"+bnum+" · pitch "+G.abPitches); }
+    else if(type==="strike"){ G.strikes++; feedPitch("Strike"+pt,"#"+bnum+" · pitch "+G.abPitches);
+      const outK=G.strikes>=3, out5=G.abPitches>=5;
+      if(outK||out5){ G.outs++; creditBatter("strikeout",0); nextBatter(); flipIfNeeded(); flash(outK?"Strikeout":"5 pitches — out"); bcastEvent("strikeout",bn,k0,bk0); koPick=_eventId; G.anim={id:((G.anim&&G.anim.id)||0)+1,ts:Date.now(),sfx:"whiff"}; }
+      else { try{Snd.pip("strike");}catch(e){} } }
+  }
+  else if(type==="ball"){G.balls++;try{Snd.pip("ball");}catch(e){}feedPitch("Ball"+pt,"#"+bnum+" · "+G.balls+"-"+G.strikes);if(G.balls>=4){applyPlanInline("walk");flash("Walk");bcastEvent("walk","Ball four · "+bn,k0,bk0);}}
   else if(type==="strike"){G.strikes++;feedPitch("Strike"+pt,"#"+bnum+" · "+G.balls+"-"+G.strikes);if(G.strikes>=3){G.outs++;creditBatter("strikeout",0);nextBatter();flipIfNeeded();flash("Strikeout");bcastEvent("strikeout",bn,k0,bk0);koPick=_eventId;G.anim={id:((G.anim&&G.anim.id)||0)+1,ts:Date.now(),sfx:"whiff"};}else{try{Snd.pip("strike");}catch(e){}}}
   else if(type==="foul"){if(G.strikes<2)G.strikes++;try{Snd.pip("foul");}catch(e){}feedPitch("Foul"+pt,"#"+bnum+" · "+G.balls+"-"+G.strikes);}
   render();broadcast();try{triggerAnim(G.anim);}catch(e){}
@@ -4273,12 +4287,14 @@ function actionArea(){
         ${PITCH_TYPES.map(pt=>{const on=pitchType===pt.k;return `<button data-act="ptype" data-arg="${pt.k}" title="${pt.n}" style="background:${on?T.amber:T.surface};border:none;border-radius:0;color:${on?T.field:T.chalk};padding:10px 2px;font-family:${MONO};font-size:13px;font-weight:800">${pt.k}</button>`;}).join("")}
       </div>`:"";
     const onBase=[1,2,3].some(b=>G.bases&&G.bases[b]);   // base-running events need a runner aboard
-    return `${ptypeRow}
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:2px;background:${T.line};border:2px solid ${T.line};border-radius:12px;overflow:hidden">
-        ${pitchBtn("ball","Ball",ICN.ball)}${pitchBtn("strike","Strike",ICN.strike)}${pitchBtn("foul","Foul",ICN.foul)}${pitchBtn("inplay","In Play",ICN.inplay,true)}</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:2px;background:${T.line};border:2px solid ${T.line};border-radius:10px;overflow:hidden">
+    const _cp=cpMode();   // coach pitch: no Ball / no HBP; show "pitch N of 5"
+    const cpTag=_cp?`<div style="display:flex;align-items:center;justify-content:center;gap:8px;background:${T.surface2};border:2px solid ${T.line};border-radius:9px;padding:6px 10px;font-family:${MONO};font-weight:800;font-size:13px;color:${T.amber};letter-spacing:.5px">COACH PITCH · PITCH ${(G.abPitches||0)+1} OF 5<span style="color:${T.sageDim};font-weight:600;font-size:11px;letter-spacing:0">fouls extend</span></div>`:"";
+    return `${cpTag}${ptypeRow}
+      <div style="display:grid;grid-template-columns:repeat(${_cp?3:4},1fr);gap:2px;background:${T.line};border:2px solid ${T.line};border-radius:12px;overflow:hidden">
+        ${_cp?"":pitchBtn("ball","Ball",ICN.ball)}${pitchBtn("strike","Strike",ICN.strike)}${pitchBtn("foul","Foul",ICN.foul)}${pitchBtn("inplay","In Play",ICN.inplay,true)}</div>
+      <div style="display:grid;grid-template-columns:${_cp?"1fr 1fr":"1fr 1fr 1fr"};gap:2px;background:${T.line};border:2px solid ${T.line};border-radius:10px;overflow:hidden">
         <button data-act="brsheet" title="Steal, WP/PB, balk, pickoff, caught stealing" style="${flatBtn};border:none;border-radius:0;flex-direction:column;gap:1px;border-bottom:3px solid ${T.safe}"><span style="display:flex;align-items:center;gap:5px"><span style="color:${T.safe};font-size:15px;line-height:1">&#9826;</span>Base run</span><span style="color:${T.sage};font-weight:600;font-size:10px;text-transform:none;letter-spacing:0">steal · WP/PB</span></button>
-        <button data-act="hbp" style="${flatBtn};border:none;border-radius:0"><span style="color:${T.sage}">${ICN.hbp}</span>HBP</button>
+        ${_cp?"":`<button data-act="hbp" style="${flatBtn};border:none;border-radius:0"><span style="color:${T.sage}">${ICN.hbp}</span>HBP</button>`}
         <button data-act="endinning" style="${flatBtn};border:none;border-radius:0;flex-direction:column;gap:1px"><span style="display:flex;align-items:center;gap:5px"><span style="color:${T.amber}">${ICN.inning}</span>End inn</span><span style="color:${T.sage};font-weight:600;font-size:10px;text-transform:none;letter-spacing:0">${halfLabel} · ${G.outs} out${G.outs===1?"":"s"}</span></button></div>`;
   }
   if(mode==="locate"){
@@ -5955,7 +5971,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v295";
+var APP_VERSION="v296";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
