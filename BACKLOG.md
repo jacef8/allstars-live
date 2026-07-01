@@ -218,7 +218,25 @@ Status: [ ] todo · [~] in progress · [x] done. Grouped by theme; recurring/met
       - **Write-guard every action:** before each scoring write, verify `activeUid==me`; if not, STOP and
         flip to read-only with a toast. Stops the demoted device double-writing during the tug-of-war.
       - **Clear demotion banner** on the device that lost it: "Someone took over scoring — you're watching now."
+      - **A KEEPS CONTROL — no hostile takeover (jford asked 2026-06-30 "what if A doesn't want to give up?"):**
+        take-over is NOT unconditional last-claim-wins. Rules:
+        · **SAME account, 2nd device** → instant seamless hand-off (it's the same person; no prompt).
+        · **DIFFERENT account** → B can only REQUEST → A gets "**Keep scoring** / Let them take over." A stays
+          active unless A approves. If A does nothing, B stays read-only (can't score).
+        · **A is STALE** (no heartbeat ~30–45s = app closed/crashed/no signal) → B may force-take-over so a dead
+          scorer can't lock the game forever.
+        Distinguish same-vs-different account via the signed-in uid on the live doc's `activeUid`.
       Relates to [[allstars-cross-device-live-game]], [[allstars-live-access-control]]. Requires signed-in scorer.
+
+## S. Native camera setup page is unreachable (NEW 2026-06-30, jford)
+- [ ] S1. In the native app's "Camera & stream setup" (`SrtIngestScreen`, opened via `AppUi.setShowVideo`),
+      the real SETUP/instructions panel (`showSetup`) is hidden behind a **long-press anywhere** (MainActivity
+      ~line 165, "admin-only"). In device-camera ("allInOne") mode the screen AUTO-STARTS the camera preview
+      and shows NO visible Setup button (CameraStatus's "Setup" button only renders when NOT playing + a YT
+      channel is set), so the operator is stuck on the camera view with no way to reach setup except the
+      undiscoverable long-press. FIX (native, needs APK rebuild): add a VISIBLE "Setup"/gear button on the
+      camera view (always), so setup is reachable without the long-press. jford hit this trying to see the
+      setup instructions. (For the Osmo 360 + Mimo workflow this screen isn't needed anyway — see [[allstars-watch-with-scorebug]] N1.)
 
 ## L. Share-access landing + clarity (NEW 2026-06-30, jford: "lots of issues sharing access")
 - [x] L0. Share > Text dropped the link on iPhone (sms:?body= → iOS needs &body=). Fixed v277: prefer

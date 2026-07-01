@@ -618,6 +618,7 @@ window.edTeamName=function(v){const t=teamById(openTeamId);if(!t)return;t.name=(
 window.edTeamAbbr=function(v){const t=teamById(openTeamId);if(!t)return;t.short=(v||"").toUpperCase().slice(0,6)||"TM";saveDB();};
 window.edTeamRulesUrl=function(v){const t=teamById(openTeamId);if(!t)return;t.rulesUrl=(v||"").trim()||undefined;saveDB();};
 window.edTeamColor=function(v){const t=teamById(openTeamId);if(!t||!v)return;t.color=v;saveDB();render();};
+window.edTeamLeague=function(v){const t=teamById(openTeamId);if(!t)return;t.league=(v||"custom");saveDB();render();};   // team DEFAULT league/rules → every NEW game starts from this
 window.setOppColor=function(v){ if(!v)return; OPP.color=v; try{render();}catch(e){} try{broadcast();}catch(e){} };
 // Upload one or more team photos: downscale each to <=1280px JPEG, push to the cloud gallery.
 window.uploadTeamPhotos=function(input,teamId){ try{ const files=input&&input.files; if(!files||!files.length)return; if(!window.cloudAddPhoto){flash("Sign in to add photos");return;}
@@ -3363,6 +3364,14 @@ function actionArea(){
           <input id="rbName" placeholder="League name" autocomplete="off" style="${cell};flex:1;min-width:120px;font-size:13px">
           <input id="rbUrl" placeholder="https://… rules link" type="url" inputmode="url" autocapitalize="off" style="${cell};flex:1.4;min-width:140px;font-size:13px">
           <button data-act="addrulebook" style="background:${T.surface2};color:${T.lime};border:2px solid ${T.line};border-radius:8px;padding:9px 16px;font-weight:800;font-size:13px">Add</button></div></div>`;
+    // Team DEFAULT game rules (J2): pick the league once → every new game for this team starts with those
+    // rule numbers (innings / run cap / mercy / pitch limit). Still overridable per game in New Game setup.
+    const _tl=leagueById(t.league||"custom");
+    const leagueDefaultSection=`<div class="frost-card" style="background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:14px 16px">
+        <div style="font-size:13.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin-bottom:4px">Default game rules</div>
+        <div style="font-size:11px;color:${T.sageDim};margin-bottom:9px;line-height:1.45">Pick this team's league once — <b style="color:${T.sage}">every new game starts with these rules</b> (innings, run cap, mercy, pitch limit). You can still change them for a single game in New Game setup.</div>
+        <select onchange="edTeamLeague(this.value)" style="width:100%;max-width:340px;background:${T.surface2};border:2px solid ${T.line};color:${T.ink};border-radius:10px;padding:12px;font-family:${MONO};font-size:15px;font-weight:800;outline:none">${LEAGUES.map(l=>`<option value="${l.id}"${(t.league||"custom")===l.id?" selected":""}>${(l.name||"").replace(/</g,"&lt;")}</option>`).join("")}</select>
+        <div style="font-size:12px;color:${T.sage};margin-top:8px;line-height:1.4">${_tl.note}</div></div>`;
     // Team access (cloud) — owner + authorized scorers. Only when signed in.
     const C=window.Cloud, signedIn=!!(C&&C.enabled&&C.user);
     const owner=signedIn && typeof window.cloudIsOwner==="function" && window.cloudIsOwner(t);
@@ -3538,7 +3547,7 @@ function actionArea(){
             return `<button data-act="${act}" data-arg="${t.id}" style="background:${T.surface};border:2px solid ${T.lime};color:${T.ink};border-radius:13px;padding:14px 18px;display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;cursor:pointer">
               <span style="display:flex;align-items:center;gap:10px;min-width:0"><span style="width:10px;height:10px;border-radius:50%;flex:none;background:#E11D2E;box-shadow:0 0 7px #E11D2E"></span><span style="font-weight:800;font-size:16px">View current game</span></span>
               <span style="font-family:${MONO};font-weight:800;font-size:13.5px;color:${T.sage};white-space:nowrap">${_le(s.a||"")} ${s.as|0}–${s.hs|0} ${_le(s.h||"")} · ${cta}</span></button>`; })():"");
-      return secWrap(`${secHdr("Team management")}${mgmtLiveBtn}${detailsBlock}${rulebookSection}${scorersSection}${membersSection}${discoverySection}${seasonSection}`);
+      return secWrap(`${secHdr("Team management")}${mgmtLiveBtn}${detailsBlock}${rulebookSection}${leagueDefaultSection}${scorersSection}${membersSection}${discoverySection}${seasonSection}`);
     }
     if(teamTab==="schedule") return `<div style="width:100%;max-width:1080px;margin:0 auto;display:flex;flex-direction:column;gap:14px">${secHdr("Schedule")}${scheduleSection}</div>`;
     if(teamTab==="gameview"){
@@ -5259,7 +5268,10 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="apprefresh"){ flash("Refreshing…"); try{ if(navigator.serviceWorker&&navigator.serviceWorker.getRegistrations) navigator.serviceWorker.getRegistrations().then(function(rs){rs.forEach(function(r){try{r.update();}catch(e){}});}); }catch(e){} try{ if(window.cloudSyncTeams)cloudSyncTeams(); }catch(e){} setTimeout(function(){ try{ location.reload(); }catch(e){} }, 500); }
   else if(act==="settings"){mode="settings";render();}
   else if(act==="opencamera"){ try{ if(window.AllStars&&window.AllStars.openVideo)AllStars.openVideo(); }catch(e){} }
-  else if(act==="newgamestart"){newgameFrom="home";resetOpponent();mode="newgame";render();}
+  else if(act==="newgamestart"){newgameFrom="home";resetOpponent();
+    // J2: start a new game from THIS team's default league/rules (still overridable in the setup below).
+    try{ const _t=teamById(curTeamId); if(_t&&_t.league&&!gameActive){ const L=leagueById(_t.league); G.league=L.id; G.innings=L.innings; G.runCap=L.runCap; G.mercy=L.mercy?{r15:L.mercy.r15,r10:L.mercy.r10}:null; G.pitchMax=L.pitch||0; } }catch(e){}
+    mode="newgame";render();}
   else if(act==="gototeams"){mode="teams";render();}
   else if(act==="opent"){openTeamId=arg;teamTab="hub";openTeamFrom=(mode==="home"?"home":"teams");mode="team";render();}
   else if(act==="teamtab"){teamTab=arg;render();}
@@ -5908,7 +5920,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v286";
+var APP_VERSION="v287";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
