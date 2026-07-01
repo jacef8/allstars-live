@@ -3219,7 +3219,7 @@ function actionArea(){
           </div>
         </div>`;
     }
-    return `<div style="position:relative;min-height:100%;display:flex;flex-direction:column;justify-content:safe center;gap:14px;padding:6px 0">${authTopChip}${settingsGear}${hero}${resumeBtn}${liveRows}${newGameBtn}${showTeams?`<div style="flex:none">${teamsBlock}</div>`:""}${followingBlock?`<div style="flex:none">${followingBlock}</div>`:""}${showTeams?`<div style="flex:none">${manageBtn}</div>`:""}<div style="display:flex;gap:2px;background:${T.line};border:2px solid ${T.line};border-radius:11px;overflow:hidden">${shareBtnHome}${shareAppBtn}</div>${authBar}</div>`;
+    return `<div style="position:relative;min-height:100%;display:flex;flex-direction:column;justify-content:safe center;gap:14px;padding:6px 0">${authTopChip}${settingsGear}${hero}${resumeBtn}${liveRows}${newGameBtn}${showTeams?`<div style="flex:none">${teamsBlock}</div>`:""}${followingBlock?`<div style="flex:none">${followingBlock}</div>`:""}${showTeams?`<div style="flex:none">${manageBtn}</div>`:""}<div style="flex:none;display:flex;gap:2px;background:${T.line};border:2px solid ${T.line};border-radius:11px;overflow:hidden">${shareBtnHome}${shareAppBtn}</div>${authBar}</div>`;
   }
   if(mode==="teams"){
     const sorted=DB.teams.slice().sort((a,b)=>(b.fav?1:0)-(a.fav?1:0));
@@ -5950,7 +5950,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v289";
+var APP_VERSION="v290";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;

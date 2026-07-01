@@ -320,6 +320,26 @@ Status: [ ] todo · [~] in progress · [x] done. Grouped by theme; recurring/met
       from the app's own TEAM chat (Firestore). Posting requires the viewer be signed into YouTube in that
       webview. Pairs naturally with the paste-a-YouTube-link monitor work ([[allstars-watch-with-scorebug]]).
 
+## T. Phone score page — empty middle band wastes space (NEW 2026-06-30, jford)
+- [ ] T1. On the PHONE live scorer (idle), the layout (line ~4869) is
+      `statusBar + batterCard + pcLine + <div flex:1 (EMPTY SPACER)> + actionEl + controls` — the empty
+      flex:1 spacer intentionally pushes the scoring buttons to the thumb zone, but it leaves a big blank
+      band in the middle. jford wants that space USED to make the (cramped) scoring buttons BIGGER. FIX:
+      remove/shrink the spacer and let `actionEl` (the pitch/result buttons in `actionArea()`) grow to fill
+      — likely give the button ROWS `flex:1`/taller min-heights so they distribute into the freed space
+      instead of a blank gap. Careful: don't break the wide layouts (they share `actionEl`). Verify buttons
+      one row, no scroll, thumb-reachable. Relates to [[allstars-recurring-ux-rules]] (no oversized buttons —
+      so grow to FILL, don't just inflate).
+
+## Field-map done (v289) + what's LEFT for coach-pitch
+- [x] Field map: last-name display + bump-to-bench drag (no swap/confirm) + Bench row — DONE v289 (see below).
+- [ ] **4-OUTFIELDER + no-balls "coach pitch" SCORING mode is still J1** — jford: "I don't see a way to turn
+      on the 4 outfielder mode which also includes the pitch-tracking differences." Enablement PATH now that
+      J2 shipped: a **"Coach pitch" team TYPE** (extend the league presets / add a flag on `t.league`) that,
+      when active, changes SCORING — no ball button, no walks/HBP, 5-pitch limit (fouls extend), pitch-count-
+      per-hitter, and adds a **4th outfielder** position (`POSLIST` + `FXY` + `POSNUM` get an extra OF; the
+      field map + bench already support >9 via the new bench). Build J1 as the next core-scoring session.
+
 ---
 Done earlier this session: edit/correction ghost-click fix (v185), grid-button sweep (v184),
 window-border consistency (v185–v188), cross-device stale-write protection (v188).
