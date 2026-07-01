@@ -898,15 +898,16 @@ function fieldPlace(ri,pos){ ri=+ri;
    spot, pick another spot, or bench him) — so you control the whole chain, all visible on the field. */
 function fieldMapHtml(){
   const first=n=>(n||"").split(" ")[0];
+  const lastnm=n=>{const p=(n||"").trim().split(/\s+/);return (p.length>1?p[p.length-1]:(p[0]||"")).replace(/</g,"&lt;");};   // LAST name — the clearest ID (rosters are "M Ford")
   const FXY={P:[50,63],C:[50,91],"1B":[79,60],"2B":[62,47],SS:[38,47],"3B":[21,60],LF:[18,27],CF:[50,15],RF:[82,27]};
   const _narrow=window.innerWidth<430;   // phone: smaller spot pills so the infielders don't overlap / run text
   const placing=(fieldHold!=null);
   const spot=(P)=>{ const ri=G.lineup.pos[P], pl=(ri!=null)?ROSTER[ri]:null, sel=(fieldAssign===P), open=(ri==null), xy=FXY[P];
     // While holding a bumped player, every spot is a drop target (open ones glow amber).
     const bd=sel?"#fff":(placing?(open?T.amber:OUR.color):(pl?OUR.color:T.line));
-    return `<button data-act="${placing?"fieldplacepos":"fieldpos"}" data-arg="${P}" data-fieldspot="${P}" ${fieldDisplaced?"disabled":""} style="position:absolute;left:${xy[0]}%;top:${xy[1]}%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:0;background:${sel?OUR.color:"rgba(13,19,32,.92)"};border:2px solid ${bd};border-radius:8px;padding:${_narrow?"2px 4px":"5px 7px"};min-width:${_narrow?"34px":"46px"};max-width:${_narrow?"62px":"84px"};cursor:${pl?"grab":"pointer"};touch-action:none;box-shadow:0 2px 9px rgba(0,0,0,.55);z-index:2;${fieldDisplaced?"opacity:.6":""}">
+    return `<button data-act="${placing?"fieldplacepos":"fieldpos"}" data-arg="${P}" data-fieldspot="${P}" ${pl!=null?`data-fieldri="${ri}"`:""} ${fieldDisplaced?"disabled":""} style="position:absolute;left:${xy[0]}%;top:${xy[1]}%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:0;background:${sel?OUR.color:"rgba(13,19,32,.92)"};border:2px solid ${bd};border-radius:8px;padding:${_narrow?"2px 5px":"5px 8px"};min-width:${_narrow?"40px":"52px"};max-width:${_narrow?"78px":"96px"};cursor:${pl?"grab":"pointer"};touch-action:none;box-shadow:0 2px 9px rgba(0,0,0,.55);z-index:2;${fieldDisplaced?"opacity:.6":""}">
         <span style="font-family:${MONO};font-size:${_narrow?"11px":"14px"};font-weight:800;color:${sel?"#fff":T.lime};line-height:1.05">${P}</span>
-        <span style="font-size:${_narrow?"9px":"11px"};font-weight:700;color:${sel?"#fff":(pl?T.chalk:T.sageDim)};max-width:${_narrow?"56px":"78px"};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.1">${pl?("#"+pl.num+" "+first(pl.name)):"—"}</span></button>`; };
+        <span style="font-size:${_narrow?"10px":"12px"};font-weight:800;color:${sel?"#fff":(pl?T.chalk:T.sageDim)};max-width:${_narrow?"72px":"90px"};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.15">${pl?((pl.num?"#"+pl.num+" ":"")+lastnm(pl.name)):"—"}</span></button>`; };
   const diamond=`<svg viewBox="0 0 300 280" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" style="display:block;position:absolute;inset:0">
       <path d="M150,250 L292,108 Q150,-12 8,108 Z" fill="${T.grass}"/>
       <path d="M150,250 L246,154 Q150,70 54,154 Z" fill="${T.grassLt}" opacity="0.45"/>
@@ -930,10 +931,19 @@ function fieldMapHtml(){
     panel=`<div style="flex:none"><div style="font-size:13px;font-weight:800;color:${T.lime};margin:0 2px 6px">Who plays ${fieldAssign}? — tap a player <span data-act="fieldcancel" style="color:${T.sageDim};font-weight:600;margin-left:6px;cursor:pointer">(cancel)</span></div>
         <div style="display:flex;flex-wrap:wrap;gap:6px;max-height:20vh;overflow-y:auto">${chips}</div></div>`;
   } else {
-    panel=`<div style="flex:none;font-size:12.5px;color:${T.sageDim};text-align:center;padding:6px 8px;border:1px dashed ${T.line};border-radius:9px"><b style="color:${T.lime}">Drag a player to a new spot</b> to move or swap him. Or tap an empty spot, then a player.</div>`;
+    panel=`<div style="flex:none;font-size:12.5px;color:${T.sageDim};text-align:center;padding:6px 8px;border:1px dashed ${T.line};border-radius:9px"><b style="color:${T.lime}">Drag a player onto a spot.</b> Whoever's there drops to the Bench below — drag them back up to any spot. No taps, no confirm.</div>`;
   }
+  // Bench / extra hitters = anyone in the batting order without a fielding position. Drag them up to a spot;
+  // drag a fielder down here to bench him. This replaces the old "where does the bumped player go?" prompt.
+  const bench=(G.lineup.order||[]).filter(ri=>posOfPlayer(ri)==null);
+  const benchRow=`<div style="flex:none">
+      <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.sageDim};margin:2px 2px 5px">Bench / extra hitters${bench.length?" — drag up to a spot":""}</div>
+      <div id="fieldbench" style="display:flex;flex-wrap:wrap;gap:7px;min-height:46px;border:2px dashed ${T.line};border-radius:10px;padding:8px;background:${T.surface2};align-content:flex-start">
+        ${bench.length?bench.map(ri=>{const pl=ROSTER[ri];return `<button data-fieldbench="${ri}" title="Drag up to a position" style="background:${T.surface};border:2px solid ${T.line};color:${T.chalk};border-radius:9px;padding:8px 12px;font-family:${MONO};font-size:14px;font-weight:800;white-space:nowrap;cursor:grab;touch-action:none">${pl.num?"#"+pl.num+" ":""}${(pl.name||"").replace(/</g,"&lt;")}</button>`;}).join(""):`<span style="color:${T.sageDim};font-size:12px;align-self:center;padding:0 4px">Everyone's on the field. Drag a fielder here to bench him (still bats).</span>`}
+      </div></div>`;
   return `<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px">
       <div style="position:relative;width:100%;max-width:400px;margin:0 auto;flex:none"><div id="fieldmap" style="position:relative;width:100%;height:0;padding-bottom:93.33%;border:2px solid ${T.line};border-radius:10px;overflow:hidden">${diamond}${POSLIST.map(spot).join("")}</div></div>
+      ${benchRow}
       ${panel}</div>`;
 }
 /* Opponent field map (parity with our field map): tap a position, tap a hitter to place him there.
@@ -4433,47 +4443,42 @@ function setupLineupDrag(){
     });
   });
 }
-/* Field map drag-and-drop: drag a player icon onto another spot to MOVE him there (if it's empty) or
-   SWAP the two players (if it's taken). Positions only — each keeps his batting slot. A short flag
-   suppresses the tap-to-assign click that the same pointer-up would otherwise fire. */
+/* Field map drag-and-drop (BUMP-to-bench model, no confirm): drag any player — a fielder OR a bench chip —
+   onto a spot. `fieldPlace` puts him there, vacates his old spot, and whoever was there drops to the Bench
+   (no prompt). Drag a fielder onto the Bench to bench him. A short flag suppresses the tap that the same
+   pointer-up would otherwise fire. */
 let _fieldJustDragged=0;
-function fieldSwap(fromP,toP){
-  if(fromP===toP)return;
-  const a=G.lineup.pos[fromP]; if(a==null)return;     // nothing to move
-  const b=G.lineup.pos[toP];
-  if(b!=null){ G.lineup.pos[fromP]=b; logLineup(_pname(a)+" ⇄ "+_pname(b)); }   // swap the two gloves
-  else { delete G.lineup.pos[fromP]; logLineup(_pname(a)+" → "+toP); }            // move into the open spot
-  G.lineup.pos[toP]=a;
-}
 function setupFieldDrag(){
-  const wrap=document.getElementById("fieldmap"); if(!wrap)return;
-  const target=(x,y)=>{ const el=document.elementFromPoint(x,y); return el?el.closest('[data-fieldspot]'):null; };
-  wrap.querySelectorAll('[data-fieldspot]').forEach(btn=>{
-    btn.addEventListener('pointerdown',e=>{
-      const fromP=btn.getAttribute('data-fieldspot');
-      if(G.lineup.pos[fromP]==null) return;            // empty spot → let tap-to-assign handle it
+  const wrap=document.getElementById("fieldmap"); const bench=document.getElementById("fieldbench");
+  if(!wrap)return;
+  const target=(x,y)=>{ const el=document.elementFromPoint(x,y); if(!el)return null; return el.closest('[data-fieldspot]')||(bench&&bench.contains(el)?bench:null); };
+  const clear=()=>{ wrap.querySelectorAll('[data-fieldspot]').forEach(s=>{ s.style.outline=''; }); if(bench)bench.style.outline=''; };
+  const bind=(el,ri)=>{
+    el.addEventListener('pointerdown',e=>{
       e.preventDefault();
       const sx=e.clientX, sy=e.clientY; let dragging=false, ghost=null;
-      const clear=()=>wrap.querySelectorAll('[data-fieldspot]').forEach(s=>{ s.style.outline=''; });
       const move=ev=>{
         if(!dragging && Math.hypot(ev.clientX-sx,ev.clientY-sy)<6) return;
-        if(!dragging){ dragging=true; btn.style.opacity='0.3';
-          ghost=btn.cloneNode(true); Object.assign(ghost.style,{position:'fixed',zIndex:'9999',pointerEvents:'none',margin:'0',left:ev.clientX+'px',top:ev.clientY+'px',transform:'translate(-50%,-50%) scale(1.08)',boxShadow:'0 10px 24px rgba(0,0,0,.6)'}); document.body.appendChild(ghost); }
+        if(!dragging){ dragging=true; el.style.opacity='0.3';
+          ghost=el.cloneNode(true); Object.assign(ghost.style,{position:'fixed',zIndex:'9999',pointerEvents:'none',margin:'0',left:ev.clientX+'px',top:ev.clientY+'px',transform:'translate(-50%,-50%) scale(1.08)',boxShadow:'0 10px 24px rgba(0,0,0,.6)'}); document.body.appendChild(ghost); }
         ghost.style.left=ev.clientX+'px'; ghost.style.top=ev.clientY+'px';
-        clear(); const t=target(ev.clientX,ev.clientY); if(t&&t!==btn) t.style.outline='3px solid '+T.amber;
+        clear(); const t=target(ev.clientX,ev.clientY); if(t&&t!==el) t.style.outline='3px solid '+T.amber;
       };
       const up=ev=>{
         window.removeEventListener('pointermove',move); window.removeEventListener('pointerup',up);
-        if(ghost)ghost.remove(); clear(); btn.style.opacity='';
+        if(ghost)ghost.remove(); clear(); el.style.opacity='';
         if(dragging){ _fieldJustDragged=Date.now();
           const t=target(ev.clientX,ev.clientY);
-          if(t){ const toP=t.getAttribute('data-fieldspot'); if(toP&&toP!==fromP){ fieldSwap(fromP,toP); render(); broadcast(); return; } }
-          render();   // dropped on nothing / itself — just repaint (cancels the pending tap)
+          if(t===bench){ const old=posOfPlayer(ri); if(old){ delete G.lineup.pos[old]; logLineup(_pname(ri)+" → bench"); render(); broadcast(); return; } render(); return; }
+          if(t && t.getAttribute && t.getAttribute('data-fieldspot')){ const toP=t.getAttribute('data-fieldspot'); if(posOfPlayer(ri)!==toP){ fieldPlace(ri,toP); render(); broadcast(); return; } }
+          render();   // dropped on nothing / itself — repaint (cancels the pending tap)
         }
       };
       window.addEventListener('pointermove',move); window.addEventListener('pointerup',up);
     });
-  });
+  };
+  wrap.querySelectorAll('[data-fieldri]').forEach(el=>bind(el, +el.getAttribute('data-fieldri')));
+  if(bench) bench.querySelectorAll('[data-fieldbench]').forEach(el=>bind(el, +el.getAttribute('data-fieldbench')));
 }
 /* Same drag, for the OPPONENT batting order (commits a reordered G.oppLineup). */
 function setupOppDrag(){
@@ -5945,7 +5950,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v288";
+var APP_VERSION="v289";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;

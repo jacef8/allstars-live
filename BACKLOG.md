@@ -292,7 +292,7 @@ Status: [ ] todo · [~] in progress · [x] done. Grouped by theme; recurring/met
       gating — verify it doesn't break the app's own streaming path.
 
 ## O. Day / Night mode toggle (NEW 2026-06-30, jford — daytime/sunlight readability)
-- [ ] O1. Settings toggle (al-day-mode). DAY = light backgrounds + DARK text; jford wants EVERYTHING light
+- [x] O1 (v288). Settings toggle (al-day-mode). DAY = light backgrounds + DARK text; jford wants EVERYTHING light
       incl. the video monitor + on-air scorebug (confirmed). Approach: make `T` swappable (dark/light
       palettes) + `applyTheme()` re-render; ICN is fine (icons use `currentColor`). ⚠️ HARD PART — the `T`
       keys are OVERLOADED: `T.line` = white BORDERS *and* white TEXT on red/colored buttons; `T.sage` = white
