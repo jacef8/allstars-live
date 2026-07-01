@@ -1092,7 +1092,7 @@ window.ngOppBatters=function(v){const n=parseInt(v,10); G.oppBatters=(isNaN(n)||
 const LEAGUES=[
   {id:"custom",  name:"Custom (set manually)", innings:6, runCap:0, mercy:null,          pitch:0,  note:"Set every rule yourself · no run cap unless you set one."},
   {id:"dyb-tb",  name:"DYB Tee Ball",          innings:4, runCap:5, mercy:null,          pitch:0,  note:"Tee/coach pitch · no pitch limits."},
-  {id:"dyb-cp",  name:"DYB 6U/8U Coach Pitch", innings:6, runCap:5, mercy:{r15:3,r10:4}, pitch:0,  note:"Coaches pitch · 15-run after 3, 10-run after 4 innings."},
+  {id:"dyb-cp",  name:"DYB 6U/8U Coach Pitch", innings:6, runCap:7, mercy:{r15:3,r10:4}, pitch:0,  note:"Coaches pitch · 7 runs/half-inning · 15-run after 3, 10-run after 4 innings."},
   {id:"dyb-a",   name:"DYB A / AA",            innings:6, runCap:7, mercy:{r15:3,r10:4}, pitch:75, note:"6 inn · 15-after-3 / 10-after-4 · opt. 7 runs/half · 75 pitches/day (≤10U)."},
   {id:"dyb-aaa", name:"DYB AAA (10U)",         innings:6, runCap:0, mercy:{r15:3,r10:4}, pitch:75, note:"6 inn · 15-after-3 / 10-after-4 · opt. 10 runs/half · 75 pitches/day."},
   {id:"dyb-maj", name:"DYB Majors (12U)",      innings:6, runCap:0, mercy:{r15:3,r10:4}, pitch:85, note:"6 inn · 15-after-3 / 10-after-4 · opt. 10 runs/half · 85 pitches/day (11-12U)."},
@@ -5950,7 +5950,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v290";
+var APP_VERSION="v291";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
