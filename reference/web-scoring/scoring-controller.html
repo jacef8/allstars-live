@@ -2862,12 +2862,18 @@ function syncNotifTopics(){ try{
   have.filter(x=>want.indexOf(x)<0).forEach(function(tp){ try{ window.AllStars.unsubscribeTopic(tp); }catch(e){} });
   try{ localStorage.setItem("al-notif-topics",JSON.stringify(want)); }catch(e){}
 }catch(e){} }
-function getRecentOpps(){ try{ return JSON.parse(localStorage.getItem("al-recent-opps")||"[]"); }catch(e){ return []; } }
+// Recent opponents are scoped PER TEAM (keyed by your team's id) so a game you set up for one team never
+// suggests opponents you only played with a DIFFERENT team/division — e.g. an AAA opponent won't show when
+// you're starting an AA game. Storage: al-recent-opps-v2 = { <yourTeamId>: [{name,short,color}], … }.
+// (Old flat al-recent-opps is intentionally dropped — the per-team schedule reseed rebuilds each team's list
+//  correctly-scoped on every opponent pick, so nothing legit is lost.)
+function _recentOppMap(){ try{ const m=JSON.parse(localStorage.getItem("al-recent-opps-v2")||"{}"); return (m&&typeof m==="object"&&!Array.isArray(m))?m:{}; }catch(e){ return {}; } }
+function getRecentOpps(teamId){ if(!teamId)return []; const m=_recentOppMap(); const r=m[teamId]; return Array.isArray(r)?r:[]; }
 /* Per-device "last seen this team's chat" stamps → home unread badge (t.lastMsgAt is cloud-set). */
 function getSeenChat(){ try{ return JSON.parse(localStorage.getItem("al-chat-seen")||"{}"); }catch(e){ return {}; } }
 function markSeenChat(id){ if(!id)return; try{ const s=getSeenChat(); s[id]=Date.now(); localStorage.setItem("al-chat-seen",JSON.stringify(s)); }catch(e){} }
 function teamHasUnread(t){ try{ if(!t||!t.lastMsgAt)return false; return (getSeenChat()[t.id]||0) < (t.lastMsgAt-4000); }catch(e){ return false; } }  // 4s grace: never badge your own just-sent message (same-device clock skew)
-function recordRecentOpp(o){ if(!o||!o.name||o.name==="Opponent")return; try{ let r=getRecentOpps().filter(x=>x.name!==o.name); r.unshift({name:o.name,short:o.short||"",color:o.color||"#E11D2E"}); localStorage.setItem("al-recent-opps",JSON.stringify(r.slice(0,12))); }catch(e){} }
+function recordRecentOpp(o,teamId){ if(!o||!o.name||o.name==="Opponent"||!teamId)return; try{ const m=_recentOppMap(); let r=(Array.isArray(m[teamId])?m[teamId]:[]).filter(x=>x.name!==o.name); r.unshift({name:o.name,short:o.short||"",color:o.color||"#E11D2E"}); m[teamId]=r.slice(0,12); localStorage.setItem("al-recent-opps-v2",JSON.stringify(m)); }catch(e){} }
 /* Reusable list of places you've scheduled at (for the schedule form's location autocomplete). */
 function getRecentLocs(){ try{ return JSON.parse(localStorage.getItem("al-recent-locs")||"[]"); }catch(e){ return []; } }
 function recordRecentLoc(loc){ loc=(loc||"").trim(); if(!loc)return; try{ let r=getRecentLocs().filter(x=>x.toLowerCase()!==loc.toLowerCase()); r.unshift(loc); localStorage.setItem("al-recent-locs",JSON.stringify(r.slice(0,15))); }catch(e){} }
@@ -3380,7 +3386,7 @@ function actionArea(){
     const eq=v=>(v||"").replace(/"/g,"&quot;");
     const eOpp = editing?(editing.opp||""):"";
     const dbOpps=(DB.teams||[]).filter(x=>x.id!==t.id);
-    const recentOpps=getRecentOpps().filter(o=>o.name && !dbOpps.some(x=>x.name===o.name));   // saved-for-reuse opponent names
+    const recentOpps=getRecentOpps(t.id).filter(o=>o.name && !dbOpps.some(x=>x.name===o.name));   // this team's recent opponents only
     const oppNewSel = !!(editing && eOpp && !dbOpps.some(x=>x.name===eOpp) && !recentOpps.some(o=>o.name===eOpp));
     const scheduleEditCard=`<div id="schedEditCard" class="frost-card" style="scroll-margin:80px;background:${T.surface};border:2px solid ${editing?T.lime:T.line};border-radius:14px;padding:16px 18px;display:flex;flex-direction:column;gap:11px">
         <div style="font-size:14px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime}">${editing?"Edit game or practice":"Add a game or practice"}</div>
@@ -3727,7 +3733,7 @@ function actionArea(){
     if(pickFor==="opp"){
       const C2=window.Cloud, canSearch=!!(C2&&C2.enabled&&C2.user);
       const typed=(window._finderQ||"").trim();
-      const recent=getRecentOpps();
+      const recent=getRecentOpps(curTeamId);
       const recentBlock = recent.length ? `<div>
           <div style="font-size:13.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin-bottom:6px">Recent opponents</div>
           <div style="display:flex;flex-wrap:wrap;gap:6px">${recent.map((o,i)=>`<button data-act="setrecentopp" data-arg="${i}" data-recentopp="${(o.name||'').toLowerCase().replace(/"/g,'&quot;')}" style="background:${T.surface};border:2px solid ${T.line};border-left:4px solid ${o.color||T.out};color:${T.ink};border-radius:8px;padding:8px 12px;font-family:${MONO};font-weight:800;font-size:13px">${(o.name||'').replace(/</g,'&lt;')}</button>`).join("")}</div></div>` : "";
@@ -4068,7 +4074,7 @@ function actionArea(){
           ${header}
           <div style="width:100%;max-width:1180px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start">
             <div style="display:flex;flex-direction:column;gap:12px">${teamRow("Your team",OUR.name,OUR.short,OUR.color,"pickour")}${teamRow("Opponent",OPP.name,OPP.short,OPP.color,"pickopp")}<button data-act="editopproster" style="${ghost};border-color:${OPP.color||T.lime};color:${T.ink};display:flex;align-items:center;justify-content:center;gap:8px;width:100%;flex:none;margin-top:-6px">${IC('users',16)} Add / edit ${(OPP.short||"opponent").replace(/</g,"&lt;")} lineup &rsaquo;</button>${sideSel}<div style="display:flex;gap:12px"><div style="flex:1;min-width:0">${runCapCard}</div><div style="flex:1;min-width:0">${hittersCard}</div></div>${startCard}</div>
-            <div style="display:flex;flex-direction:column;gap:12px">${leagueCard}${alertsCard}${pitchCatchCard}${pitchTypeCard}${detailedCard}</div>
+            <div style="display:flex;flex-direction:column;gap:12px">${leagueCard}${rulebookCard}${alertsCard}${pitchCatchCard}${pitchTypeCard}${detailedCard}</div>
           </div>
           <div style="width:100%;max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:10px">${lineupCardBtn}</div>
         </div>`;
@@ -5050,7 +5056,7 @@ document.getElementById("app").addEventListener("click",e=>{
     if(s&&s.opp){ const m=(DB.teams||[]).find(x=>x.id!==t.id && (x.name||"").toLowerCase()===(s.opp||"").toLowerCase());
       if(m){ oppTeamId=m.id; OPP.name=m.name; OPP.short=m.short; OPP.color=m.color; OPP.logo=m.logo||null; }
       else { oppTeamId=null; OPP.name=s.opp; OPP.short=(s.opp||"OPP").slice(0,3).toUpperCase(); OPP.color="#E11D2E"; OPP.logo=null; }
-      try{ recordRecentOpp(OPP); }catch(e){} }
+      try{ recordRecentOpp(OPP,t.id); }catch(e){} }
     resetOppLineup(); mode="newgame"; render(); broadcast(); return; }
   if(act==="ngdatetoggle"){ ngDateOpen=!ngDateOpen; if(ngDateOpen)ngDateYM=null; render(); return; }
   if(act==="ngmonth"){ if(!ngDateYM){const d=new Date();ngDateYM={y:d.getFullYear(),m:d.getMonth()};} let mm=ngDateYM.m+(+arg),yy=ngDateYM.y; while(mm<0){mm+=12;yy--;} while(mm>11){mm-=12;yy++;} ngDateYM={y:yy,m:mm}; render(); return; }
@@ -5059,7 +5065,7 @@ document.getElementById("app").addEventListener("click",e=>{
   if(act==="schedcancel"){ schedEditId=null; ngDateVal=null; ngDateOpen=false; ngDateYM=null; render(); return; }
   if(act==="schedadd"){ const t=teamById(openTeamId); if(!t)return; const g=id=>{const e=document.getElementById(id);return e?(e.value||""):"";}; const date=g("schDate"); if(!date){flash("Pick a date");return;} ngDateVal=null;ngDateOpen=false;ngDateYM=null; const _sel=g("schOppSel"); const opp=(_sel==="__new__"?g("schOppNew"):_sel).trim(); if(!Array.isArray(t.schedule))t.schedule=[];
     const fields={type:g("schType")||"game",date:date,time:g("schTime"),opp:opp,loc:g("schLoc").trim(),notes:g("schNotes").trim()};
-    if(opp)recordRecentOpp({name:opp}); if(fields.loc)recordRecentLoc(fields.loc);   // remember for next time
+    if(opp)recordRecentOpp({name:opp},t.id); if(fields.loc)recordRecentLoc(fields.loc);   // remember for next time (this team only)
     if(schedEditId){ const ex=t.schedule.find(s=>s.id===schedEditId); if(ex)Object.assign(ex,fields); schedEditId=null; saveDB(); try{ if(window.cloudSaveTeam)window.cloudSaveTeam(t); }catch(e){} flash("Schedule updated"); render(); return; }
     const ev=Object.assign({id:"s"+Date.now().toString(36)},fields);
     t.schedule.push(ev); saveDB();
@@ -5385,7 +5391,7 @@ document.getElementById("app").addEventListener("click",e=>{
     // Seed the recent-opponent quick-picks from the team's SCHEDULE (which syncs across devices), so a
     // team you put on the schedule is pickable here even on a different device — recent-opps are local-
     // only, but the schedule isn't. recordRecentOpp dedupes by name. (D2)
-    try{ const _t=curTeam()||teamById(openTeamId); if(_t&&Array.isArray(_t.schedule)){ _t.schedule.slice().reverse().forEach(function(s){ if(s&&s.type!=="practice"&&s.opp) recordRecentOpp({name:s.opp}); }); } }catch(e){}
+    try{ const _t=curTeam()||teamById(openTeamId); if(_t&&Array.isArray(_t.schedule)){ _t.schedule.slice().reverse().forEach(function(s){ if(s&&s.type!=="practice"&&s.opp) recordRecentOpp({name:s.opp},_t.id); }); } }catch(e){}
     mode="pickteam";render();}
   else if(act==="oppcolor"){ OPP.color=arg; render(); broadcast(); }
   else if(act==="findteams"){ const e=document.getElementById("finderQ"); const q=e?(e.value||"").trim():""; window._finderQ=q; if(!window.cloudSearchTeams){flash("Search needs sign-in");return;} flash("Searching…"); window.cloudSearchTeams(q).then(function(res){ finderResults=res||[]; render(); }); }
@@ -5398,12 +5404,12 @@ document.getElementById("app").addEventListener("click",e=>{
       try{ _vtLiveUnsub=window.cloudSubscribeGameDoc(arg+"-live",function(doc){ vtLive=(doc&&!doc.final&&doc.summary&&doc.activeUid)?doc.summary:null; if(mode==="teamstats")render(); }); }catch(e){}
     }); }
   else if(act==="favpublicteam"){ if(!viewTeam)return; const ex=DB.teams.find(x=>x.id===viewTeam.id); if(ex){ DB.teams=DB.teams.filter(x=>x.id!==viewTeam.id); saveDB(); flash("Removed from your home"); } else { const copy=JSON.parse(JSON.stringify(viewTeam)); copy.fav=true; copy.external=true; if(!Array.isArray(copy.players))copy.players=[]; DB.teams.push(copy); saveDB(); flash("Added to your home — watch them from the Home screen"); } render(); }
-  else if(act==="setpubopp"){ const r=finderResults&&finderResults[+arg]; if(r){ oppTeamId=r.id; OPP.name=r.name; OPP.short=r.short||(r.name||"OPP").slice(0,3).toUpperCase(); OPP.color=r.color; OPP.logo=r.logo||null; recordRecentOpp(OPP); } finderResults=null; resetOppLineup(); mode="newgame"; render(); broadcast(); }
-  else if(act==="setrecentopp"){ const o=getRecentOpps()[+arg]; if(o){ oppTeamId=null; OPP.name=o.name; OPP.short=o.short||(o.name||"OPP").slice(0,3).toUpperCase(); OPP.color=o.color||"#E11D2E"; recordRecentOpp(OPP); } resetOppLineup(); mode="newgame"; render(); broadcast(); }
-  else if(act==="setteam"){const id=arg;if(pickFor==="our"){selectTeam(id);if(!gameActive)applyTeamDefaultRules();}else{const t=teamById(id);oppTeamId=id;if(t){OPP.name=t.name;OPP.short=t.short;OPP.color=t.color;OPP.logo=t.logo||null;recordRecentOpp(OPP);}resetOppLineup();}mode="newgame";render();broadcast();}
+  else if(act==="setpubopp"){ const r=finderResults&&finderResults[+arg]; if(r){ oppTeamId=r.id; OPP.name=r.name; OPP.short=r.short||(r.name||"OPP").slice(0,3).toUpperCase(); OPP.color=r.color; OPP.logo=r.logo||null; recordRecentOpp(OPP,curTeamId); } finderResults=null; resetOppLineup(); mode="newgame"; render(); broadcast(); }
+  else if(act==="setrecentopp"){ const o=getRecentOpps(curTeamId)[+arg]; if(o){ oppTeamId=null; OPP.name=o.name; OPP.short=o.short||(o.name||"OPP").slice(0,3).toUpperCase(); OPP.color=o.color||"#E11D2E"; recordRecentOpp(OPP,curTeamId); } resetOppLineup(); mode="newgame"; render(); broadcast(); }
+  else if(act==="setteam"){const id=arg;if(pickFor==="our"){selectTeam(id);if(!gameActive)applyTeamDefaultRules();}else{const t=teamById(id);oppTeamId=id;if(t){OPP.name=t.name;OPP.short=t.short;OPP.color=t.color;OPP.logo=t.logo||null;recordRecentOpp(OPP,curTeamId);}resetOppLineup();}mode="newgame";render();broadcast();}
   else if(act==="newteampick"){const t=newTeam("");if(pickFor==="our"){selectTeam(t.id);}else{oppTeamId=t.id;OPP.name=t.name;OPP.short=t.short;OPP.color=t.color;OPP.logo=null;resetOppLineup();}mode="newgame";render();broadcast();}
   else if(act==="oppnoroster"){oppTeamId=null;OPP.name="Opponent";OPP.short="OPP";OPP.color="#E11D2E";resetOppLineup();mode="newgame";render();broadcast();}
-  else if(act==="oppusetyped"){ const e=document.getElementById("oppNameInput"); const nm=(e?(e.value||""):(window._finderQ||"")).trim(); if(!nm){flash("Type an opponent name first");return;} oppTeamId=null; OPP.name=nm; OPP.short=(nm.replace(/[^A-Za-z0-9]/g,"").slice(0,3).toUpperCase())||"OPP"; OPP.color="#E11D2E"; OPP.logo=null; recordRecentOpp(OPP); finderResults=null; resetOppLineup(); mode="newgame"; render(); broadcast(); }
+  else if(act==="oppusetyped"){ const e=document.getElementById("oppNameInput"); const nm=(e?(e.value||""):(window._finderQ||"")).trim(); if(!nm){flash("Type an opponent name first");return;} oppTeamId=null; OPP.name=nm; OPP.short=(nm.replace(/[^A-Za-z0-9]/g,"").slice(0,3).toUpperCase())||"OPP"; OPP.color="#E11D2E"; OPP.logo=null; recordRecentOpp(OPP,curTeamId); finderResults=null; resetOppLineup(); mode="newgame"; render(); broadcast(); }
   else if(act==="ngback"){mode="newgame";render();}
   else if(act==="ng-side"){G.ourSide=arg;render();broadcast();}
   else if(act==="ng-start")startNewGame();
@@ -5988,7 +5994,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v299";
+var APP_VERSION="v300";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
