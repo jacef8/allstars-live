@@ -5329,7 +5329,7 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="toggleteams"){teamsOpen=!teamsOpen;try{localStorage.setItem("al-teams-open",teamsOpen?"1":"0");}catch(e){}render();}
   else if(act==="togglefollow"){followOpen=!followOpen;try{localStorage.setItem("al-follow-open",followOpen?"1":"0");}catch(e){}render();}
   else if(act==="openplayer"){const i=arg.indexOf(":");openPlayer={teamId:arg.slice(0,i),pid:arg.slice(i+1)};openPlayerFrom=(mode==="team"?"team":"home");playerTab="stats";mode="player";render();}
-  else if(act==="shareplayer"){ const i=arg.indexOf(":"); const tt=teamById(arg.slice(0,i)); const pp=tt&&(tt.players||[]).find(x=>x.id===arg.slice(i+1)); const nm=pp?(("#"+(pp.num||"")+" "+(pp.name||"Player")).trim()):"this player"; openShareLink({ url:appBaseUrl()+"?player="+encodeURIComponent(arg), title:"SHARE PLAYER", sub:"Opens "+nm.replace(/</g,"&lt;")+"&#39;s stats. The team must be Public (Team management &rarr; Discovery) for others to open it." }); }
+  else if(act==="shareplayer"){ const i=arg.indexOf(":"); const tt=teamById(arg.slice(0,i)); const pp=tt&&(tt.players||[]).find(x=>x.id===arg.slice(i+1)); const nm=pp?(("#"+(pp.num||"")+" "+(pp.name||"Player")).trim()):"this player"; const pn=pp?(pp.name||"this player"):"this player"; const tnm=tt?(tt.name||"the team"):"the team"; openShareLink({ url:appBaseUrl()+"?player="+encodeURIComponent(arg), title:"SHARE PLAYER", sub:"Opens "+nm.replace(/</g,"&lt;")+"&#39;s stats. The team must be Public (Team management &rarr; Discovery) for others to open it.", subject:pn+"'s stats on All-Stars Live", body:"See "+nm+" ("+tnm+") on All-Stars Live, a free youth-baseball app — batting & pitching stats, game log, and schedule. Tap to view:" }); }
   else if(act==="playerback"){mode=(openPlayerFrom==="team"?"team":"home");if(mode==="team")teamTab="roster";render();}
   else if(act==="playertab"){playerTab=(arg==="schedule"?"schedule":"stats");render();}
   else if(act==="followplayer"){const i=arg.indexOf(":");toggleFollowPlayer(arg.slice(0,i),arg.slice(i+1));render();}
@@ -5988,7 +5988,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v298";
+var APP_VERSION="v299";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
