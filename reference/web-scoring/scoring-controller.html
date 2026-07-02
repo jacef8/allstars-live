@@ -2983,7 +2983,13 @@ window._acBlur=function(){ setTimeout(_ddClose, 160); };
 (function(){ try{
   const bd=document.getElementById("ddBackdrop"); if(bd)bd.addEventListener("click",_ddClose);
   window.addEventListener("resize",_ddClose,{passive:true});
-  document.addEventListener("scroll",function(){ const p=document.getElementById("ddPop"); if(p&&p.style.display==="block")_ddClose(); },true);
+  // Capture phase because "scroll" doesn't bubble — but that also fires for scrolling INSIDE the menu
+  // itself (#ddMenu is its own overflow-y:auto list, e.g. the position picker's P/C/1B/…/LF/CF/RF options
+  // run past one screenful). Ignore those — only close when the scroll target is OUTSIDE the popup, i.e.
+  // the page underneath moved. Was unconditionally closing on ANY scroll, so scrolling the menu itself to
+  // reach the lower options closed it instantly — reported as "the list disappears" / can't reach LF/CF/RF. (v312)
+  document.addEventListener("scroll",function(e){ const p=document.getElementById("ddPop"); if(!p||p.style.display!=="block")return;
+    const t=e.target; if(t&&t.nodeType===1&&p.contains(t))return; _ddClose(); },true);
 }catch(e){} })();
 
 /* Recent opponents — remembered locally so the opponent picker can offer quick re-picks. */
@@ -4741,32 +4747,41 @@ function setupOppDrag(){
   });
 }
 /* ---- drag-to-reorder a SAVED lineup in the builder (teamTab==="lineupedit") ---- */
+// Same pointer-capture pattern as setupFieldDrag/setupLineupDrag (v311/v312) — element-scoped listeners +
+// setPointerCapture + pointercancel handling, NOT window listeners. The old window-listener version had
+// the identical leak: a cancelled touch near the handle left pointermove attached to window forever,
+// which then hijacked later scroll attempts anywhere on this list.
 function setupBuilderDrag(){
   const list=document.getElementById("lu-list"); if(!list)return;
   list.querySelectorAll('[data-ludrag]').forEach(handle=>{
     handle.addEventListener('pointerdown',e=>{
       e.preventDefault();
       const row=handle.closest('[data-lurow]'); if(!row)return;
-      row.style.opacity='0.55'; row.style.boxShadow='0 6px 16px rgba(15,30,60,.25)';
-      document.body.style.userSelect='none';
+      try{ handle.setPointerCapture(e.pointerId); }catch(_){}
+      const sy=e.clientY; let dragging=false;
       const move=ev=>{
+        if(!dragging){ if(Math.abs(ev.clientY-sy)<5)return; dragging=true;
+          row.style.opacity='0.55'; row.style.boxShadow='0 6px 16px rgba(15,30,60,.25)'; document.body.style.userSelect='none'; }
         const rows=[...list.querySelectorAll('[data-lurow]')];
         for(const r of rows){ if(r===row)continue;
           const b=r.getBoundingClientRect();
           if(ev.clientY < b.top + b.height/2){ list.insertBefore(row,r); return; } }
         list.appendChild(row);
       };
-      const up=()=>{
-        window.removeEventListener('pointermove',move);
-        window.removeEventListener('pointerup',up);
+      const up=ev=>{
+        handle.removeEventListener('pointermove',move);
+        handle.removeEventListener('pointerup',up);
+        handle.removeEventListener('pointercancel',up);
+        try{ handle.releasePointerCapture(ev.pointerId); }catch(_){}
         document.body.style.userSelect='';
         row.style.opacity=''; row.style.boxShadow='';
-        const t=teamById(openTeamId), lu=t&&lineupById(t,editLineupId);
-        if(lu){ lu.order=[...list.querySelectorAll('[data-lurow]')].map(r=>r.dataset.id); saveDB(); }
-        render();
+        if(dragging){ const t=teamById(openTeamId), lu=t&&lineupById(t,editLineupId);
+          if(lu){ lu.order=[...list.querySelectorAll('[data-lurow]')].map(r=>r.dataset.id); saveDB(); }
+          render(); }
       };
-      window.addEventListener('pointermove',move);
-      window.addEventListener('pointerup',up);
+      handle.addEventListener('pointermove',move);
+      handle.addEventListener('pointerup',up);
+      handle.addEventListener('pointercancel',up);
     });
   });
 }
@@ -6201,7 +6216,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v311";
+var APP_VERSION="v312";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
