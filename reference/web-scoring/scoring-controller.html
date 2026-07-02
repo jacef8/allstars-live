@@ -1736,16 +1736,8 @@ function otherLiveGames(){ return (DB.teams||[]).filter(function(t){
   return true; }).map(function(t){ return {team:t, live:_liveGames[t.id]}; }); }
 let _seq=0,_event=null,_eventId=0,_pitch=null;
 // B4: after a strikeout, a quick (skippable) prompt to tag it looking vs swinging. koPick holds the
-// feed entry id to update; any next pitch clears it, so it never slows scoring down.
-function koPrompt(){
-  const btn=`background:${T.surface2};border:2px solid ${T.line};color:${T.chalk};border-radius:999px;padding:8px 14px;font-family:${SANS};font-size:13px;font-weight:800;white-space:nowrap`;
-  return `<div style="position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 86px);transform:translateX(-50%);z-index:30;display:flex;align-items:center;gap:7px;background:#0B0E13;border:2px solid ${T.lime};border-radius:999px;padding:6px 7px 6px 13px;box-shadow:0 8px 26px rgba(0,0,0,.6)">
-      <span style="font-family:${MONO};font-size:11px;font-weight:800;letter-spacing:.6px;color:${T.lime}">STRIKEOUT —</span>
-      <button data-act="kotype" data-arg="looking" style="${btn}">Looking</button>
-      <button data-act="kotype" data-arg="swinging" style="${btn}">Swinging</button>
-      <button data-act="koskip" title="skip" style="background:transparent;border:none;color:${T.sageDim};font-size:20px;font-weight:800;padding:2px 9px;line-height:1;cursor:pointer">&times;</button>
-    </div>`;
-}
+// feed entry id to update; any next pitch clears it, so it never slows scoring down. (Swapped into the
+// pitch-buttons grid itself since v321 — see koActive/koBanner/pitchGrid in the mode==="idle" render.)
 let phonePane="score";   // phone-only paging: "score" | "video" (large screens show both)
 let summaryTeam="us";    // end-game box score: which team's batting/pitching to show ("us" | "opp")
 let monitorOn=(()=>{try{ const p=new URLSearchParams(location.search); if(p.get("feed")==="1") return false; if(p.get("yt")) return true; return localStorage.getItem("al-monitor-on")!=="0";}catch(e){return true;}})();  // wide: video shown/hidden; shared ?feed=1 opens feed-only
@@ -2681,7 +2673,9 @@ function fieldOverlays(){
   const aH=sideHits("away"),hH=sideHits("home");
   const aE=(G.errors&&G.errors.away)||0,hE=(G.errors&&G.errors.home)||0;
   const box=`position:absolute;z-index:4;background:rgba(9,13,19,.74);border:2px solid ${T.line};border-radius:11px;box-shadow:0 3px 12px rgba(0,0,0,.45)`;
-  const pcChip=`<div style="${box};bottom:8px;left:8px;padding:5px 11px 5px 9px;display:flex;align-items:center;gap:9px;line-height:1">
+  // Coach pitch already shows its own per-batter "PITCH N OF 5" tag — a running TOTAL game pitch count
+  // for "the pitcher" isn't meaningful there (the coach is pitching, not a tracked player). (v321)
+  const pcChip=cpMode()?"":`<div style="${box};bottom:8px;left:8px;padding:5px 11px 5px 9px;display:flex;align-items:center;gap:9px;line-height:1">
       <div style="font-family:${MONO};font-size:23px;font-weight:800;color:${T.amber}">${pc}</div>
       <div style="display:flex;flex-direction:column;gap:2px;min-width:0">
         <div style="font-size:9px;font-weight:800;letter-spacing:1.2px;color:${T.sageDim}">PITCHES</div>
@@ -4514,9 +4508,19 @@ function actionArea(){
     const onBase=[1,2,3].some(b=>G.bases&&G.bases[b]);   // base-running events need a runner aboard
     const _cp=cpMode();   // coach pitch: no Ball / no HBP; show "pitch N of 5"
     const cpTag=_cp?`<div style="display:flex;align-items:center;justify-content:center;gap:8px;background:${T.surface2};border:2px solid ${T.line};border-radius:9px;padding:6px 10px;font-family:${MONO};font-weight:800;font-size:13px;color:${T.amber};letter-spacing:.5px">COACH PITCH · PITCH ${(G.abPitches||0)+1} OF 5<span style="color:${T.sageDim};font-weight:600;font-size:11px;letter-spacing:0">fouls extend</span></div>`:"";
-    return `${cpTag}${ptypeRow}
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:2px;background:${T.line};border:2px solid ${T.line};border-radius:12px;overflow:hidden">
-        ${pitchBtn("ball","Ball",ICN.ball)}${pitchBtn("strike","Strike",ICN.strike)}${pitchBtn("foul","Foul",ICN.foul)}${pitchBtn("inplay","In Play",ICN.inplay,true)}</div>
+    // Strikeout looking/swinging tag (B4): used to float as its own pill at the bottom of the screen,
+    // easy to miss and overlapping other content. jford: swap it INTO the pitch-buttons window itself —
+    // Ball/Strike/Foul/In Play give way to Looking/Swinging the moment a 3rd strike is recorded, then
+    // swap back (any next pitch, or the × skip, clears koPick and restores the normal 4 buttons). (v321)
+    const koActive=(koPick!=null&&viewMode==="scorer");
+    const koBanner=koActive?`<div style="display:flex;align-items:center;justify-content:center;gap:6px;font-family:${MONO};font-size:12px;font-weight:800;letter-spacing:.6px;color:${T.lime}">STRIKEOUT — LOOKING OR SWINGING?</div>`:"";
+    const koBtn=(arg,label)=>`<button data-act="kotype" data-arg="${arg}" style="background:${T.surface};border:none;border-radius:0;color:${T.chalk};padding:14px 4px;font-family:${SANS};font-size:15px;font-weight:800;letter-spacing:.3px;text-transform:uppercase">${label}</button>`;
+    const pitchGrid=koActive
+      ? `<div style="display:grid;grid-template-columns:1fr 1fr 52px;gap:2px;background:${T.line};border:2px solid ${T.lime};border-radius:12px;overflow:hidden">${koBtn("looking","Looking")}${koBtn("swinging","Swinging")}<button data-act="koskip" title="Skip — back to Ball/Strike/Foul/In Play" style="background:${T.surface};border:none;border-radius:0;color:${T.sageDim};font-size:20px;font-weight:800;display:flex;align-items:center;justify-content:center">&times;</button></div>`
+      : `<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:2px;background:${T.line};border:2px solid ${T.line};border-radius:12px;overflow:hidden">
+        ${pitchBtn("ball","Ball",ICN.ball)}${pitchBtn("strike","Strike",ICN.strike)}${pitchBtn("foul","Foul",ICN.foul)}${pitchBtn("inplay","In Play",ICN.inplay,true)}</div>`;
+    return `${cpTag}${koBanner}${ptypeRow}
+      ${pitchGrid}
       ${(()=>{
         // Base-running (steal/WP/PB/balk/pickoff) stays on the wide (tablet/PC) layout, which has the
         // room for it — dropped on phone specifically (jford: "page does not need a baserunning button"
@@ -5092,8 +5096,9 @@ function render(){
     const fieldBig=`<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px">
         ${miniCount()}${batterCard()}
         <div style="flex:1;min-height:0;display:flex;align-items:center;justify-content:center;position:relative">${diamondSVG()}${toastEl}</div></div>`;
-    // Thumbnail field: pitch count sits in the empty space to the LEFT (out of the field box).
-    const pcSide=`<div style="flex:none;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(9,13,19,.6);border:2px solid ${T.line};border-radius:11px;padding:8px 14px;line-height:1">
+    // Thumbnail field: pitch count sits in the empty space to the LEFT (out of the field box). Hidden
+    // in coach pitch — no meaningful total-game pitch count for "the pitcher" there. (v321)
+    const pcSide=cpMode()?"":`<div style="flex:none;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(9,13,19,.6);border:2px solid ${T.line};border-radius:11px;padding:8px 14px;line-height:1">
         <div style="font-family:${MONO};font-size:30px;font-weight:800;color:${T.amber}">${currentPitchCount()}</div>
         <div style="font-size:9px;font-weight:800;letter-spacing:1.4px;color:${T.sageDim};margin-top:3px">PITCHES</div>
         <div style="font-size:11px;font-weight:600;color:${T.sage};max-width:130px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${currentPitcherName()}</div></div>`;
@@ -5148,7 +5153,9 @@ function render(){
     // for locate/runners (focusPlay).
     const pitchTeam=fielding()?(OUR.short||"US"):(OPP.short||"OPP");
     const pitchClr=fielding()?OUR.color:OPP.color;
-    const pcLine=`<div style="flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px;background:${T.surface};border:2px solid ${T.line};border-radius:10px;padding:11px 16px">
+    // Hidden in coach pitch — no meaningful total-game pitch count for "the pitcher" there (the coach
+    // is pitching, and the per-batter "PITCH N OF 5" tag already covers it). (v321)
+    const pcLine=cpMode()?"":`<div style="flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px;background:${T.surface};border:2px solid ${T.line};border-radius:10px;padding:11px 16px">
         <div style="display:flex;align-items:baseline;gap:9px;flex:none">
           <span style="font-family:${MONO};font-size:32px;font-weight:800;color:${T.amber};line-height:1">${currentPitchCount()}</span>
           <span style="font-size:14px;font-weight:800;letter-spacing:1.2px;color:${T.sageDim}">PITCHES</span></div>
@@ -5182,7 +5189,6 @@ function render(){
     ${watchVidOpen?watchVidModal():""}
     ${(pickerModal&&wide)?`<div style="${sheetWrap}">
         <div id="action-area" style="${sheetCard};overflow-y:auto;-webkit-overflow-scrolling:touch;background:${T.surface};padding:16px;display:flex;flex-direction:column;gap:8px">${actionArea()}</div></div>`:""}
-    ${(koPick!=null&&viewMode==="scorer"&&gameActive&&mode==="idle")?koPrompt():""}
     ${floatLayer}${floatToggleBtn}`);
   try{ setupFloatWins(); }catch(e){}
   try{ setupLongPress(); }catch(e){}
@@ -6272,7 +6278,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v320";
+var APP_VERSION="v321";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
