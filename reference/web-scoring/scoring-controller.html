@@ -3282,7 +3282,7 @@ function actionArea(){
             onerror="if(this.src.indexOf('logo-mark')<0){this.src='icons/logo-mark.png';}else{this.style.display='none';}"
             style="height:clamp(112px,calc(var(--avh) * 20),156px);width:auto;display:block;filter:drop-shadow(0 8px 18px rgba(0,0,0,.6))">
           <div style="font-family:${MONO};font-size:clamp(26px,3.6vw,42px);font-weight:800;letter-spacing:1.5px;line-height:1;color:${T.ink};text-shadow:var(--heroShadow)">ALL-STARS <span style="color:${T.lime}">LIVE</span></div></div>`;
-    const resumeBtn = (gameActive&&!(G&&G.final))?`<div style="position:relative"><button data-act="resume" style="${bigBtn("#FFFFFF","border:1px solid rgba(0,0,0,.10)",T.field)};font-size:16px;padding:14px 16px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;width:100%">
+    const resumeBtn = (gameActive&&!(G&&G.final))?`<div style="position:relative"><button data-act="resume" style="${bigBtn("#FFFFFF","border:1px solid rgba(0,0,0,.10)","#10141A")};font-size:16px;padding:14px 16px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;width:100%">
         <span style="display:flex;align-items:center;gap:8px;font-weight:800">${IC(PLAY)} Resume game</span>
         <span style="font-size:13px;font-weight:700;color:${T.navy}">${(OUR.short||"US").replace(/</g,"")} ${ourRuns()} &middot; ${(OPP.short||"OPP").replace(/</g,"")} ${oppRuns()} &nbsp;—&nbsp; ${G.half==="T"?"Top":"Bot"} ${ordinal(G.inning)}</span></button>
         <button data-act="discardgame" title="Discard this in-progress game" style="position:absolute;top:8px;right:8px;width:32px;height:32px;border-radius:8px;background:rgba(225,29,46,.16);border:1.5px solid ${T.out};color:${T.out};font-weight:800;font-size:16px;line-height:1;display:flex;align-items:center;justify-content:center;cursor:pointer">&times;</button></div>`:"";
@@ -6256,7 +6256,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v318";
+var APP_VERSION="v319";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
