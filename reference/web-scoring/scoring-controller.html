@@ -833,7 +833,7 @@ const initGame=()=>({inning:1,half:"T",away:0,home:0,outs:0,balls:0,strikes:0,
   alerts:{on:true,runRule:true,runCap:true,pitch:true,inning:true,pcRules:pcRulesPref()}, // rule-reminder popups (pcRules = tournament pitch/catch limits)
   caught:{},       // innings caught per OUR catcher this game, keyed "o"+rosterIdx (feeds the pitch/catch rule alerts)
   halfRuns:0,      // runs scored so far in the current half-inning
-  oppBatters:9,    // opponent's batting-order size (continuous order support)
+  oppBatters:12,   // opponent's batting-order size (continuous order support) — default 12 (full roster bats)
   stats:{},        // per-batter box-score stats, keyed "o"+rosterIdx (ours) / "p"+spot (opp)
   pitches:{},      // pitch count per pitcher, keyed "o"+rosterIdx (our P) / "oppP" (their P)
   pstats:{},       // per-pitcher line, same keys: {k,bb,h,r,outs} (outs/3 = IP)
@@ -871,7 +871,7 @@ function oppBenchList(){ if(!Array.isArray(G.oppBench))G.oppBench=[]; return G.o
 // blank generic order). Called whenever the opponent CHANGES, so a new opponent never inherits the last
 // opponent's lineup. (jford bug: new game's opp lineup was the previous opponent's.)
 function resetOppLineup(){ const ot=oppTeamId&&teamById(oppTeamId);
-  const all = ot ? ot.players.map(p=>({num:p.num,name:p.name})) : Array.from({length:Math.max(1,G.oppBatters||9)},(_,i)=>({num:String(i+1),name:""}));
+  const all = ot ? ot.players.map(p=>({num:p.num,name:p.name})) : Array.from({length:Math.max(1,G.oppBatters||12)},(_,i)=>({num:String(i+1),name:""}));
   G.oppLineup = all.slice(0,12); G.oppBench = all.slice(12); if(ot)G.oppBatters=G.oppLineup.length; try{ oppDefaultPositions(); }catch(e){} }
 // Clear the opponent entirely (start a new game with a blank opponent so nothing carries over).
 function resetOpponent(){ oppTeamId=null; OPP.name="Opponent"; OPP.short="OPP"; OPP.color="#E11D2E"; OPP.logo=null; G.oppLineup=[]; G.oppBench=[]; }
@@ -1011,8 +1011,19 @@ function fieldMapHtml(){
 function oppAssignPos(idx,pos){ const L=oppList(); if(!L[idx])return; const cur=L[idx].pos||""; const occ=oppAtPos(pos); L[idx].pos=pos; if(occ>=0&&occ!==idx)L[occ].pos=cur; }
 function oppFieldMapHtml(){
   const first=n=>(n||"").split(" ")[0];
-  const FXY={P:[50,64],C:[50,92],"1B":[71,63],"2B":[61,51],SS:[39,51],"3B":[29,63],LF:[24,30],CF:[50,19],RF:[76,30]};
+  // Same coach-pitch (4 outfielders) handling as OUR fieldMapHtml() — this was missing here, so the
+  // opponent's field map always showed the standard 9 spots even in a coach-pitch game while our side
+  // correctly showed 10 (LF/LCF/RCF/RF). Reported: "opponent and my team position field map aren't the
+  // same even in the same game with same rules." (v316)
+  const _cpFld=cpMode();
+  const FXY=_cpFld
+    ? {P:[50,64],C:[50,92],"1B":[71,63],"2B":[61,51],SS:[39,51],"3B":[29,63],LF:[16,32],LCF:[39,18],RCF:[61,18],RF:[84,32]}
+    : {P:[50,64],C:[50,92],"1B":[71,63],"2B":[61,51],SS:[39,51],"3B":[29,63],LF:[24,30],CF:[50,19],RF:[76,30]};
+  const FPOS=_cpFld?["P","C","1B","2B","3B","SS","LF","LCF","RCF","RF"]:POSLIST;
   const L=oppList();
+  // Coach pitch has no lone CF — migrate a default/auto "CF" assignment to LCF once (idempotent), same
+  // as our side, so the player isn't hidden; RCF stays open as the 4th-outfielder spot.
+  if(_cpFld){ const cfE=L.find(e=>e&&e.pos==="CF"); if(cfE && !L.some(e=>e&&e.pos==="LCF")) cfE.pos="LCF"; }
   const spot=(P)=>{ const i=oppAtPos(P), e=(i>=0)?L[i]:null, sel=(oppFieldSel===P), open=(i<0), xy=FXY[P];
     const bd=sel?"#fff":(open?T.line:OPP.color);
     const nm=e?("#"+((e.num||"?").toString().replace(/</g,""))+" "+(first((e.name||"").trim())||"")):"—";
@@ -1034,7 +1045,7 @@ function oppFieldMapHtml(){
     panel=`<div style="flex:none;font-size:12.5px;color:${T.sageDim};text-align:center;padding:6px 8px;border:1px dashed ${T.line};border-radius:9px">Tap a position, then tap a hitter to put him there. Positions swap cleanly.</div>`;
   }
   return `<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px">
-      <div style="position:relative;width:100%;max-width:400px;margin:0 auto;flex:none"><div style="position:relative;width:100%;height:0;padding-bottom:93.33%;border:2px solid ${T.line};border-radius:10px;overflow:hidden">${diamond}${POSLIST.map(spot).join("")}</div></div>
+      <div style="position:relative;width:100%;max-width:400px;margin:0 auto;flex:none"><div style="position:relative;width:100%;height:0;padding-bottom:93.33%;border:2px solid ${T.line};border-radius:10px;overflow:hidden">${diamond}${FPOS.map(spot).join("")}</div></div>
       ${panel}</div>`;
 }
 /* ---- continuous batting order: 9 fielders + extra hitters (bat only), up to 12 ---- */
@@ -1145,7 +1156,7 @@ window.luPFirst=function(slot,v){const ri=G.lineup.order[+slot]; if(ROSTER[ri]){
 window.luPLast=function(slot,v){const ri=G.lineup.order[+slot]; if(ROSTER[ri]){ROSTER[ri].last=v; ensureName(ROSTER[ri]); saveDB();}};
 window.ngOppName=function(v){const s=(v||"").trim(); OPP.name=s||"Opponent"; OPP.short=(s||"OPP").slice(0,3).toUpperCase();};
 window.ngRunCap=function(v){const n=parseInt(v,10); G.runCap=(isNaN(n)||n<0)?0:Math.min(n,30);};        // 0 = no cap
-window.ngOppBatters=function(v){const n=parseInt(v,10); G.oppBatters=(isNaN(n)||n<1)?9:Math.min(n,15);};
+window.ngOppBatters=function(v){const n=parseInt(v,10); G.oppBatters=(isNaN(n)||n<1)?12:Math.min(n,15);};
 
 /* ===== League presets (Diamond Youth Baseball 2026 + custom) — set default rules & alerts ===== */
 const LEAGUES=[
@@ -6233,7 +6244,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v315";
+var APP_VERSION="v316";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
