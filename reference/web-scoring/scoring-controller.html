@@ -4513,13 +4513,14 @@ function actionArea(){
     // Ball/Strike/Foul/In Play give way to Looking/Swinging the moment a 3rd strike is recorded, then
     // swap back (any next pitch, or the × skip, clears koPick and restores the normal 4 buttons). (v321)
     const koActive=(koPick!=null&&viewMode==="scorer");
-    const koBanner=koActive?`<div style="display:flex;align-items:center;justify-content:center;gap:6px;font-family:${MONO};font-size:12px;font-weight:800;letter-spacing:.6px;color:${T.lime}">STRIKEOUT — LOOKING OR SWINGING?</div>`:"";
-    const koBtn=(arg,label)=>`<button data-act="kotype" data-arg="${arg}" style="background:${T.surface};border:none;border-radius:0;color:${T.chalk};padding:14px 4px;font-family:${SANS};font-size:15px;font-weight:800;letter-spacing:.3px;text-transform:uppercase">${label}</button>`;
+    const koBtn=(arg,label)=>`<button data-act="kotype" data-arg="${arg}" style="background:${T.surface};border:none;border-radius:0;color:${T.chalk};padding:12px 4px;font-family:${SANS};font-size:15px;font-weight:800;letter-spacing:.3px;text-transform:uppercase">${label}</button>`;
     const pitchGrid=koActive
-      ? `<div style="display:grid;grid-template-columns:1fr 1fr 52px;gap:2px;background:${T.line};border:2px solid ${T.lime};border-radius:12px;overflow:hidden">${koBtn("looking","Looking")}${koBtn("swinging","Swinging")}<button data-act="koskip" title="Skip — back to Ball/Strike/Foul/In Play" style="background:${T.surface};border:none;border-radius:0;color:${T.sageDim};font-size:20px;font-weight:800;display:flex;align-items:center;justify-content:center">&times;</button></div>`
+      ? `<div style="background:${T.surface};border:2px solid ${T.lime};border-radius:12px;overflow:hidden">
+          <div style="padding:8px 8px 6px;text-align:center;font-family:${MONO};font-size:12px;font-weight:800;letter-spacing:.6px;color:${T.lime}">STRIKEOUT — LOOKING OR SWINGING?</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 52px;gap:2px;background:${T.line}">${koBtn("looking","Looking")}${koBtn("swinging","Swinging")}<button data-act="koskip" title="Skip — back to Ball/Strike/Foul/In Play" style="background:${T.surface};border:none;border-radius:0;color:${T.sageDim};font-size:20px;font-weight:800;display:flex;align-items:center;justify-content:center">&times;</button></div></div>`
       : `<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:2px;background:${T.line};border:2px solid ${T.line};border-radius:12px;overflow:hidden">
         ${pitchBtn("ball","Ball",ICN.ball)}${pitchBtn("strike","Strike",ICN.strike)}${pitchBtn("foul","Foul",ICN.foul)}${pitchBtn("inplay","In Play",ICN.inplay,true)}</div>`;
-    return `${cpTag}${koBanner}${ptypeRow}
+    return `${cpTag}${ptypeRow}
       ${pitchGrid}
       ${(()=>{
         // Base-running (steal/WP/PB/balk/pickoff) stays on the wide (tablet/PC) layout, which has the
@@ -6278,7 +6279,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v321";
+var APP_VERSION="v322";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
