@@ -6033,6 +6033,45 @@ function applySetupParams(){
 
 applySetupParams();
 render();broadcast();
+// ===== ONE-TIME LINEUP + NUMBER FIX (REMOVE AFTER CONFIRMED): coach Jeremy's text (2026-07-02) gave the
+// batting order for this weekend PLUS jersey numbers for players whose number was still blank in the app.
+// This also resolves the earlier "B Hobbs 27 AB" investigation — his real number is #17 (not a duplicate of
+// Mayo's #27); the corrupted total was from something else, now moot since every player has a real number.
+// Polls ~32s for the LC AA team, then ONCE: (1) fills in each blank-number player's real number (never
+// overwrites a number that's already set — safe if jford already fixed one by hand), (2) reorders the roster
+// to match the batting order, (3) creates/updates a saved lineup "Weekend lineup" with that order and makes
+// it the team's default, so it auto-loads at the next game start. Idempotent on the fixed lineup id
+// lu-jeremy-20260702. Delete this block once confirmed on-device.
+(function(){
+  const _lid="lu-jeremy-20260702";
+  const _nums={"M Ford":"4","C Tranquille":"8","B Hobbs":"17","C Cook":"1","D Edwards":"18","C Ammons":"13"};
+  const _order=["M Ford","B Mayo","W Walker","P Spikes","K Summers","C Cook","C Ammons","D Edwards","B Hobbs","R Revell","C Tranquille","R Miller"];
+  let _n=0;
+  const _iv=setInterval(function(){
+    _n++; if(_n>40){ clearInterval(_iv); return; }
+    try{
+      const t=(DB.teams||[]).find(x=>{const u=(x.name||"").toUpperCase(); return /\bAA\b/.test(u) && !/AAA/.test(u);});
+      if(!t) return;   // AA team not loaded yet — keep waiting for the cloud
+      if(!Array.isArray(t.lineups))t.lineups=[];
+      if(t.lineups.some(l=>l.id===_lid)){ clearInterval(_iv); return; }   // already applied
+      if(!Array.isArray(t.players)){ clearInterval(_iv); return; }
+      Object.keys(_nums).forEach(function(nm){ const p=t.players.find(x=>(x.name||"").trim()===nm);
+        if(p && !(p.num||"").trim()) p.num=_nums[nm]; });   // only fill blanks — never clobber a set number
+      const byName={}; t.players.forEach(function(p){ byName[(p.name||"").trim()]=p; });
+      const orderedIds=_order.map(function(nm){ return byName[nm] && byName[nm].id; }).filter(Boolean);
+      if(orderedIds.length<9){ clearInterval(_iv); return; }   // names didn't match the roster — bail safely, nothing saved
+      const orderedPlayers=orderedIds.map(function(id){ return t.players.find(function(p){return p.id===id;}); });
+      const rest=t.players.filter(function(p){ return orderedIds.indexOf(p.id)<0; });   // e.g. Charlie Cook — not in this weekend's order, kept at the end
+      t.players=orderedPlayers.concat(rest);
+      t.lineups.push({id:_lid,name:"Weekend lineup",order:orderedIds,pos:{}});
+      t.activeLineupId=_lid;
+      t.updatedAt=Date.now(); saveDB();
+      try{ if(window.cloudSaveTeam)cloudSaveTeam(t,true); }catch(e){}
+      try{ render(); }catch(e){}
+      clearInterval(_iv);
+    }catch(e){}
+  }, 800);
+})();
 // Persistent watch link (?watch=<gameId>): subscribe to the cloud game doc and follow it live —
 // works even after the scorer's device goes offline. Public-read by rules; no sign-in needed.
 (function(){ var id; try{id=new URLSearchParams(location.search).get("watch");}catch(e){} if(!id)return;
@@ -6098,7 +6137,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v308";
+var APP_VERSION="v309";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
