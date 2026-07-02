@@ -2603,11 +2603,17 @@ function monitorPane(){
       ${yt?`<button data-act="ytopen" title="Open in YouTube" style="${monBtn}">${ytIcon}</button>`:""}
       ${yt?`<button data-act="fullscreen" title="Fullscreen" style="${monBtn}">${fsIcon}</button>`:""}
     </div>`;
+  // Bare "LIVE" pill: viewers need it (confirms they're watching a live feed); the scorer already
+  // knows they're live (they're running the broadcast) — jford: not necessary except on the viewer
+  // window. Scoped out for the scorer role here; the operational status chip (WAITING FOR CAMERA /
+  // GOING LIVE / etc., IS_APP branch above) stays for the scorer since that's actionable info, not
+  // just a "yes this is live" badge.
+  const bareLiveDot=(viewMode==="viewer")?`<div style="position:absolute;top:9px;left:10px;display:flex;align-items:center;gap:6px;background:rgba(8,11,16,.62);border-radius:999px;padding:4px 11px;z-index:3">
+        <span style="width:8px;height:8px;border-radius:50%;background:${T.live};box-shadow:0 0 8px ${T.live}"></span>
+        <span style="font-family:${MONO};font-weight:800;font-size:11px;letter-spacing:1.6px;color:#fff">LIVE</span></div>`:"";
   return `<div id="monitor" style="position:relative;width:100%;flex:1;min-height:0;background:#0b0f15;border:2px solid ${T.line};border-radius:14px;overflow:hidden;box-shadow:0 6px 22px rgba(0,0,0,.4)">
       ${feed}
-      <div style="position:absolute;top:9px;left:10px;display:flex;align-items:center;gap:6px;background:rgba(8,11,16,.62);border-radius:999px;padding:4px 11px;z-index:3">
-        <span style="width:8px;height:8px;border-radius:50%;background:${T.live};box-shadow:0 0 8px ${T.live}"></span>
-        <span style="font-family:${MONO};font-weight:800;font-size:11px;letter-spacing:1.6px;color:#fff">LIVE</span></div>
+      ${bareLiveDot}
       ${ctrls}
       <div style="position:absolute;left:8px;right:8px;bottom:8px;z-index:2;pointer-events:none">${statusBar()}</div>
     </div>`;
@@ -6250,7 +6256,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v317";
+var APP_VERSION="v318";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
