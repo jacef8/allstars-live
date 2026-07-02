@@ -3405,13 +3405,24 @@ function actionArea(){
   if(mode==="team"){
     const t=teamById(openTeamId); if(!t){mode="teams";return actionArea();}
     const cell=`background:${T.surface2};border:2px solid ${T.line};color:${T.ink};border-radius:7px;padding:8px 8px;font-weight:700;outline:none`;
-    const roster=t.players.map((p,i)=>`<div style="display:flex;align-items:center;gap:8px;padding:8px 0;${i>0?`border-top:1.5px solid ${T.line};`:""}">
+    // Duplicate jersey numbers silently corrupt season stats — the box-score matcher (matchRosterPlayer)
+    // matches by NUMBER first, so two players sharing a number make one player's at-bats/hits land on the
+    // OTHER player instead (root-caused a real "27 at-bats" bug: a player's number had drifted to match a
+    // teammate's, so every one of that teammate's plate appearances counted for the wrong player). Flag any
+    // duplicate, non-blank number inline so it's never silent again. (v307)
+    const _numCounts={}; t.players.forEach(p=>{const n=(p.num||"").trim(); if(n) _numCounts[n]=(_numCounts[n]||0)+1;});
+    const roster=t.players.map((p,i)=>{const _dup=(()=>{const n=(p.num||"").trim(); return n && _numCounts[n]>1;})();
+      return `<div style="display:flex;align-items:center;gap:8px;padding:8px 0;${i>0?`border-top:1.5px solid ${T.line};`:""}">
         <span title="Player ${i+1} of ${t.players.length}" style="flex:none;width:26px;text-align:center;font-family:${MONO};font-size:16px;font-weight:800;color:${T.sageDim}">${i+1}</span>
-        <input value="${(p.num||"").replace(/"/g,"&quot;")}" oninput="teamPNum('${p.id}',this.value)" inputmode="numeric" maxlength="3" style="${cell};width:54px;text-align:center;font-family:${MONO};font-weight:800;font-size:18px">
+        <input value="${(p.num||"").replace(/"/g,"&quot;")}" oninput="teamPNum('${p.id}',this.value)" inputmode="numeric" maxlength="3" title="${_dup?"Duplicate number — shared with another player. Stats can be miscounted between them.":""}" style="${cell};width:54px;text-align:center;font-family:${MONO};font-weight:800;font-size:18px${_dup?`;border-color:${T.out};box-shadow:0 0 0 2px ${T.out}55`:""}">
         <input value="${(p.name||"").replace(/"/g,"&quot;")}" oninput="teamPName('${p.id}',this.value)" placeholder="Player name" style="${cell};flex:1 1 200px;min-width:0;font-size:18px">
-        <div style="flex:1;min-width:0"></div>
+        ${_dup?`<span title="Duplicate jersey number — stats can be miscounted between these players" style="flex:none;color:${T.out};font-size:18px">${IC('alert',18)}</span>`:`<div style="flex:1;min-width:0"></div>`}
         <button data-act="openplayer" data-arg="${t.id}:${p.id}" title="View / follow player" style="background:${T.surface2};border:2px solid ${T.line};color:${isFollowingPlayer(t.id,p.id)?T.amber:T.lime};border-radius:9px;min-width:48px;height:46px;display:inline-flex;align-items:center;justify-content:center;font-size:24px;font-weight:800;flex:none;line-height:1">${isFollowingPlayer(t.id,p.id)?IC('starFill',22):"&rsaquo;"}</button>
-        <button data-act="rmteamp" data-arg="${p.id}" title="Remove player" style="background:none;border:2px solid ${T.out}66;color:${T.out};border-radius:9px;min-width:48px;height:46px;display:inline-flex;align-items:center;justify-content:center;font-size:26px;font-weight:800;flex:none;line-height:1"${t.players.length<=9?" disabled":""}>&times;</button></div>`).join("");
+        <button data-act="rmteamp" data-arg="${p.id}" title="Remove player" style="background:none;border:2px solid ${T.out}66;color:${T.out};border-radius:9px;min-width:48px;height:46px;display:inline-flex;align-items:center;justify-content:center;font-size:26px;font-weight:800;flex:none;line-height:1"${t.players.length<=9?" disabled":""}>&times;</button></div>`;}).join("");
+    const _dupNums=Object.keys(_numCounts).filter(n=>_numCounts[n]>1);
+    const dupWarnBanner=_dupNums.length?`<div style="display:flex;align-items:flex-start;gap:10px;background:rgba(225,29,46,.12);border:2px solid ${T.out};border-radius:12px;padding:12px 14px">
+        <span style="flex:none;color:${T.out};font-size:20px">${IC('alert',20)}</span>
+        <div style="font-size:13px;color:${T.ink};line-height:1.45"><b style="color:${T.out}">Duplicate jersey number${_dupNums.length>1?"s":""} (#${_dupNums.join(", #")})</b> — two players share a number, marked below in red. The app matches game stats by number, so at-bats/hits meant for one player can land on the other. Fix the duplicate, then use <b>Recompute season stats from the game log</b> (bottom of Stats &amp; games) to rebuild correct totals.</div></div>`:"";
     // ===== Season filter: CURRENT (this year) vs HISTORICAL (earlier years), grouped in one dropdown.
     const _sel=statsSeason||"all";
     const _seasons=teamSeasons(t), _cur=_seasons.filter(s=>s.current), _hist=_seasons.filter(s=>!s.current);
@@ -3650,6 +3661,7 @@ function actionArea(){
           ${LUs.length?LUs.map(luRow).join(""):`<div style="font-size:12px;color:${T.sageDim};text-align:center;padding:10px 6px;border:1px dashed ${T.line};border-radius:10px">No saved lineups yet. Build one batting order &amp; field assignment and reuse it every game.</div>`}
         </div>`;
       return secWrap(`${secHdr("Roster &amp; lineup")}
+          ${dupWarnBanner}
           <div class="frost-card" style="background:${T.surface};border:2px solid ${T.line};border-radius:12px;padding:11px 12px 4px">
             <div style="font-size:13.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin:0 2px 8px">Roster — tap to edit #/name &middot; &rsaquo; for player stats</div>${roster}</div>
           <button data-act="addteamp" style="${ghost}">+ Add player</button>
@@ -6086,7 +6098,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v306";
+var APP_VERSION="v307";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
