@@ -2329,7 +2329,7 @@ function batterCard(){
   return `<div data-act="reviewbatter" data-arg="${batterKeyOf(b)}" class="frost-card" style="display:flex;align-items:center;gap:13px;background:var(--frost);border:2px solid ${c}66;border-left:5px solid ${c};border-radius:10px;padding:9px 14px;flex-shrink:0;cursor:pointer">
     <span style="font-family:${MONO};font-size:34px;font-weight:700;color:${c};line-height:1;min-width:46px;text-align:center">${big}</span>
     <div style="flex:1;min-width:0">
-      <div style="display:inline-flex;align-items:center;gap:6px;background:${c};color:#fff;border-radius:999px;padding:2px 9px;font-family:${MONO};font-size:10px;font-weight:800;letter-spacing:1px;margin-bottom:4px;line-height:1">${IC('dot',8)} AT BAT</div>
+      <div style="display:inline-flex;align-items:center;background:${c};color:#fff;border-radius:999px;padding:2px 9px;font-family:${MONO};font-size:10px;font-weight:800;letter-spacing:1px;margin-bottom:4px;line-height:1">AT BAT</div>
       <div style="font-family:${MONO};font-size:23px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;line-height:1;color:${T.chalk};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${nameLine}</div>
       <div style="font-size:11px;color:${T.sage};font-weight:500;margin-top:3px">${sub}</div></div>
     <div style="text-align:center;line-height:1;flex:none;border-left:1.5px solid ${T.line};border-right:1.5px solid ${T.line};padding:0 13px">
@@ -4724,7 +4724,7 @@ function setupFieldDrag(){
       const move=ev=>{
         if(!dragging && Math.hypot(ev.clientX-sx,ev.clientY-sy)<5) return;
         if(!dragging){ dragging=true; el.style.opacity='0.3';
-          ghost=el.cloneNode(true); Object.assign(ghost.style,{position:'fixed',zIndex:'9999',pointerEvents:'none',margin:'0',left:ev.clientX+'px',top:ev.clientY+'px',transform:'translate(-50%,-50%) scale(1.08)',boxShadow:'0 10px 24px rgba(0,0,0,.6)'}); document.body.appendChild(ghost); }
+          ghost=el.cloneNode(true); ghost.setAttribute('data-drag-ghost','1'); Object.assign(ghost.style,{position:'fixed',zIndex:'9999',pointerEvents:'none',margin:'0',left:ev.clientX+'px',top:ev.clientY+'px',transform:'translate(-50%,-50%) scale(1.08)',boxShadow:'0 10px 24px rgba(0,0,0,.6)'}); document.body.appendChild(ghost); }
         ghost.style.left=ev.clientX+'px'; ghost.style.top=ev.clientY+'px';
         clear(); const t=target(ev.clientX,ev.clientY); if(t&&t!==el) t.style.outline='3px solid '+T.amber;
       };
@@ -4927,6 +4927,16 @@ function tvPane(){
     </div>`;
 }
 function render(){
+  // Defensive cleanup: a field-map drag's floating "ghost" clone (position:fixed, appended straight to
+  // document.body, z-index 9999) is only removed by its own pointerup/pointercancel handler. If a drag
+  // is interrupted by NAVIGATING AWAY mid-gesture (switching lineup tabs, the OS backgrounding the app)
+  // rather than releasing the pointer, that handler never fires and the ghost is orphaned — surviving
+  // every future render() (which only touches #content) and rendering on TOP OF EVERY SCREEN after it,
+  // looking like a stuck, ghosted duplicate of whatever was being dragged. Reported: the Lineup/Batting-
+  // order screen showing an overlapping "#4 M Ford" ghost behind row 1. Sweeping any stray ghost at the
+  // top of every render() guarantees it can never survive a screen change, regardless of how the drag
+  // was interrupted. (v320)
+  try{ document.querySelectorAll('[data-drag-ghost]').forEach(function(g){ g.remove(); }); }catch(e){}
   if(OVERLAY){ try{ var _oc=document.getElementById("content"); if(_oc)_oc.innerHTML=overlayBug(); }catch(e){} return; }   // H1: OBS overlay = bug only
   if(tvMode){ try{ var _tc=document.getElementById("content"); if(_tc)_tc.innerHTML=tvPane(); }catch(e){} return; }          // TV mode = fullscreen video + bug
   // Watch-link viewer, but no live game yet → show a friendly lobby instead of the Home screen
@@ -5827,7 +5837,13 @@ function renderToolbar(){
   const resetBtn = (barEdit&&anyFloat)?`<button data-act="barreset" title="Put every button back on the top row" style="flex:none;display:inline-flex;align-items:center;justify-content:center;background:${T.surface2};border:2px solid ${T.out};color:${T.out};border-radius:10px;padding:0 12px;height:38px;font-family:${SANS};font-size:13px;font-weight:800;white-space:nowrap">Reset</button>`:"";
   // Every movable button, keyed. gc controls only exist while actively scoring (wide).
   const inCtl=(isWide()&&mode==="idle"&&viewMode==="scorer");
-  const barPieces={ videotoggle:vidToggle, share:shareBtnTop, sound:soundBtn, live:liveDot, swap:vsw,
+  // "live" (the relay LOCAL/LIVE/OFFLINE connection dot) is a VIEWER-only indicator, per jford — the
+  // scorer doesn't need it. It's also a movable toolbar piece (the "drag any button anywhere" feature),
+  // so it could get dragged to a floating position and then persist mid-screen on every scoring page —
+  // this fully removes it from the scorer's set (both the toolbar row AND the float layer, since
+  // renderBarFloat() only draws pieces that are still present in _barPieces) rather than just relocating
+  // it. (v320)
+  const barPieces={ videotoggle:vidToggle, share:shareBtnTop, sound:soundBtn, live:(viewMode==="viewer")?liveDot:"", swap:vsw,
     lineup:inCtl?gcBtn("lineup"):"", inninglog:inCtl?gcBtn("inninglog"):"", ingamesettings:inCtl?gcBtn("ingamesettings"):"",
     home:inCtl?gcBtn("home"):"", endgame:inCtl?gcBtn("endgame"):"", undo:inCtl?gcBtn("undo"):"" };
   _barPieces=barPieces;   // the float layer renders the moved-out buttons from this
@@ -6256,7 +6272,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v319";
+var APP_VERSION="v320";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
