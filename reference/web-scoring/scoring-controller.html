@@ -1893,14 +1893,20 @@ function broadcast(){
 function pitch(type){
   try{ if(navigator.vibrate) navigator.vibrate(12); }catch(e){}   // short, light haptic confirm on each pitch tap
   koPick=null;   // a new pitch dismisses any pending "looking / swinging?" prompt (skippable, B4)
-  if(cpMode() && type==="ball") return;   // COACH PITCH: no balls (button is hidden anyway)
   snapshot();const k0=battingKey(),b0=batter(),bn=b0.name,bnum=b0.num,bk0=batterKeyOf(b0);_pitch=type;recordPitch(type);
   const pt=(advPitch&&pitchType)?" "+pitchType:"";   // pitch type tag (if advanced tracking on)
   if(cpMode()){
     // COACH PITCH: 5 pitches per batter — out on the 5th miss OR 3 swinging strikes; a FOUL never ends
-    // the at-bat (extends past 5). No balls/walks. G.abPitches counts this at-bat's pitches.
+    // the at-bat (extends past 5). No WALKS (ball four never happens — coach controls the pitch), but a
+    // "Ball" pitch type still exists for a pitch the batter didn't swing at: it counts toward the 5-pitch
+    // limit (same "5th miss = out" rule as a strike) WITHOUT counting toward the 3-swinging-strikes out
+    // (jford: "pitches that were not swung at but count against the 5 pitch limit"). G.abPitches counts
+    // this at-bat's pitches (any type).
     G.abPitches=(G.abPitches||0)+1;
     if(type==="foul"){ if(G.strikes<2)G.strikes++; try{Snd.pip("foul");}catch(e){} feedPitch("Foul"+pt,"#"+bnum+" · pitch "+G.abPitches); }
+    else if(type==="ball"){ feedPitch("Ball"+pt,"#"+bnum+" · pitch "+G.abPitches);
+      if(G.abPitches>=5){ G.outs++; creditBatter("strikeout",0); nextBatter(); flipIfNeeded(); flash("5 pitches — out"); bcastEvent("strikeout",bn,k0,bk0); koPick=_eventId; G.anim={id:((G.anim&&G.anim.id)||0)+1,ts:Date.now(),sfx:"whiff"}; }
+      else { try{Snd.pip("ball");}catch(e){} } }
     else if(type==="strike"){ G.strikes++; feedPitch("Strike"+pt,"#"+bnum+" · pitch "+G.abPitches);
       const outK=G.strikes>=3, out5=G.abPitches>=5;
       if(outK||out5){ G.outs++; creditBatter("strikeout",0); nextBatter(); flipIfNeeded(); flash(outK?"Strikeout":"5 pitches — out"); bcastEvent("strikeout",bn,k0,bk0); koPick=_eventId; G.anim={id:((G.anim&&G.anim.id)||0)+1,ts:Date.now(),sfx:"whiff"}; }
@@ -4503,8 +4509,8 @@ function actionArea(){
     const _cp=cpMode();   // coach pitch: no Ball / no HBP; show "pitch N of 5"
     const cpTag=_cp?`<div style="display:flex;align-items:center;justify-content:center;gap:8px;background:${T.surface2};border:2px solid ${T.line};border-radius:9px;padding:6px 10px;font-family:${MONO};font-weight:800;font-size:13px;color:${T.amber};letter-spacing:.5px">COACH PITCH · PITCH ${(G.abPitches||0)+1} OF 5<span style="color:${T.sageDim};font-weight:600;font-size:11px;letter-spacing:0">fouls extend</span></div>`:"";
     return `${cpTag}${ptypeRow}
-      <div style="display:grid;grid-template-columns:repeat(${_cp?3:4},1fr);gap:2px;background:${T.line};border:2px solid ${T.line};border-radius:12px;overflow:hidden">
-        ${_cp?"":pitchBtn("ball","Ball",ICN.ball)}${pitchBtn("strike","Strike",ICN.strike)}${pitchBtn("foul","Foul",ICN.foul)}${pitchBtn("inplay","In Play",ICN.inplay,true)}</div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:2px;background:${T.line};border:2px solid ${T.line};border-radius:12px;overflow:hidden">
+        ${pitchBtn("ball","Ball",ICN.ball)}${pitchBtn("strike","Strike",ICN.strike)}${pitchBtn("foul","Foul",ICN.foul)}${pitchBtn("inplay","In Play",ICN.inplay,true)}</div>
       ${(()=>{
         // Base-running (steal/WP/PB/balk/pickoff) stays on the wide (tablet/PC) layout, which has the
         // room for it — dropped on phone specifically (jford: "page does not need a baserunning button"
@@ -6244,7 +6250,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v316";
+var APP_VERSION="v317";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
