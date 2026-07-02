@@ -651,6 +651,21 @@ function _setFullName(p,v){ if(!p)return; p.name=v; p.first=undefined; p.last=un
 window.teamPName=function(id,v){const t=teamById(openTeamId);if(!t)return;const p=t.players.find(p=>p.id===id);if(p){_setFullName(p,v);saveDB();}};
 window.luPName=function(slot,v){const ri=G.lineup.order[+slot]; if(ROSTER[ri]){_setFullName(ROSTER[ri],v); saveDB();}};
 window.edName=function(v){const ri=G.lineup.order[editSlot]; if(ROSTER[ri]){_setFullName(ROSTER[ri],v); saveDB();}};
+// Quick batter edit (scorer screen, no navigation away): resolve a batterKey ("o<rosterIdx>" / "p<oppSpot>")
+// to the live player object it points at. OUR players are ROSTER[ri] — the SAME object as t.players[ri]
+// (see selectTeam: ROSTER=t.players), so a saveDB() here is already "reflected on the main lineup page".
+// Opponent spots edit G.oppLineup (per-game only — opponents aren't a persisted roster).
+function _quickEditTarget(key){
+  if(!key)return null;
+  if(key[0]==="o"){ const ri=+key.slice(1),p=ROSTER[ri]; return p?{kind:"our",p,ri}:null; }
+  const spot=+key.slice(1); if(!(spot>=1))return null;
+  if(!Array.isArray(G.oppLineup))G.oppLineup=[];
+  while(G.oppLineup.length<spot)G.oppLineup.push({num:String(G.oppLineup.length+1),name:""});
+  return {kind:"opp",p:G.oppLineup[spot-1],spot};
+}
+window.quickEditNum=function(key,v){ const tg=_quickEditTarget(key); if(!tg)return; tg.p.num=v; if(tg.kind==="our")saveDB(); };
+window.quickEditName=function(key,v){ const tg=_quickEditTarget(key); if(!tg)return; if(tg.kind==="our"){_setFullName(tg.p,v);saveDB();} else tg.p.name=v; };
+window.quickEditCommit=function(){ try{broadcast();}catch(e){} };   // push the edited name/number to the live scorebug once typing settles (onchange, not every keystroke)
 window.luName=function(v){const t=teamById(openTeamId);const lu=t&&lineupById(t,editLineupId);if(lu){lu.name=(v||"").trim()||"Lineup";saveDB();}};
 window.applySavedLineup=function(id){ if(!id)return; const t=curTeam(); const lu=t&&lineupById(t,id); const idx=lu&&lineupToIdx(t,lu);
   if(idx&&idx.order.length>=9){ G.lineup={order:idx.order.slice(),pos:Object.assign({},idx.pos)}; t.activeLineupId=id; saveDB(); render(); try{broadcast();}catch(e){} }
@@ -1795,6 +1810,7 @@ let advEvents=(()=>{try{return localStorage.getItem("al-adv-events")==="1";}catc
 let pitchType=null;     // armed (sticky) pitch type while advPitch is on
 let reviewBatter=null;  // batterKey shown in the batter-review modal
 let reviewInn=false;    // inning-log modal open
+let quickEditKey=null;  // batterKey shown in the quick name/number edit modal (edit a batter without leaving the scorer)
 const PITCH_TYPES=[{k:"FB",n:"Fastball"},{k:"CB",n:"Curve"},{k:"CH",n:"Change"},{k:"SL",n:"Slider"},{k:"OTH",n:"Other"}];
 const PITCH_TYPE_NAME=k=>{const p=PITCH_TYPES.find(x=>x.k===k);return p?p.n:k;};
 const PLAYHEAD={single:"SINGLE",double:"DOUBLE",triple:"TRIPLE",hr:"HOME RUN",error:"REACHED ON ERROR",
@@ -2310,6 +2326,7 @@ function batterCard(){
       <div style="font-family:${MONO};font-size:22px;font-weight:800;color:${T.chalk};line-height:1.05">${lp.line}</div>
       ${lp.extra?`<div style="font-size:10px;font-weight:600;color:${T.sage};white-space:nowrap">${lp.extra}</div>`:""}
     </div>
+    <button data-act="quickeditbatter" data-arg="${batterKeyOf(b)}" title="Quick edit name/number" style="flex:none;background:${T.surface2};border:2px solid ${T.line};color:${T.chalk};border-radius:9px;width:34px;height:34px;display:flex;align-items:center;justify-content:center;font-size:15px">&#9998;</button>
   </div>`;
 }
 
@@ -2323,7 +2340,7 @@ function batterStrip(){
   const nm=b.ours?pBug(b):(b.name||"").trim();
   const nameLine=nm||(b.num?("#"+b.num):"—");
   const abp=(G.ab&&G.ab.pitches)?G.ab.pitches.length:0;   // pitches to this batter this at-bat
-  return `<button data-act="reviewbatter" data-arg="${batterKeyOf(b)}" class="frost-card" style="flex:1 1 auto;width:100%;display:flex;align-items:center;gap:14px;background:var(--chip);border:2px solid ${c}66;border-left:6px solid ${c};border-radius:10px;padding:8px 16px;cursor:pointer;max-width:100%;min-width:0">
+  return `<div data-act="reviewbatter" data-arg="${batterKeyOf(b)}" class="frost-card" style="flex:1 1 auto;width:100%;display:flex;align-items:center;gap:14px;background:var(--chip);border:2px solid ${c}66;border-left:6px solid ${c};border-radius:10px;padding:8px 16px;cursor:pointer;max-width:100%;min-width:0">
     <span title="Lineup spot" style="font-family:${MONO};font-size:30px;font-weight:800;color:${c};line-height:1;flex:none">${ord}</span>
     <div style="flex:1;min-width:0;text-align:left;display:flex;flex-direction:column;gap:3px">
       <div style="font-size:10px;letter-spacing:1.5px;font-weight:800;color:${T.sageDim};line-height:1">BATTING ${ordinal(ord)}</div>
@@ -2331,7 +2348,8 @@ function batterStrip(){
     <div style="flex:none;text-align:right;line-height:1.15">
       <div style="font-family:${MONO};font-size:19px;font-weight:800;color:${T.chalk}">${G.balls}-${G.strikes}</div>
       <div style="font-size:9px;font-weight:800;letter-spacing:1px;color:${T.sageDim}">${abp} ${abp===1?"PITCH":"PITCHES"}</div></div>
-  </button>`;
+    <button data-act="quickeditbatter" data-arg="${batterKeyOf(b)}" title="Quick edit name/number" style="flex:none;background:${T.surface};border:2px solid ${T.line};color:${T.chalk};border-radius:9px;width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-size:15px">&#9998;</button>
+  </div>`;
 }
 
 /* ───────── Free-layout windows (BETA prototype) ─────────
@@ -2699,6 +2717,31 @@ function batterReviewModal(){
   const rows=list.length?list.map((pa,i)=>paRowHtml(pa,i,list.length)).reverse().join("")
     :`<div style="color:${T.sageDim};padding:18px;text-align:center">No at-bats yet — this is their first time up.</div>`;
   return modalWrap(title,`Today: ${gl}`,rows,"closereview");
+}
+/* Quick name/number edit — reachable straight from the scorer screen (pencil on the AT-BAT card/strip) so
+   a batter's name or number can be fixed the moment they come up, without leaving to the Lineup screen.
+   OUR-team edits save straight to the roster (ROSTER===t.players — same object as the Team management
+   Roster tab, so it shows there too); opponent edits are per-game only. Prev/Next steps through the whole
+   batting order so you can also pre-fill the on-deck/upcoming hitters during a lull. */
+function quickEditModal(){
+  const key=quickEditKey; const tg=_quickEditTarget(key); if(!tg){ quickEditKey=null; return ""; }
+  const isOur=tg.kind==="our";
+  const ord=isOur?(G.lineup.order.indexOf(tg.ri)+1):tg.spot;
+  const teamShort=isOur?(OUR.short||"US"):(OPP.short||"OPP");
+  const isCur=key===batterKeyOf(batter());
+  const inp=`background:${T.surface2};border:2px solid ${T.line};color:${T.ink};border-radius:9px;padding:13px 12px;font-family:${MONO};font-weight:800;font-size:18px;outline:none`;
+  const inner=`
+    <div style="display:flex;align-items:center;justify-content:center;gap:8px">
+      <button data-act="quickeditnav" data-arg="prev" style="background:${T.surface2};border:2px solid ${T.line};color:${T.chalk};border-radius:9px;width:44px;height:44px;font-size:20px;font-weight:800">&lsaquo;</button>
+      <div style="flex:1;text-align:center;font-size:13px;font-weight:800;letter-spacing:.5px;color:${T.sage}">${teamShort} &middot; batting ${ord}${isCur?` &middot; <span style="color:${T.lime}">AT BAT NOW</span>`:""}</div>
+      <button data-act="quickeditnav" data-arg="next" style="background:${T.surface2};border:2px solid ${T.line};color:${T.chalk};border-radius:9px;width:44px;height:44px;font-size:20px;font-weight:800">&rsaquo;</button>
+    </div>
+    <div style="display:flex;gap:10px">
+      <input value="${(tg.p.num||"").replace(/"/g,"&quot;")}" oninput="window.quickEditNum('${key}',this.value)" onchange="window.quickEditCommit()" inputmode="numeric" maxlength="3" placeholder="#" style="${inp};width:76px;text-align:center;flex:none">
+      <input value="${(tg.p.name||"").replace(/"/g,"&quot;")}" oninput="window.quickEditName('${key}',this.value)" onchange="window.quickEditCommit()" placeholder="Player name" style="${inp};flex:1;min-width:0">
+    </div>
+    <div style="font-size:11.5px;color:${T.sageDim};text-align:center">${isOur?"Saves to the roster instantly — shows on Team management too.":"Opponent player — saved for this game only."}</div>`;
+  return modalWrap("Quick edit",isOur?"Your lineup":"Opponent lineup",inner,"closequickedit");
 }
 /* Inning log — totals by half-inning (pitches, runs, hits, LOB) for review. */
 function inningLogModal(){
@@ -5056,6 +5099,7 @@ function render(){
   paintContent(`
     ${body}${confirmOverlay()}${alertOverlay()}
     ${reviewBatter?batterReviewModal():""}
+    ${quickEditKey?quickEditModal():""}
     ${reviewInn?inningLogModal():""}
     ${brSheet?baseRunModal():""}
     ${correctOpen?correctModal():""}
@@ -5119,6 +5163,15 @@ document.getElementById("app").addEventListener("click",e=>{
   // In Play opens the locate step, base-running opens the sheet — give the tap an immediate confirm too.
   if(act==="inplay"||act==="brsheet"){ try{ if(navigator.vibrate)navigator.vibrate(13); }catch(e){} }
   if(act==="reviewbatter"){ reviewBatter=arg; render(); return; }
+  if(act==="quickeditbatter"){ quickEditKey=arg; render(); return; }
+  if(act==="quickeditnav"){
+    const key=quickEditKey; if(!key)return;
+    if(key[0]==="o"){ const ri=+key.slice(1); const idx=G.lineup.order.indexOf(ri); if(idx<0)return;
+      const n=G.lineup.order.length; const ni=arg==="next"?(idx+1)%n:(idx-1+n)%n; quickEditKey="o"+G.lineup.order[ni]; }
+    else { const spot=+key.slice(1); const len=Math.max(1,(G.oppLineup&&G.oppLineup.length)||G.oppBatters||1);
+      quickEditKey="p"+(arg==="next"?(spot%len)+1:((spot-2+len)%len)+1); }
+    render(); return; }
+  if(act==="closequickedit"){ quickEditKey=null; render(); return; }
   if(act==="brsheet"){ brSheet=true; brPitchPick=null; brWPMove=null; render(); return; }
   if(act==="brclose"){ brSheet=false; brPitchPick=null; brWPMove=null; render(); return; }
   if(act==="correctopen"){ correctOpen=true; correctOpenAt=Date.now(); render(); return; }
@@ -5845,6 +5898,7 @@ window.appBack=function(){
     const ym=document.getElementById("ytmodal"); if(ym&&ym.style.display==="flex"){ ym.style.display="none"; return true; }
     if(typeof confirmAct!=="undefined"&&confirmAct){ confirmAct=null; render(); return true; }
     if(reviewBatter){reviewBatter=null;render();return true;}
+    if(quickEditKey){quickEditKey=null;render();return true;}
     if(reviewInn){reviewInn=false;render();return true;}
     if(["locate","contact","result","runners","errpos","outpos","dppick"].includes(mode)){ resetUI(); render(); return true; }
     if(mode==="editplayer"||mode==="pickpos"||mode==="pickplayer"){ mode="lineup"; render(); return true; }
@@ -6137,7 +6191,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v309";
+var APP_VERSION="v310";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
