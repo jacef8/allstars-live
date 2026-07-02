@@ -4633,29 +4633,39 @@ function confirmOverlay(){
 /* ---- drag-to-reorder the batting order (pointer-based; works on touch & mouse) ---- */
 function setupLineupDrag(){
   const list=document.getElementById("lineup-list"); if(!list)return;
+  // Pointer-capture based (element listeners, NOT window) — matches setupFieldDrag's fix (v294). The old
+  // window-listener version leaked pointermove/pointerup on any pointercancel (very common when a touch
+  // starting near the drag handle conflicts with a scroll gesture): the leaked listener then kept firing
+  // on EVERY later touch anywhere in the list, silently reordering rows and eating the scroll — reported
+  // as "the list disappears and won't let me scroll." A 5px move threshold also means a touch that starts
+  // on the handle but never really moves (i.e. a scroll attempt that barely nudges) doesn't yank the row. (v311)
   list.querySelectorAll('[data-drag]').forEach(handle=>{
     handle.addEventListener('pointerdown',e=>{
       e.preventDefault();
       const row=handle.closest('[data-row]'); if(!row)return;
-      row.style.opacity='0.55'; row.style.boxShadow='0 6px 16px rgba(15,30,60,.25)';
-      document.body.style.userSelect='none';
+      try{ handle.setPointerCapture(e.pointerId); }catch(_){}
+      const sy=e.clientY; let dragging=false;
       const move=ev=>{
+        if(!dragging){ if(Math.abs(ev.clientY-sy)<5)return; dragging=true;
+          row.style.opacity='0.55'; row.style.boxShadow='0 6px 16px rgba(15,30,60,.25)'; document.body.style.userSelect='none'; }
         const rows=[...list.querySelectorAll('[data-row]')];
         for(const r of rows){ if(r===row)continue;
           const b=r.getBoundingClientRect();
           if(ev.clientY < b.top + b.height/2){ list.insertBefore(row,r); return; } }
         list.appendChild(row);
       };
-      const up=()=>{
-        window.removeEventListener('pointermove',move);
-        window.removeEventListener('pointerup',up);
+      const up=ev=>{
+        handle.removeEventListener('pointermove',move);
+        handle.removeEventListener('pointerup',up);
+        handle.removeEventListener('pointercancel',up);
+        try{ handle.releasePointerCapture(ev.pointerId); }catch(_){}
         document.body.style.userSelect='';
         row.style.opacity=''; row.style.boxShadow='';
-        G.lineup.order=[...list.querySelectorAll('[data-row]')].map(r=>+r.dataset.ri);  // commit new batting order
-        render(); broadcast();
+        if(dragging){ G.lineup.order=[...list.querySelectorAll('[data-row]')].map(r=>+r.dataset.ri); render(); broadcast(); }   // commit new batting order
       };
-      window.addEventListener('pointermove',move);
-      window.addEventListener('pointerup',up);
+      handle.addEventListener('pointermove',move);
+      handle.addEventListener('pointerup',up);
+      handle.addEventListener('pointercancel',up);
     });
   });
 }
@@ -6191,7 +6201,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v310";
+var APP_VERSION="v311";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
