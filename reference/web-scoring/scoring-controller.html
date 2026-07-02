@@ -4352,7 +4352,7 @@ function actionArea(){
       ${lineupView==="field" ? fieldMapHtml() : `
       <div style="flex-shrink:0;display:flex;align-items:center;justify-content:space-between;background:${T.surface2};border:2px solid ${T.line};border-radius:9px;padding:9px 12px">
         <span style="font-size:14px;color:${T.sage}">Pitcher</span>
-        <button data-act="pickpitch" style="background:transparent;border:none;color:${T.chalk};font-size:18px;font-weight:700;display:flex;align-items:center;gap:8px"><span style="font-family:${MONO};color:${OUR.color}">#${pit.num}</span>${pit.name}<span style="font-size:12px;color:${OUR.color};font-weight:700;margin-left:4px">CHANGE</span></button></div>
+        <button data-act="pickpitch" style="background:transparent;border:none;color:${T.chalk};font-size:18px;font-weight:700;display:flex;align-items:center;gap:8px">${pit?`<span style="font-family:${MONO};color:${OUR.color}">#${pit.num}</span>${pit.name}<span style="font-size:12px;color:${OUR.color};font-weight:700;margin-left:4px">CHANGE</span>`:`<span style="color:${T.sageDim}">— Tap to set pitcher</span>`}</button></div>
       <div id="lineup-list" style="flex:1 1 auto;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:6px">${rows}</div>
       <div style="flex-shrink:0;display:flex;gap:8px">
         <button data-act="addbatter" style="${ghost};flex:1" ${n>=12?"disabled":""}>+ Add batter (EH)</button>
@@ -4920,14 +4920,20 @@ function render(){
   if(viewMode==="scorer" && !canScoreNow()) viewMode="viewer";
   renderToolbar();
   const menu=(mode==="home"||mode==="teams"||mode==="team"||mode==="pickteam"||mode==="newgame"||mode==="lineup"||mode==="pickplayer"||mode==="pickpos"||mode==="editplayer"||mode==="opppickpos"||mode==="opppickpitch"||mode==="oppeditplayer"||mode==="summary"||mode==="settings"||mode==="notifs"||mode==="directory"||mode==="teamstats"||mode==="debug"||mode==="player"||mode==="followcal");
-  if(IS_APP&&window.AllStars.setInGame){ try{ AllStars.setInGame(!menu); }catch(e){} }   // hide native tabs during a game
+  // window.AllStars is re-checked (not just IS_APP, which is a const latched once at load) because the
+  // Android WebView's JS bridge object can go stale after a lifecycle event (backgrounding, rotation) —
+  // if that happens, `window.AllStars.setInGame` alone throws a TypeError since IS_APP stays true forever
+  // but the property access is on undefined. That throw aborts the REST of render() before the mode's
+  // actual content paints — every action looks like it silently does nothing (reported: "Start game
+  // button doesn't work" — the tap DID fire and DID change mode, it just never got drawn). (v313)
+  if(IS_APP&&window.AllStars&&window.AllStars.setInGame){ try{ AllStars.setInGame(!menu); }catch(e){} }   // hide native tabs during a game
   // Push the live score to the native compositor so it's burned into the broadcast.
-  if(IS_APP&&!menu&&window.AllStars.setScore){ try{
+  if(IS_APP&&!menu&&window.AllStars&&window.AllStars.setScore){ try{
     AllStars.setScore(TEAMS.away.short||"AWAY", TEAMS.home.short||"HOME",
       G.away|0, G.home|0, G.inning|0, G.half==="T", G.balls|0, G.strikes|0, G.outs|0);
   }catch(e){} }
   // Push team logos to the native scorebug — only when they change (base64 is big).
-  if(IS_APP&&!menu&&window.AllStars.setTeamLogos){ const al=TEAMS.away.logo||"", hl=TEAMS.home.logo||"";
+  if(IS_APP&&!menu&&window.AllStars&&window.AllStars.setTeamLogos){ const al=TEAMS.away.logo||"", hl=TEAMS.home.logo||"";
     if(al!==window.__lastAwayLogo||hl!==window.__lastHomeLogo){ window.__lastAwayLogo=al; window.__lastHomeLogo=hl; try{ AllStars.setTeamLogos(al,hl); }catch(e){} } }
   if(menu){
     const scroll=mode!=="lineup";
@@ -6216,7 +6222,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v312";
+var APP_VERSION="v313";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
