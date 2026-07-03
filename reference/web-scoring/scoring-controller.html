@@ -1488,7 +1488,11 @@ function correctModal(){
         <div style="display:flex;align-items:center;gap:10px"><div style="flex:1;font-family:${MONO};font-size:18px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:${T.lime}">Correct the game</div>
           <button data-act="correctclose" style="${ghost};padding:8px 14px;flex:none">Done</button></div>
         <div style="font-size:12px;color:${T.sage};margin-top:-4px">Directly fix the count, outs, score &amp; inning. Each change is undoable.</div>
-        <div style="font-size:10px;font-weight:800;letter-spacing:1px;color:${T.sageDim};margin:4px 2px 0">COUNT &amp; OUTS</div>
+        <div style="font-size:10px;font-weight:800;letter-spacing:1px;color:${T.sageDim};margin:4px 2px 0">HOME / AWAY</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;background:${T.surface2};border:2px solid ${T.line};border-radius:12px;padding:10px 12px">
+          <div style="min-width:0"><div style="font-weight:700;color:${T.ink};font-size:15px">${(OUR.short||"Us").replace(/</g,"")} is ${G.ourSide==="home"?"Home":"Away"}</div><div style="font-size:11px;color:${T.sageDim}">Swaps the score, line score &amp; batting order together — undoable</div></div>
+          <button data-act="swapsides" style="background:${T.surface};border:2px solid ${T.line};color:${T.chalk};border-radius:10px;padding:11px 16px;font-family:${MONO};font-weight:800;font-size:13px;white-space:nowrap;flex:none">&#8646; Swap</button></div>
+        <div style="font-size:10px;font-weight:800;letter-spacing:1px;color:${T.sageDim};margin:6px 2px 0">COUNT &amp; OUTS</div>
         ${step("balls","Balls",G.balls)}
         ${step("strikes","Strikes",G.strikes)}
         ${step("outs","Outs",G.outs)}
@@ -5338,6 +5342,17 @@ document.getElementById("app").addEventListener("click",e=>{
     else if(f==="pitch"){ if(!G.pitches)G.pitches={}; const k=currentPitcherKey(); G.pitches[k]=Math.max(0,(G.pitches[k]||0)+d); G.halfPitches=Math.max(0,(G.halfPitches||0)+d); }
     else if(f==="batter"){ const k=G.half==="T"?"awayPtr":"homePtr"; G[k]=Math.max(0,(G[k]||0)+d); G.balls=0; G.strikes=0; G.ab={pitches:[],loc:null}; }   // skip / go back a batter (C3) — fresh count
     render(); broadcast(); return; }
+  if(act==="swapsides"){ snapshot();
+    // Flip which side WE are — the runs/line-score/batting-pointer swap keeps them attached to the
+    // correct actual team, just relabeled home vs away. Everything else (stats, lineups, bases, half,
+    // outs/balls/strikes) is keyed by our/opp or by whoever's currently up, not by home/away, so it
+    // doesn't need touching. jford, 2026-07-03: fix a wrong home/away pick without restarting the game.
+    G.ourSide=(G.ourSide==="home")?"away":"home";
+    const t=G.home; G.home=G.away; G.away=t;
+    if(!G.line)G.line={away:[],home:[]}; const tl=G.line.home; G.line.home=G.line.away; G.line.away=tl;
+    const tp=G.homePtr; G.homePtr=G.awayPtr; G.awayPtr=tp;
+    flash((OUR.short||"Us")+" is now "+(G.ourSide==="home"?"Home":"Away"));
+    render(); broadcast(); return; }
   if(act==="tventer"){ tvMode=true; watchVidOpen=false; render(); try{ const el=document.documentElement; if(el.requestFullscreen) el.requestFullscreen().catch(function(){}); }catch(e){} return; }
   if(act==="tvexit"){ tvMode=false; try{ if(document.fullscreenElement&&document.exitFullscreen) document.exitFullscreen().catch(function(){}); }catch(e){} render(); return; }
   if(act==="tvcast"){ try{ const el=document.documentElement; if(document.fullscreenElement){ if(document.exitFullscreen)document.exitFullscreen().catch(function(){}); } else if(el.requestFullscreen){ el.requestFullscreen().catch(function(){}); } }catch(e){} flash("Fullscreen on. To cast to a TV: use your phone/tablet's Screen Cast / mirror, or in Chrome tap ⋮ → Cast."); return; }
@@ -6355,7 +6370,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v333";
+var APP_VERSION="v334";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
