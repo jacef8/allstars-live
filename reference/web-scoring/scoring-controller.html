@@ -5932,10 +5932,16 @@ function renderToolbar(){
   // Watching as a listed scorer? Give them an explicit way back into scoring FROM this screen —
   // otherwise the only path was backing all the way out to Home/Team management (jford, 2026-07-03:
   // "what do i do if i DO want to take over scoring?"). Only shown to actual scorers, not plain fans.
+  // v341 follow-up: was background:none (transparent) with T.sage text — jford: "light lettering in
+  // a light background making it hard to see". Given a real, solid fill (matching the WATCHING pill's
+  // own solid-background pattern) instead of a transparent/outline style.
   const _canTakeOver=viewerLocked&&curTeamId&&window.cloudIsScorer&&window.cloudIsScorer(teamById(curTeamId));
-  const takeOverBtn=_canTakeOver?`<button data-act="takeoverlive" data-arg="${curTeamId}" title="Take over scoring this game" style="background:none;border:2px solid ${T.line};color:${T.sage};border-radius:999px;padding:5px 12px;font-family:${MONO};font-weight:800;font-size:11px;letter-spacing:.5px;white-space:nowrap;cursor:pointer">Take over</button>`:"";
+  const takeOverBtn=_canTakeOver?`<button data-act="takeoverlive" data-arg="${curTeamId}" title="Take over scoring this game" style="background:${T.surface2};border:2px solid ${T.lime};color:${T.lime};border-radius:999px;padding:5px 12px;font-family:${MONO};font-weight:800;font-size:11px;letter-spacing:.5px;white-space:nowrap;cursor:pointer">Take over</button>`:"";
+  // The "LC vs FRA" matchup text had NO card/background of its own — just bare text floating on the
+  // toolbar (which itself has no background either) — jford: "toward top left where it says LC vs
+  // FRA, there is no window backing." Wrapped in the same card treatment as the WATCHING pill next to it.
   const chip=(playMode2&&viewerLocked)
-    ? `<div style="display:inline-flex;align-items:center;gap:8px"><span style="display:inline-flex;align-items:center;gap:5px;background:${T.surface};border:2px solid ${T.line};border-radius:999px;padding:5px 11px;font-family:${MONO};font-size:11px;font-weight:800;letter-spacing:1px;color:${T.lime}">${IC('eye',14)} WATCHING</span><span style="font-family:${MONO};font-weight:700;font-size:15px;color:${T.chalk}">${OUR.short||"US"} <span style="color:${T.sageDim};font-weight:600">vs</span> ${OPP.short||"OPP"}</span>${takeOverBtn}</div>`
+    ? `<div style="display:inline-flex;align-items:center;gap:8px"><span style="display:inline-flex;align-items:center;gap:5px;background:${T.surface};border:2px solid ${T.line};border-radius:999px;padding:5px 11px;font-family:${MONO};font-size:11px;font-weight:800;letter-spacing:1px;color:${T.lime}">${IC('eye',14)} WATCHING</span><span style="display:inline-flex;align-items:center;background:${T.surface};border:2px solid ${T.line};border-radius:999px;padding:5px 12px;font-family:${MONO};font-weight:700;font-size:15px;color:${T.chalk}">${OUR.short||"US"} <span style="color:${T.sageDim};font-weight:600">&nbsp;vs&nbsp;</span> ${OPP.short||"OPP"}</span>${takeOverBtn}</div>`
     : playMode2
     ? `<div style="display:inline-flex;gap:2px;background:${T.line};border:2px solid ${T.line};border-radius:10px;overflow:hidden">${roleSeg("scorer","Scorer")}${roleSeg("viewer","Viewer")}</div>`
     : inGame
@@ -6441,7 +6447,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v341";
+var APP_VERSION="v342";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
