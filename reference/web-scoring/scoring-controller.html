@@ -3612,7 +3612,7 @@ function actionArea(){
     const roster=t.players.map((p,i)=>{const _dup=(()=>{const n=(p.num||"").trim(); return n && _numCounts[n]>1;})();
       return `<div style="display:flex;align-items:center;gap:8px;padding:8px 0;${i>0?`border-top:1.5px solid ${T.line};`:""}">
         <span title="Player ${i+1} of ${t.players.length}" style="flex:none;width:26px;text-align:center;font-family:${MONO};font-size:16px;font-weight:800;color:${T.sageDim}">${i+1}</span>
-        <input value="${(p.num||"").replace(/"/g,"&quot;")}" oninput="teamPNum('${p.id}',this.value)" inputmode="numeric" maxlength="3" title="${_dup?"Duplicate number — shared with another player. Stats can be miscounted between them.":""}" style="${cell};width:54px;text-align:center;font-family:${MONO};font-weight:800;font-size:18px${_dup?`;border-color:${T.out};box-shadow:0 0 0 2px ${T.out}55`:""}">
+        <input value="${(p.num||"").replace(/"/g,"&quot;")}" oninput="teamPNum('${p.id}',this.value)" onblur="window.render()" inputmode="numeric" maxlength="3" title="${_dup?"Duplicate number — shared with another player. Stats can be miscounted between them.":""}" style="${cell};width:54px;text-align:center;font-family:${MONO};font-weight:800;font-size:18px${_dup?`;border-color:${T.out};box-shadow:0 0 0 2px ${T.out}55`:""}">
         <input value="${(p.name||"").replace(/"/g,"&quot;")}" oninput="teamPName('${p.id}',this.value)" placeholder="Player name" style="${cell};flex:1 1 200px;min-width:0;font-size:18px">
         ${_dup?`<span title="Duplicate jersey number — stats can be miscounted between these players" style="flex:none;color:${T.out};font-size:18px">${IC('alert',18)}</span>`:`<div style="flex:1;min-width:0"></div>`}
         <button data-act="openplayer" data-arg="${t.id}:${p.id}" title="View / follow player" style="background:${T.surface2};border:2px solid ${T.line};color:${isFollowingPlayer(t.id,p.id)?T.amber:T.lime};border-radius:9px;min-width:48px;height:46px;display:inline-flex;align-items:center;justify-content:center;font-size:24px;font-weight:800;flex:none;line-height:1">${isFollowingPlayer(t.id,p.id)?IC('starFill',22):"&rsaquo;"}</button>
@@ -6498,7 +6498,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v344";
+var APP_VERSION="v345";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
