@@ -104,6 +104,13 @@ fun SrtIngestScreen(onUseTestPattern: () -> Unit = {}) {
     var lensBack by remember { mutableStateOf(prefs.getBoolean("lens_back", true)) }
     // Track YouTube connection so we can show a first-run prompt when it's not set up.
     var ytChannel by remember { mutableStateOf(prefs.getString("yt_channel", null)) }
+    // Opal (or any repeater) between the camera and this tablet: the camera can't reach this
+    // tablet's own local IP anymore (it's behind the repeater's NAT), so the RTMP address shown
+    // for the camera to use has to be the repeater's WAN-side IP instead — see
+    // allstars-opal-repeater-rtmp-toggle memory for the full story. That address is on a subnet
+    // this tablet can't see into, so it's typed in once and remembered, not auto-detected.
+    var usingOpal by remember { mutableStateOf(prefs.getBoolean("using_opal", false)) }
+    var opalWanIp by remember { mutableStateOf(prefs.getString("opal_wan_ip", "") ?: "") }
 
     fun isDevice() = setupMode == "allInOne"
 
@@ -254,6 +261,10 @@ fun SrtIngestScreen(onUseTestPattern: () -> Unit = {}) {
                 onSetupMode = { applyMode(it); restart() },
                 lensBack = lensBack,
                 onLens = { lensBack = it; prefs.edit().putBoolean("lens_back", it).apply(); if (isDevice()) restart() },
+                usingOpal = usingOpal,
+                onUsingOpal = { usingOpal = it; prefs.edit().putBoolean("using_opal", it).apply() },
+                opalWanIp = opalWanIp,
+                onOpalWanIp = { opalWanIp = it; prefs.edit().putString("opal_wan_ip", it).apply() },
                 onRestart = { restart() },
                 onClose = {
                     showSetup = false
@@ -454,15 +465,24 @@ private fun CameraSetupSheet(
     onSetupMode: (String) -> Unit,
     lensBack: Boolean,
     onLens: (Boolean) -> Unit,
+    usingOpal: Boolean,
+    onUsingOpal: (Boolean) -> Unit,
+    opalWanIp: String,
+    onOpalWanIp: (String) -> Unit,
     onRestart: () -> Unit,
     onClose: () -> Unit,
 ) {
     val clipboard = LocalClipboardManager.current
     val ctx = LocalContext.current
     // Re-detect the tablet's IP every 2s so the address shown to the camera is ALWAYS current. When
-    // the Wi-Fi/AP hands out a new IP, a stale address is the #1 reason the Mevo won't connect.
-    var url by remember { mutableStateOf(RtmpHub.currentPublishUrl().ifEmpty { if (publishUrl.startsWith("rtmp://")) publishUrl else "" }) }
-    LaunchedEffect(Unit) { while (true) { val u = RtmpHub.currentPublishUrl(); if (u.isNotEmpty()) url = u; delay(2000) } }
+    // the Wi-Fi/AP hands out a new IP, a stale address is the #1 reason the Mevo won't connect. This
+    // is the tablet's OWN local address — only correct when the camera connects to this tablet
+    // directly. With a repeater (e.g. an Opal) in between, the camera can't reach this address at
+    // all; it needs the repeater's own WAN-side IP instead (typed in below, since this tablet has
+    // no visibility into that separate subnet).
+    var directUrl by remember { mutableStateOf(RtmpHub.currentPublishUrl().ifEmpty { if (publishUrl.startsWith("rtmp://")) publishUrl else "" }) }
+    LaunchedEffect(Unit) { while (true) { val u = RtmpHub.currentPublishUrl(); if (u.isNotEmpty()) directUrl = u; delay(2000) } }
+    val url = if (usingOpal && opalWanIp.isNotBlank()) "rtmp://$opalWanIp:${RtmpHub.port}/live" else directUrl
     val profile = profileOf(profileId)
     val isDevice = setupMode == "allInOne"
     val isPhone = setupMode == "phoneCam"
@@ -568,6 +588,46 @@ private fun CameraSetupSheet(
                             Text(step, color = Color(0xFFE8EAED), fontSize = 14.sp)
                         }
                     }
+                }
+                // ----- Repeater (e.g. GL.iNet Opal) toggle: the camera has to push to a different
+                // address when there's a Wi-Fi repeater between it and this tablet, since this
+                // tablet's own IP is then behind the repeater's NAT and unreachable to the camera. -----
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier.fillMaxWidth().clickable { onUsingOpal(!usingOpal) },
+                ) {
+                    Box(
+                        Modifier
+                            .size(width = 40.dp, height = 24.dp)
+                            .background(if (usingOpal) Color(0xFFA3E635) else Color(0xFF222B36), RoundedCornerShape(999.dp))
+                            .padding(3.dp),
+                    ) {
+                        Box(
+                            Modifier
+                                .size(18.dp)
+                                .background(Color.White, RoundedCornerShape(999.dp))
+                                .then(Modifier.padding(start = if (usingOpal) 16.dp else 0.dp)),
+                        )
+                    }
+                    Text(
+                        "Using a Wi-Fi repeater (Opal, etc.) between the camera and this tablet",
+                        color = Color(0xFFE8EAED), fontSize = 13.sp, fontWeight = FontWeight.Medium,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                if (usingOpal) {
+                    OutlinedTextField(
+                        value = opalWanIp,
+                        onValueChange = onOpalWanIp,
+                        label = { Text("Repeater's WAN IP (from its Internet/status page)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Text(
+                        "This is the repeater's own address on the camera's network — not this tablet's address. Check the repeater's admin page after it connects to the camera's Wi-Fi.",
+                        color = Color(0xFF6B7585), fontSize = 12.sp,
+                    )
                 }
                 // The address the camera/phone pushes RTMP to.
                 Text(
