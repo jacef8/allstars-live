@@ -5911,7 +5911,14 @@ window.cloudMyName=function(){ const u=window.Cloud&&window.Cloud.user; if(!u)re
 window.onCloudAuth=function(u){
   // Signed OUT → drop the cloud listeners AND the local team cache so a shared tablet doesn't keep
   // showing the previous account's teams. (Signing back in re-syncs them from the cloud.)
-  if(!u){ try{ if(window.cloudStopSync)window.cloudStopSync(); }catch(e){} try{ DB.teams=[]; curTeamId=null; openTeamId=null; saveDB(); }catch(e){} try{ if(["team","teams","pickteam","settings"].includes(mode)) mode="home"; }catch(e){} try{ render(); }catch(e){} return; }
+  // EXCEPTION: never do this while a game is active. Firebase's onAuthStateChanged can fire a
+  // transient null (token-refresh hiccup, a WebView reload, a brief network drop) even when the
+  // scorer never touched Sign out — and wiping DB.teams here also nulls curTeamId, which silently
+  // orphans the in-progress game: endGame() then can't find a team to save the record/stats to
+  // (jford, 2026-07-02: "a few times... ended the game and that game has not shown in the team
+  // record or stats"). Losing a live game's data is far worse than a stale team list for a few
+  // seconds, so just skip the wipe until the game ends — the next real auth event catches it then.
+  if(!u){ if(gameActive) return; try{ if(window.cloudStopSync)window.cloudStopSync(); }catch(e){} try{ DB.teams=[]; curTeamId=null; openTeamId=null; saveDB(); }catch(e){} try{ if(["team","teams","pickteam","settings"].includes(mode)) mode="home"; }catch(e){} try{ render(); }catch(e){} return; }
   try{ if(window.cloudSyncTeams)window.cloudSyncTeams(); }catch(e){} try{ if(window.cloudClaimInvite)window.cloudClaimInvite(); }catch(e){} try{ if(window.cloudClaimFollow)window.cloudClaimFollow(); }catch(e){} try{ loadCloudFloat(); }catch(e){} try{ setupLiveHomeWatch(); }catch(e){} try{ if(["home","settings","teams","pickteam"].includes(mode)) mode="home"; }catch(e){} try{ render(); }catch(e){} };   // after sign-in, land on Home
 
 /* ===== Team chat (modal) — real-time messages; owner/scorers/followers can post, owner can delete ===== */
@@ -6315,7 +6322,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v324";
+var APP_VERSION="v325";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
