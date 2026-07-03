@@ -1486,7 +1486,7 @@ function correctModal(){
       <div style="font-weight:700;color:${T.ink};font-size:15px">Half</div>
       <button data-act="corr" data-arg="half:0" style="background:${T.surface};border:2px solid ${T.line};color:${T.chalk};border-radius:10px;padding:11px 18px;font-family:${MONO};font-weight:800;font-size:15px">${G.half==="T"?"▲ TOP":"▼ BOTTOM"} &middot; tap to flip</button></div>`;
   return `<div data-act="correctclose" style="position:fixed;left:0;right:0;top:0;height:calc(var(--avh) * 100);z-index:120;background:rgba(8,11,16,.78);display:flex;align-items:center;justify-content:center;padding:16px">
-      <div data-act="noop" style="width:100%;max-width:440px;max-height:calc(var(--avh) * 92);overflow-y:auto;-webkit-overflow-scrolling:touch;background:${T.surface};border:2px solid ${T.line};border-radius:18px;padding:16px;display:flex;flex-direction:column;gap:10px;box-shadow:0 18px 54px rgba(0,0,0,.6)">
+      <div id="correctModalBody" data-act="noop" style="width:100%;max-width:440px;max-height:calc(var(--avh) * 92);overflow-y:auto;-webkit-overflow-scrolling:touch;background:${T.surface};border:2px solid ${T.line};border-radius:18px;padding:16px;display:flex;flex-direction:column;gap:10px;box-shadow:0 18px 54px rgba(0,0,0,.6)">
         <div style="display:flex;align-items:center;gap:10px"><div style="flex:1;font-family:${MONO};font-size:18px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:${T.lime}">Correct the game</div>
           <button data-act="correctclose" style="${ghost};padding:8px 14px;flex:none">Done</button></div>
         <div style="font-size:12px;color:${T.sage};margin-top:-4px">Directly fix the count, outs, score &amp; inning. Each change is undoable.</div>
@@ -2347,6 +2347,12 @@ function batterCard(){
   const sub=b.ours
     ? `${TEAMS[k].short}${b.pos?` · ${b.pos}`:""} &middot; ${ord} in order`
     : `${TEAMS[k].short||"OPP"} &middot; ${ord} batter`;   // include the team so it's unmistakable
+  // A colored team badge next to AT BAT — the team short name was already in the `sub` text line,
+  // but as small grey text it didn't read as a clear "which team is up" indicator at a glance
+  // (jford, 2026-07-03: "need something in the current batter window indicating what team the
+  // player is on or what team is batting"). Outlined in the team's own color so it's distinct from
+  // the solid AT BAT pill next to it.
+  const teamBadge=`<div title="${(TEAMS[k].name||TEAMS[k].short||"").replace(/</g,"&lt;")} batting" style="display:inline-flex;align-items:center;background:${c}22;border:1.5px solid ${c};color:${c};border-radius:999px;padding:2px 9px;font-family:${MONO};font-size:10px;font-weight:800;letter-spacing:.6px;line-height:1;white-space:nowrap">${(TEAMS[k].short||"?").replace(/</g,"&lt;")}</div>`;
   if(!isWide()){
     // PHONE: the old single-row 4-column squeeze truncated the batter's name to fit alongside the
     // count/pitches/today stats. Stack instead — the name gets its OWN full-width row, using vertical
@@ -2359,6 +2365,7 @@ function batterCard(){
       <div style="display:flex;align-items:center;gap:10px">
         <span style="font-family:${MONO};font-size:22px;font-weight:800;color:${c};line-height:1">${big}</span>
         <div style="display:inline-flex;align-items:center;background:${c};color:#fff;border-radius:999px;padding:3px 10px;font-family:${MONO};font-size:10px;font-weight:800;letter-spacing:1px;line-height:1">AT BAT</div>
+        ${teamBadge}
         <div style="flex:1"></div>
         <button data-act="quickeditbatter" data-arg="${batterKeyOf(b)}" title="Quick edit name/number" style="flex:none;background:${T.surface2};border:2px solid ${T.line};color:${T.chalk};border-radius:9px;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:14px">&#9998;</button>
       </div>
@@ -2372,7 +2379,7 @@ function batterCard(){
   return `<div data-act="reviewbatter" data-arg="${batterKeyOf(b)}" class="frost-card" style="display:flex;align-items:center;gap:13px;background:var(--frost);border:2px solid ${c}66;border-left:5px solid ${c};border-radius:10px;padding:9px 14px;flex-shrink:0;cursor:pointer">
     <span style="font-family:${MONO};font-size:34px;font-weight:700;color:${c};line-height:1;min-width:46px;text-align:center">${big}</span>
     <div style="flex:1;min-width:0">
-      <div style="display:inline-flex;align-items:center;background:${c};color:#fff;border-radius:999px;padding:2px 9px;font-family:${MONO};font-size:10px;font-weight:800;letter-spacing:1px;margin-bottom:4px;line-height:1">AT BAT</div>
+      <div style="display:flex;align-items:center;gap:7px;margin-bottom:4px"><div style="display:inline-flex;align-items:center;background:${c};color:#fff;border-radius:999px;padding:2px 9px;font-family:${MONO};font-size:10px;font-weight:800;letter-spacing:1px;line-height:1">AT BAT</div>${teamBadge}</div>
       <div style="font-family:${MONO};font-size:23px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;line-height:1;color:${T.chalk};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${nameLine}</div>
       <div style="font-size:11px;color:${T.sage};font-weight:500;margin-top:3px">${sub}</div></div>
     <div style="text-align:center;line-height:1;flex:none;border-left:1.5px solid ${T.line};border-right:1.5px solid ${T.line};padding:0 13px">
@@ -2403,7 +2410,7 @@ function batterStrip(){
   return `<div data-act="reviewbatter" data-arg="${batterKeyOf(b)}" class="frost-card" style="flex:1 1 auto;width:100%;display:flex;align-items:center;gap:14px;background:var(--chip);border:2px solid ${c}66;border-left:6px solid ${c};border-radius:10px;padding:8px 16px;cursor:pointer;max-width:100%;min-width:0">
     <span title="Lineup spot" style="font-family:${MONO};font-size:30px;font-weight:800;color:${c};line-height:1;flex:none">${ord}</span>
     <div style="flex:1;min-width:0;text-align:left;display:flex;flex-direction:column;gap:3px">
-      <div style="font-size:10px;letter-spacing:1.5px;font-weight:800;color:${T.sageDim};line-height:1">BATTING ${ordinal(ord)}</div>
+      <div style="font-size:10px;letter-spacing:1.5px;font-weight:800;color:${T.sageDim};line-height:1">BATTING ${ordinal(ord)} &middot; <span style="color:${c}">${(TEAMS[k].short||"?").replace(/</g,"&lt;")}</span></div>
       <div style="font-family:${MONO};font-size:21px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;line-height:1;color:${T.chalk};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${nameLine}</div></div>
     <div style="flex:none;text-align:right;line-height:1.15">
       <div style="font-family:${MONO};font-size:19px;font-weight:800;color:${T.chalk}">${G.balls}-${G.strikes}</div>
@@ -5369,18 +5376,27 @@ document.getElementById("app").addEventListener("click",e=>{
     else if(f==="away"||f==="home"){ G[f]=Math.max(0,(G[f]||0)+d); if(!G.line)G.line={away:[],home:[]}; if(!G.line[f])G.line[f]=[]; G.line[f][G.inning]=Math.max(0,(G.line[f][G.inning]||0)+d); }
     else if(f==="pitch"){ if(!G.pitches)G.pitches={}; const k=currentPitcherKey(); G.pitches[k]=Math.max(0,(G.pitches[k]||0)+d); G.halfPitches=Math.max(0,(G.halfPitches||0)+d); }
     else if(f==="batter"){ const k=G.half==="T"?"awayPtr":"homePtr"; G[k]=Math.max(0,(G[k]||0)+d); G.balls=0; G.strikes=0; G.ab={pitches:[],loc:null}; }   // skip / go back a batter (C3) — fresh count
-    render(); broadcast(); return; }
+    // render() rebuilds the modal from scratch, which resets its scroll to the top by default — jford,
+    // 2026-07-03: "when you make the change it snaps back to top of window." Capture + restore around
+    // the rebuild (rule #3, allstars-recurring-ux-rules: never scroll-to-top on input).
+    { const _sc=document.getElementById("correctModalBody"), _st=_sc?_sc.scrollTop:0;
+      render(); broadcast();
+      const _sc2=document.getElementById("correctModalBody"); if(_sc2)_sc2.scrollTop=_st; }
+    return; }
   if(act==="swapsides"){ snapshot();
     // Flip which side WE are — the runs/line-score/batting-pointer swap keeps them attached to the
     // correct actual team, just relabeled home vs away. Everything else (stats, lineups, bases, half,
     // outs/balls/strikes) is keyed by our/opp or by whoever's currently up, not by home/away, so it
     // doesn't need touching. jford, 2026-07-03: fix a wrong home/away pick without restarting the game.
+    const _sc=document.getElementById("correctModalBody"), _st=_sc?_sc.scrollTop:0;
     G.ourSide=(G.ourSide==="home")?"away":"home";
     const t=G.home; G.home=G.away; G.away=t;
     if(!G.line)G.line={away:[],home:[]}; const tl=G.line.home; G.line.home=G.line.away; G.line.away=tl;
     const tp=G.homePtr; G.homePtr=G.awayPtr; G.awayPtr=tp;
     flash((OUR.short||"Us")+" is now "+(G.ourSide==="home"?"Home":"Away"));
-    render(); broadcast(); return; }
+    render(); broadcast();
+    const _sc2=document.getElementById("correctModalBody"); if(_sc2)_sc2.scrollTop=_st;
+    return; }
   if(act==="tventer"){ tvMode=true; watchVidOpen=false; render(); try{ const el=document.documentElement; if(el.requestFullscreen) el.requestFullscreen().catch(function(){}); }catch(e){} return; }
   if(act==="tvexit"){ tvMode=false; try{ if(document.fullscreenElement&&document.exitFullscreen) document.exitFullscreen().catch(function(){}); }catch(e){} render(); return; }
   if(act==="tvcast"){ try{ const el=document.documentElement; if(document.fullscreenElement){ if(document.exitFullscreen)document.exitFullscreen().catch(function(){}); } else if(el.requestFullscreen){ el.requestFullscreen().catch(function(){}); } }catch(e){} flash("Fullscreen on. To cast to a TV: use your phone/tablet's Screen Cast / mirror, or in Chrome tap ⋮ → Cast."); return; }
@@ -6407,7 +6423,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v338";
+var APP_VERSION="v339";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
