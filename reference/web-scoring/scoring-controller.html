@@ -5702,7 +5702,16 @@ document.getElementById("app").addEventListener("click",e=>{
     });
   }
   else if(act==="resumegame"){G.final=false;gameActive=true;mode="idle";render();broadcast();}   // un-end → game is live again
-  else if(act==="discardgame"){ confirmAct={title:"Discard this game?",msg:"Removes this in-progress game from the Home screen. It is NOT saved to any team's record — use this for an abandoned or test game. This can't be undone.",yes:"Discard",run:function(){ gameActive=false; G=initGame(); curTeamId=null; oppTeamId=null; try{localStorage.removeItem(GAME_KEY);}catch(e){} resetUI(); mode="home"; render(); broadcast(); }}; render(); return; }   // clear a lingering/abandoned Resume ghost
+  else if(act==="discardgame"){ confirmAct={title:"Discard this game?",msg:"Removes this in-progress game from the Home screen. It is NOT saved to any team's record — use this for an abandoned or test game. This can't be undone.",yes:"Discard",run:function(){
+    // End it in the CLOUD too, not just locally — otherwise the live-game doc stays final:false
+    // forever, and every OTHER view that reads it (the Home "in progress · take over" card, another
+    // device's own Resume ghost, etc.) keeps showing this abandoned game as still ongoing even after
+    // you've discarded it here (jford, 2026-07-03: "clicked the x... Franklin County game is still
+    // ongoing... other box still takes me to the game, which is still ongoing").
+    const _cid=G.cloudId||(curTeamId?curTeamId+"-live":null);
+    try{ if(_cid&&window.cloudEndGame)window.cloudEndGame(_cid); }catch(e){}
+    if(curTeamId)delete _liveGames[curTeamId];
+    gameActive=false; G=initGame(); curTeamId=null; oppTeamId=null; try{localStorage.removeItem(GAME_KEY);}catch(e){} resetUI(); mode="home"; render(); broadcast(); }}; render(); return; }   // clear a lingering/abandoned Resume ghost
   else if(act==="summary-done"){gameActive=false;mode="teams";render();broadcast();}
   else if(act==="pickplayer"){editSlot=+arg;mode="pickplayer";render();}
   else if(act==="pickpos"){editSlot=+arg;mode="pickpos";render();}
@@ -6432,7 +6441,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v340";
+var APP_VERSION="v341";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
