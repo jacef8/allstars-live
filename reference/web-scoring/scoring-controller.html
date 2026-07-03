@@ -2222,7 +2222,12 @@ function diamondSVG(){
   const zoneSVG=showZones?zonesOverlay():"";
   const banner=armed?`<div style="position:absolute;inset:0;display:flex;align-items:flex-start;justify-content:center;pointer-events:none;padding-top:8px">
       <span style="background:${T.clay};color:#FFFFFF;font-size:11px;font-weight:800;padding:4px 10px;border-radius:999px;letter-spacing:.3px">Tap where the ball went</span></div>`:"";
-  return `<div id="field-surface" style="height:100%;width:auto;max-width:100%;aspect-ratio:300/280;margin:auto;position:relative;border:2px solid ${T.line};border-radius:10px;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,.5);${armed?"cursor:crosshair":""};touch-action:manipulation">
+  // Border is literal white (not T.line) — the field's own green/turf fill runs edge-to-edge, so
+  // T.line's day-mode grey-blue (meant for a border against a WHITE card) has too little contrast
+  // against both the green field AND the similarly-toned day-mode page background to read as a
+  // frame at all (jford, 2026-07-03: "does not have the white border... like all other windows").
+  // Dark mode's T.line is already literal white, so this only changes the day-mode look.
+  return `<div id="field-surface" style="height:100%;width:auto;max-width:100%;aspect-ratio:300/280;margin:auto;position:relative;border:2px solid #FFFFFF;border-radius:10px;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,.5);${armed?"cursor:crosshair":""};touch-action:manipulation">
     <svg id="field-svg" viewBox="0 0 300 280" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" style="display:block">
       <defs>${markerDefs}</defs>
       <path d="M150,250 L292,108 Q150,-12 8,108 Z" fill="${T.grass}"/>
@@ -6341,7 +6346,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v331";
+var APP_VERSION="v332";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
