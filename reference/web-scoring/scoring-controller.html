@@ -1742,6 +1742,15 @@ function setupLiveHomeWatch(){
     _liveHomeSubs[t.id]=window.cloudSubscribeGameDoc(t.id+"-live",function(doc){
       if(doc&&!doc.final&&doc.summary&&doc.activeUid) _liveGames[t.id]={summary:doc.summary,activeUid:doc.activeUid,activeName:doc.activeName||"",activeAt:doc.activeAt||0};
       else delete _liveGames[t.id];
+      // THIS device's own "Resume game" ghost is purely local (gameActive/G, see GAME_KEY) — it never
+      // knew the game it was last showing got played out AND ended on a DIFFERENT device (the tablet).
+      // Now that we're hearing the live doc say final, clear our own stale ghost too, so Home doesn't
+      // keep offering to "Resume" a game that's actually long over (jford, 2026-07-03: PC still showed
+      // "Resume game · Top 2nd" after the whole game was scored + finished on the tablet). Only touches
+      // OUR local flag for the matching game, and only if we're not the one still actively scoring it.
+      if(doc&&doc.final&&gameActive&&!G.final&&!amActiveScorer&&G.cloudId===(t.id+"-live")){
+        gameActive=false; G.final=true; try{localStorage.removeItem(GAME_KEY);}catch(e){}
+      }
       if(mode==="home")render();
     });
   });
@@ -6423,7 +6432,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v339";
+var APP_VERSION="v340";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
