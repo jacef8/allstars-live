@@ -1626,6 +1626,17 @@ function flashSchedEdit(){
     setTimeout(function(){ try{ el.classList.remove("flash-attn"); }catch(e){} }, 1700);
   }); }catch(e){}
 }
+/* Scroll to + pulse-glow the just-added/just-edited row in the Upcoming list (same flash-attn ring
+   as flashSchedEdit) so it's unmistakable the schedule actually saved it — jford: adding a game gave
+   no confirmation beyond scrolling up and spotting it yourself in the list. */
+function flashSchedRow(id){
+  try{ requestAnimationFrame(function(){
+    var el=document.getElementById("sched-row-"+id); if(!el) return;
+    try{ el.scrollIntoView({behavior:"smooth",block:"center"}); }catch(e){ try{ el.scrollIntoView(); }catch(_){} }
+    el.classList.remove("flash-attn"); void el.offsetWidth; el.classList.add("flash-attn");
+    setTimeout(function(){ try{ el.classList.remove("flash-attn"); }catch(e){} }, 1700);
+  }); }catch(e){}
+}
 
 /* ===== broadcast link — the controller is the single source of truth =====
    Publishes a compact game state on every change. The overlay only listens. */
@@ -3582,7 +3593,7 @@ function actionArea(){
           ${isG?`<button data-act="schedshare" data-arg="${s.id}" title="Send family/fans a watch link for this game" style="background:none;border:2px solid ${T.line};color:${T.lime};border-radius:8px;padding:9px 12px;font-weight:800;font-size:13px;display:inline-flex;align-items:center;gap:5px">${IC('share',15)} Share</button>`:""}
           <button data-act="schededit" data-arg="${s.id}" title="Edit" style="background:${schedEditId===s.id?T.lime:"none"};border:2px solid ${schedEditId===s.id?T.lime:T.line};color:${schedEditId===s.id?"#fff":T.lime};border-radius:8px;padding:9px 14px;font-weight:800;font-size:13px">Edit</button>
           <button data-act="schedrm" data-arg="${s.id}" title="Remove" style="background:none;border:2px solid ${T.line};color:${T.out};border-radius:8px;padding:9px 13px;font-weight:800;font-size:18px">&times;</button></div>`;
-      return `<div style="display:flex;${wide?"flex-direction:row;align-items:center":"flex-direction:column;align-items:stretch"};gap:10px;background:${T.surface2};border:2px solid ${T.line};border-left:6px solid ${isG?OUR.color:T.sage};border-radius:11px;padding:14px 15px${past?";opacity:.6":""}">
+      return `<div id="sched-row-${s.id}" style="display:flex;${wide?"flex-direction:row;align-items:center":"flex-direction:column;align-items:stretch"};gap:10px;background:${T.surface2};border:2px solid ${T.line};border-left:6px solid ${isG?OUR.color:T.sage};border-radius:11px;padding:14px 15px${past?";opacity:.6":""}">
           ${textBlock}${btns}</div>`;};
     // A scheduled GAME counts as played once a finished game exists for the same date (+ opponent if set),
     // so it moves to "Earlier" even if you scored it before its listed time.
@@ -5373,7 +5384,7 @@ document.getElementById("app").addEventListener("click",e=>{
   if(act==="schedadd"){ const t=teamById(openTeamId); if(!t)return; const g=id=>{const e=document.getElementById(id);return e?(e.value||""):"";}; const date=g("schDate"); if(!date){flash("Pick a date");return;} ngDateVal=null;ngDateOpen=false;ngDateYM=null; const _sel=g("schOppSel"); const opp=(_sel==="__new__"?g("schOppNew"):_sel).trim(); if(!Array.isArray(t.schedule))t.schedule=[];
     const fields={type:g("schType")||"game",date:date,time:g("schTime"),opp:opp,loc:g("schLoc").trim(),notes:g("schNotes").trim()};
     if(opp)recordRecentOpp({name:opp},t.id); if(fields.loc)recordRecentLoc(fields.loc);   // remember for next time (this team only)
-    if(schedEditId){ const ex=t.schedule.find(s=>s.id===schedEditId); if(ex)Object.assign(ex,fields); schedEditId=null; saveDB(); try{ if(window.cloudSaveTeam)window.cloudSaveTeam(t); }catch(e){} flash("Schedule updated"); render(); return; }
+    if(schedEditId){ const exId=schedEditId; const ex=t.schedule.find(s=>s.id===exId); if(ex)Object.assign(ex,fields); schedEditId=null; saveDB(); try{ if(window.cloudSaveTeam)window.cloudSaveTeam(t); }catch(e){} flash("Schedule updated"); scheduleView="list"; render(); flashSchedRow(exId); return; }
     const ev=Object.assign({id:"s"+Date.now().toString(36)},fields);
     t.schedule.push(ev); saveDB();
     // Push the team (with the new game) to the cloud IMMEDIATELY — before the chat message below.
@@ -5390,7 +5401,7 @@ document.getElementById("app").addEventListener("click",e=>{
       window.cloudSendMessage(openTeamId,msg); posted=true;
     } }catch(e){}
     flash(posted?"Added — posted to team chat":"Added to schedule");
-    render(); return; }
+    scheduleView="list"; render(); flashSchedRow(ev.id); return; }
   if(act==="openmap"){ try{ openMapLoc(decodeURIComponent(arg||"")); }catch(e){} return; }
   if(act==="schedrm"){ const t=teamById(openTeamId); if(t&&Array.isArray(t.schedule)){ if(schedEditId===arg)schedEditId=null; t.schedule=t.schedule.filter(s=>s.id!==arg);
     if(!Array.isArray(t.deletedSchedule))t.deletedSchedule=[]; t.deletedSchedule.push(arg); if(t.deletedSchedule.length>200)t.deletedSchedule=t.deletedSchedule.slice(-200);   // tombstone so a cloud merge can't resurrect it
@@ -6330,7 +6341,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v329";
+var APP_VERSION="v330";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
