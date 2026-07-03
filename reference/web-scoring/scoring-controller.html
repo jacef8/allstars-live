@@ -3685,13 +3685,13 @@ function actionArea(){
         <div style="${subLbl}">Co-owners &mdash; full management access</div>
         ${(t.coOwners&&t.coOwners.length)?t.coOwners.map(co=>`<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 0;border-top:1.5px solid ${T.line}"><span style="font-size:13px;color:${T.chalk};word-break:break-all">${IC('starFill',14)} ${co.replace(/</g,"")}</span>${owner?`<button data-act="rmcoowner" data-arg="${co}" style="background:none;border:2px solid ${T.line};color:${T.out};border-radius:7px;padding:5px 10px;font-weight:800;font-size:12px">Remove</button>`:""}</div>`).join(""):`<div style="font-size:12px;color:${T.sageDim};padding:2px 0">No co-owners yet.</div>`}
         ${owner?`<div style="display:flex;gap:8px;margin:10px 0 4px"><input id="coOwnerWho" type="email" autocomplete="off" autocapitalize="off" placeholder="Co-owner email" style="${cell};flex:1;min-width:0"><button data-act="addcoowner" style="background:${T.surface2};color:${T.lime};border:2px solid ${T.line};border-radius:8px;padding:9px 16px;font-weight:800;font-size:13px">Add</button></div>
-          <div style="font-size:11px;color:${T.sageDim};margin-top:4px">A co-owner can manage the roster, schedule, scorers &amp; settings — only you can delete the team or change co-owners.</div>`:`<div style="font-size:11px;color:${T.sageDim};margin-top:6px">Only the primary owner can add or remove co-owners.</div>`}</div>`;
+          <div style="font-size:12.5px;color:${T.sageDim};margin-top:4px;line-height:1.4">Manages roster, schedule &amp; scorers. Only you can delete the team or change co-owners.</div>`:`<div style="font-size:12.5px;color:${T.sageDim};margin-top:6px">Only the primary owner can add or remove co-owners.</div>`}</div>`;
     const scorersCard=`<div class="frost-card" style="${cardCss}">
         <div style="font-size:13.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin-bottom:4px">Scorers</div>
-        <div style="font-size:12px;color:${T.sageDim};margin-bottom:4px">Can score games &amp; edit the team — but can't manage owners or delete the team.</div>
+        <div style="font-size:12.5px;color:${T.sageDim};margin-bottom:4px;line-height:1.4">Scores games &amp; edits the team — can't manage owners or delete it.</div>
         ${(t.scorers&&t.scorers.length)?t.scorers.map(s=>`<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 0;border-top:1.5px solid ${T.line}"><span style="font-size:13px;color:${T.chalk};word-break:break-all">${s.replace(/</g,"")}</span>${canManage?`<button data-act="rmscorer" data-arg="${s}" style="background:none;border:2px solid ${T.line};color:${T.out};border-radius:7px;padding:5px 10px;font-weight:800;font-size:12px">Remove</button>`:""}</div>`).join(""):`<div style="font-size:12px;color:${T.sageDim};padding:4px 0">No authorized scorers yet.</div>`}
         ${canManage?`<div style="display:flex;gap:8px;margin-top:10px"><input id="inviteWho" type="text" autocomplete="off" autocapitalize="off" placeholder="Email or phone number" style="${cell};flex:1;min-width:0">${(window.AllStars&&window.AllStars.pickContact)?`<button data-act="pickcontact" title="Pick from contacts" style="background:${T.surface2};color:${T.lime};border:2px solid ${T.line};border-radius:8px;padding:9px 13px;font-size:16px">${IC('user',18)}</button>`:""}<button data-act="inviteadd" style="background:${T.lime};color:#fff;border:none;border-radius:8px;padding:9px 16px;font-weight:800;font-size:13px">Invite</button></div>
-          <div style="font-size:11px;color:${T.sageDim};margin-top:6px">Enter an <b style="color:${T.sage}">email</b> to authorize a scorer, or a <b style="color:${T.sage}">phone number</b> to text them a join link. Either way they sign in once and they're in.</div>`:`<div style="font-size:11px;color:${T.sageDim};margin-top:6px">Only the owner or a co-owner can add scorers.</div>`}</div>`;
+          <div style="font-size:12.5px;color:${T.sageDim};margin-top:6px;line-height:1.4"><b style="color:${T.sage}">Email</b> = instant access. <b style="color:${T.sage}">Phone</b> = texts a join link.</div>`:`<div style="font-size:12.5px;color:${T.sageDim};margin-top:6px">Only the owner or a co-owner can add scorers.</div>`}</div>`;
     const scorersSection = !(C&&C.enabled) ? ""
       : !signedIn ? `<div style="${cardCss}">
           <div style="font-size:13.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin-bottom:6px">Owners &amp; scorers</div>
@@ -3699,12 +3699,12 @@ function actionArea(){
       : ownersCard + scorersCard;
     // Owner-only discovery toggles (public team directory + public stats).
     const toggleRow=(act,on,label,sub)=>`<button data-act="${act}" style="display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;background:${T.surface};border:2px solid ${T.line};border-radius:10px;padding:12px 14px;text-align:left;cursor:pointer">
-        <div style="flex:1;min-width:0"><div style="font-weight:800;color:${T.ink};font-size:14px">${label}</div><div style="font-size:11px;color:${T.sageDim};margin-top:2px;line-height:1.35">${sub}</div></div>
+        <div style="flex:1;min-width:0"><div style="font-weight:800;color:${T.ink};font-size:14px">${label}</div><div style="font-size:12.5px;color:${T.sageDim};margin-top:2px;line-height:1.4">${sub}</div></div>
         <span style="flex:none;width:46px;height:26px;border-radius:13px;background:${on?T.lime:"#0E1726"};border:1.5px solid ${on?T.lime:"#5A6B85"};position:relative;display:inline-block"><span style="position:absolute;top:2px;left:${on?"22px":"2px"};width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.5)"></span></span></button>`;
     const discoverySection = owner ? `<div style="display:flex;flex-direction:column;gap:10px">
         <div style="font-size:13.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime}">Discovery</div>
-        ${toggleRow("togglepublic",!!t.public,"Public team","Anyone can search for this team by name and add it as an opponent in a new game.")}
-        ${toggleRow("togglestatspublic",!!t.statsPublic,"Public season stats","Let people who find your team also see its season stats.")}
+        ${toggleRow("togglepublic",!!t.public,"Public team","Others can find this team by name to add as an opponent.")}
+        ${toggleRow("togglestatspublic",!!t.statsPublic,"Public season stats","Also shows season stats to anyone who finds this team.")}
       </div>` : "";
     // Owner-only: approve parents/players as MEMBERS (team chat + photos + full updates). Fans who follow
     // only see scores/stats/viewer. Pending requests come in here for Approve / Deny.
@@ -3720,7 +3720,7 @@ function actionArea(){
           <button data-act="removemember" data-arg="${esc(em)}" style="background:none;border:1.5px solid ${T.line};color:${T.sageDim};border-radius:7px;padding:6px 11px;font-weight:700;font-size:11px;cursor:pointer">Remove</button></div>`).join("");
       return `<div style="${cardCss}">
           <div style="font-size:13.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin-bottom:4px">Members &amp; requests</div>
-          <div style="font-size:11.5px;color:${T.sageDim};line-height:1.4;margin-bottom:9px">Approved members get <b style="color:${T.sage}">team chat, photos &amp; full updates</b>. Fans who follow only see scores, stats &amp; the live viewer.</div>
+          <div style="font-size:12.5px;color:${T.sageDim};line-height:1.4;margin-bottom:9px">Members get <b style="color:${T.sage}">chat, photos &amp; updates</b>. Followers just see scores &amp; stats.</div>
           ${reqs.length?`<div style="font-size:11px;font-weight:800;letter-spacing:.6px;color:${T.amber};margin:2px 2px 6px">PENDING REQUESTS (${reqs.length})</div><div style="display:flex;flex-direction:column;gap:7px">${reqRows}</div>`:`<div style="font-size:12px;color:${T.sageDim};padding:2px 2px 4px">No pending requests.</div>`}
           ${mems.length?`<div style="font-size:11px;font-weight:800;letter-spacing:.6px;color:${T.sageDim};margin:13px 2px 2px">MEMBERS (${mems.length})</div>${memRows}`:""}
         </div>`;
@@ -3784,7 +3784,11 @@ function actionArea(){
           <div style="font-size:13.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin:0 2px 6px">Lineup name</div>
           <input value="${esc(lu.name)}" oninput="window.luName(this.value)" placeholder="e.g. Vs lefties" style="${cell};width:100%;font-family:${MONO};font-weight:800;font-size:16px">
           <div style="font-size:11px;color:${T.sageDim};margin-top:6px">${n} batting${n>9?" (continuous)":""} &middot; positions fill the field; spots without one bat as EH.${n<9?` <span style="color:${T.out}">Add ${9-n} more to use this in a game.</span>`:""}</div></div>`;
-      const posOpts=()=>["",...POSLIST].map(P=>({v:P,label:P||"EH"}));
+      // Coach-pitch teams field a 4th outfielder (LCF/RCF instead of one CF) — go by the team's default
+      // league since there's no live game here to read cpMode() from (jford, 2026-07-03: this picker
+      // "doesn't list the extra outfield positions" for a coach-pitch team's saved lineup).
+      const _cpLu=!!(leagueById(t.league||"custom").cp);
+      const posOpts=()=>["",...(_cpLu?["P","C","1B","2B","3B","SS","LF","LCF","RCF","RF"]:POSLIST)].map(P=>({v:P,label:P||"EH"}));
       const rows=lu.order.map((id,i)=>{ const p=t.players.find(x=>x.id===id)||{num:"",name:"?"};
         const cur=Object.keys(lu.pos||{}).find(k=>lu.pos[k]===id)||"";
         return `<div data-lurow data-id="${id}" style="display:flex;align-items:center;gap:5px;background:${T.surface2};border:2px solid ${T.line};border-radius:9px;padding:7px 8px">
@@ -3828,9 +3832,9 @@ function actionArea(){
       const seasonSection=`<div class="frost-card" style="background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:9px">
           <div style="font-size:13.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime}">Season</div>
           ${t.archived
-            ? `<div style="font-size:12.5px;color:${T.sage}">This team's season is <b style="color:${T.ink}">ended</b> — it's hidden from the Home screen. Its record &amp; stats are kept.</div>
+            ? `<div style="font-size:13px;color:${T.sage};line-height:1.4"><b style="color:${T.ink}">Ended</b> — hidden from Home. Record &amp; stats are kept.</div>
                <button data-act="reopenseason" data-arg="${t.id}" style="${bigBtn(T.safe,'')};display:flex;align-items:center;justify-content:center;gap:9px">${IC('refresh',17)} Reopen season &middot; show on Home</button>`
-            : `<div style="font-size:12.5px;color:${T.sage}">When the season's over, end it to move this team off the Home screen. Nothing is deleted — the record &amp; stats stay, and you can reopen it anytime.</div>
+            : `<div style="font-size:13px;color:${T.sage};line-height:1.4">Moves this team off Home when the season's done. Nothing is deleted — reopen anytime.</div>
                <button data-act="endseason" data-arg="${t.id}" style="background:none;border:2px solid ${T.clay};color:${T.clay};border-radius:11px;padding:13px;font-family:${MONO};font-weight:800;font-size:14px;letter-spacing:.5px;display:flex;align-items:center;justify-content:center;gap:9px">${IC('flag',16)} End season</button>`}
         </div>`;
       // A live/in-progress game for THIS team → a "View current game" button right here (mirrors Home).
@@ -4430,7 +4434,8 @@ function actionArea(){
     const cell=p=>{const who=playerAtPos(p),sel=p===cur;
       return `<button data-act="setpos" data-arg="${p}" style="display:flex;flex-direction:column;gap:4px;align-items:center;background:${sel?OUR.color:T.surface};border:2px solid ${sel?OUR.color:T.line};color:${sel?"#08111f":T.chalk};border-radius:9px;padding:16px 6px;font-family:${MONO};font-weight:800;font-size:23px">${p}<span style="font-size:13px;font-weight:600;color:${sel?"#08111f":T.sage};max-width:96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${who?who.name:"—"}</span></button>`;};
     const takenByOther=p=>{const h=G.lineup.pos[p];return h!=null&&h!==ri;};
-    const open=POSLIST.filter(p=>!takenByOther(p)), used=POSLIST.filter(takenByOther);
+    const _posList=cpMode()?["P","C","1B","2B","3B","SS","LF","LCF","RCF","RF"]:POSLIST;   // coach pitch: 4 outfielders
+    const open=_posList.filter(p=>!takenByOther(p)), used=_posList.filter(takenByOther);
     const grid=arr=>`<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">${arr.map(cell).join("")}</div>`;
     const div=used.length?`<div style="display:flex;align-items:center;gap:10px;margin:6px 2px"><div style="flex:1;height:1px;background:${T.line}"></div><span style="font-size:10px;font-weight:800;letter-spacing:1px;color:${T.sageDim};white-space:nowrap">TAKEN &middot; TAP TO SWAP</span><div style="flex:1;height:1px;background:${T.line}"></div></div>`:"";
     return step(`${ROSTER[ri].name} — position`,"Open spots first; tap a taken spot to swap.",
@@ -4455,7 +4460,8 @@ function actionArea(){
     const cell=p=>{const oi=oppAtPos(p),who=oi>=0?oppList()[oi]:null,sel=p===cur;const wn=who?(((who.name||"").trim())||("#"+(who.num||""))):"—";
       return `<button data-act="oppsetpos" data-arg="${p}" style="display:flex;flex-direction:column;gap:4px;align-items:center;background:${sel?OPP.color:T.surface};border:2px solid ${sel?OPP.color:T.line};color:${sel?"#08111f":T.chalk};border-radius:9px;padding:16px 6px;font-family:${MONO};font-weight:800;font-size:23px">${p}<span style="font-size:13px;font-weight:600;color:${sel?"#08111f":T.sage};max-width:96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${wn.replace(/</g,"&lt;")}</span></button>`;};
     const takenByOther=p=>{const oi=oppAtPos(p);return oi>=0&&oi!==editSlot;};
-    const open=POSLIST.filter(p=>!takenByOther(p)), used=POSLIST.filter(takenByOther);
+    const _posList=cpMode()?["P","C","1B","2B","3B","SS","LF","LCF","RCF","RF"]:POSLIST;   // coach pitch: 4 outfielders
+    const open=_posList.filter(p=>!takenByOther(p)), used=_posList.filter(takenByOther);
     const grid=arr=>`<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">${arr.map(cell).join("")}</div>`;
     const div=used.length?`<div style="display:flex;align-items:center;gap:10px;margin:6px 2px"><div style="flex:1;height:1px;background:${T.line}"></div><span style="font-size:10px;font-weight:800;letter-spacing:1px;color:${T.sageDim};white-space:nowrap">TAKEN &middot; TAP TO SWAP</span><div style="flex:1;height:1px;background:${T.line}"></div></div>`:"";
     return step(`${(((e.name||"").trim())||("#"+(e.num||"")))} — position`,"Open spots first; tap a taken spot to swap.",
@@ -6322,7 +6328,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v325";
+var APP_VERSION="v326";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
