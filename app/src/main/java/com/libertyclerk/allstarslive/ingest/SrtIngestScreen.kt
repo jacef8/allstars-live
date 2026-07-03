@@ -31,6 +31,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -196,7 +197,30 @@ fun SrtIngestScreen(onUseTestPattern: () -> Unit = {}) {
 
         if (playing) {
             // Top-RIGHT so it doesn't sit under the "‹ Done" exit button (top-left, from MainActivity).
-            LiveChip(Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(14.dp))
+            // The gear is a REQUIRED explicit tap target here, not decoration: the long-press-anywhere
+            // gesture above is applied to this whole Box, but a live SurfaceView sitting on top of it
+            // (actively compositing camera frames, including this tablet's own camera in all-in-one
+            // mode) unreliably eats/cancels that long-press — jford, 2026-07-03: once a signal was
+            // playing, "not able to get out of the tablet camera mode" at all. CameraStatus's own
+            // "Camera setup" button already covers the not-yet-playing case below; this covers the
+            // gap once a picture is actually up, with a real click target instead of relying on the
+            // gesture reaching through the video surface.
+            Row(
+                Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(14.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                LiveChip()
+                Box(
+                    Modifier
+                        .size(34.dp)
+                        .background(Color(0x99000000), RoundedCornerShape(999.dp))
+                        .clickable { showSetup = true },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(Icons.Filled.Settings, contentDescription = "Camera setup", tint = Color.White, modifier = Modifier.size(18.dp))
+                }
+            }
         } else if (ytChannel != null) {
             // Camera not live yet, but YouTube is set up → show the "waiting for camera" status.
             // (When YouTube isn't connected we show the first-run prompt below INSTEAD, so the two
