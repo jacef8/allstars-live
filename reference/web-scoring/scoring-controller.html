@@ -3344,14 +3344,18 @@ function actionArea(){
     // Games live on ANOTHER device for a team I score → "in progress · take over" (cross-device handoff).
     const _esc=x=>String(x==null?"":x).replace(/</g,"&lt;");
     const liveRows = otherLiveGames().map(function(o){ const s=o.live.summary||{}; const who=o.live.activeName?(" &middot; "+_esc(o.live.activeName)):"";
-      // A scorer can take over scoring; a follower (read-only) watches the live game + feed instead.
+      // A scorer CAN take over, but tapping the card itself must never force that — a listed scorer
+      // who just wants to watch shouldn't be dropped into scoring by mistake (jford, 2026-07-03: "i
+      // dont want to take over, i just want to be a viewer"). The card is always a Watch tap target;
+      // scorers get a distinct, smaller "Take over" pill alongside it for when they actually want to.
       const canScore=!!(window.cloudIsScorer&&window.cloudIsScorer(o.team));
-      const act=canScore?"takeoverlive":"watchlive";
-      const cta=canScore?"Take over &rsaquo;":"Watch live &rsaquo;";
-      const sub=canScore?("In progress"+who+" · tap to take over scoring"):("In progress"+who+" · tap to watch live");
-      return `<button data-act="${act}" data-arg="${o.team.id}" style="background:${T.surface};border:2px solid ${T.lime};color:${T.ink};border-radius:13px;padding:15px 18px;display:flex;align-items:center;justify-content:space-between;gap:10px;text-align:left;cursor:pointer">
-        <span style="display:flex;align-items:center;gap:10px;min-width:0"><span style="width:10px;height:10px;border-radius:50%;flex:none;background:#E11D2E;box-shadow:0 0 7px #E11D2E"></span><span style="min-width:0"><span style="font-size:18px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block">${_esc(s.a||"")} ${s.as|0}–${s.hs|0} ${_esc(s.h||"")}</span><span style="font-size:13.5px;color:${T.sage}">${sub}</span></span></span>
-        <span style="font-family:${MONO};font-size:15px;font-weight:800;color:${T.lime};white-space:nowrap">${cta}</span></button>`; }).join("");
+      const sub="In progress"+who+" · tap to watch live";
+      const takeoverPill=canScore?`<button data-act="takeoverlive" data-arg="${o.team.id}" title="Take over scoring" style="background:none;border:2px solid ${T.line};color:${T.sage};border-radius:9px;padding:9px 12px;font-family:${MONO};font-weight:800;font-size:12px;white-space:nowrap;flex:none">Take over</button>`:"";
+      return `<div style="background:${T.surface};border:2px solid ${T.lime};border-radius:13px;padding:15px 18px;display:flex;align-items:center;gap:10px">
+        <button data-act="watchlive" data-arg="${o.team.id}" style="flex:1;min-width:0;background:none;border:none;color:${T.ink};display:flex;align-items:center;justify-content:space-between;gap:10px;text-align:left;cursor:pointer;padding:0">
+          <span style="display:flex;align-items:center;gap:10px;min-width:0"><span style="width:10px;height:10px;border-radius:50%;flex:none;background:#E11D2E;box-shadow:0 0 7px #E11D2E"></span><span style="min-width:0"><span style="font-size:18px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block">${_esc(s.a||"")} ${s.as|0}–${s.hs|0} ${_esc(s.h||"")}</span><span style="font-size:13.5px;color:${T.sage}">${sub}</span></span></span>
+          <span style="font-family:${MONO};font-size:15px;font-weight:800;color:${T.lime};white-space:nowrap;flex:none">Watch &rsaquo;</span></button>
+        ${takeoverPill}</div>`; }).join("");
     const newGameBtn = `<button data-act="newgamestart" style="${bigBtn(T.lime,"font-size:21px;padding:17px;border:2px solid rgba(255,255,255,.92);box-shadow:0 8px 22px rgba(225,29,46,.34)")}">${IC(PLAY)} New Game</button>`;
     const manageBtn = DB.teams.length
       ? `<button data-act="gototeams" style="${ghost};width:100%;padding:17px;font-size:17px;border:2px solid rgba(255,255,255,.55);color:${T.ink};display:flex;align-items:center;justify-content:center;gap:9px">${IC('<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>')} Manage teams &amp; rosters</button>`
@@ -3504,13 +3508,18 @@ function actionArea(){
     const sorted=DB.teams.slice().sort((a,b)=>(b.fav?1:0)-(a.fav?1:0));
     const mkCard=t=>{const R=teamRec(t);const rec=`${R.w}-${R.l}${R.t?"-"+R.t:""}`;const games=R.w+R.l+R.t;const ended=!!t.archived;
       const sub=(()=>{ if(ended)return "Season ended"; const n=new Date(),today=n.getFullYear()+"-"+String(n.getMonth()+1).padStart(2,"0")+"-"+String(n.getDate()).padStart(2,"0");const up=(t.schedule||[]).filter(s=>s.date&&s.date>=today).sort((a,b)=>((a.date+(a.time||""))<(b.date+(b.time||""))?-1:1))[0];if(up){try{return "Next · "+new Date(up.date+"T00:00").toLocaleDateString(undefined,{month:"short",day:"numeric"});}catch(e){return "Next game set";}}return games?(games+" game"+(games===1?"":"s")):"New season";})();
+      // LIVE badge → jump straight to watching, from the Teams list (not just Home) — jford,
+      // 2026-07-03: "needs to be a way to see active game in other places, not just the homescreen."
+      const liveT=_liveGames&&_liveGames[t.id];
+      const liveBadge=liveT?`<button data-act="watchlive" data-arg="${t.id}" title="Watch the live game" style="flex:none;display:flex;align-items:center;gap:5px;background:rgba(225,29,46,.14);border:1.5px solid #E11D2E;color:#E11D2E;border-radius:8px;padding:6px 10px;font-family:${MONO};font-weight:800;font-size:11px;letter-spacing:.5px;cursor:pointer"><span style="width:7px;height:7px;border-radius:50%;background:#E11D2E;box-shadow:0 0 6px #E11D2E"></span>LIVE</button>`:"";
       return `<div style="display:flex;align-items:center;gap:8px;background:${T.surface};border:2px solid ${t.color};border-left:7px solid ${t.color};border-radius:12px;padding:11px 13px;box-shadow:0 6px 16px rgba(0,0,0,.35)${ended?";opacity:.74":""}">
         ${(window.cloudIsScorer&&window.cloudIsScorer(t))?"":`<button data-act="favteam" data-arg="${t.id}" title="Follow this team" style="background:none;border:none;color:${t.fav?T.amber:T.sageDim};font-size:25px;line-height:1;padding:2px 4px;cursor:pointer">${t.fav?IC('starFill',23):IC('star',23)}</button>`}
         <button data-act="opent" data-arg="${t.id}" style="flex:1;min-width:0;display:flex;align-items:center;gap:10px;text-align:left;background:none;border:none;padding:6px 2px;cursor:pointer">
           <div style="flex:1;min-width:0">
             <div style="font-family:${MONO};font-size:22px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.name}${ended?` <span style="font-family:${SANS};font-size:11px;font-weight:800;letter-spacing:.5px;color:${T.sageDim};background:${T.surface2};border:1px solid ${T.line};border-radius:6px;padding:2px 7px;vertical-align:middle">ENDED</span>`:""}</div>
             <div style="display:flex;align-items:baseline;gap:9px;margin-top:5px"><span style="font-family:${MONO};font-size:26px;font-weight:800;color:${t.color};line-height:1">${rec}</span><span style="font-size:13px;color:${T.sage}">${sub}</span></div></div>
-          <span style="color:${t.color};font-weight:800;font-size:15px;letter-spacing:.5px;white-space:nowrap">MANAGE &rsaquo;</span></button></div>`;};
+          <span style="color:${t.color};font-weight:800;font-size:15px;letter-spacing:.5px;white-space:nowrap">MANAGE &rsaquo;</span></button>
+        ${liveBadge}</div>`;};
     const activeCards=sorted.filter(t=>!t.archived).map(mkCard).join("")
       ||`<div style="color:${T.sage};font-size:15px;text-align:center;padding:24px 8px;border:1px dashed ${T.line};border-radius:12px">No active teams — create one, or reopen an ended season below.</div>`;
     const endedCards=sorted.filter(t=>t.archived).map(mkCard).join("");
@@ -3874,10 +3883,15 @@ function actionArea(){
         ? `<button data-act="resume" style="background:#FFFFFF;color:#10141A;border:2px solid ${T.lime};border-radius:13px;padding:14px 18px;display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.25)">
             <span style="display:flex;align-items:center;gap:10px;min-width:0"><span style="width:10px;height:10px;border-radius:50%;flex:none;background:#E11D2E;box-shadow:0 0 7px #E11D2E"></span><span style="font-weight:800;font-size:16px">${IC('<path d="M8 5l11 7-11 7z" fill="currentColor" stroke="none"/>',18)} View current game</span></span>
             <span style="font-family:${MONO};font-weight:800;font-size:13.5px;color:${T.navy};white-space:nowrap">${(OUR.short||"US").replace(/</g,"")} ${ourRuns()}–${oppRuns()} ${(OPP.short||"OPP").replace(/</g,"")} · ${G.half==="T"?"Top":"Bot"} ${ordinal(G.inning)}</span></button>`
-        : (_liveT?(function(){ const s=_liveT.summary||{}; const canScore=!!(window.cloudIsScorer&&window.cloudIsScorer(t)); const act=canScore?"takeoverlive":"watchlive"; const cta=canScore?"Take over &rsaquo;":"Watch live &rsaquo;";
-            return `<button data-act="${act}" data-arg="${t.id}" style="background:${T.surface};border:2px solid ${T.lime};color:${T.ink};border-radius:13px;padding:14px 18px;display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;cursor:pointer">
-              <span style="display:flex;align-items:center;gap:10px;min-width:0"><span style="width:10px;height:10px;border-radius:50%;flex:none;background:#E11D2E;box-shadow:0 0 7px #E11D2E"></span><span style="font-weight:800;font-size:16px">View current game</span></span>
-              <span style="font-family:${MONO};font-weight:800;font-size:13.5px;color:${T.sage};white-space:nowrap">${_le(s.a||"")} ${s.as|0}–${s.hs|0} ${_le(s.h||"")} · ${cta}</span></button>`; })():"");
+        : (_liveT?(function(){ const s=_liveT.summary||{}; const canScore=!!(window.cloudIsScorer&&window.cloudIsScorer(t));
+            // Card itself is always a Watch tap target — a listed scorer who just wants to view
+            // shouldn't get pulled into scoring by mistake; Take over is a separate, explicit pill.
+            const takeoverPill=canScore?`<button data-act="takeoverlive" data-arg="${t.id}" title="Take over scoring" style="background:none;border:2px solid ${T.line};color:${T.sage};border-radius:8px;padding:8px 11px;font-family:${MONO};font-weight:800;font-size:11.5px;white-space:nowrap;flex:none">Take over</button>`:"";
+            return `<div style="background:${T.surface};border:2px solid ${T.lime};border-radius:13px;padding:14px 18px;display:flex;align-items:center;gap:10px;width:100%">
+              <button data-act="watchlive" data-arg="${t.id}" style="flex:1;min-width:0;background:none;border:none;color:${T.ink};display:flex;align-items:center;justify-content:space-between;gap:10px;text-align:left;cursor:pointer;padding:0">
+                <span style="display:flex;align-items:center;gap:10px;min-width:0"><span style="width:10px;height:10px;border-radius:50%;flex:none;background:#E11D2E;box-shadow:0 0 7px #E11D2E"></span><span style="font-weight:800;font-size:16px">View current game</span></span>
+                <span style="font-family:${MONO};font-weight:800;font-size:13.5px;color:${T.sage};white-space:nowrap">${_le(s.a||"")} ${s.as|0}–${s.hs|0} ${_le(s.h||"")} · Watch</span></button>
+              ${takeoverPill}</div>`; })():"");
       return secWrap(`${secHdr("Team management")}${mgmtLiveBtn}${detailsBlock}${rulebookSection}${leagueDefaultSection}${scorersSection}${membersSection}${discoverySection}${seasonSection}`);
     }
     if(teamTab==="schedule") return `<div style="width:100%;max-width:1080px;margin:0 auto;display:flex;flex-direction:column;gap:14px">${secHdr("Schedule")}${scheduleSection}</div>`;
@@ -6370,7 +6384,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v334";
+var APP_VERSION="v335";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
