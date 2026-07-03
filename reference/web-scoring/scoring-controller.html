@@ -2581,7 +2581,12 @@ function monitorPane(){
   // VIEWER pasted a YouTube-live link → embed it + lay the live scorebug on top. Handled before the
   // IS_APP branch so it works on the native app too (the native transparent-camera path is for the
   // SCORER's own broadcast, where the bug is composited natively — a viewer has no local camera).
-  if(_isViewer && viewerVid){
+  // EXCLUDES the native app's own active local broadcast (IS_APP && !_remoteLive) even while toggled
+  // to the "Viewer" preview tab — jford, 2026-07-03: this branch pre-empted the native monitor
+  // entirely, so the camera settings gear (only rendered further down, in the IS_APP branch) never
+  // appeared at all while it was showing a stale pasted video instead — looked like "the youtube
+  // video buttons are on top of" the gear, and like an old video "still playing" after a new game.
+  if(_isViewer && viewerVid && !(IS_APP && !_remoteLive)){
     const _mb="width:34px;height:34px;border-radius:9px;background:rgba(8,11,16,.66);border:1px solid rgba(255,255,255,.22);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer";
     const _linkIco=`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>`;
     return `<div id="monitor" style="position:relative;width:100%;flex:1;min-height:0;background:#0b0f15;border:2px solid ${T.line};border-radius:14px;overflow:hidden;box-shadow:0 6px 22px rgba(0,0,0,.4)">
@@ -5623,7 +5628,11 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="watchlive"){ const teamId=arg;
     if(!(window.Cloud&&window.Cloud.db&&window.cloudSubscribeGameDoc)){ flash("Watching live needs an internet connection"); return; }   // NO login needed — live games are world-readable
     flash("Loading game…");
-    amActiveScorer=false; viewMode="viewer";
+    // Lock to viewer for this session — a listed scorer who explicitly chose "Watch" must not still
+    // see an interactive Scorer/Viewer toggle (canScoreNow() would let them right back into scoring
+    // controls that don't sync). jford, 2026-07-03: "i tapped to just view the game but... i can
+    // still just toggle over to the scorer page." takeoverlive is the explicit escape hatch back in.
+    amActiveScorer=false; viewMode="viewer"; viewerLocked=true;
     if(_watchLiveUnsub){ try{_watchLiveUnsub();}catch(e){} _watchLiveUnsub=null; }
     const _gen=++_watchGen;   // new watch session; invalidates any in-flight delayed updates from a prior one
     _watchLiveUnsub=window.cloudSubscribeGameDoc(teamId+"-live",function(doc){
@@ -5651,7 +5660,7 @@ document.getElementById("app").addEventListener("click",e=>{
       try{ const s=doc.state;
         G=s.G; if(Array.isArray(s.ROSTER))ROSTER=s.ROSTER; if(s.OUR)Object.assign(OUR,s.OUR); if(s.OPP)Object.assign(OPP,s.OPP);
         if(Array.isArray(s.gameFeed))gameFeed=s.gameFeed; if(s.curTeamId)curTeamId=s.curTeamId; if(s.oppTeamId!=null)oppTeamId=s.oppTeamId;
-        gameActive=true; G.cloudId=teamId+"-live"; amActiveScorer=true; _myClaimAt=Date.now(); viewMode="scorer"; _remoteLive=false;
+        gameActive=true; G.cloudId=teamId+"-live"; amActiveScorer=true; _myClaimAt=Date.now(); viewMode="scorer"; viewerLocked=false; _remoteLive=false;
         try{ if(window.cloudClaimScoring)window.cloudClaimScoring(teamId+"-live", myCloudName()); }catch(e){}
         try{ watchLiveTakeover(teamId); }catch(e){}
         hist=[]; resetUI(); mode="idle"; flash("You're now scoring this game"); render(); broadcast();
@@ -6384,7 +6393,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v335";
+var APP_VERSION="v336";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
