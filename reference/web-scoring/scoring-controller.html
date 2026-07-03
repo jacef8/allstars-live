@@ -2744,7 +2744,7 @@ function fieldOverlays(){
   const pc=currentPitchCount(),pn=currentPitcherName();
   const aH=sideHits("away"),hH=sideHits("home");
   const aE=(G.errors&&G.errors.away)||0,hE=(G.errors&&G.errors.home)||0;
-  const box=`position:absolute;z-index:4;background:rgba(9,13,19,.74);border:2px solid ${T.line};border-radius:11px;box-shadow:0 3px 12px rgba(0,0,0,.45)`;
+  const box=`position:absolute;z-index:4;background:var(--frost);border:2px solid ${T.line};border-radius:11px;box-shadow:0 3px 12px rgba(0,0,0,.45)`;
   // Coach pitch already shows its own per-batter "PITCH N OF 5" tag — a running TOTAL game pitch count
   // for "the pitcher" isn't meaningful there (the coach is pitching, not a tracked player). (v321)
   const pcChip=cpMode()?"":`<div style="${box};bottom:8px;left:8px;padding:5px 11px 5px 9px;display:flex;align-items:center;gap:9px;line-height:1">
@@ -2757,7 +2757,7 @@ function fieldOverlays(){
   const cell=(v,act)=>`<td style="text-align:center;padding:1px 8px;font-family:${MONO};font-size:16px;font-weight:800;color:${act?T.chalk:T.sage}">${v}</td>`;
   // Edit/correct lives in the field's empty top-right corner (the fan-shaped field leaves it blank),
   // the same way the pitch count uses the bottom-left — keeps it off the scoreboard.
-  const editChip=`<button data-act="correctopen" title="Correct the count, outs, score &amp; inning" style="position:absolute;z-index:5;top:8px;right:8px;background:rgba(9,13,19,.74);border:2px solid ${T.lime};border-radius:11px;box-shadow:0 3px 12px rgba(0,0,0,.45);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;padding:6px 12px;color:${T.lime};cursor:pointer;pointer-events:auto;font-family:${SANS}"><span style="font-size:20px;line-height:1">&#9998;</span><span style="font-size:9px;font-weight:800;letter-spacing:1px;color:${T.sageDim}">EDIT</span></button>`;
+  const editChip=`<button data-act="correctopen" title="Correct the count, outs, score &amp; inning" style="position:absolute;z-index:5;top:8px;right:8px;background:var(--frost);border:2px solid ${T.lime};border-radius:11px;box-shadow:0 3px 12px rgba(0,0,0,.45);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;padding:6px 12px;color:${T.lime};cursor:pointer;pointer-events:auto;font-family:${SANS}"><span style="font-size:20px;line-height:1">&#9998;</span><span style="font-size:9px;font-weight:800;letter-spacing:1px;color:${T.sageDim}">EDIT</span></button>`;
   return pcChip+editChip;  // R/H/E box removed — the scorebug/top strip is the single scoreboard
 }
 
@@ -5194,7 +5194,7 @@ function render(){
         <div style="flex:1;min-height:0;display:flex;align-items:center;justify-content:center;position:relative">${diamondSVG()}${toastEl}</div></div>`;
     // Thumbnail field: pitch count sits in the empty space to the LEFT (out of the field box). Hidden
     // in coach pitch — no meaningful total-game pitch count for "the pitcher" there. (v321)
-    const pcSide=cpMode()?"":`<div style="flex:none;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(9,13,19,.6);border:2px solid ${T.line};border-radius:11px;padding:8px 14px;line-height:1">
+    const pcSide=cpMode()?"":`<div style="flex:none;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--frost);border:2px solid ${T.line};border-radius:11px;padding:8px 14px;line-height:1">
         <div style="font-family:${MONO};font-size:30px;font-weight:800;color:${T.amber}">${currentPitchCount()}</div>
         <div style="font-size:9px;font-weight:800;letter-spacing:1.4px;color:${T.sageDim};margin-top:3px">PITCHES</div>
         <div style="font-size:11px;font-weight:600;color:${T.sage};max-width:130px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${currentPitcherName()}</div></div>`;
@@ -5895,8 +5895,13 @@ function renderToolbar(){
   // already shows in the scorebug below — no need to repeat it here).
   const scorerLocked=!canScoreNow();   // signed-in follower (not a scorer) → grey the Scorer tab
   const roleSeg=(r,lbl)=>{const lock=(r==="scorer"&&scorerLocked);return `<button data-act="role" data-arg="${r}" title="${lock?'Scorers only — ask the owner for access':''}" style="padding:${isWide()?'8px 14px':'7px 10px'};border:none;font-family:${MONO};font-weight:800;font-size:${isWide()?'13px':'12px'};letter-spacing:.5px;text-transform:uppercase;cursor:${lock?'not-allowed':'pointer'};background:${viewMode===r?T.lime:T.surface};color:${viewMode===r?"#fff":T.sage};${lock?'opacity:.4':''};display:inline-flex;align-items:center;gap:5px">${lbl}${lock?IC('key',12):''}</button>`;};
+  // Watching as a listed scorer? Give them an explicit way back into scoring FROM this screen —
+  // otherwise the only path was backing all the way out to Home/Team management (jford, 2026-07-03:
+  // "what do i do if i DO want to take over scoring?"). Only shown to actual scorers, not plain fans.
+  const _canTakeOver=viewerLocked&&curTeamId&&window.cloudIsScorer&&window.cloudIsScorer(teamById(curTeamId));
+  const takeOverBtn=_canTakeOver?`<button data-act="takeoverlive" data-arg="${curTeamId}" title="Take over scoring this game" style="background:none;border:2px solid ${T.line};color:${T.sage};border-radius:999px;padding:5px 12px;font-family:${MONO};font-weight:800;font-size:11px;letter-spacing:.5px;white-space:nowrap;cursor:pointer">Take over</button>`:"";
   const chip=(playMode2&&viewerLocked)
-    ? `<div style="display:inline-flex;align-items:center;gap:8px"><span style="display:inline-flex;align-items:center;gap:5px;background:${T.surface};border:2px solid ${T.line};border-radius:999px;padding:5px 11px;font-family:${MONO};font-size:11px;font-weight:800;letter-spacing:1px;color:${T.lime}">${IC('eye',14)} WATCHING</span><span style="font-family:${MONO};font-weight:700;font-size:15px;color:${T.chalk}">${OUR.short||"US"} <span style="color:${T.sageDim};font-weight:600">vs</span> ${OPP.short||"OPP"}</span></div>`
+    ? `<div style="display:inline-flex;align-items:center;gap:8px"><span style="display:inline-flex;align-items:center;gap:5px;background:${T.surface};border:2px solid ${T.line};border-radius:999px;padding:5px 11px;font-family:${MONO};font-size:11px;font-weight:800;letter-spacing:1px;color:${T.lime}">${IC('eye',14)} WATCHING</span><span style="font-family:${MONO};font-weight:700;font-size:15px;color:${T.chalk}">${OUR.short||"US"} <span style="color:${T.sageDim};font-weight:600">vs</span> ${OPP.short||"OPP"}</span>${takeOverBtn}</div>`
     : playMode2
     ? `<div style="display:inline-flex;gap:2px;background:${T.line};border:2px solid ${T.line};border-radius:10px;overflow:hidden">${roleSeg("scorer","Scorer")}${roleSeg("viewer","Viewer")}</div>`
     : inGame
@@ -6402,7 +6407,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v337";
+var APP_VERSION="v338";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
