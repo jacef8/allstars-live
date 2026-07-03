@@ -3649,12 +3649,12 @@ function actionArea(){
     const rbRow=(r)=>`<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1.5px solid ${T.line}">
         <button data-act="setrulebook" data-arg="${r.id}" title="Use for this team" style="width:22px;height:22px;flex:none;border-radius:50%;border:2px solid ${rbSel===r.id?T.lime:T.line};background:${rbSel===r.id?T.lime:'transparent'};cursor:pointer"></button>
         <div style="flex:1;min-width:0"><div style="font-weight:700;color:${T.ink};font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${(r.name||'').replace(/</g,'&lt;')}</div>
-          <div style="font-size:11px;color:${T.sageDim}">${r.kind==="text"?IC('doc',13)+" Searchable in-app":(/\.pdf($|\?)/i.test(r.src||"")?IC('doc',13)+" Official PDF &mdash; searchable":IC('link',13)+" Opens official site")}</div></div>
+          <div style="font-size:12px;color:${T.sageDim}">${r.kind==="text"?IC('doc',13)+" Searchable in-app":(/\.pdf($|\?)/i.test(r.src||"")?IC('doc',13)+" Official PDF &mdash; searchable":IC('link',13)+" Opens official site")}</div></div>
         <button data-act="viewrulebook" data-arg="${r.id}" style="background:${T.surface2};color:${T.lime};border:2px solid ${T.line};border-radius:8px;padding:8px 12px;font-weight:800;font-size:12px;white-space:nowrap">View &rsaquo;</button>
         ${r.custom?`<button data-act="rmrulebook" data-arg="${r.id}" style="background:none;border:2px solid ${T.line};color:${T.out};border-radius:8px;padding:8px 10px;font-weight:800;font-size:12px">&times;</button>`:""}</div>`;
     const rulebookSection=`<div class="frost-card" style="background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:14px 16px">
         <div style="font-size:13.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin-bottom:4px">Rulebook</div>
-        <div style="font-size:11px;color:${T.sageDim};margin-bottom:4px;line-height:1.45">Tap the dot to set this team's league (it carries into each game for quick dispute lookups). Tap <b style="color:${T.sage}">View</b> to read any rulebook.</div>
+        <div style="font-size:12.5px;color:${T.sageDim};margin-bottom:4px;line-height:1.4">Tap the dot to set this team's league. Tap <b style="color:${T.sage}">View</b> to read any rulebook.</div>
         ${allRulebooks().map(rbRow).join("")}
         <div style="font-size:12.5px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:${T.sageDim};margin:12px 0 4px">Add a rulebook (name + link)</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -3666,7 +3666,7 @@ function actionArea(){
     const _tl=leagueById(t.league||"custom");
     const leagueDefaultSection=`<div class="frost-card" style="background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:14px 16px">
         <div style="font-size:13.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin-bottom:4px">Default game rules</div>
-        <div style="font-size:11px;color:${T.sageDim};margin-bottom:9px;line-height:1.45">Pick this team's league once — <b style="color:${T.sage}">every new game starts with these rules</b> (innings, run cap, mercy, pitch limit). You can still change them for a single game in New Game setup.</div>
+        <div style="font-size:12.5px;color:${T.sageDim};margin-bottom:9px;line-height:1.4">New games start with these rules (innings, run cap, mercy, pitch limit) — still editable per game.</div>
         ${themedSelect("edTeamLeagueSel",LEAGUES.map(l=>({v:l.id,label:l.name+(l.cp?" ★":"")})),(t.league||"custom"),{onpick:"edTeamLeague",css:`width:100%;max-width:340px;background:${T.surface2};border:2px solid ${T.line};color:${T.ink};border-radius:10px;padding:12px;font-family:${MONO};font-size:15px;font-weight:800;outline:none;display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer;text-align:left`})}
         <div style="font-size:12px;color:${T.sage};margin-top:8px;line-height:1.4">${_tl.note}</div></div>`;
     // Team access (cloud) — owner + authorized scorers. Only when signed in.
@@ -3737,20 +3737,17 @@ function actionArea(){
       const esc=s=>(s==null?"":String(s)).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
       // ---- saved lineups card ----
       const LUs=teamLineups(t), actId=t.activeLineupId||(LUs[0]&&LUs[0].id);
-      const sBtn=(act,id,label,col)=>`<button data-act="${act}" data-arg="${id}" style="flex:1;background:${T.surface};border:2px solid ${T.line};color:${col||T.sage};border-radius:7px;padding:7px 4px;font-size:11px;font-weight:700;letter-spacing:.3px">${label}</button>`;
+      // v327: the whole card is now ONE tap target (open the lineup) — jford: with Make default/Print/
+      // Duplicate/Delete also on the card, "there's not a real clear place to click... hard to know
+      // where to click without clicking one of those buttons if you're just trying to view that
+      // lineup." Those 4 actions moved INSIDE the lineup editor itself (teamTab==="lineupedit"), so
+      // this list row is unambiguous — tap anywhere on it to open.
       const luRow=lu=>{ const idx=lineupToIdx(t,lu),cnt=idx?idx.order.length:0,isDef=lu.id===actId;
-        return `<div style="background:${T.surface2};border:2px solid ${isDef?T.lime:T.line};border-radius:11px;padding:10px 11px;display:flex;flex-direction:column;gap:8px">
-          <button data-act="luedit" data-arg="${lu.id}" style="text-align:left;background:transparent;border:none;color:${T.ink};display:flex;align-items:center;gap:8px;padding:0">
+        return `<button data-act="luedit" data-arg="${lu.id}" style="text-align:left;background:${T.surface2};border:2px solid ${isDef?T.lime:T.line};border-radius:11px;padding:12px 13px;display:flex;align-items:center;gap:8px;color:${T.ink};width:100%">
             <span style="flex:1;min-width:0"><span style="font-family:${MONO};font-weight:800;font-size:15px">${esc(lu.name)}</span>
               <span style="display:block;font-size:11px;color:${T.sage};margin-top:1px">${cnt} batter${cnt===1?"":"s"}${cnt<9?` &middot; needs 9+`:""} &middot; tap to edit</span></span>
-            ${isDef?`<span style="font-size:10px;font-weight:800;color:${T.lime};letter-spacing:.5px">&#9733; DEFAULT</span>`:`<span style="font-size:17px;color:${T.line}">&rsaquo;</span>`}
-          </button>
-          <div style="display:flex;gap:6px">
-            ${isDef?`<div style="flex:1;display:flex;align-items:center;justify-content:center;font-size:11px;color:${T.sageDim}">Loads at game start</div>`:sBtn("ludefault",lu.id,"Make default",T.chalk)}
-            ${sBtn("luprintcard",lu.id,"Print",T.sage)}
-            ${sBtn("ludup",lu.id,"Duplicate",T.sage)}
-            ${sBtn("ludel",lu.id,"Delete",T.out)}
-          </div></div>`; };
+            ${isDef?`<span style="font-size:10px;font-weight:800;color:${T.lime};letter-spacing:.5px;white-space:nowrap">&#9733; DEFAULT</span>`:`<span style="font-size:17px;color:${T.line}">&rsaquo;</span>`}
+          </button>`; };
       const lineupsCard=`<div class="frost-card" style="background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:12px 13px;display:flex;flex-direction:column;gap:9px">
           <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
             <div><div style="font-size:13.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime}">Lineups</div>
@@ -3812,6 +3809,9 @@ function actionArea(){
           <div style="display:flex;gap:8px">
             <button data-act="luprintcard" data-arg="${lu.id}" style="${ghost};flex:1;display:flex;align-items:center;justify-content:center;gap:8px">${ICN.doc} Print card</button>
             <button data-act="ludefault" data-arg="${lu.id}" style="${ghost};flex:1">${lu.id===(t.activeLineupId||(teamLineups(t)[0]&&teamLineups(t)[0].id))?"&#9733; Default":"Make default"}</button></div>
+          <div style="display:flex;gap:8px">
+            <button data-act="ludup" data-arg="${lu.id}" style="${ghost};flex:1">Duplicate</button>
+            <button data-act="ludel" data-arg="${lu.id}" style="${ghost};flex:1;border-color:${T.out};color:${T.out}">Delete</button></div>
           <button data-act="teamtab" data-arg="roster" style="${bigBtn(T.lime,"")}">Done</button>`);
     }
     if(teamTab==="manage"){
@@ -3825,9 +3825,9 @@ function actionArea(){
       const detailsBlock=`<div class="frost-card" style="background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:4px 14px 12px">
           <div style="font-size:13.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};padding:11px 2px 2px">Team details</div>
           ${dRow("Team name",`<label title="Team color — tap to change" style="position:relative;width:16px;align-self:stretch;min-height:44px;flex:none;border-radius:6px;background:${t.color};box-shadow:0 0 0 1px ${T.line};cursor:pointer"><input type="color" value="${t.color}" onchange="window.edTeamColor(this.value)" style="position:absolute;left:0;top:0;width:100%;height:100%;opacity:0;cursor:pointer"></label><input value="${(t.name||"").replace(/"/g,"&quot;")}" oninput="edTeamName(this.value)" placeholder="Team name" style="${cell};flex:1;min-width:150px;font-family:${MONO};font-weight:800;font-size:16px">`,true)}
-          ${dRow("Scoreboard abbr",`<input value="${(t.short||"").replace(/"/g,"&quot;")}" oninput="edTeamAbbr(this.value)" maxlength="6" placeholder="TIGERS" style="${cell};width:120px;text-align:center;font-family:${MONO};font-weight:800;letter-spacing:.5px;text-transform:uppercase"><span style="font-size:11px;color:${T.sageDim}">up to 6 chars &middot; tap the colour bar by the name to set the team colour</span>`)}
+          ${dRow("Scoreboard abbr",`<input value="${(t.short||"").replace(/"/g,"&quot;")}" oninput="edTeamAbbr(this.value)" maxlength="6" placeholder="TIGERS" style="${cell};width:120px;text-align:center;font-family:${MONO};font-weight:800;letter-spacing:.5px;text-transform:uppercase"><span style="font-size:12.5px;color:${T.sageDim}">Up to 6 chars &middot; tap the colour bar to recolor</span>`)}
           ${dRow("Logo",logoCtl)}
-          <div style="font-size:11px;color:${T.sageDim};line-height:1.4;padding:8px 2px 0">The logo shows on team cards, the lineup card &amp; (soon) the scoreboard. A square PNG with a transparent background looks best.</div>
+          <div style="font-size:12.5px;color:${T.sageDim};line-height:1.4;padding:8px 2px 0">Shows on team cards &amp; the lineup card. Square PNG, transparent background works best.</div>
         </div>`;
       const seasonSection=`<div class="frost-card" style="background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:9px">
           <div style="font-size:13.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime}">Season</div>
@@ -5681,7 +5681,7 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="lunew"){ const t=teamById(openTeamId); if(t){ const lu=makeLineup(t); editLineupId=lu.id; teamTab="lineupedit"; render(); } }
   else if(act==="luedit"){ const t=teamById(openTeamId); if(t&&lineupById(t,arg)){ editLineupId=arg; teamTab="lineupedit"; render(); } }
   else if(act==="ludefault"){ const t=teamById(openTeamId); if(t){ t.activeLineupId=arg; saveDB(); render(); } }
-  else if(act==="ludup"){ const t=teamById(openTeamId); const lu=t&&lineupById(t,arg); if(lu){ const c={id:nextId("lu"),name:lu.name+" (copy)",order:(lu.order||[]).slice(),pos:Object.assign({},lu.pos||{})}; teamLineups(t).push(c); saveDB(); render(); } }
+  else if(act==="ludup"){ const t=teamById(openTeamId); const lu=t&&lineupById(t,arg); if(lu){ const c={id:nextId("lu"),name:lu.name+" (copy)",order:(lu.order||[]).slice(),pos:Object.assign({},lu.pos||{})}; teamLineups(t).push(c); saveDB(); flash('Saved as "'+c.name+'"'); render(); } }
   else if(act==="ludel"){ const t=teamById(openTeamId); const lu=t&&lineupById(t,arg); if(lu){ const lid=arg; confirmAct={title:'Delete lineup "'+lu.name+'"?',msg:"This removes the saved lineup. It won't affect any game already played.",yes:"Delete",danger:true,run:function(){ t.lineups=teamLineups(t).filter(l=>l.id!==lid); if(t.activeLineupId===lid)t.activeLineupId=(t.lineups[0]&&t.lineups[0].id)||null; saveDB(); render(); }}; render(); } }
   else if(act==="luprintcard"){ const t=teamById(openTeamId); const lu=t&&lineupById(t,arg); if(t&&lu){ printLineupCard(t,{lineup:lineupToIdx(t,lu)}); } }
   else if(act==="luremove"){ const t=teamById(openTeamId); const lu=t&&lineupById(t,editLineupId); if(lu&&lu.order.length>9){ lu.order=lu.order.filter(id=>id!==arg); Object.keys(lu.pos||{}).forEach(P=>{if(lu.pos[P]===arg)delete lu.pos[P];}); saveDB(); render(); } }
@@ -6328,7 +6328,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v326";
+var APP_VERSION="v327";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
