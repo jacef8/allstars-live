@@ -37,6 +37,7 @@
       lastMsgAt: t.lastMsgAt || 0,                        // newest chat ts → powers home unread badge
       games: t.games || [],                               // finished-game log (Recent games list)
       deletedGames: t.deletedGames || [],                 // tombstoned game ids → additive merge won't resurrect a deleted game
+      deletedSchedule: t.deletedSchedule || [],           // tombstoned schedule-entry ids → additive merge won't resurrect a deleted event
       logo: t.logo || "",                                 // team logo data URL (downscaled ≤240px)
       archived: !!t.archived,                             // season ended → hidden from Home (still in Teams)
     };
@@ -64,6 +65,24 @@
     var out = order.map(function (id) { return byId[id]; });
     out.sort(function (x, y) { var dx = x.date || "", dy = y.date || ""; return dx < dy ? 1 : dx > dy ? -1 : 0; });
     return out.slice(0, 60);
+  }
+  // Union two SCHEDULE arrays by id, same reasoning as unionGames — a schedule entry added on one
+  // device must never vanish because the whole-doc merge picked the OTHER device's (older, entry-
+  // missing) copy on a timestamp race. Local (a) wins an id collision — the device that just
+  // added/edited the entry is presumably the one calling this. Tombstoned (deleted) ids are dropped
+  // from both sides so a deleted event can't resurrect. (jford, 2026-07-03: "created a new game
+  // earlier this morning but it's not in the schedule now" — root cause: schedule was a plain
+  // "newer updatedAt wins the whole doc" scalar, so a stale snapshot arriving after the add's own
+  // push (e.g. racing the chat-message updatedAt bump right after schedadd) could clobber it.)
+  function unionSchedule(a, b, dead) {
+    a = Array.isArray(a) ? a : []; b = Array.isArray(b) ? b : []; dead = dead || {};
+    var byId = {}, order = [];
+    function add(s) { if (!s || !s.id || dead[s.id]) return;
+      if (!(s.id in byId)) { byId[s.id] = s; order.push(s.id); } }
+    a.forEach(add); b.forEach(add);
+    var out = order.map(function (id) { return byId[id]; });
+    out.sort(function (x, y) { var dx = (x.date || "") + (x.time || ""), dy = (y.date || "") + (y.time || ""); return dx < dy ? -1 : dx > dy ? 1 : 0; });
+    return out;
   }
   // Called from saveDB (NOT while applying an inbound snapshot): bump updatedAt for any team whose
   // content actually changed vs its synced baseline. Teams with no baseline yet (never synced this
@@ -290,23 +309,31 @@
           markClean(DB.teams[i]); return;
         }
         // OUR team (owned / scorer / co-owner): CONVERGE instead of whole-doc last-write-wins.
-        //  • the game LOG is additive — unioned by id, so neither device ever loses a game it scored
-        //    (this is the real fix for "the record never updates across devices");
-        //  • scalar config (name/color/players/schedule/archived…) follows the newer timestamp;
+        //  • the game LOG and the SCHEDULE are both additive — unioned by id, so neither device ever
+        //    loses a game it scored OR an event it added (this is the real fix for "the record never
+        //    updates across devices" and for a just-added schedule entry vanishing on a timestamp race);
+        //  • other scalar config (name/color/players/archived…) follows the newer timestamp;
         //  • the RECORD is DERIVED from the unioned log, so it can't disagree with the games.
-        // Merge the game tombstones (union — a delete on EITHER device wins and propagates via the doc),
-        // and exclude tombstoned ids from the unioned log so a deleted game can't resurrect.
+        // Merge the game/schedule tombstones (union — a delete on EITHER device wins and propagates via
+        // the doc), and exclude tombstoned ids from the unioned lists so a deleted item can't resurrect.
         var deadG = {};
         (loc.deletedGames || []).forEach(function (id) { deadG[id] = 1; });
         (c.deletedGames || []).forEach(function (id) { deadG[id] = 1; });
         var unioned = unionGames(loc.games, c.games, deadG);
         var gamesGrew = unioned.length !== ((loc.games || []).length);
+        var deadS = {};
+        (loc.deletedSchedule || []).forEach(function (id) { deadS[id] = 1; });
+        (c.deletedSchedule || []).forEach(function (id) { deadS[id] = 1; });
+        var unionedSched = unionSchedule(loc.schedule, c.schedule, deadS);
+        var schedGrew = unionedSched.length !== ((loc.schedule || []).length);
         var next = (cTs > lTs) ? Object.assign({}, loc, c) : Object.assign({}, loc);   // local scalars stay if we're newer
         next.games = unioned;
         next.deletedGames = Object.keys(deadG).slice(-200);   // carry the merged tombstone set
+        next.schedule = unionedSched;
+        next.deletedSchedule = Object.keys(deadS).slice(-200);
         try { if (typeof teamRec === "function") next.record = teamRec(next); } catch (e) {}
         if (sansTimestamp(next) !== sansTimestamp(loc)) {
-          if (gamesGrew || cTs > lTs) next.updatedAt = Math.max(lTs, cTs) + 1;   // monotonic bump → the converged doc re-pushes & wins
+          if (gamesGrew || schedGrew || cTs > lTs) next.updatedAt = Math.max(lTs, cTs) + 1;   // monotonic bump → the converged doc re-pushes & wins
           DB.teams[i] = next; changed = true; convergedIds[next.id] = true;
         } else if (cTs >= lTs) {
           markClean(DB.teams[i]);   // identical & cloud not behind → in sync, don't echo back

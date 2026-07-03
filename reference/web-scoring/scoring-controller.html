@@ -5392,7 +5392,9 @@ document.getElementById("app").addEventListener("click",e=>{
     flash(posted?"Added — posted to team chat":"Added to schedule");
     render(); return; }
   if(act==="openmap"){ try{ openMapLoc(decodeURIComponent(arg||"")); }catch(e){} return; }
-  if(act==="schedrm"){ const t=teamById(openTeamId); if(t&&Array.isArray(t.schedule)){ if(schedEditId===arg)schedEditId=null; t.schedule=t.schedule.filter(s=>s.id!==arg); saveDB(); try{ if(window.cloudSaveTeam)window.cloudSaveTeam(t); }catch(e){} render(); } return; }
+  if(act==="schedrm"){ const t=teamById(openTeamId); if(t&&Array.isArray(t.schedule)){ if(schedEditId===arg)schedEditId=null; t.schedule=t.schedule.filter(s=>s.id!==arg);
+    if(!Array.isArray(t.deletedSchedule))t.deletedSchedule=[]; t.deletedSchedule.push(arg); if(t.deletedSchedule.length>200)t.deletedSchedule=t.deletedSchedule.slice(-200);   // tombstone so a cloud merge can't resurrect it
+    saveDB(); try{ if(window.cloudSaveTeam)window.cloudSaveTeam(t); }catch(e){} render(); } return; }
   if(act==="schview"){ scheduleView=(arg==="calendar"?"calendar":"list"); try{localStorage.setItem("al-sched-view",scheduleView);}catch(e){} render(); return; }
   if(act==="calprev"||act==="calnext"){ if(!calYM){const d=new Date();calYM={y:d.getFullYear(),m:d.getMonth()};} let mm=calYM.m+(act==="calnext"?1:-1),yy=calYM.y; if(mm<0){mm=11;yy--;} else if(mm>11){mm=0;yy++;} calYM={y:yy,m:mm}; calSelDay=null; render(); return; }
   if(act==="calday"){ calSelDay=(calSelDay===arg?null:arg); render(); return; }
@@ -6328,7 +6330,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v328";
+var APP_VERSION="v329";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
