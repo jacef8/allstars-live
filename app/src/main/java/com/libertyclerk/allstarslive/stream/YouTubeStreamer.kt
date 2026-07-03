@@ -53,6 +53,14 @@ class YouTubeStreamer(
     // camera delivers no audio.
     @Volatile var cameraAudio = false
     @Volatile private var camAudioConfigured = false
+    @Volatile private var camSampleRate = 44100
+
+    // Same anchor-then-advance-by-samples pattern as the mic path below (see the comment on
+    // samplesWritten/firstPtsUs in startAudio) — the camera's AAC arrives over Wi-Fi/RTMP, so it's
+    // even more exposed to scheduling/network jitter than the local mic ever was. Re-deriving PTS
+    // from wall-clock per frame here caused the "garbled/bucket" audio on camera passthrough.
+    private var camSamplesWritten = 0L
+    private var camFirstPtsUs = -1L
 
     private val client: RtmpClient = RtmpClient(object : ConnectChecker {
         override fun onConnectionStarted(url: String) = onStatus("Connecting…")
@@ -114,6 +122,8 @@ class YouTubeStreamer(
 
     // ---- camera-audio passthrough: forward the camera's AAC straight to YouTube ----
     private fun startCameraAudio() {
+        camSamplesWritten = 0L
+        camFirstPtsUs = -1L
         RtmpHub.camAudioConfig?.let { applyCameraAsc(it) }           // config the client from the known ASC
         RtmpHub.onCamAudioConfig = { asc -> applyCameraAsc(asc) }    // and update if it (re)arrives
         RtmpHub.onCamAudio = { aac, _ -> feedCameraAac(aac) }
@@ -125,12 +135,18 @@ class YouTubeStreamer(
         val ch = (asc[1].toInt() shr 3) and 0x0F                                            // channel config
         val rate = AAC_RATES.getOrElse(sfi) { 44100 }
         runCatching { client.setAudioInfo(rate, ch >= 2) }
+        camSampleRate = rate
         camAudioConfigured = true
         Log.i(TAG, "camera audio: ${rate}Hz ch=$ch")
     }
     private fun feedCameraAac(aac: ByteArray) {
         if (!streaming || !camAudioConfigured) return
-        val pts = (System.nanoTime() - avBaseNs) / 1000 + AUDIO_DELAY_US   // shared a/v clock (+tunable offset)
+        // Anchor the first frame to the shared a/v clock once, then advance strictly by samples
+        // written (1024 samples/frame, standard AAC-LC) — NOT wall-clock per frame. See the
+        // comment on camSamplesWritten above and the matching mic-path fix in startAudio().
+        if (camFirstPtsUs < 0L) camFirstPtsUs = (System.nanoTime() - avBaseNs) / 1000 + AUDIO_DELAY_US
+        val pts = camFirstPtsUs + camSamplesWritten * 1_000_000L / camSampleRate
+        camSamplesWritten += 1024L
         val info = MediaCodec.BufferInfo().apply { set(0, aac.size, pts, 0) }
         runCatching { client.sendAudio(ByteBuffer.wrap(aac), info) }
     }
@@ -268,7 +284,7 @@ class YouTubeStreamer(
     fun stop() {
         streaming = false
         shouldStream = false        // intentional end — don't auto-reconnect
-        if (cameraAudio) { RtmpHub.onCamAudio = null; RtmpHub.onCamAudioConfig = null }   // stop forwarding camera audio
+        if (cameraAudio) { RtmpHub.onCamAudio = null; RtmpHub.onCamAudioConfig = null; camFirstPtsUs = -1L; camSamplesWritten = 0L }   // stop forwarding camera audio
         audioThread?.interrupt(); audioThread = null
         runCatching { client.disconnect() }
         runCatching { encoder.stop() }

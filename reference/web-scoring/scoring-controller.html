@@ -1792,6 +1792,24 @@ let viewer360=(()=>{try{return localStorage.getItem("al-watch-360")==="1";}catch
 let watchVidOpen=false,_watchGen=0;
 // iframe permissions for the embedded YouTube player; accelerometer+gyroscope enable 360 phone-tilt.
 const YT_ALLOW="autoplay; encrypted-media; picture-in-picture; accelerometer; gyroscope";
+// YouTube's own native player chrome (play bar, its own settings gear, "more" menu) rendered ON TOP
+// of the app's custom overlay buttons in the same corner — jford, repeatedly: "the youtube video
+// buttons are on top of it"/"can't get to my settings button"/"it's because of the youtube embedded
+// link buttons." Both embeds below now suppress YouTube's native UI (controls=0 etc.) so there's only
+// ONE set of buttons in that corner — the app's own. That also removes YouTube's own volume control
+// (videos start muted, since autoplay requires it), so ytMuteBtn/act==="ytmute" below stand in for it —
+// render() always fully replaces #content's innerHTML (paintContent), recreating the iframe from
+// scratch on every render anyway, so the mute state is just baked into the src's mute= param instead
+// of fighting that via the postMessage IFrame Player API. The re-render happens synchronously inside
+// the button's own click handler, so the browser's autoplay-with-sound gesture check still passes.
+let ytMuted=true;
+const YT_CHROME_OFF="controls=0&disablekb=1&fs=0&iv_load_policy=3&cc_load_policy=0";
+function ytMuteBtn(){
+  const ico=ytMuted
+    ? `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M22 9l-6 6M16 9l6 6"/></svg>`
+    : `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.8 6a9 9 0 0 1 0 12"/></svg>`;
+  return `<button data-act="ytmute" title="${ytMuted?"Unmute video":"Mute video"}" style="width:34px;height:34px;border-radius:9px;background:rgba(8,11,16,.66);border:1px solid rgba(255,255,255,.22);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer">${ico}</button>`;
+}
 // OBS/broadcast OVERLAY mode (H1): ?overlay=1 on a watch link renders ONLY a clean scorebug on a
 // transparent page, so a streamer can drop the URL into a browser source and burn in the live score —
 // even though the video is on a different device. Forces transparent background everywhere.
@@ -2608,9 +2626,9 @@ function monitorPane(){
     const _mb="width:34px;height:34px;border-radius:9px;background:rgba(8,11,16,.66);border:1px solid rgba(255,255,255,.22);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer";
     const _linkIco=`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>`;
     return `<div id="monitor" style="position:relative;width:100%;flex:1;min-height:0;background:#0b0f15;border:2px solid ${T.line};border-radius:14px;overflow:hidden;box-shadow:0 6px 22px rgba(0,0,0,.4)">
-        <iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(viewerVid)}?autoplay=1&mute=1&playsinline=1&modestbranding=1&rel=0" allow="${YT_ALLOW}" allowfullscreen style="position:absolute;inset:0;width:100%;height:100%;border:0"></iframe>
+        <iframe id="ytembed" src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(viewerVid)}?autoplay=1&mute=${ytMuted?1:0}&playsinline=1&modestbranding=1&rel=0&${YT_CHROME_OFF}" allow="${YT_ALLOW}" allowfullscreen style="position:absolute;inset:0;width:100%;height:100%;border:0"></iframe>
         <div style="position:absolute;top:9px;left:10px;display:flex;align-items:center;gap:6px;background:rgba(8,11,16,.62);border-radius:999px;padding:4px 11px;z-index:3"><span style="width:8px;height:8px;border-radius:50%;background:${T.live};box-shadow:0 0 8px ${T.live}"></span><span style="font-family:${MONO};font-weight:800;font-size:11px;letter-spacing:1.6px;color:#fff">LIVE</span>${bugDelay?`<span style="font-family:${MONO};font-size:10px;font-weight:800;color:${T.amber};margin-left:3px">+${bugDelay}s</span>`:""}${viewer360?`<span style="font-family:${MONO};font-size:10px;font-weight:800;color:#7CC4FF;margin-left:3px">360° · drag</span>`:""}</div>
-        <div style="position:absolute;top:9px;right:10px;display:flex;gap:6px;z-index:3"><button data-act="tventer" title="Full-screen TV mode" style="${_mb};width:auto;padding:0 11px;font-family:${MONO};font-weight:800;font-size:12px;letter-spacing:1px">TV</button><button data-act="watchvidopen" title="Change video link / scorebug delay" style="${_mb}">${_linkIco}</button></div>
+        <div style="position:absolute;top:9px;right:10px;display:flex;gap:6px;z-index:3">${ytMuteBtn()}<button data-act="tventer" title="Full-screen TV mode" style="${_mb};width:auto;padding:0 11px;font-family:${MONO};font-weight:800;font-size:12px;letter-spacing:1px">TV</button><button data-act="watchvidopen" title="Change video link / scorebug delay" style="${_mb}">${_linkIco}</button></div>
         <div style="position:absolute;left:8px;right:8px;bottom:8px;z-index:2;pointer-events:none">${statusBar()}</div>
       </div>`;
   }
@@ -2645,7 +2663,7 @@ function monitorPane(){
   const _extYt=(function(){try{return localStorage.getItem("al-ext-stream")==="1";}catch(e){return false;}})();
   const yt=(IS_APP && window.__bcastPhase!=="LIVE" && !_extYt)?"":streamYt();
   const feed=yt
-    ? `<iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(yt)}?autoplay=1&mute=1&playsinline=1&modestbranding=1&rel=0" allow="${YT_ALLOW}" allowfullscreen style="position:absolute;inset:0;width:100%;height:100%;border:0"></iframe>`
+    ? `<iframe id="ytembed" src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(yt)}?autoplay=1&mute=${ytMuted?1:0}&playsinline=1&modestbranding=1&rel=0&${YT_CHROME_OFF}" allow="${YT_ALLOW}" allowfullscreen style="position:absolute;inset:0;width:100%;height:100%;border:0"></iframe>`
     : `<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;padding:0 20px 104px;background:radial-gradient(circle at 50% 34%, #16202e, #0b0f15)">
         <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="${T.sageDim}" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
         <div style="font-family:${MONO};font-weight:800;letter-spacing:2px;font-size:14px;color:${T.sage}">${(viewerLocked||viewMode==="viewer")?"WAITING FOR VIDEO":"CAMERA FEED"}</div>
@@ -2673,6 +2691,7 @@ function monitorPane(){
       ${IS_APP&&appLive()?muteBtn:""}
       ${IS_APP&&appLive()?endBtn:""}
       ${setGear}
+      ${yt?ytMuteBtn():""}
       ${yt?`<button data-act="ytopen" title="Open in YouTube" style="${monBtn}">${ytIcon}</button>`:""}
       ${yt?`<button data-act="fullscreen" title="Fullscreen" style="${monBtn}">${fsIcon}</button>`:""}
     </div>`;
@@ -3377,12 +3396,17 @@ function actionArea(){
       // scorers get a distinct, smaller "Take over" pill alongside it for when they actually want to.
       const canScore=!!(window.cloudIsScorer&&window.cloudIsScorer(o.team));
       const sub="In progress"+who+" · tap to watch live";
-      const takeoverPill=canScore?`<button data-act="takeoverlive" data-arg="${o.team.id}" title="Take over scoring" style="background:none;border:2px solid ${T.line};color:${T.sage};border-radius:9px;padding:9px 12px;font-family:${MONO};font-weight:800;font-size:12px;white-space:nowrap;flex:none">Take over</button>`:"";
+      const takeoverPill=canScore?`<button data-act="takeoverlive" data-arg="${o.team.id}" title="Take over scoring" style="background:${T.surface2};border:2px solid ${T.lime};color:${T.lime};border-radius:9px;padding:9px 12px;font-family:${MONO};font-weight:800;font-size:12px;white-space:nowrap;flex:none">Take over</button>`:"";
+      // Force-end pill: only this team's scorers can see it, and only for a game NOT actively being
+      // scored right now (activeAt is 0/old = stale/abandoned; a genuinely live scorer's activeAt is
+      // fresh) — otherwise it'd invite ending someone else's real in-progress game by mistake.
+      const _stale=!o.live.activeAt||(Date.now()-o.live.activeAt)>5*60*1000;
+      const endPill=(canScore&&_stale)?`<button data-act="endlivegame" data-arg="${o.team.id}" title="End this stuck game for everyone" style="background:${T.surface2};border:2px solid ${T.out};color:${T.out};border-radius:9px;padding:9px 12px;font-family:${MONO};font-weight:800;font-size:12px;white-space:nowrap;flex:none">End</button>`:"";
       return `<div style="background:${T.surface};border:2px solid ${T.lime};border-radius:13px;padding:15px 18px;display:flex;align-items:center;gap:10px">
         <button data-act="watchlive" data-arg="${o.team.id}" style="flex:1;min-width:0;background:none;border:none;color:${T.ink};display:flex;align-items:center;justify-content:space-between;gap:10px;text-align:left;cursor:pointer;padding:0">
           <span style="display:flex;align-items:center;gap:10px;min-width:0"><span style="width:10px;height:10px;border-radius:50%;flex:none;background:#E11D2E;box-shadow:0 0 7px #E11D2E"></span><span style="min-width:0"><span style="font-size:18px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block">${_esc(s.a||"")} ${s.as|0}–${s.hs|0} ${_esc(s.h||"")}</span><span style="font-size:13.5px;color:${T.sage}">${sub}</span></span></span>
           <span style="font-family:${MONO};font-size:15px;font-weight:800;color:${T.lime};white-space:nowrap;flex:none">Watch &rsaquo;</span></button>
-        ${takeoverPill}</div>`; }).join("");
+        ${takeoverPill}${endPill}</div>`; }).join("");
     const newGameBtn = `<button data-act="newgamestart" style="${bigBtn(T.lime,"font-size:21px;padding:17px;border:2px solid rgba(255,255,255,.92);box-shadow:0 8px 22px rgba(225,29,46,.34)")}">${IC(PLAY)} New Game</button>`;
     const manageBtn = DB.teams.length
       ? `<button data-act="gototeams" style="${ghost};width:100%;padding:17px;font-size:17px;border:2px solid rgba(255,255,255,.55);color:${T.ink};display:flex;align-items:center;justify-content:center;gap:9px">${IC('<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>')} Manage teams &amp; rosters</button>`
@@ -3913,12 +3937,18 @@ function actionArea(){
         : (_liveT?(function(){ const s=_liveT.summary||{}; const canScore=!!(window.cloudIsScorer&&window.cloudIsScorer(t));
             // Card itself is always a Watch tap target — a listed scorer who just wants to view
             // shouldn't get pulled into scoring by mistake; Take over is a separate, explicit pill.
-            const takeoverPill=canScore?`<button data-act="takeoverlive" data-arg="${t.id}" title="Take over scoring" style="background:none;border:2px solid ${T.line};color:${T.sage};border-radius:8px;padding:8px 11px;font-family:${MONO};font-weight:800;font-size:11.5px;white-space:nowrap;flex:none">Take over</button>`:"";
+            const takeoverPill=canScore?`<button data-act="takeoverlive" data-arg="${t.id}" title="Take over scoring" style="background:${T.surface2};border:2px solid ${T.lime};color:${T.lime};border-radius:8px;padding:8px 11px;font-family:${MONO};font-weight:800;font-size:11.5px;white-space:nowrap;flex:none">Take over</button>`:"";
+            // Force-end: same 5-minute-since-last-heartbeat staleness gate as the Home version — see
+            // allstars-discardgame-cloud-fix / the "stuck cloud game with no local device to discard
+            // it from" gap this closes. Team management is the natural place for an owner to reach
+            // for this since it's already where End season / other admin actions live.
+            const _staleT=!_liveT.activeAt||(Date.now()-_liveT.activeAt)>5*60*1000;
+            const endPillT=(canScore&&_staleT)?`<button data-act="endlivegame" data-arg="${t.id}" title="End this stuck game for everyone" style="background:${T.surface2};border:2px solid ${T.out};color:${T.out};border-radius:8px;padding:8px 11px;font-family:${MONO};font-weight:800;font-size:11.5px;white-space:nowrap;flex:none">End</button>`:"";
             return `<div style="background:${T.surface};border:2px solid ${T.lime};border-radius:13px;padding:14px 18px;display:flex;align-items:center;gap:10px;width:100%">
               <button data-act="watchlive" data-arg="${t.id}" style="flex:1;min-width:0;background:none;border:none;color:${T.ink};display:flex;align-items:center;justify-content:space-between;gap:10px;text-align:left;cursor:pointer;padding:0">
                 <span style="display:flex;align-items:center;gap:10px;min-width:0"><span style="width:10px;height:10px;border-radius:50%;flex:none;background:#E11D2E;box-shadow:0 0 7px #E11D2E"></span><span style="font-weight:800;font-size:16px">View current game</span></span>
                 <span style="font-family:${MONO};font-weight:800;font-size:13.5px;color:${T.sage};white-space:nowrap">${_le(s.a||"")} ${s.as|0}–${s.hs|0} ${_le(s.h||"")} · Watch</span></button>
-              ${takeoverPill}</div>`; })():"");
+              ${takeoverPill}${endPillT}</div>`; })():"");
       return secWrap(`${secHdr("Team management")}${mgmtLiveBtn}${detailsBlock}${rulebookSection}${leagueDefaultSection}${scorersSection}${membersSection}${discoverySection}${seasonSection}`);
     }
     if(teamTab==="schedule") return `<div style="width:100%;max-width:1080px;margin:0 auto;display:flex;flex-direction:column;gap:14px">${secHdr("Schedule")}${scheduleSection}</div>`;
@@ -5415,6 +5445,7 @@ document.getElementById("app").addEventListener("click",e=>{
   if(act==="watch360"){ viewer360=!viewer360; try{localStorage.setItem("al-watch-360",viewer360?"1":"0");}catch(e){} render(); return; }
   if(act==="watchvidset"){ const el=document.getElementById("watchVidInput"); const raw=el?el.value:""; const id=parseYouTubeId(raw); if(!id){ const h=document.getElementById("watchVidHint"); if(h)h.textContent=/\/(live|streams)\/?($|\?)/i.test(raw)&&!/\/live\/[A-Za-z0-9_-]{11}/i.test(raw)?"That's a channel link, not a specific video — open the stream on YouTube, tap Share, and copy that direct link instead.":"Couldn't read a YouTube link — paste the full watch?v=… / youtu.be/… / live/[video id]… URL."; return; } viewerVid=id; try{localStorage.setItem("al-watch-yt",id);}catch(e){} watchVidOpen=false; render(); return; }
   if(act==="watchvidclear"){ viewerVid=""; try{localStorage.removeItem("al-watch-yt");}catch(e){} watchVidOpen=false; render(); return; }
+  if(act==="ytmute"){ ytMuted=!ytMuted; render(); return; }
   if(act==="abedit"){ editAB=+arg; render(); return; }
   if(act==="abeditclose"){ editAB=null; render(); return; }
   if(act==="abreclass"){ const i=arg.indexOf(":"); reclassAB(+arg.slice(0,i), arg.slice(i+1)); return; }
@@ -5712,6 +5743,15 @@ document.getElementById("app").addEventListener("click",e=>{
     try{ if(_cid&&window.cloudEndGame)window.cloudEndGame(_cid); }catch(e){}
     if(curTeamId)delete _liveGames[curTeamId];
     gameActive=false; G=initGame(); curTeamId=null; oppTeamId=null; try{localStorage.removeItem(GAME_KEY);}catch(e){} resetUI(); mode="home"; render(); broadcast(); }}; render(); return; }   // clear a lingering/abandoned Resume ghost
+  // Force-end a game that's stuck live in the CLOUD as seen from a device that never scored it (no
+  // local ghost/gameActive to "discardgame" here) — jford, 2026-07-03: kept seeing a stuck "Franklin
+  // County" game as still in-progress from the PC, which never had a Resume ghost for it (that only
+  // existed on the tablet that actually scored it) — so the PC had no way to end it at all, only
+  // Watch/Take over. This is the missing escape hatch: same cloudEndGame() the real End Game/Discard
+  // flows use, reachable from any device a scorer is signed into, keyed by team id not local state.
+  else if(act==="endlivegame"){ const _tid=arg; confirmAct={title:"End this live game?",msg:"Marks this game finished for everyone. Use this if it's stuck showing as in-progress and no one is actively scoring it. This can't be undone.",yes:"End game",run:function(){
+    try{ if(window.cloudEndGame)window.cloudEndGame(_tid+"-live"); }catch(e){}
+    delete _liveGames[_tid]; render(); }}; render(); return; }
   else if(act==="summary-done"){gameActive=false;mode="teams";render();broadcast();}
   else if(act==="pickplayer"){editSlot=+arg;mode="pickplayer";render();}
   else if(act==="pickpos"){editSlot=+arg;mode="pickpos";render();}
@@ -6447,7 +6487,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v342";
+var APP_VERSION="v343";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
