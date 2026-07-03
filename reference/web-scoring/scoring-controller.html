@@ -48,7 +48,10 @@
     --chalk:#18222E; --sage:#2C3A4C; --sageDim:#414C5C; --amber:#B77A10; --navy:#2B4A7A;
     --lime:#C21324;   /* deeper red so small accent text/headers read on white */
     --panel:#F4F7FB; --panel-hi:#E7EDF5; --textdim:#38424F; --textmid:#414C5C;
-    --frost:rgba(255,255,255,.86); --drawer:rgba(255,255,255,.72); --chip:rgba(255,255,255,.85);
+    /* v344: bumped from .86/.72/.85 — jford, repeated reports of frosted cards being "extremely hard
+       to see... super light background" in day mode against the bright turf photo. One shared knob
+       instead of chasing each washed-out card as a one-off. */
+    --frost:rgba(255,255,255,.96); --drawer:rgba(255,255,255,.90); --chip:rgba(255,255,255,.95);
     --heroShadow:-1.5px -1.5px 0 rgba(255,255,255,.95),1.5px -1.5px 0 rgba(255,255,255,.95),-1.5px 1.5px 0 rgba(255,255,255,.95),1.5px 1.5px 0 rgba(255,255,255,.95),0 3px 14px rgba(255,255,255,.75);   /* hard outline + glow so the dark wordmark reads on the day turf */
     --clay:#A85F1E; --amber:#9A6606;   /* darken warm accents so they read on white */
     --sbdiv:rgba(0,0,0,.10); --sbpanel2:rgba(0,0,0,.04); --sbpipoff:#A8B4C4;
@@ -81,6 +84,14 @@
   /* Team-color tinted cards (batter card, team tiles): same frosted dark backing so text is
      readable over the turf, with the team color kept as the left accent (set inline). */
   .frost-card{ -webkit-backdrop-filter:blur(13px) saturate(1.1);backdrop-filter:blur(13px) saturate(1.1); }
+  /* v344: section-caption labels (e.g. "Roster — tap to edit…", "Recent games", "Owners") are plain
+     colored text dropped directly between cards — no card background of their own — so on busy/bright
+     turf they can be nearly unreadable (jford: circled one of these, "extremely hard to see"). A
+     translucent card bg can't fix bare text; give every instance of this caption style the same hard
+     outline+glow already used to keep the "ALL-STARS LIVE" wordmark readable on the turf, same
+     attribute-selector trick as the frost-window rule above — covers every current AND future caption
+     using this exact style, not just the ones reported so far. */
+  [style*="text-transform:uppercase;color:var(--lime)"]{text-shadow:var(--heroShadow)!important;}
   button{font-family:var(--sans);cursor:pointer;color:var(--chalk);
     /* Default to the light page text color. <button> does NOT inherit `color` (it resets to
        black), so any button that draws a currentColor icon without setting its own color was
@@ -6487,7 +6498,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v343";
+var APP_VERSION="v344";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
