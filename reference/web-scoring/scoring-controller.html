@@ -2495,14 +2495,23 @@ function setupFloatWins(){
 /* Which YouTube stream the monitor shows: ?yt= wins, else the device-saved one. */
 function streamYt(){ try{ return new URLSearchParams(location.search).get("yt") || localStorage.getItem("al-stream-yt") || ""; }catch(e){ return new URLSearchParams(location.search).get("yt")||""; } }
 /* Accept a full YouTube link (watch?v=, youtu.be/, /live/, /embed/) or a bare id. */
+// A real YouTube video id is always exactly 11 chars of [A-Za-z0-9_-].
+const _YT_ID_RE=/^[A-Za-z0-9_-]{11}$/;
 function parseYouTubeId(s){
   s=(s||"").trim(); if(!s) return "";
   if(!/[\/\s.]/.test(s)) return s;                       // already a bare id
   try{ const u=new URL(s.includes("://")?s:"https://"+s);
     const v=u.searchParams.get("v"); if(v) return v;
     const parts=u.pathname.split("/").filter(Boolean);
-    return parts[parts.length-1]||"";
-  }catch(e){ return s; }
+    const last=parts[parts.length-1]||"";
+    // A channel/handle "watch my live stream" link (e.g. youtube.com/@handle/live or
+    // youtube.com/channel/UC…/live) has NO video id in the URL at all — the last path
+    // segment is literally the word "live", which is NOT an id. Taking it at face value
+    // silently "succeeded" with a bogus id that never plays (jford, 2026-07-03: "on viewer
+    // page when i paste the youtube link nothing happens" — no error shown, video just
+    // never loads). Only accept something that's actually shaped like a real video id.
+    return _YT_ID_RE.test(last)?last:"";
+  }catch(e){ return _YT_ID_RE.test(s)?s:""; }
 }
 
 /* ===== tablet-app bridge (window.AllStars) =====
@@ -5336,7 +5345,7 @@ document.getElementById("app").addEventListener("click",e=>{
   if(act==="watchvidclose"){ watchVidOpen=false; render(); return; }
   if(act==="watchdelay"){ bugDelay=Math.max(0,Math.min(60,bugDelay+(+arg))); try{localStorage.setItem("al-bug-delay",bugDelay);}catch(e){} render(); return; }
   if(act==="watch360"){ viewer360=!viewer360; try{localStorage.setItem("al-watch-360",viewer360?"1":"0");}catch(e){} render(); return; }
-  if(act==="watchvidset"){ const el=document.getElementById("watchVidInput"); const id=el?parseYouTubeId(el.value):""; if(!id){ const h=document.getElementById("watchVidHint"); if(h)h.textContent="Couldn't read a YouTube link — paste the full watch?v=… / youtu.be/… / live/… URL."; return; } viewerVid=id; try{localStorage.setItem("al-watch-yt",id);}catch(e){} watchVidOpen=false; render(); return; }
+  if(act==="watchvidset"){ const el=document.getElementById("watchVidInput"); const raw=el?el.value:""; const id=parseYouTubeId(raw); if(!id){ const h=document.getElementById("watchVidHint"); if(h)h.textContent=/\/(live|streams)\/?($|\?)/i.test(raw)&&!/\/live\/[A-Za-z0-9_-]{11}/i.test(raw)?"That's a channel link, not a specific video — open the stream on YouTube, tap Share, and copy that direct link instead.":"Couldn't read a YouTube link — paste the full watch?v=… / youtu.be/… / live/[video id]… URL."; return; } viewerVid=id; try{localStorage.setItem("al-watch-yt",id);}catch(e){} watchVidOpen=false; render(); return; }
   if(act==="watchvidclear"){ viewerVid=""; try{localStorage.removeItem("al-watch-yt");}catch(e){} watchVidOpen=false; render(); return; }
   if(act==="abedit"){ editAB=+arg; render(); return; }
   if(act==="abeditclose"){ editAB=null; render(); return; }
@@ -6346,7 +6355,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v332";
+var APP_VERSION="v333";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
