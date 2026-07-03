@@ -5396,8 +5396,8 @@ document.getElementById("app").addEventListener("click",e=>{
     let posted=false;
     try{ if(window.cloudSendMessage&&window.Cloud&&window.Cloud.enabled&&window.Cloud.user){
       let when=ev.date; try{ const dt=new Date(ev.date+"T"+(ev.time||"00:00")); if(!isNaN(dt)){ when=dt.toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"}); if(ev.time)when+=" · "+dt.toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"}); } }catch(e){}
-      const head=ev.type==="practice"?"⚾ Practice added":("🏟️ Game added"+(ev.opp?(" vs "+ev.opp):""));
-      let msg="📅 "+head+"\n"+when; if(ev.loc)msg+=" · "+ev.loc; if(ev.notes)msg+="\n"+ev.notes;
+      const head=ev.type==="practice"?"Practice added":("Game added"+(ev.opp?(" vs "+ev.opp):""));
+      let msg=head+"\n"+when; if(ev.loc)msg+=" · "+ev.loc; if(ev.notes)msg+="\n"+ev.notes;
       window.cloudSendMessage(openTeamId,msg); posted=true;
     } }catch(e){}
     flash(posted?"Added — posted to team chat":"Added to schedule");
@@ -6341,7 +6341,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v330";
+var APP_VERSION="v331";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
