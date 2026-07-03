@@ -35,6 +35,7 @@
     --panel:#0D1320; --panel-hi:#16202e; --scrim:rgba(8,11,16,.72); --textdim:#B7C2D6; --textmid:#9AA6B8;
     --frost:rgba(13,19,32,.82);   /* frosted-window backing (see the [style*=…] rule) */
     --drawer:rgba(13,19,32,.55); --chip:rgba(13,19,32,.72);   /* Home drawers + top icon buttons */
+    --sbdiv:rgba(255,255,255,.08); --sbpanel2:rgba(0,0,0,.25); --sbpipoff:#5C6675;   /* scoreBar() (wide scorer board) — was hardcoded dark-only, jford 2026-07-03: "black background... even in day mode" */
     --heroShadow:-1.5px -1.5px 0 rgba(0,0,0,.85),1.5px -1.5px 0 rgba(0,0,0,.85),-1.5px 1.5px 0 rgba(0,0,0,.85),1.5px 1.5px 0 rgba(0,0,0,.85),0 3px 14px rgba(0,0,0,.65);   /* hard outline + glow — a soft shadow alone still blended into the busy blue turf photo */
     --mono:"Barlow",system-ui,-apple-system,sans-serif;
     --sans:"Barlow",system-ui,-apple-system,sans-serif;
@@ -50,6 +51,7 @@
     --frost:rgba(255,255,255,.86); --drawer:rgba(255,255,255,.72); --chip:rgba(255,255,255,.85);
     --heroShadow:-1.5px -1.5px 0 rgba(255,255,255,.95),1.5px -1.5px 0 rgba(255,255,255,.95),-1.5px 1.5px 0 rgba(255,255,255,.95),1.5px 1.5px 0 rgba(255,255,255,.95),0 3px 14px rgba(255,255,255,.75);   /* hard outline + glow so the dark wordmark reads on the day turf */
     --clay:#A85F1E; --amber:#9A6606;   /* darken warm accents so they read on white */
+    --sbdiv:rgba(0,0,0,.10); --sbpanel2:rgba(0,0,0,.04); --sbpipoff:#A8B4C4;
   }
   /* Day mode: lighten the turf backdrop so the page reads bright, and flip the native date/time pickers. */
   body.day{ background:linear-gradient(rgba(255,255,255,.30),rgba(210,224,240,.55)), url("bg-turf.jpg") center center / cover no-repeat #E9EEF5; }
@@ -2701,28 +2703,32 @@ function scoreBar(){
   // v324: stretches to fill the column width (was content-sized, leaving a lot of dead space to the
   // right on a wide screen — jford: "too small... could fill to the right"). Not broadcast-shared, so
   // free to enlarge — unlike statusBar()/bugPreviewHtml(), nothing else depends on this box's size.
+  // v337: was hardcoded dark-only (jford: "black background on scorer page even in day mode") — now
+  // uses theme vars (--panel/--panel-hi/--ink/--textmid/--textdim + new --sbdiv/--sbpanel2/--sbpipoff)
+  // so it actually flips with Day mode, like every other card. statusBar()/bugPreviewHtml() (the real
+  // broadcast bug) are untouched and still stay dark by design.
   const col=t=>TEAMS[t].color;
   const tabRow=(t,val,act)=>{const c=col(t),lg=(TEAMS.away.logo&&TEAMS.home.logo)?TEAMS[t].logo:null;return `<div style="position:relative;display:flex;align-items:center;gap:13px;height:52px;padding:0 18px 0 0;background:${act?`linear-gradient(90deg,${c}33,transparent 75%)`:"transparent"}">
       <span style="width:6px;align-self:stretch;background:${c};flex:none"></span>
       ${lg?`<img src="${lg}" alt="" style="width:32px;height:32px;object-fit:contain;border-radius:6px;background:#fff;flex:none;${act?"":"opacity:.55"}">`:`<span style="width:32px;height:32px;border-radius:6px;flex:none;background:${c};display:inline-flex;align-items:center;justify-content:center;font-family:${MONO};font-size:16px;font-weight:800;color:${idealText(c)}">${(TEAMS[t].short||"?").slice(0,1)}</span>`}
-      <span style="font-family:${MONO};font-weight:800;font-size:24px;letter-spacing:.5px;color:${act?"#fff":"#9AA6B8"};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${TEAMS[t].short}</span>
+      <span style="font-family:${MONO};font-weight:800;font-size:24px;letter-spacing:.5px;color:${act?"var(--ink)":"var(--textmid)"};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${TEAMS[t].short}</span>
       ${act?`<span title="at bat" style="width:8px;height:8px;border-radius:50%;background:${c};box-shadow:0 0 8px ${c};flex:none"></span>`:`<span style="width:8px;flex:none"></span>`}
-      <span style="margin-left:auto;padding-left:14px;font-family:${MONO};font-weight:800;font-size:42px;line-height:1;color:${act?"#fff":"#C2CBD8"}">${val}</span></div>`;};
-  const b=G.bases,base=(x,y,on)=>`<rect x="${x-8.5}" y="${y-8.5}" width="17" height="17" rx="2.5" transform="rotate(45 ${x} ${y})" fill="${on?T.clay:"none"}" stroke="${on?T.clay:"#5C6675"}" stroke-width="2.5"/>`;
+      <span style="margin-left:auto;padding-left:14px;font-family:${MONO};font-weight:800;font-size:42px;line-height:1;color:${act?"var(--ink)":"var(--textmid)"}">${val}</span></div>`;};
+  const b=G.bases,base=(x,y,on)=>`<rect x="${x-8.5}" y="${y-8.5}" width="17" height="17" rx="2.5" transform="rotate(45 ${x} ${y})" fill="${on?T.clay:"none"}" stroke="${on?T.clay:"var(--sbpipoff)"}" stroke-width="2.5"/>`;
   const diamond=`<svg width="58" height="50" viewBox="0 0 48 44" style="overflow:visible">${base(24,11,b[2])}${base(37,24,b[1])}${base(11,24,b[3])}</svg>`;
-  const pip=(on,c)=>`<span style="width:15px;height:15px;border-radius:50%;background:${on?c:"transparent"};border:2.5px solid ${on?c:"#5C6675"};display:inline-block"></span>`;
-  const pipRow=(label,n,max,c)=>`<div style="display:flex;align-items:center;gap:6px"><span style="font-family:${MONO};font-size:13px;font-weight:800;color:#6B7686;width:12px">${label}</span>${Array.from({length:max},(_,i)=>pip(i<n,c)).join("")}</div>`;
-  const labeled=(label,inner)=>`<div style="display:flex;flex-direction:column;align-items:center;gap:4px"><div style="font-family:${MONO};font-size:9px;font-weight:800;letter-spacing:1px;color:#6B7686">${label}</div>${inner}</div>`;
-  return `<div id="scorebar" data-longpress="correct" title="Tap the pencil (or hold) to correct the count / outs / score" style="position:relative;display:flex;width:100%;align-items:stretch;background:linear-gradient(180deg,#11151c 0%,#070a0e 100%);border:1.5px solid rgba(255,255,255,.16);border-radius:11px;overflow:hidden;flex-shrink:0;box-shadow:0 10px 26px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.06);user-select:none;-webkit-user-select:none;-webkit-touch-callout:none">
+  const pip=(on,c)=>`<span style="width:15px;height:15px;border-radius:50%;background:${on?c:"transparent"};border:2.5px solid ${on?c:"var(--sbpipoff)"};display:inline-block"></span>`;
+  const pipRow=(label,n,max,c)=>`<div style="display:flex;align-items:center;gap:6px"><span style="font-family:${MONO};font-size:13px;font-weight:800;color:var(--textdim);width:12px">${label}</span>${Array.from({length:max},(_,i)=>pip(i<n,c)).join("")}</div>`;
+  const labeled=(label,inner)=>`<div style="display:flex;flex-direction:column;align-items:center;gap:4px"><div style="font-family:${MONO};font-size:9px;font-weight:800;letter-spacing:1px;color:var(--textdim)">${label}</div>${inner}</div>`;
+  return `<div id="scorebar" data-longpress="correct" title="Tap the pencil (or hold) to correct the count / outs / score" style="position:relative;display:flex;width:100%;align-items:stretch;background:linear-gradient(180deg,var(--panel-hi) 0%,var(--panel) 100%);border:1.5px solid var(--line);border-radius:11px;overflow:hidden;flex-shrink:0;box-shadow:0 10px 26px rgba(0,0,0,.4);user-select:none;-webkit-user-select:none;-webkit-touch-callout:none">
     <div style="flex:1;display:flex;flex-direction:column;justify-content:center;min-width:200px;padding:0">
       ${tabRow("away",G.away,G.half==="T")}
-      <div style="height:1px;background:rgba(255,255,255,.08);margin:0 0 0 6px"></div>
+      <div style="height:1px;background:var(--sbdiv);margin:0 0 0 6px"></div>
       ${tabRow("home",G.home,G.half==="B")}</div>
-    <div style="width:1px;background:rgba(255,255,255,.13)"></div>
-    <div style="flex:none;display:flex;align-items:center;gap:22px;padding:0 26px;background:rgba(0,0,0,.25)">
-      ${labeled(G.half==="T"?"TOP":"BOT",`<div style="font-family:${MONO};font-size:28px;font-weight:800;color:#fff;line-height:1">${G.half==="T"?"▲":"▼"}${G.inning}</div>`)}
-      <div style="display:flex;flex-direction:column;gap:5px">${pipRow("B",G.balls,3,T.amber)}${pipRow("S",G.strikes,2,T.out)}${pipRow("O",G.outs,3,"#C2CBD8")}</div>
-      ${G.startedAt?labeled("TIME",`<div style="font-family:${MONO};font-size:16px;font-weight:700;color:#9AA6B8;white-space:nowrap"><span class="game-clock">${gameClockStr()}</span></div>`):""}
+    <div style="width:1px;background:var(--line)"></div>
+    <div style="flex:none;display:flex;align-items:center;gap:22px;padding:0 26px;background:var(--sbpanel2)">
+      ${labeled(G.half==="T"?"TOP":"BOT",`<div style="font-family:${MONO};font-size:28px;font-weight:800;color:var(--ink);line-height:1">${G.half==="T"?"▲":"▼"}${G.inning}</div>`)}
+      <div style="display:flex;flex-direction:column;gap:5px">${pipRow("B",G.balls,3,T.amber)}${pipRow("S",G.strikes,2,T.out)}${pipRow("O",G.outs,3,"var(--textmid)")}</div>
+      ${G.startedAt?labeled("TIME",`<div style="font-family:${MONO};font-size:16px;font-weight:700;color:var(--textmid);white-space:nowrap"><span class="game-clock">${gameClockStr()}</span></div>`):""}
     </div>
   </div>`;
 }
@@ -5180,8 +5186,11 @@ function render(){
     // Viewer: watch only, NO scoring tools. With video ON, the RIGHT side stacks the ball
     // field + a trimmed game feed; the ⇅ toggle flips which one is the big one. Video OFF =
     // field beside the full feed.
+    // v337: was miniCount() (a plain text score line) here — with video off (or not yet loaded),
+    // a wide viewer had NO actual scoreboard at all, just that one line (jford: "viewer page has no
+    // scoreboard"). Swapped for scoreBar(), matching what the scorer's own video-off wide view shows.
     const fieldBig=`<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px">
-        ${miniCount()}${batterCard()}
+        ${scoreBar()}${batterCard()}
         <div style="flex:1;min-height:0;display:flex;align-items:center;justify-content:center;position:relative">${diamondSVG()}${toastEl}</div></div>`;
     // Thumbnail field: pitch count sits in the empty space to the LEFT (out of the field box). Hidden
     // in coach pitch — no meaningful total-game pitch count for "the pitcher" there. (v321)
@@ -5201,7 +5210,7 @@ function render(){
           ${rightCol}
         </div>`
       : `<div style="flex:1;min-height:0;display:flex;flex-direction:row;gap:12px">
-          <div style="flex:0 0 52%;max-width:52%;min-width:0;min-height:0;display:flex;flex-direction:column;gap:8px">${miniCount()}${batterCard()}<div style="flex:1;min-height:0;display:flex;align-items:center;justify-content:center;position:relative">${diamondSVG()}${toastEl}</div></div>
+          <div style="flex:0 0 52%;max-width:52%;min-width:0;min-height:0;display:flex;flex-direction:column;gap:8px">${scoreBar()}${batterCard()}<div style="flex:1;min-height:0;display:flex;align-items:center;justify-content:center;position:relative">${diamondSVG()}${toastEl}</div></div>
           ${feedPanel()}
         </div>`;
   } else if(wide && monitorOn){
@@ -6393,7 +6402,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v336";
+var APP_VERSION="v337";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
