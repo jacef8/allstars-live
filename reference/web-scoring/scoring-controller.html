@@ -350,6 +350,29 @@ function migrateTeam(t){ if(t&&t.players)t.players.forEach(ensureName); if(t&&!A
    Teams, rosters, and FULL-BOX season stats (batting / pitching / fielding) persist
    across games & reloads. The native app will swap this for an on-device database. */
 const DB_KEY="allstars-scorer-db";
+// ===== Network/sync troubleshooting log — a running, TIMESTAMPED, PERSISTED trace of connectivity
+// and cloud-sync events (sign-in changes, live-publish success/blocked/error, team-sync failures,
+// scorer handoffs). Same shape as the existing _flipLog (inning-swap trace) but for network/cloud
+// issues, and persisted to localStorage — not just in-memory — because these problems are almost
+// always noticed well AFTER the fact (a viewer only realizes mid-game or after "nothing updated"),
+// often across an app reload/update in between. jford, 2026-07-03: spent a long multi-message
+// investigation reconstructing what must have happened during a game from indirect evidence (Firebase
+// network dumps, screenshots, code reasoning) because nothing was actually recorded at the time.
+// Called from auth.js / cloud-data.js too (guarded with `if(window.netLog)` there, since this main
+// script loads AFTER those — by the time their async callbacks actually fire, this already exists).
+window.netLog=function(msg){
+  try{
+    if(!window._netLog){ try{window._netLog=JSON.parse(localStorage.getItem("al-netlog")||"[]");}catch(e){window._netLog=[];} }
+    const d=new Date(),p=n=>String(n).padStart(2,"0");
+    window._netLog.push(`${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}  ${msg}`);
+    if(window._netLog.length>200)window._netLog=window._netLog.slice(-200);
+    try{localStorage.setItem("al-netlog",JSON.stringify(window._netLog));}catch(e){}
+  }catch(e){}
+};
+try{
+  window.addEventListener("online",()=>window.netLog("Internet: back online"));
+  window.addEventListener("offline",()=>window.netLog("Internet: went offline"));
+}catch(e){}
 function loadDB(){try{const r=localStorage.getItem(DB_KEY);if(r){const d=JSON.parse(r);if(d&&d.teams)return d;}}catch(e){}return {teams:[],seq:1};}
 function saveDB(){
   // Stamp updatedAt="now" ONLY on teams whose CONTENT actually changed since the last synced baseline
@@ -1744,6 +1767,7 @@ function watchLiveTakeover(teamId){
     if(!doc||!doc.activeUid) return;
     if(doc.activeUid!==myCloudUid() && (doc.activeAt||0)>=_myClaimAt && amActiveScorer){
       amActiveScorer=false;
+      try{ if(window.netLog)window.netLog("Relinquished active-scorer status"+(doc.activeName?(" to "+doc.activeName):"")+" — this device is now watch-only"); }catch(e){}
       try{ if(window.cloudCancelPublish)window.cloudCancelPublish(); }catch(e){}   // don't let a pending write re-claim
       flash("Scoring taken over"+(doc.activeName?(" by "+doc.activeName):"")+" — now watching");
       viewMode="viewer"; _remoteLive=true;
@@ -1952,6 +1976,13 @@ function broadcast(){
         window.cloudPublishGame(G.cloudId, Object.assign({teamId:curTeamId},_full), _meta);
         try{ watchLiveTakeover(curTeamId); }catch(e){}
       } }
+    // Log only the TRANSITION (not every ~1s play) — going from fine to blocked, or newly blocked for
+    // a DIFFERENT reason, is exactly what a post-game investigation needs and would otherwise have no
+    // record of at all.
+    if(window.netLog && window._livePublishSkip!==window._lastLoggedSkip){
+      window.netLog(window._livePublishSkip?("Live publish blocked: "+window._livePublishSkip):"Live publish: now unblocked");
+      window._lastLoggedSkip=window._livePublishSkip;
+    }
   }catch(e){}
   _seq++; const k=battingKey(),b=batter();
   LINK.send({type:"state",seq:_seq,
@@ -4307,6 +4338,14 @@ function actionArea(){
         <div style="font-size:13px;font-weight:800;color:${T.ink};margin-bottom:8px">Inning-flip trace <span style="font-weight:600;color:${T.sageDim};font-size:11px">(what triggered each half-inning change)</span></div>
         ${flips.length?`<div style="font-family:${MONO};font-size:11px;color:${T.sage};line-height:1.7;max-height:210px;overflow:auto;white-space:pre-wrap">${flips.slice(-30).map(l=>l.replace(/</g,"&lt;")).join("\n")}</div>`:`<div style="font-size:12px;color:${T.sageDim}">No half-inning changes yet this session.</div>`}</div>`;
     window.__diagText += "\n\nInning-flip trace:\n"+(flips.length?flips.join("\n"):"(none)");
+    // Network/sync log — sign-in drops, live-publish blocks/failures/recoveries, team-sync failures,
+    // scorer handoffs. PERSISTED (survives a reload/app update), unlike the flip trace above, since
+    // these issues are almost always noticed well after the fact. Newest last. Included in Copy.
+    const netlog=(window._netLog||(function(){try{return JSON.parse(localStorage.getItem("al-netlog")||"[]");}catch(e){return [];}})());
+    const netlogBlock=`<div style="background:${T.surface};border:2px solid ${T.line};border-radius:11px;padding:13px 15px">
+        <div style="font-size:13px;font-weight:800;color:${T.ink};margin-bottom:8px">Network/sync log <span style="font-weight:600;color:${T.sageDim};font-size:11px">(sign-in drops, live-publish &amp; sync failures, scorer handoffs)</span></div>
+        ${netlog.length?`<div style="font-family:${MONO};font-size:11px;color:${T.sage};line-height:1.7;max-height:210px;overflow:auto;white-space:pre-wrap">${netlog.slice(-60).map(l=>l.replace(/</g,"&lt;")).join("\n")}</div>`:`<div style="font-size:12px;color:${T.sageDim}">No network/sync events logged yet.</div>`}</div>`;
+    window.__diagText += "\n\nNetwork/sync log:\n"+(netlog.length?netlog.join("\n"):"(none)");
     return `<div style="display:flex;flex-direction:column;gap:12px">
         <div class="frost-card" style="display:flex;align-items:center;gap:10px;background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:12px 14px">
           <button data-act="opensettings" style="${ghost};padding:9px 11px">&lsaquo; Settings</button>
@@ -4314,6 +4353,7 @@ function actionArea(){
         <div style="font-size:12px;color:${T.sage};margin:0 2px">Live status for field troubleshooting.</div>
         <div style="display:flex;flex-direction:column;gap:8px">${rows}</div>
         ${flipBlock}
+        ${netlogBlock}
         ${tip}
         <div style="display:flex;gap:8px">
           ${signedIn?`<button data-act="syncnow" style="${bigBtn(T.lime,'')};flex:1;display:flex;align-items:center;justify-content:center;gap:8px">${ICN.refresh} Update &amp; sync</button>`:""}
@@ -6533,7 +6573,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v350";
+var APP_VERSION="v351";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;

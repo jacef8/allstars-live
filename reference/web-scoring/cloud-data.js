@@ -164,8 +164,16 @@
     if (t.ownerUid && t.ownerUid !== u && (t.scorers || []).indexOf(myEmail()) < 0 && (t.coOwners || []).indexOf(myEmail()) < 0) return; // not mine
     if (!force && _sig[t.id] !== undefined && _sig[t.id] === teamSig(t)) return;   // nothing changed → don't re-stamp/re-push
     d.collection("teams").doc(t.id).set(teamDoc(t), { merge: true })
-      .then(function () { window._lastCloudPush = Date.now(); markClean(t); })
-      .catch(function (e) { console.warn("cloudSaveTeam:", e.message); });
+      .then(function () {
+        window._lastCloudPush = Date.now(); markClean(t);
+        if (window.netLog && window._teamSyncWasFailing) window.netLog("Team sync: recovered, \"" + (t.name || t.id) + "\" pushed");
+        window._teamSyncWasFailing = false;
+      })
+      .catch(function (e) {
+        if (window.netLog && !window._teamSyncWasFailing) window.netLog("Team sync FAILED for \"" + (t.name || t.id) + "\": " + e.message);
+        window._teamSyncWasFailing = true;
+        console.warn("cloudSaveTeam:", e.message);
+      });
   };
 
   // Force an immediate push of every team I can write (bypasses the debounce) — wired to the
@@ -576,8 +584,19 @@
       // saw a single play update, and there was no way after the fact to tell whether the publish was
       // ever even attempted. Surfaced on the Diagnostics page as "Live publish".
       d.collection("games").doc(id).set(doc, { merge: true })
-        .then(function () { window._lastLivePublishOk = Date.now(); })
-        .catch(function (e) { window._lastLivePublishErr = { at: Date.now(), msg: e.message }; console.warn("cloudPublishGame:", e.message); });
+        .then(function () {
+          window._lastLivePublishOk = Date.now();
+          // Log only the transition (not every ~1s publish while scoring) — a recovery after a prior
+          // failure is exactly the moment worth recording.
+          if (window.netLog && window._livePublishWasFailing) window.netLog("Live publish: recovered, now reaching Firestore again");
+          window._livePublishWasFailing = false;
+        })
+        .catch(function (e) {
+          window._lastLivePublishErr = { at: Date.now(), msg: e.message };
+          if (window.netLog && !window._livePublishWasFailing) window.netLog("Live publish FAILED: " + e.message);
+          window._livePublishWasFailing = true;
+          console.warn("cloudPublishGame:", e.message);
+        });
     }, 1000);
   };
   // Cancel a pending debounced publish (used when relinquishing scoring, so a stale write can't

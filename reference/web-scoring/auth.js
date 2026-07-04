@@ -67,6 +67,14 @@
 
       try { auth.getRedirectResult().catch(function () {}); } catch (e) {}   // complete Google redirect flow
       auth.onAuthStateChanged(function (u) {
+        // Log every transition, especially an UNEXPECTED drop to signed-out while the app was
+        // previously signed in — that's the exact, previously-invisible failure mode suspected in a
+        // "live game never synced to any other device" report (2026-07-03): if this fires with u=null
+        // mid-game, every cloud write silently no-ops from that point on with no other symptom.
+        try {
+          var was = window.Cloud.user;
+          if (window.netLog) window.netLog(u ? ("Signed in: " + (u.email || u.uid)) : (was ? "Signed OUT unexpectedly (was signed in)" : "Signed out"));
+        } catch (e) {}
         window.Cloud.user = u; window.Cloud.ready = true;
         try { if (typeof window.onCloudAuth === "function") window.onCloudAuth(u); } catch (e) {}
       });
