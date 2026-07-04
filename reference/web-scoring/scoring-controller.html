@@ -1984,7 +1984,19 @@ function broadcast(){
         if(!_myClaimAt)_myClaimAt=Date.now();
         const _meta={ final:!!G.final, activeUid:myCloudUid(), activeName:myCloudName(),
           summary:{a:TEAMS.away.short||"AWAY",h:TEAMS.home.short||"HOME",as:G.away|0,hs:G.home|0,inn:G.inning|0,half:G.half} };
-        window.cloudPublishGame(G.cloudId, Object.assign({teamId:curTeamId},_full), _meta);
+        // Firestore's .set() flatly rejects ANY nested array anywhere in the document — and
+        // G.anim.paths[].pts is exactly that: an array of [x,y] coordinate PAIRS, i.e. an array of
+        // arrays (used for drawing the ball-flight/runner-path animation). Every push after a ball
+        // put in play carried this shape and got rejected outright with "Nested arrays are not
+        // supported" — poisoning the live-game sync from that point on, while simple pitches
+        // (ball/strike/foul, no G.anim.paths) kept working, which is exactly what jford saw: some
+        // plays reached viewers, but sync then broke down and stayed broken. LINK.send() above
+        // (WebSocket relay) has no such restriction and already went out with the real [x,y] arrays
+        // intact — only this Firestore-bound copy needs the [x,y] pairs reshaped to {x,y} objects.
+        const _fsG=(G.anim&&Array.isArray(G.anim.paths))
+          ? Object.assign({},G,{anim:Object.assign({},G.anim,{paths:G.anim.paths.map(p=>Object.assign({},p,{pts:(p.pts||[]).map(pt=>({x:pt[0],y:pt[1]}))}))})})
+          : G;
+        window.cloudPublishGame(G.cloudId, Object.assign({teamId:curTeamId},_full,{G:_fsG}), _meta);
         try{ watchLiveTakeover(curTeamId); }catch(e){}
       } }
     // Log only the TRANSITION (not every ~1s play) — going from fine to blocked, or newly blocked for
@@ -6617,7 +6629,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v355";
+var APP_VERSION="v356";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
