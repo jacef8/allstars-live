@@ -78,6 +78,26 @@
         window.Cloud.user = u; window.Cloud.ready = true;
         try { if (typeof window.onCloudAuth === "function") window.onCloudAuth(u); } catch (e) {}
       });
+
+      // Force-refresh the sign-in token the moment the app comes back to the foreground. The token
+      // is good for ~1hr and is supposed to silently auto-renew in the background — but Android
+      // pauses a backgrounded WebView's timers to save battery (screen locks, switching away for a
+      // bit), so that renewal can be overdue by the time the screen comes back on. The very next
+      // save then races ahead of the (now-overdue) renewal and gets rejected as permission-denied,
+      // even though the app looks signed in the whole time. (jford, 2026-07-05: "why would it be a
+      // network blip... on my high-speed Wi-Fi" — it isn't; this has nothing to do with connection
+      // quality.) Proactively refreshing on resume means a stale token is never the thing a save
+      // trips over. Guarded to at most once per 20s so rapid focus/blur cycles don't hammer it.
+      var _lastTokenRefresh = 0;
+      function refreshTokenOnResume() {
+        if (document.visibilityState !== "visible") return;
+        var u = auth.currentUser; if (!u) return;
+        var now = Date.now(); if (now - _lastTokenRefresh < 20000) return;
+        _lastTokenRefresh = now;
+        u.getIdToken(true).catch(function (e) { if (window.netLog) window.netLog("Token refresh on resume failed: " + e.message); });
+      }
+      try { document.addEventListener("visibilitychange", refreshTokenOnResume); } catch (e) {}
+      try { window.addEventListener("focus", refreshTokenOnResume); } catch (e) {}
     })
     .catch(function (e) {
       console.error("Cloud (Firebase) failed to load — staying local-only:", e);
