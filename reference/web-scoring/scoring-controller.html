@@ -1948,13 +1948,23 @@ const PLAYHEAD={single:"SINGLE",double:"DOUBLE",triple:"TRIPLE",hr:"HOME RUN",er
   cpout:"OUT"};   // coach-pitch 5-pitch-limit out (didn't swing through it — NOT a strikeout, see pitch())
 // Plays that record an out — the feed shows the resulting out count after these (B2).
 const OUT_KINDS=["out1","flyout","lineout","popout","dp","sacfly","sacbunt","strikeout","fc","cpout"];
-function bcastEvent(kind,sub,team,bk){
+// inn/half: OPTIONAL override for which half-inning this play belongs to. Every caller that can end
+// the half (a 3rd out, a run-cap walk/hit) resolves the out/flip BEFORE calling this — so by the time
+// this runs, G.inning/G.half have often already moved on to the NEXT half. Without the override, the
+// play that actually ENDED the inning got mislabeled as the first play of the new one: e.g. a
+// bottom-2-ending strikeout would show up tagged "Top 3", positioned right above the "End of Bottom 2"
+// divider, with a batter from the wrong team — reads as "the same team is still batting" even though
+// the score/state itself was correct all along. (jford, 2026-07-05, from an inning-flip screenshot +
+// "it shows the inning over but then the same team is still batting.") Callers that capture the
+// pre-flip inning/half up front (inn0/half0, alongside the existing k0=battingKey() capture) pass them
+// through so the entry is stamped with when the play actually happened, not whatever G reads by now.
+function bcastEvent(kind,sub,team,bk,inn,half){
   const head=PLAYHEAD[kind]||kind.toUpperCase();
   _event={id:++_eventId,head,sub:sub||"",team};
   // Append to the live game feed (play-by-play) shown to viewers. Carry kind + the post-play out
   // count so the feed can tag out-making plays with "· N out" (relevant context for that play).
   // bk = the batter's stat key (e.g. "o3"/"p5") so a completed at-bat can be edited from the feed.
-  gameFeed.push({id:_eventId,inn:G.inning,half:G.half,type:"play",kind:kind,outs:(G.outs|0),head,sub:sub||"",away:G.away,home:G.home,bk:bk||null});
+  gameFeed.push({id:_eventId,inn:(inn!=null?inn:G.inning),half:(half!=null?half:G.half),type:"play",kind:kind,outs:(G.outs|0),head,sub:sub||"",away:G.away,home:G.home,bk:bk||null});
   if(gameFeed.length>220)gameFeed.shift();
 }
 /* Assemble the live box score (per-batter rows + R/H/E totals), mapped to away/home. */
@@ -2046,7 +2056,7 @@ function broadcast(){
 function pitch(type){
   try{ if(navigator.vibrate) navigator.vibrate(12); }catch(e){}   // short, light haptic confirm on each pitch tap
   koPick=null;   // a new pitch dismisses any pending "looking / swinging?" prompt (skippable, B4)
-  snapshot();const k0=battingKey(),b0=batter(),bn=b0.name,bnum=b0.num,bk0=batterKeyOf(b0);_pitch=type;recordPitch(type);
+  snapshot();const k0=battingKey(),b0=batter(),bn=b0.name,bnum=b0.num,bk0=batterKeyOf(b0),inn0=G.inning,half0=G.half;_pitch=type;recordPitch(type);
   const pt=(advPitch&&pitchType)?" "+pitchType:"";   // pitch type tag (if advanced tracking on)
   if(cpMode()){
     // COACH PITCH: 5 pitches per batter — out on the 5th miss OR 3 swinging strikes; a FOUL never ends
@@ -2063,20 +2073,20 @@ function pitch(type){
     // an out, not a strikeout."
     if(type==="foul"){ if(G.strikes<2)G.strikes++; try{Snd.pip("foul");}catch(e){} feedPitch("Foul"+pt,"#"+bnum+" · pitch "+G.abPitches); }
     else if(type==="ball"){ feedPitch("Ball"+pt,"#"+bnum+" · pitch "+G.abPitches);
-      if(G.abPitches>=5){ G.outs++; creditBatter("cpout",0); nextBatter(); flipIfNeeded(); flash("5 pitches — out"); bcastEvent("cpout",bn,k0,bk0); G.anim={id:((G.anim&&G.anim.id)||0)+1,ts:Date.now(),sfx:"whiff"}; }
+      if(G.abPitches>=5){ G.outs++; creditBatter("cpout",0); nextBatter(); flipIfNeeded(); flash("5 pitches — out"); bcastEvent("cpout",bn,k0,bk0,inn0,half0); G.anim={id:((G.anim&&G.anim.id)||0)+1,ts:Date.now(),sfx:"whiff"}; }
       else { try{Snd.pip("ball");}catch(e){} } }
     else if(type==="strike"){ G.strikes++; feedPitch("Strike"+pt,"#"+bnum+" · pitch "+G.abPitches);
       const outK=G.strikes>=3, out5=G.abPitches>=5;
-      if(outK){ G.outs++; creditBatter("strikeout",0); nextBatter(); flipIfNeeded(); flash("Strikeout"); bcastEvent("strikeout",bn,k0,bk0); koPick=_eventId; G.anim={id:((G.anim&&G.anim.id)||0)+1,ts:Date.now(),sfx:"whiff"}; }
-      else if(out5){ G.outs++; creditBatter("cpout",0); nextBatter(); flipIfNeeded(); flash("5 pitches — out"); bcastEvent("cpout",bn,k0,bk0); G.anim={id:((G.anim&&G.anim.id)||0)+1,ts:Date.now(),sfx:"whiff"}; }
+      if(outK){ G.outs++; creditBatter("strikeout",0); nextBatter(); flipIfNeeded(); flash("Strikeout"); bcastEvent("strikeout",bn,k0,bk0,inn0,half0); koPick=_eventId; G.anim={id:((G.anim&&G.anim.id)||0)+1,ts:Date.now(),sfx:"whiff"}; }
+      else if(out5){ G.outs++; creditBatter("cpout",0); nextBatter(); flipIfNeeded(); flash("5 pitches — out"); bcastEvent("cpout",bn,k0,bk0,inn0,half0); G.anim={id:((G.anim&&G.anim.id)||0)+1,ts:Date.now(),sfx:"whiff"}; }
       else { try{Snd.pip("strike");}catch(e){} } }
   }
-  else if(type==="ball"){G.balls++;try{Snd.pip("ball");}catch(e){}feedPitch("Ball"+pt,"#"+bnum+" · "+G.balls+"-"+G.strikes);if(G.balls>=4){applyPlanInline("walk");flash("Walk");bcastEvent("walk","Ball four · "+bn,k0,bk0);}}
-  else if(type==="strike"){G.strikes++;feedPitch("Strike"+pt,"#"+bnum+" · "+G.balls+"-"+G.strikes);if(G.strikes>=3){G.outs++;creditBatter("strikeout",0);nextBatter();flipIfNeeded();flash("Strikeout");bcastEvent("strikeout",bn,k0,bk0);koPick=_eventId;G.anim={id:((G.anim&&G.anim.id)||0)+1,ts:Date.now(),sfx:"whiff"};}else{try{Snd.pip("strike");}catch(e){}}}
+  else if(type==="ball"){G.balls++;try{Snd.pip("ball");}catch(e){}feedPitch("Ball"+pt,"#"+bnum+" · "+G.balls+"-"+G.strikes);if(G.balls>=4){applyPlanInline("walk");flash("Walk");bcastEvent("walk","Ball four · "+bn,k0,bk0,inn0,half0);}}
+  else if(type==="strike"){G.strikes++;feedPitch("Strike"+pt,"#"+bnum+" · "+G.balls+"-"+G.strikes);if(G.strikes>=3){G.outs++;creditBatter("strikeout",0);nextBatter();flipIfNeeded();flash("Strikeout");bcastEvent("strikeout",bn,k0,bk0,inn0,half0);koPick=_eventId;G.anim={id:((G.anim&&G.anim.id)||0)+1,ts:Date.now(),sfx:"whiff"};}else{try{Snd.pip("strike");}catch(e){}}}
   else if(type==="foul"){if(G.strikes<2)G.strikes++;try{Snd.pip("foul");}catch(e){}feedPitch("Foul"+pt,"#"+bnum+" · "+G.balls+"-"+G.strikes);}
   render();broadcast();try{triggerAnim(G.anim);}catch(e){}
 }
-function manual(kind,label){snapshot();const k0=battingKey(),bn=batter().name,bk0=batterKeyOf(batter());if(kind==="hbp")recordPitch("hbp");applyPlanInline(kind);bcastEvent(kind,bn,k0,bk0);flash(label);render();broadcast();}
+function manual(kind,label){snapshot();const k0=battingKey(),bn=batter().name,bk0=batterKeyOf(batter()),inn0=G.inning,half0=G.half;if(kind==="hbp")recordPitch("hbp");applyPlanInline(kind);bcastEvent(kind,bn,k0,bk0,inn0,half0);flash(label);render();broadcast();}
 function startInPlay(){mode="locate";tap=null;render();}
 function onFieldTap(x,y){const z=zoneFromPoint(x,y);tap={x,y,pos:z.pos,zone:z.zone};contact=defaultContact(z.pos);mode="contact";render();}
 function chooseContact(c){contact=c;showAll=false;mode="result";render();}
@@ -2130,7 +2140,7 @@ function commit(r,movers){
     }
     G.anim={ id:((G.anim&&G.anim.id)||0)+1, ts:Date.now(), hit:(tap?{x:tap.x,y:tap.y}:null), k:r.kind, hr:(r.kind==="hr"), contact:contact||"", outKind:(outsFromKind(r.kind)>0), throws:_throws, paths:_ap.map(p=>({pts:p.pts,color:p.color,scored:!!p.scored,out:!!p.out})) };
   }catch(e){}
-  const k0=battingKey(),bn=batter().name,bk0=batterKeyOf(batter());
+  const k0=battingKey(),bn=batter().name,bk0=batterKeyOf(batter()),inn0=G.inning,half0=G.half;
   const runs=resolve(movers,outs);                 // capped runs that actually count
   const rbi=rbiEligible(r.kind)?runs:0;
   if(r.kind==="error") G.errors[k0==="away"?"home":"away"]++;   // error charged to the fielding team
@@ -2142,7 +2152,7 @@ function commit(r,movers){
   const _ord={1:"1st",2:"2nd",3:"3rd"};
   const _scd=movers.filter(m=>!m.out&&m.dest===4&&!m.isBatter).map(m=>((m.name||m.label||"Runner")+(_ord[m.start]?" scores from "+_ord[m.start]:" scores")));
   const _loc=(tap&&tap.zone)?(" "+tap.zone):"";   // where it was hit, e.g. "to left field" (B5 — name the hitter + where)
-  bcastEvent(r.kind, bn+_loc+(_scd.length?"; "+_scd.join(", "):"")+(rbi?` · ${rbi} RBI`:""), k0, bk0);
+  bcastEvent(r.kind, bn+_loc+(_scd.length?"; "+_scd.join(", "):"")+(rbi?` · ${rbi} RBI`:""), k0, bk0, inn0, half0);
   flash(r.note+(runs?` · ${runs} run${runs>1?"s":""}`:"")+(rbi?` · ${rbi} RBI`:"")+(capped?" · run cap":""));resetUI();render();broadcast();
   try{ triggerAnim(G.anim); }catch(e){}
 }
@@ -6744,7 +6754,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v367";
+var APP_VERSION="v368";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
