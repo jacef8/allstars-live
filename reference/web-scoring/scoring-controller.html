@@ -91,7 +91,8 @@
      outline+glow already used to keep the "ALL-STARS LIVE" wordmark readable on the turf, same
      attribute-selector trick as the frost-window rule above — covers every current AND future caption
      using this exact style, not just the ones reported so far. */
-  [style*="text-transform:uppercase;color:var(--lime)"]{text-shadow:var(--heroShadow)!important;}
+  [style*="text-transform:uppercase;color:var(--lime)"],
+  [style*="text-transform:uppercase;color:var(--sageDim)"]{text-shadow:var(--heroShadow)!important;}
   button{font-family:var(--sans);cursor:pointer;color:var(--chalk);
     /* Default to the light page text color. <button> does NOT inherit `color` (it resets to
        black), so any button that draws a currentColor icon without setting its own color was
@@ -3586,16 +3587,17 @@ function actionArea(){
       ||`<div style="color:${T.sage};font-size:15px;text-align:center;padding:24px 8px;border:1px dashed ${T.line};border-radius:12px">No active teams — create one, or reopen an ended season below.</div>`;
     const endedCards=sorted.filter(t=>t.archived).map(mkCard).join("");
     return `<div style="display:flex;flex-direction:column;gap:14px">
-        <div class="frost-card" style="display:flex;align-items:center;gap:10px;background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:12px 14px">
-          <button data-act="gohome" style="${ghost};padding:9px 11px">&lsaquo; Home</button>
-          <div style="font-family:${MONO};font-size:23px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:${T.lime}">Teams</div></div>
-        <div style="font-size:12px;color:${T.sage};margin-top:-6px">Manage rosters &amp; season stats.</div>
+        <div class="frost-card" style="display:flex;flex-direction:column;gap:2px;background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:12px 14px">
+          <div style="display:flex;align-items:center;gap:10px">
+            <button data-act="gohome" style="${ghost};padding:9px 11px">&lsaquo; Home</button>
+            <div style="font-family:${MONO};font-size:23px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:${T.lime}">Teams</div></div>
+          <div style="font-size:12px;color:${T.sage};margin:2px 2px 0 2px">Manage rosters &amp; season stats.</div></div>
         <div style="font-size:13px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:${T.lime};margin-top:2px">Current teams</div>
         <div style="display:flex;flex-direction:column;gap:8px">${activeCards}</div>
         <div style="font-size:13px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:${T.sageDim};margin-top:8px">Past teams</div>
         ${endedCards
-          ? `<div style="font-size:11.5px;color:${T.sageDim};margin-top:-4px">Wrapped-up teams from past seasons. Hidden from Home; open one to view its stats, or reopen it from Team management.</div><div style="display:flex;flex-direction:column;gap:8px">${endedCards}</div>`
-          : `<div style="font-size:12px;color:${T.sageDim};padding:12px 14px;border:1px dashed ${T.line};border-radius:12px">No past teams yet. When a team's season wraps up, open it &rarr; <b style="color:${T.sage}">Team management</b> &rarr; <b style="color:${T.sage}">End season</b> to retire it here (off your Home screen). Nothing is deleted — its record &amp; stats are kept, and you can reopen it anytime.</div>`}
+          ? `<div style="font-size:11.5px;color:${T.sageDim};background:${T.surface2};border:1px solid ${T.line};border-radius:10px;padding:9px 12px">Wrapped-up teams from past seasons. Hidden from Home; open one to view its stats, or reopen it from Team management.</div><div style="display:flex;flex-direction:column;gap:8px">${endedCards}</div>`
+          : `<div style="font-size:12px;color:${T.sageDim};background:${T.surface2};padding:12px 14px;border:1px dashed ${T.line};border-radius:12px">No past teams yet. When a team's season wraps up, open it &rarr; <b style="color:${T.sage}">Team management</b> &rarr; <b style="color:${T.sage}">End season</b> to retire it here (off your Home screen). Nothing is deleted — its record &amp; stats are kept, and you can reopen it anytime.</div>`}
         <button data-act="newteam" style="${bigBtn(OUR.color)}">${IC('<path d="M12 5v14M5 12h14"/>')} New team</button>
         ${(window.Cloud&&window.Cloud.enabled)?`<button data-act="opendirectory" style="${ghost};display:flex;align-items:center;justify-content:center;gap:9px">${ICN.search} Browse public teams to follow</button>`:""}
       </div>`;
@@ -6498,7 +6500,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v345";
+var APP_VERSION="v346";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
