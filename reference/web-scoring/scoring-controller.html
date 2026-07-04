@@ -2878,7 +2878,13 @@ function monitorPane(){
   // Settings gear shown in the player (scorer only) → jumps straight to the camera/stream
   // setup instead of backing out of the scorer.
   const _gearSvg=`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/></svg>`;
-  const setGear=(viewMode==="viewer"||!canScoreNow())?"":`<button data-act="videosetup" title="Video & camera settings" style="width:34px;height:34px;border-radius:9px;background:rgba(8,11,16,.66);border:1px solid rgba(255,255,255,.22);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer">${_gearSvg}</button>`;   // scorers only — viewers/fans can't change the shared stream
+  // Gated on canScoreNow() alone — it already returns false for a real viewer/follower (checks
+  // viewerLocked + team scoring permission internally). The old extra `viewMode==="viewer"` check
+  // hid the gear from the SCORER too, any time they were on their own Viewer preview tab — exactly
+  // where a pasted YouTube link plays (jford, 2026-07-06: "where the YouTube is playing I think our
+  // gear icon is getting hidden by all the YouTube buttons" — it wasn't hidden behind them, it was
+  // never rendered at all in that state).
+  const setGear=(!canScoreNow())?"":`<button data-act="videosetup" title="Video & camera settings" style="width:34px;height:34px;border-radius:9px;background:rgba(8,11,16,.66);border:1px solid rgba(255,255,255,.22);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer">${_gearSvg}</button>`;   // scorers only — viewers/fans can't change the shared stream
   const _isViewer=(viewerLocked||viewMode==="viewer");
   // Only defer to the native camera pane when it actually HAS something to show — a live camera
   // feed or an in-progress broadcast. (jford, 2026-07-06, pasting a link while the camera was never
@@ -2896,14 +2902,18 @@ function monitorPane(){
   // branch pre-empted the native monitor entirely, so the camera settings gear (only rendered
   // further down, in the IS_APP branch) never appeared at all while it was showing a stale pasted
   // video instead — looked like "the youtube video buttons are on top of" the gear, and like an old
-  // video "still playing" after a new game.
+  // video "still playing" after a new game. This branch's own controls row STILL never included the
+  // gear at all (jford, 2026-07-06: "where the YouTube is playing I think our gear icon is getting
+  // hidden by all the YouTube buttons") — setGear is prepended below now; it already no-ops for a
+  // real viewer/follower (its own canScoreNow()/viewMode guard), so this only ever shows it to the
+  // scorer, same as everywhere else it's used.
   if(_isViewer && viewerVid && !(IS_APP && !_remoteLive && _camActuallyLive)){
     const _mb="width:34px;height:34px;border-radius:9px;background:rgba(8,11,16,.66);border:1px solid rgba(255,255,255,.22);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer";
     const _linkIco=`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>`;
     return `<div id="monitor" style="position:relative;width:100%;flex:1;min-height:0;background:#0b0f15;border:2px solid ${T.line};border-radius:14px;overflow:hidden;box-shadow:0 6px 22px rgba(0,0,0,.4)">
         <iframe id="ytembed" src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(viewerVid)}?autoplay=1&mute=${ytMuted?1:0}&playsinline=1&modestbranding=1&rel=0&${YT_CHROME_OFF}" allow="${YT_ALLOW}" allowfullscreen style="position:absolute;inset:0;width:100%;height:100%;border:0"></iframe>
         <div style="position:absolute;top:9px;left:10px;display:flex;align-items:center;gap:6px;background:rgba(8,11,16,.62);border-radius:999px;padding:4px 11px;z-index:3"><span style="width:8px;height:8px;border-radius:50%;background:${T.live};box-shadow:0 0 8px ${T.live}"></span><span style="font-family:${MONO};font-weight:800;font-size:11px;letter-spacing:1.6px;color:#fff">LIVE</span>${bugDelay?`<span style="font-family:${MONO};font-size:10px;font-weight:800;color:${T.amber};margin-left:3px">+${bugDelay}s</span>`:""}${viewer360?`<span style="font-family:${MONO};font-size:10px;font-weight:800;color:#7CC4FF;margin-left:3px">360° · drag</span>`:""}</div>
-        <div style="position:absolute;top:9px;right:10px;display:flex;gap:6px;z-index:3">${ytMuteBtn()}<button data-act="tventer" title="Full-screen TV mode" style="${_mb};width:auto;padding:0 11px;font-family:${MONO};font-weight:800;font-size:12px;letter-spacing:1px">TV</button><button data-act="watchvidopen" title="Change video link / scorebug delay" style="${_mb}">${_linkIco}</button></div>
+        <div style="position:absolute;top:9px;right:10px;display:flex;gap:6px;z-index:3">${setGear}${ytMuteBtn()}<button data-act="tventer" title="Full-screen TV mode" style="${_mb};width:auto;padding:0 11px;font-family:${MONO};font-weight:800;font-size:12px;letter-spacing:1px">TV</button>${canScoreNow()?`<button data-act="watchvidopen" title="Change video link / scorebug delay" style="${_mb}">${_linkIco}</button>`:""}</div>
         <div style="position:absolute;left:8px;right:8px;bottom:8px;z-index:2;pointer-events:none">${statusBar()}</div>
       </div>`;
   }
@@ -2926,7 +2936,11 @@ function monitorPane(){
           ? `<button data-act="appgolive" style="position:absolute;bottom:14px;left:50%;transform:translateX(-50%);z-index:3;background:${T.live};color:#fff;border:none;border-radius:10px;padding:12px 22px;font-family:${SANS};font-weight:800;font-size:16px;display:inline-flex;align-items:center;gap:9px;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.55)">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="#fff" stroke="none"><path d="M5 3l14 9-14 9V3z"/></svg>Go Live</button>`
           : "");
-    const vidLinkBtn=(isViewer)?`<button data-act="watchvidopen" style="position:absolute;bottom:16px;left:50%;transform:translateX(-50%);z-index:4;background:${T.lime};color:#fff;border:none;border-radius:10px;padding:11px 18px;font-family:${SANS};font-weight:800;font-size:14px;display:inline-flex;align-items:center;gap:8px;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.5)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>Paste live video link</button>`:"";
+    // Pasting a video link is a SCORER control, not a fan one (jford, 2026-07-06: "the paste a
+    // YouTube link should only be available to the scorer") — gated on canScoreNow(), not just
+    // which tab this device happens to be viewing, so the scorer's own Viewer-tab preview (the exact
+    // case the v381 fix above was for) still gets it, but a real follower/fan never does.
+    const vidLinkBtn=(isViewer&&canScoreNow())?`<button data-act="watchvidopen" style="position:absolute;bottom:16px;left:50%;transform:translateX(-50%);z-index:4;background:${T.lime};color:#fff;border:none;border-radius:10px;padding:11px 18px;font-family:${SANS};font-weight:800;font-size:14px;display:inline-flex;align-items:center;gap:8px;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.5)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>Paste live video link</button>`:"";
     return `<div id="monitor" style="position:relative;width:100%;flex:1;min-height:0;background:transparent;border:2px solid ${camLive?T.line:T.surface2};border-radius:14px;overflow:hidden">
         ${chip}${end}${center}${vidLinkBtn}</div>`;
   }
@@ -2943,12 +2957,12 @@ function monitorPane(){
         <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="${T.sageDim}" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
         <div style="font-family:${MONO};font-weight:800;letter-spacing:2px;font-size:14px;color:${T.sage}">${(viewerLocked||viewMode==="viewer")?"WAITING FOR VIDEO":"CAMERA FEED"}</div>
         <div style="font-size:11px;color:${T.sageDim};max-width:260px;line-height:1.45">${(viewerLocked||viewMode==="viewer")?"The video will appear here once the game is live.":(IS_APP?"Start the stream to put the game on YouTube with the scorebug.":"Connect your YouTube Live stream to see it here with the scorebug.")}</div>
-        ${(viewerLocked||viewMode==="viewer"||!canScoreNow())?`<button data-act="watchvidopen" style="margin-top:4px;background:${T.lime};color:#fff;border:none;border-radius:9px;padding:10px 16px;font-family:${SANS};font-weight:800;font-size:13px;display:inline-flex;align-items:center;gap:7px;cursor:pointer">
+        ${!canScoreNow()?"":((viewerLocked||viewMode==="viewer")?`<button data-act="watchvidopen" style="margin-top:4px;background:${T.lime};color:#fff;border:none;border-radius:9px;padding:10px 16px;font-family:${SANS};font-weight:800;font-size:13px;display:inline-flex;align-items:center;gap:7px;cursor:pointer">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>Paste live video link</button>`:`<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:4px">
           <button data-act="${IS_APP?'appgolive':'setstream'}" style="background:${T.lime};color:#fff;border:none;border-radius:9px;padding:10px 16px;font-family:${SANS};font-weight:800;font-size:13px;display:inline-flex;align-items:center;gap:7px;cursor:pointer">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="${T.field}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3l14 9-14 9V3z"/></svg>${IS_APP?(appLive()?"Going live…":"Start game stream"):"Connect your stream"}</button>
           ${IS_APP?`<button data-act="setstream" title="Show a YouTube Live link in the monitor — e.g. when the camera streams straight to YouTube and the app isn't doing the broadcast" style="background:${T.surface2};color:${T.chalk};border:2px solid ${T.line};border-radius:9px;padding:10px 14px;font-family:${SANS};font-weight:800;font-size:13px;display:inline-flex;align-items:center;gap:7px;cursor:pointer"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="${T.lime}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>Paste a YouTube link</button>`:""}
-        </div>`}</div>`;
+        </div>`)}</div>`;
   const monBtn="width:32px;height:32px;border-radius:8px;background:rgba(8,11,16,.6);border:1px solid rgba(255,255,255,.2);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer";
   const fsIcon=`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>`;
   const ytIcon=`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M9 7h8v8"/></svg>`;
@@ -5434,13 +5448,13 @@ function tvPane(){
     : `<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;background:radial-gradient(circle at 50% 38%,#16202e,#05080c);text-align:center;padding:0 24px">
         <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="${T.sageDim}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
         <div style="font-family:${MONO};font-weight:800;letter-spacing:2px;color:${T.sage};font-size:18px">${live?"WAITING FOR VIDEO":"NO LIVE GAME YET"}</div>
-        <button data-act="watchvidopen" style="${tvBtn};background:${T.lime};border-color:${T.lime}">Paste live video link</button></div>`;
+        ${canScoreNow()?`<button data-act="watchvidopen" style="${tvBtn};background:${T.lime};border-color:${T.lime}">Paste live video link</button>`:""}</div>`;
   return `<div style="position:fixed;inset:0;z-index:200;background:#000;overflow:hidden">
       ${vid}
       ${live?`<div style="position:absolute;left:26px;bottom:26px;z-index:3">${tvBug()}</div>`:""}
       <div style="position:absolute;top:16px;right:16px;z-index:5;display:flex;align-items:center;gap:9px">
         ${yt?ytMuteBtn():""}
-        ${yt?`<button data-act="watchvidopen" title="Change video / scorebug delay" style="${tvBtn}">Video</button>`:""}
+        ${(yt&&canScoreNow())?`<button data-act="watchvidopen" title="Change video / scorebug delay" style="${tvBtn}">Video</button>`:""}
         <button data-act="tvcast" title="Fullscreen / Cast" style="${tvBtn}">&#9974; Fullscreen</button>
         <button data-act="tvexit" style="${tvBtn}">&#10005; Exit TV</button></div>
       ${live?`<div style="position:absolute;top:16px;left:16px;z-index:5;display:flex;align-items:center;gap:8px;background:rgba(8,11,16,.6);border-radius:999px;padding:6px 14px"><span style="width:9px;height:9px;border-radius:50%;background:${T.live};box-shadow:0 0 8px ${T.live}"></span><span style="font-family:${MONO};font-weight:800;font-size:12px;letter-spacing:1.5px;color:#fff">LIVE${bugDelay?` &middot; +${bugDelay}s`:""}${viewer360?` &middot; 360°`:""}</span></div>`:""}
@@ -6951,7 +6965,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v381";
+var APP_VERSION="v382";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
