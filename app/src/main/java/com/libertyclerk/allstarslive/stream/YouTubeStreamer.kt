@@ -12,6 +12,7 @@ import android.view.Surface
 import com.pedro.common.ConnectChecker
 import com.pedro.rtmp.rtmp.RtmpClient
 import com.libertyclerk.allstarslive.ingest.RtmpHub
+import com.libertyclerk.allstarslive.net.NetworkRouter
 import java.nio.ByteBuffer
 
 /**
@@ -65,10 +66,14 @@ class YouTubeStreamer(
     private val client: RtmpClient = RtmpClient(object : ConnectChecker {
         override fun onConnectionStarted(url: String) = onStatus("Connecting…")
         override fun onConnectionSuccess() {
+            NetworkRouter.unbindProcess()   // connect attempt resolved — see bindProcessToCellular's own comment
             requestKeyFrame()        // push an IDR immediately so YouTube re-locks fast
             onStatus("LIVE")
         }
-        override fun onConnectionFailed(reason: String) = onConnFailed(reason)
+        override fun onConnectionFailed(reason: String) {
+            NetworkRouter.unbindProcess()   // this attempt is over, successful or not — always clear the bind
+            onConnFailed(reason)
+        }
         override fun onNewBitrate(bitrate: Long) {}
         override fun onDisconnect() { if (!shouldStream) onStatus("Stopped") }
         override fun onAuthError() = onStatus("Auth error — check the stream key")
@@ -117,6 +122,12 @@ class YouTubeStreamer(
         shouldStream = true
         client.setReTries(60)          // ~5 min of 5s retries — survive a whole game's hiccups
         if (cameraAudio) startCameraAudio() else { audioEncoder.start(); startAudio() }
+        // See NetworkRouter.bindProcessToCellular's comment: RootEncoder's RtmpClient opens its own
+        // socket with no way to hand it a specific Network, so on the "tablet is on the camera's
+        // internet-less Wi-Fi" setup this connect can silently try (and fail) over that dead Wi-Fi
+        // instead of falling back to cellular. Bind for just this handshake; unbindProcess() fires
+        // from the ConnectChecker callbacks above the instant the outcome is known.
+        NetworkRouter.bindProcessToCellular()
         client.connect(rtmpUrl)
     }
 
@@ -156,6 +167,10 @@ class YouTubeStreamer(
      *  it inside client's own initializer would be a recursive/uninitialized error). */
     private fun onConnFailed(reason: String) {
         if (shouldStream && client.shouldRetry(reason)) {
+            // reConnect() will open a fresh socket in ~5s — re-bind now so THAT attempt also goes out
+            // over cellular instead of whatever's default (the unbind above cleared it after the
+            // attempt that just failed).
+            NetworkRouter.bindProcessToCellular()
             client.reConnect(5000)
             onStatus("Reconnecting…")
         } else {
@@ -284,6 +299,7 @@ class YouTubeStreamer(
     fun stop() {
         streaming = false
         shouldStream = false        // intentional end — don't auto-reconnect
+        NetworkRouter.unbindProcess()   // defensive: in case stop() lands while a connect/reconnect is still in flight
         if (cameraAudio) { RtmpHub.onCamAudio = null; RtmpHub.onCamAudioConfig = null; camFirstPtsUs = -1L; camSamplesWritten = 0L }   // stop forwarding camera audio
         audioThread?.interrupt(); audioThread = null
         runCatching { client.disconnect() }

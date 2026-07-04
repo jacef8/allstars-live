@@ -84,4 +84,35 @@ object NetworkRouter {
             url.openConnection() as HttpURLConnection
         }
     }
+
+    /**
+     * Temporarily bind THIS PROCESS to the cellular network so a socket-based library that can't be
+     * handed a specific [Network] directly (RootEncoder's RtmpClient, used by YouTubeStreamer to push
+     * to YouTube — it opens its own internal socket with no way to inject one) still connects over
+     * cellular instead of whatever the camera's internet-less Wi-Fi happens to be the "default" at
+     * that moment. jford, 2026-07-06: "the wifi i have to connect to to setup the camera is limiting
+     * me from connecting to youtube on the app."
+     *
+     * Scoped narrowly on purpose, unlike a permanent process bind: call this right before starting a
+     * connect attempt, then [unbindProcess] as soon as that attempt's outcome is known (RtmpClient's
+     * ConnectChecker.onConnectionSuccess/onConnectionFailed). Once a socket is actually connected it
+     * stays on whatever network it was opened on regardless of later process-binding changes, so the
+     * bound window only needs to cover the brief connect handshake, not the whole streaming session —
+     * this keeps the RTMP ingest receiver's OWN listening socket (accepting the Mevo over Wi-Fi) out
+     * of the blast radius for all but that brief window, same spirit as this file's no-
+     * bindProcessToNetwork()-for-everything rule above, just scoped instead of avoided entirely.
+     *
+     * Returns false (and does nothing) if cellular isn't currently available — the caller falls
+     * through to whatever the default route already does, no worse than before this existed.
+     */
+    fun bindProcessToCellular(): Boolean {
+        val c = cm ?: return false
+        val cell = cellular ?: return false
+        return runCatching { c.bindProcessToNetwork(cell) }.getOrDefault(false)
+    }
+
+    /** Restore normal (default-network) routing for future sockets. Safe to call even if never bound. */
+    fun unbindProcess() {
+        runCatching { cm?.bindProcessToNetwork(null) }
+    }
 }

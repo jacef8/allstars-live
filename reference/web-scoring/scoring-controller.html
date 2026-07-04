@@ -2880,15 +2880,24 @@ function monitorPane(){
   const _gearSvg=`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/></svg>`;
   const setGear=(viewMode==="viewer"||!canScoreNow())?"":`<button data-act="videosetup" title="Video & camera settings" style="width:34px;height:34px;border-radius:9px;background:rgba(8,11,16,.66);border:1px solid rgba(255,255,255,.22);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer">${_gearSvg}</button>`;   // scorers only — viewers/fans can't change the shared stream
   const _isViewer=(viewerLocked||viewMode==="viewer");
+  // Only defer to the native camera pane when it actually HAS something to show — a live camera
+  // feed or an in-progress broadcast. (jford, 2026-07-06, pasting a link while the camera was never
+  // hooked up — "WAITING FOR CAMERA" — with the modal correctly parsing the ID and closing but the
+  // video never appearing: "I paste the YouTube link and nothing happens.") Previously this deferred
+  // any time IS_APP && !_remoteLive, i.e. on ANY of this device's own local games — so a device with
+  // no camera at all (or the camera not yet connected) could never use "watch with scorebug" either,
+  // even though there was nothing native to show instead.
+  const _camActuallyLive = IS_APP && (!!window.__camLive || window.__bcastPhase==="LIVE" || window.__bcastPhase==="STARTING");
   // VIEWER pasted a YouTube-live link → embed it + lay the live scorebug on top. Handled before the
   // IS_APP branch so it works on the native app too (the native transparent-camera path is for the
   // SCORER's own broadcast, where the bug is composited natively — a viewer has no local camera).
-  // EXCLUDES the native app's own active local broadcast (IS_APP && !_remoteLive) even while toggled
-  // to the "Viewer" preview tab — jford, 2026-07-03: this branch pre-empted the native monitor
-  // entirely, so the camera settings gear (only rendered further down, in the IS_APP branch) never
-  // appeared at all while it was showing a stale pasted video instead — looked like "the youtube
-  // video buttons are on top of" the gear, and like an old video "still playing" after a new game.
-  if(_isViewer && viewerVid && !(IS_APP && !_remoteLive)){
+  // EXCLUDES the native app's own ACTIVE local broadcast/camera (IS_APP && !_remoteLive &&
+  // _camActuallyLive) even while toggled to the "Viewer" preview tab — jford, 2026-07-03: this
+  // branch pre-empted the native monitor entirely, so the camera settings gear (only rendered
+  // further down, in the IS_APP branch) never appeared at all while it was showing a stale pasted
+  // video instead — looked like "the youtube video buttons are on top of" the gear, and like an old
+  // video "still playing" after a new game.
+  if(_isViewer && viewerVid && !(IS_APP && !_remoteLive && _camActuallyLive)){
     const _mb="width:34px;height:34px;border-radius:9px;background:rgba(8,11,16,.66);border:1px solid rgba(255,255,255,.22);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer";
     const _linkIco=`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>`;
     return `<div id="monitor" style="position:relative;width:100%;flex:1;min-height:0;background:#0b0f15;border:2px solid ${T.line};border-radius:14px;overflow:hidden;box-shadow:0 6px 22px rgba(0,0,0,.4)">
@@ -5101,19 +5110,58 @@ function actionArea(){
     const roleTag=m=>m.isBatter
       ?`<span style="font-family:${MONO};font-size:10px;font-weight:800;letter-spacing:.8px;color:#0A0E14;background:${m.color};border-radius:4px;padding:1px 6px;margin-left:8px;vertical-align:middle">BATTER</span>`
       :`<span style="font-family:${MONO};font-size:10px;font-weight:700;letter-spacing:.8px;color:${T.sage};border:2px solid ${T.line};border-radius:4px;padding:1px 6px;margin-left:8px;vertical-align:middle">RUNNER</span>`;
+    // Fielder's choice / double play: which on-base runner the defense actually got is a real,
+    // sometimes-second-guessed call — but the ONLY place to change it used to be the one-shot
+    // fcpick/dppick screen, and "Back" from here always jumps to "result" (past it), not there.
+    // (jford, 2026-07-06: "I still don't see a way to change which player got out.") Surface an
+    // always-visible reassign row right on this screen instead — reuses the exact same
+    // setFcOut/setDpOut() that screen calls, so it's just a live-updating radio group.
+    const reassignKind=(result.kind==="fc"||result.kind==="dp")?result.kind:null;
+    let reassignRow="";
+    if(reassignKind){
+      const onBaseRunners=[1,2,3].filter(b=>G.bases[b]);
+      if(onBaseRunners.length>1){
+        const ract=reassignKind==="fc"?"fcout":"dpout";
+        const chips=onBaseRunners.map(b=>{
+          const r=G.bases[b],rm=plan.find(x=>!x.isBatter&&x.start===b),sel=!!(rm&&rm.out);
+          return `<button data-act="${ract}" data-arg="${b}" style="display:flex;align-items:center;gap:5px;background:${sel?T.out:T.surface2};border:2px solid ${sel?T.out:T.line};border-radius:8px;padding:6px 10px;font-size:12px;font-weight:800;color:${sel?"#FFFFFF":T.chalk}">
+            ${dot(r.color)}${r.label}${r.name?" "+r.name:""}<span style="font-family:${MONO};font-size:10px;opacity:.85">on ${BN[b]}</span></button>`;
+        }).join("");
+        reassignRow=`<div style="flex-shrink:0;display:flex;flex-direction:column;gap:5px;background:${T.surface};border:2px solid ${T.line};border-radius:10px;padding:8px 10px">
+          <span style="font-size:11px;font-weight:700;color:${T.sage}">Out on the play &mdash; tap to change:</span>
+          <div style="display:flex;flex-wrap:wrap;gap:6px">${chips}</div></div>`;
+      }
+    }
     const rows=plan.length?plan.map((m,i)=>{
       const who=`${dot(m.color)}<b style="font-family:${MONO}">${m.label}</b>${m.name?" "+m.name:""}${roleTag(m)}`;
       if(m.out){
-        return `<div style="display:flex;align-items:center;justify-content:space-between;background:${T.surface};border:2px solid ${T.line};border-left:3px solid ${T.out};border-radius:9px;padding:6px 10px">
-          <span style="font-size:13px">${who}</span><span style="font-size:11px;font-weight:800;color:${T.out};font-family:${MONO}">OUT ON PLAY</span></div>`;
+        const fromTxt=m.isBatter?"AT BAT":BN[m.start];
+        return `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;background:${T.surface};border:2px solid ${T.line};border-left:3px solid ${T.out};border-radius:9px;padding:6px 10px">
+          <span style="font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${who}</span>
+          <div style="display:flex;align-items:center;gap:7px;flex-shrink:0">
+            <span style="font-family:${MONO};font-size:10px;font-weight:700;color:${T.sageDim}">from ${fromTxt}</span>
+            <span style="font-size:11px;font-weight:800;color:${T.out};font-family:${MONO};background:rgba(225,29,46,.14);border-radius:5px;padding:2px 7px">OUT ON PLAY</span></div></div>`;
       }
       const floor=m.start===0?1:m.start;
       const fromTxt=m.isBatter?"AT BAT":BN[m.start];
       const destTxt=m.dest===4?"HOME":BN[m.dest];
-      const destCol=m.dest===4?T.safe:T.chalk;
-      const journey=`<span style="font-family:${MONO};font-size:11px;font-weight:700;color:${T.sage}">${fromTxt}</span>
-        <span style="color:${T.sageDim};margin:0 5px;font-size:12px">&rarr;</span>
-        <span style="font-family:${MONO};font-size:13px;font-weight:800;color:${destCol}">${destTxt}${m.dest===4?" &middot; scores":""}</span>`;
+      const destBg=m.dest===4?T.safe:m.color;
+      const destColor=m.dest===4?"#FFFFFF":T.ink;
+      // Two labeled, color-matched pills (not just plain "1st → 3rd" text) so it's unambiguous
+      // which base a runner started from vs. is headed to — the TO pill uses the SAME color as
+      // this runner's own dot/field-map marker, tying the two together at a glance. (jford,
+      // 2026-07-06: "trying to make it clearer... where that runner came from and where they
+      // should go. I know it says it, but it could be clearer.")
+      const journey=`<div style="display:flex;align-items:center;gap:5px">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:1px">
+          <span style="font-size:8px;font-weight:800;letter-spacing:.5px;color:${T.sageDim}">FROM</span>
+          <span style="font-family:${MONO};font-size:11px;font-weight:800;color:${T.chalk};background:${T.surface2};border-radius:5px;padding:1px 7px">${fromTxt}</span>
+        </div>
+        <span style="color:${T.sageDim};font-size:15px">&rarr;</span>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:1px">
+          <span style="font-size:8px;font-weight:800;letter-spacing:.5px;color:${T.sageDim}">TO</span>
+          <span style="font-family:${MONO};font-size:12px;font-weight:800;color:${destColor};background:${destBg};border-radius:5px;padding:1px 7px">${destTxt}</span>
+        </div></div>`;
       const cells=[1,2,3,4].map(c=>{
         const sel=m.dest===c,disabled=c<floor,home=c===4,origin=(c===m.start&&m.start>0&&!sel),selBg=home?T.safe:m.color;
         const bg=disabled?"transparent":sel?selBg:T.surface2;
@@ -5132,7 +5180,7 @@ function actionArea(){
       return `<div style="background:${rowBg};border:2px solid ${m.isBatter?"rgba(59,232,90,.45)":T.line};border-left:4px solid ${m.color};border-radius:9px;padding:7px 10px;display:flex;flex-direction:column;gap:6px">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
           <span style="font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${who}</span>
-          <span style="white-space:nowrap">${journey}</span></div>
+          ${journey}</div>
         <div style="display:flex;gap:6px">${cells}</div></div>`;
     }).join(""):`<div style="color:${T.sage};font-size:13px;text-align:center;padding:6px">Nobody on base.</div>`;
 
@@ -5151,7 +5199,8 @@ function actionArea(){
     // dark blue turf, hard to see.") Matches step()'s exact card styling now.
     return `<div class="frost-card" style="flex-shrink:0;background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:12px 14px">
         <div style="font-family:${MONO};font-size:19px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;line-height:1.05;color:${T.ink}">${title}</div>
-        <div style="font-size:11px;color:${T.sage};margin-top:3px">Tap where each runner ended up — the batter and any outs are already set.</div></div>
+        <div style="font-size:11px;color:${T.sage};margin-top:3px">${reassignRow?"Tap where each runner ended up.":"Tap where each runner ended up — the batter and any outs are already set."}</div></div>
+      ${reassignRow}
       <div style="flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;display:flex;flex-direction:column;gap:6px;padding-right:2px">${rows}</div>
       <div style="flex-shrink:0;display:flex;flex-direction:column;gap:8px">
         ${cline}
@@ -6902,7 +6951,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v380";
+var APP_VERSION="v381";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
