@@ -5262,7 +5262,8 @@ function tvPane(){
   return `<div style="position:fixed;inset:0;z-index:200;background:#000;overflow:hidden">
       ${vid}
       ${live?`<div style="position:absolute;left:26px;bottom:26px;z-index:3">${tvBug()}</div>`:""}
-      <div style="position:absolute;top:16px;right:16px;z-index:5;display:flex;gap:9px">
+      <div style="position:absolute;top:16px;right:16px;z-index:5;display:flex;align-items:center;gap:9px">
+        ${yt?ytMuteBtn():""}
         ${yt?`<button data-act="watchvidopen" title="Change video / scorebug delay" style="${tvBtn}">Video</button>`:""}
         <button data-act="tvcast" title="Fullscreen / Cast" style="${tvBtn}">&#9974; Fullscreen</button>
         <button data-act="tvexit" style="${tvBtn}">&#10005; Exit TV</button></div>
@@ -6735,7 +6736,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v365";
+var APP_VERSION="v366";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
