@@ -5220,12 +5220,19 @@ function render(){
   if(viewerLocked && !gameActive && !_remoteLive){
     renderToolbar();
     const nm=(watchTeamName||"").replace(/</g,"");
+    // jford, 2026-07-04: "no way to get past this screen" — this lobby renders before the toolbar's
+    // own mode-based logic decides whether to show anything, so a Home button reachable there isn't
+    // guaranteed here. Give this screen its OWN explicit way out, not dependent on toolbar state.
+    // Also: "the light grey letters are nearly impossible to read on the white background" — the
+    // title was hardcoded color:#fff on a var(--frost) card, which is a near-white translucent card
+    // in day mode. Same bug class as every other hardcoded-white-on-a-day-mode-card fix tonight.
     document.getElementById("content").innerHTML=`<div style="flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding:24px">
         <div class="frost-card" style="max-width:440px;text-align:center;background:var(--frost);border:2px solid ${T.line};border-radius:18px;padding:30px 26px">
           <div style="line-height:1;margin-bottom:10px">${IC('ball',46)}</div>
-          <div style="font-family:${MONO};font-size:22px;font-weight:800;color:#fff;letter-spacing:.4px">${nm?nm+" — ":""}No game in progress</div>
+          <div style="font-family:${MONO};font-size:22px;font-weight:800;color:${T.ink};letter-spacing:.4px">${nm?nm+" — ":""}No game in progress</div>
           <div style="font-size:14px;color:${T.sage};margin-top:10px;line-height:1.5">The game hasn't started yet. This page switches to the live game automatically the moment the scorer begins — keep it open.</div>
           <div style="margin-top:18px;display:inline-flex;align-items:center;gap:6px;font-size:11px;letter-spacing:1.4px;color:${T.lime};font-weight:800;background:${T.surface};border:2px solid ${T.line};border-radius:999px;padding:6px 13px">${IC('eye',14)} WATCHING LIVE</div>
+          <button data-act="home" style="margin-top:18px;display:flex;width:100%;align-items:center;justify-content:center;gap:8px;background:${T.surface2};border:2px solid ${T.line};color:${T.chalk};border-radius:11px;padding:12px;font-family:${SANS};font-weight:800;font-size:14px">${IC('home',17)} Home</button>
         </div></div>`;
     return;
   }
@@ -5821,6 +5828,14 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="oppbenchin"){const b=oppBenchList();const e=b.splice(+arg,1)[0];if(e&&oppList().length<12){oppList().push(e);G.oppBatters=oppList().length;}render();broadcast();}
   else if(act==="oppbenchout"){const i=editSlot;const e=oppList().splice(i,1)[0];if(e){delete e.pos;oppBenchList().push(e);}G.oppBatters=oppList().length;mode="lineup";render();broadcast();}
   else if(act==="home"){ if(_watchLiveUnsub){ try{_watchLiveUnsub();}catch(e){} _watchLiveUnsub=null; _watchGen++; gameActive=false; _remoteLive=false; G=initGame(); }   // leaving a watch session → drop the borrowed game + cancel any delayed updates
+    // viewerLocked was never cleared here — a viewer stuck on the "waiting for the game to start"
+    // lobby (viewerLocked && !gameActive && !_remoteLive gates that whole screen, independent of
+    // `mode`) would tap Home, land on mode="home", and immediately get shown the SAME lobby again on
+    // the very next render since nothing about that condition had changed. (jford, 2026-07-04: "no way
+    // to get past this screen".) Tapping Home is an unambiguous "I want out" signal regardless of
+    // which locked-viewer context it was; re-watching later goes back through Home's own "in
+    // progress" card or a fresh watch link either way.
+    viewerLocked=false;
     mode="home";render();}
   else if(act==="watchlive"){ const teamId=arg;
     if(!(window.Cloud&&window.Cloud.db&&window.cloudSubscribeGameDoc)){ flash("Watching live needs an internet connection"); return; }   // NO login needed — live games are world-readable
@@ -6629,7 +6644,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v356";
+var APP_VERSION="v357";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
