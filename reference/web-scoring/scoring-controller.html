@@ -1737,6 +1737,13 @@ function applyRemote(raw){
   if(viewMode!=="viewer"){ if(msg.type==="hello"){ try{ broadcast(); }catch(e){} } return; }
   if(msg.type!=="full"||!msg.G) return;
   try{
+    // A viewer (Home "Watch") had no way to learn the game they're watching actually ended — nothing
+    // here ever checked G.final, so the screen just kept sitting there looking "live" forever. (jford,
+    // 2026-07-03: ended a game on the tablet; the phone's viewer screen never showed anything had
+    // changed.) Fire a clear, one-time notice on the transition into final (not every update once it's
+    // already final, and not on the very first snapshot if it happens to already be a finished game —
+    // that's a normal "catching up on a game that already ended," not a live event worth flashing).
+    if(msg.G.final && !G.final && _remoteLive){ try{ flash("Game over — final score "+(msg.G.away|0)+"-"+(msg.G.home|0)); }catch(e){} }
     G=msg.G;
     if(Array.isArray(msg.ROSTER)) ROSTER=msg.ROSTER;
     if(msg.OUR) Object.assign(OUR,msg.OUR);
@@ -6610,7 +6617,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v354";
+var APP_VERSION="v355";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;

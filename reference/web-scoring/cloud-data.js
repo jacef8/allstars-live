@@ -180,6 +180,19 @@
         if (window.netLog && !window._teamSyncWasFailing) window.netLog("Team sync FAILED for \"" + (t.name || t.id) + "\": " + e.message);
         window._teamSyncWasFailing = true;
         console.warn("cloudSaveTeam:", e.message);
+        // Multiple devices signed into the SAME account (e.g. a tablet scoring + a phone watching,
+        // both with this team loaded) can each independently retry-push this team doc. The server
+        // rule rejects any write whose updatedAt looks behind what's already stored (the stale-write
+        // guard) — but our own retries kept resending the SAME frozen updatedAt forever if this
+        // team's CONTENT wasn't otherwise changing, so once another device's write moved the stored
+        // value ahead, ours could never catch up and just failed on repeat, indefinitely. (jford,
+        // 2026-07-03: ran a live test with the tablet scoring + phone watching simultaneously — the
+        // team record never reached either the phone or the PC, "Missing or insufficient permissions"
+        // repeating every ~1.5s in logcat the whole time.) Bumping updatedAt here doesn't affect the
+        // dirty-tracking signature (teamSig() strips updatedAt before hashing) — it just guarantees
+        // the NEXT retry carries a genuinely newer timestamp than this failed one, so it can actually
+        // win the race instead of retrying the identical losing timestamp forever.
+        if (e && e.code === "permission-denied" && t) t.updatedAt = Date.now();
       });
   };
 
@@ -630,7 +643,18 @@
     var d = fdb(); if (!d || !id) return function () {};
     try {
       return d.collection("games").doc(id).onSnapshot(function (s) {
-        var v = s.exists ? s.data() : null; try { cb(v && v.state ? v.state : null); } catch (e) {}
+        var v = s.exists ? s.data() : null;
+        // cloudEndGame() marks a finished game IMMEDIATELY via the doc's own top-level `final` field
+        // (not debounced, so a viewer sees it right away even if the scorer's device sleeps right
+        // after End Game) — but that's separate from `state.G.final`, which only updates on the next
+        // regular (debounced) broadcast() and wasn't being merged in here at all. A Watch viewer was
+        // stuck reading nothing but the last-received `state`, with no way to ever learn the game had
+        // actually ended. (jford, 2026-07-03: ended a game on the tablet; the phone's viewer screen
+        // just kept sitting there as if it was still live.) Stamp the doc's own final flag onto the
+        // state we hand back, so it's authoritative regardless of whether state.G itself caught up.
+        var out = v && v.state ? v.state : null;
+        if (out && v && v.final) { out = Object.assign({}, out); out.G = Object.assign({}, out.G, { final: true }); }
+        try { cb(out); } catch (e) {}
       }, function (e) { console.warn("game:", e.message); });
     } catch (e) { return function () {}; }
   };
