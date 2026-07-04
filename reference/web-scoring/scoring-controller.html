@@ -907,7 +907,7 @@ const initGame=()=>({inning:1,half:"T",away:0,home:0,outs:0,balls:0,strikes:0,
   startedAt:null,  // wall-clock ms when the game ACTUALLY started (auto-set at first pitch / game start; editable in Game Setup) — drives the game timer
   lineup:{ order:[0,1,2,3,4,5,6,7,8],   // batting order: 9-12 entries (slots 10+ = extra hitters)
            pos:{P:0,C:1,"1B":2,"2B":3,"3B":4,SS:5,LF:6,CF:7,RF:8} }});
-let G=initGame(),hist=[],redoStack=[],mode="home",tap=null,contact=null,result=null,plan=null,toast=null,toastTimer=null,curResults=[],showAll=false,showZones=false,editSlot=null,confirmAct=null,gameActive=false,lineupTab="us",newgameFrom="home",brSheet=false,correctOpen=false,correctOpenAt=0,lineupView="list",fieldAssign=null,fieldHold=null,fieldDisplaced=null,lineEditSlot=null,luSelSlot=null,luFromSetup=false,koPick=null,oppFieldSel=null,gcArrange=false,bugPreview=false,barEdit=false,editAB=null,gameEdit=null,statsSeason="all";
+let G=initGame(),hist=[],redoStack=[],mode="home",tap=null,contact=null,result=null,plan=null,toast=null,toastTimer=null,curResults=[],showAll=false,showZones=false,editSlot=null,confirmAct=null,gameActive=false,lineupTab="us",newgameFrom="home",brSheet=false,correctOpen=false,correctOpenAt=0,lineupView="list",fieldAssign=null,fieldHold=null,fieldDisplaced=null,lineEditSlot=null,luSelSlot=null,luBuilderSel=null,luFromSetup=false,koPick=null,oppFieldSel=null,gcArrange=false,bugPreview=false,barEdit=false,editAB=null,gameEdit=null,statsSeason="all";
 // Resume the last in-progress game (saved by saveGame) across reloads/app updates, so the
 // lineup/score is never lost. Stays on the home screen → shows "Resume". Re-links ROSTER
 // to the saved team so the lineup's player indices resolve correctly.
@@ -1116,6 +1116,18 @@ function moveLu(slot,dir){
   if(j<0||j>=ord.length) return;
   const tmp=ord[slot]; ord[slot]=ord[j]; ord[j]=tmp;
   luSelSlot=j; render(); broadcast();
+}
+// Same tap-select + up/down pattern, for the SAVED-lineup builder screen (Team management → a named
+// lineup's own batting order) — a separate data model (lu.order, an array of PLAYER IDS keyed against
+// t.players) and a separate screen from the in-game one above, so it needed its own selection state
+// and move function even though the interaction is identical.
+function selectLuBuilder(i){ luBuilderSel=(luBuilderSel===i)?null:i; render(); }
+function moveLuBuilder(i,dir){
+  const t=teamById(openTeamId), lu=t&&lineupById(t,editLineupId); if(!lu)return;
+  const ord=lu.order; const j=dir==="up"?i-1:i+1;
+  if(j<0||j>=ord.length) return;
+  const tmp=ord[i]; ord[i]=ord[j]; ord[j]=tmp;
+  luBuilderSel=j; saveDB(); render();
 }
 /* ---- continuous batting order: 9 fielders + extra hitters (bat only), up to 12 ---- */
 function addBatter(){const b=benchIdx();if(!b.length){flash("No bench players to add");return;}
@@ -4150,11 +4162,23 @@ function actionArea(){
       // "doesn't list the extra outfield positions" for a coach-pitch team's saved lineup).
       const _cpLu=!!(leagueById(t.league||"custom").cp);
       const posOpts=()=>["",...(_cpLu?["P","C","1B","2B","3B","SS","LF","LCF","RCF","RF"]:POSLIST)].map(P=>({v:P,label:P||"EH"}));
+      // Tap-to-select + up/down arrows — same replacement as the in-game batting order (v374) and for
+      // the same reason: drag depends on a held gesture surviving uninterrupted, which is inherently
+      // fragile, and jford hit the identical "reorder isn't working" complaint here too (2026-07-06,
+      // screenshot still showing the old "Drag ☰ to reorder" hint on THIS separate saved-lineup-
+      // builder screen — a different code path from the in-game one, never touched by that fix).
       const rows=lu.order.map((id,i)=>{ const p=t.players.find(x=>x.id===id)||{num:"",name:"?"};
         const cur=Object.keys(lu.pos||{}).find(k=>lu.pos[k]===id)||"";
-        return `<div data-lurow data-id="${id}" style="display:flex;align-items:center;gap:5px;background:${T.surface2};border:2px solid ${T.line};border-radius:9px;padding:7px 8px">
-          <span data-ludrag title="Drag to reorder" style="cursor:grab;color:${T.sageDim};display:flex;align-items:center;padding:4px 1px;touch-action:none">${IC('<path d="M4 7h16M4 12h16M4 17h16"/>')}</span>
-          <span style="font-family:${MONO};font-size:16px;font-weight:800;color:${T.lime};width:16px;text-align:center">${i+1}</span>
+        const _sel=(luBuilderSel===i);
+        const moveHandle=_sel
+          ? `<div style="display:flex;flex-direction:column;gap:2px;flex:none">
+              <button data-act="lubmove" data-arg="${i}:up" ${i===0?"disabled":""} style="width:24px;height:20px;border-radius:5px 5px 0 0;background:${T.lime};border:none;color:#fff;display:flex;align-items:center;justify-content:center;opacity:${i===0?.35:1};cursor:${i===0?"default":"pointer"}">${IC('<path d="M18 15 12 9 6 15"/>',13)}</button>
+              <button data-act="lubmove" data-arg="${i}:down" ${i===n-1?"disabled":""} style="width:24px;height:20px;border-radius:0 0 5px 5px;background:${T.lime};border:none;color:#fff;display:flex;align-items:center;justify-content:center;opacity:${i===n-1?.35:1};cursor:${i===n-1?"default":"pointer"}">${IC('<path d="M6 9l6 6 6-6"/>',13)}</button>
+            </div>`
+          : `<button data-act="lubselect" data-arg="${i}" title="Select to move" style="cursor:pointer;color:${T.sageDim};background:transparent;border:none;display:flex;align-items:center;padding:4px 1px;flex:none">${IC('<path d="M4 7h16M4 12h16M4 17h16"/>')}</button>`;
+        return `<div data-lurow data-id="${id}" style="display:flex;align-items:center;gap:5px;background:${_sel?"rgba(59,232,90,.14)":T.surface2};border:2px solid ${_sel?T.lime:T.line};border-radius:9px;padding:7px 8px">
+          ${moveHandle}
+          <button data-act="lubselect" data-arg="${i}" title="Select to move" style="background:transparent;border:none;font-family:${MONO};font-size:16px;font-weight:800;color:${T.lime};width:16px;text-align:center;padding:0;cursor:pointer">${i+1}</button>
           <span style="flex:1;min-width:0;display:flex;align-items:center;gap:7px;overflow:hidden"><span style="font-family:${MONO};color:${t.color};min-width:32px">#${esc(p.num)}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700">${esc(p.name)}</span></span>
           ${themedSelect("lupos_"+id,posOpts(),cur,{onpick:"_luPosPick",css:`background:${T.surface2};border:2px solid ${T.line};color:${T.chalk};border-radius:7px;padding:7px 8px;min-width:66px;font-family:${MONO};font-weight:800;font-size:14px;display:flex;align-items:center;justify-content:space-between;gap:5px;cursor:pointer;text-align:left`})}
           <button data-act="luremove" data-arg="${id}" ${n<=9?"disabled":""} title="Move to bench" style="background:none;border:2px solid ${T.line};color:${n<=9?T.sageDim:T.out};border-radius:7px;padding:7px 9px;font-weight:800">&times;</button></div>`; }).join("");
@@ -4164,7 +4188,7 @@ function actionArea(){
           <div class="frost-card" style="background:${T.surface};border:2px solid ${T.line};border-radius:12px;padding:11px 12px;display:flex;flex-direction:column;gap:6px">
             <div style="display:flex;align-items:center;justify-content:space-between;margin:0 2px 2px">
               <div><div style="font-size:15.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime}">Batting order &amp; field</div>
-                <div style="font-size:13px;color:${T.sageDim};margin-top:1px">Drag &#9776; to reorder</div></div>
+                <div style="font-size:13px;color:${T.sageDim};margin-top:1px">Tap &#9776; to select, then use the arrows to move</div></div>
               <button data-act="luauto" style="background:${T.surface2};border:2px solid ${T.line};color:${T.sage};border-radius:7px;padding:7px 11px;font-size:13px;font-weight:700">Auto-fill positions</button></div>
             <div id="lu-list" style="display:flex;flex-direction:column;gap:6px">${rows}</div></div>
           <div class="frost-card" style="background:${T.surface};border:2px solid ${T.line};border-radius:12px;padding:11px 12px">
@@ -5211,45 +5235,8 @@ function setupOppDrag(){
     });
   });
 }
-/* ---- drag-to-reorder a SAVED lineup in the builder (teamTab==="lineupedit") ---- */
-// Same pointer-capture pattern as setupFieldDrag/setupLineupDrag (v311/v312) — element-scoped listeners +
-// setPointerCapture + pointercancel handling, NOT window listeners. The old window-listener version had
-// the identical leak: a cancelled touch near the handle left pointermove attached to window forever,
-// which then hijacked later scroll attempts anywhere on this list.
-function setupBuilderDrag(){
-  const list=document.getElementById("lu-list"); if(!list)return;
-  list.querySelectorAll('[data-ludrag]').forEach(handle=>{
-    handle.addEventListener('pointerdown',e=>{
-      e.preventDefault();
-      const row=handle.closest('[data-lurow]'); if(!row)return;
-      try{ handle.setPointerCapture(e.pointerId); }catch(_){}
-      const sy=e.clientY; let dragging=false;
-      const move=ev=>{
-        if(!dragging){ if(Math.abs(ev.clientY-sy)<5)return; dragging=true;
-          row.style.opacity='0.55'; row.style.boxShadow='0 6px 16px rgba(15,30,60,.25)'; document.body.style.userSelect='none'; }
-        const rows=[...list.querySelectorAll('[data-lurow]')];
-        for(const r of rows){ if(r===row)continue;
-          const b=r.getBoundingClientRect();
-          if(ev.clientY < b.top + b.height/2){ list.insertBefore(row,r); return; } }
-        list.appendChild(row);
-      };
-      const up=ev=>{
-        handle.removeEventListener('pointermove',move);
-        handle.removeEventListener('pointerup',up);
-        handle.removeEventListener('pointercancel',up);
-        try{ handle.releasePointerCapture(ev.pointerId); }catch(_){}
-        document.body.style.userSelect='';
-        row.style.opacity=''; row.style.boxShadow='';
-        if(dragging){ const t=teamById(openTeamId), lu=t&&lineupById(t,editLineupId);
-          if(lu){ lu.order=[...list.querySelectorAll('[data-lurow]')].map(r=>r.dataset.id); saveDB(); }
-          render(); }
-      };
-      handle.addEventListener('pointermove',move);
-      handle.addEventListener('pointerup',up);
-      handle.addEventListener('pointercancel',up);
-    });
-  });
-}
+// The saved-lineup builder's batting order used to be drag-based here too (removed — see the
+// tap-select + up/down comment by the row-rendering code above, and selectLuBuilder/moveLuBuilder).
 /* Tablet-in-landscape = wide enough for a side panel instead of a bottom sheet. */
 function isWide(){return window.innerWidth>=760 && window.innerWidth>window.innerHeight;}
 
@@ -5477,7 +5464,6 @@ function render(){
          if(mode==="lineup"&&_scrollMem["__lineup"]!=null){ const l=document.getElementById("lineup-list"); if(l)l.scrollTop=_scrollMem["__lineup"]; } }catch(e){}
     if(mode==="lineup"&&lineupTab==="opp")setupOppDrag();
     if(mode==="lineup"&&lineupView==="field")setupFieldDrag();
-    if(building)setupBuilderDrag();
     return;
   }
   maybeAlert();   // rule-reminder popups (run cap / run rule / pitch limit / final inning)
@@ -5991,6 +5977,8 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="fcout")setFcOut(arg);
   else if(act==="luselect")selectLu(+arg);
   else if(act==="lumove"){ const [s,d]=arg.split(":"); moveLu(+s,d); }
+  else if(act==="lubselect")selectLuBuilder(+arg);
+  else if(act==="lubmove"){ const [s,d]=arg.split(":"); moveLuBuilder(+s,d); }
   else if(act==="showall"){showAll=!showAll;render();}
   else if(act==="back-contact"){mode="contact";render();}
   else if(act==="back-result"){mode="result";render();}
@@ -6175,8 +6163,8 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="addteamp"){const t=teamById(openTeamId);if(t)teamAddPlayer(t);render();}
   else if(act==="rmteamp"){const t=teamById(openTeamId);if(t)teamRemovePlayer(t,arg);render();}
   // ---- saved lineups ----
-  else if(act==="lunew"){ const t=teamById(openTeamId); if(t){ const lu=makeLineup(t); editLineupId=lu.id; teamTab="lineupedit"; render(); } }
-  else if(act==="luedit"){ const t=teamById(openTeamId); if(t&&lineupById(t,arg)){ editLineupId=arg; teamTab="lineupedit"; render(); } }
+  else if(act==="lunew"){ const t=teamById(openTeamId); if(t){ const lu=makeLineup(t); editLineupId=lu.id; luBuilderSel=null; teamTab="lineupedit"; render(); } }
+  else if(act==="luedit"){ const t=teamById(openTeamId); if(t&&lineupById(t,arg)){ editLineupId=arg; luBuilderSel=null; teamTab="lineupedit"; render(); } }
   else if(act==="ludefault"){ const t=teamById(openTeamId); if(t){ t.activeLineupId=arg; saveDB(); render(); } }
   else if(act==="ludup"){ const t=teamById(openTeamId); const lu=t&&lineupById(t,arg); if(lu){ const c={id:nextId("lu"),name:lu.name+" (copy)",order:(lu.order||[]).slice(),pos:Object.assign({},lu.pos||{})}; teamLineups(t).push(c); saveDB(); flash('Saved as "'+c.name+'"'); render(); } }
   else if(act==="ludel"){ const t=teamById(openTeamId); const lu=t&&lineupById(t,arg); if(lu){ const lid=arg; confirmAct={title:'Delete lineup "'+lu.name+'"?',msg:"This removes the saved lineup. It won't affect any game already played.",yes:"Delete",danger:true,run:function(){ t.lineups=teamLineups(t).filter(l=>l.id!==lid); if(t.activeLineupId===lid)t.activeLineupId=(t.lineups[0]&&t.lineups[0].id)||null; saveDB(); render(); }}; render(); } }
@@ -6895,7 +6883,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v376";
+var APP_VERSION="v377";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
