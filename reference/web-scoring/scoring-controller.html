@@ -830,7 +830,13 @@ function buildPlan(kind,bases,batterLabel,batterName,opt,batterKey){
     case"sacfly":add(batterLabel,batterName,batterColor,0,1,{isBatter:1,out:1});if(r3)add(r3.label,nm(r3),col(r3),3,4);if(r2)add(r2.label,nm(r2),col(r2),2,2);if(r1)add(r1.label,nm(r1),col(r1),1,1);break;
     case"sacbunt":add(batterLabel,batterName,batterColor,0,1,{isBatter:1,out:1});adv(1);break;
     case"fc":{
-      add(batterLabel,batterName,batterColor,0,1,{isBatter:1});const lead=r3?3:r2?2:1;
+      // Which runner the defense actually threw to is a real scoring decision, not always the lead
+      // runner — e.g. a shortstop can go to 2nd for the trailing runner instead of the plate for the
+      // lead one. opt.fcOut (from the fcpick screen, same pattern as dp's opt.dpOut) lets the scorer
+      // say who, defaulting to the lead runner when unspecified. (jford, 2026-07-06: "need to have the
+      // ability to change who got out on fielders choice... no way to pick 'out' as an option.")
+      add(batterLabel,batterName,batterColor,0,1,{isBatter:1});
+      const lead=(opt&&opt.fcOut)?opt.fcOut:(r3?3:r2?2:1);
       if(r3)add(r3.label,nm(r3),col(r3),3,lead===3?3:4,{out:lead===3});
       if(r2)add(r2.label,nm(r2),col(r2),2,lead===2?2:3,{out:lead===2});
       if(r1)add(r1.label,nm(r1),col(r1),1,lead===1?1:2,{out:lead===1});break;}
@@ -1217,7 +1223,7 @@ function startNewGame(){
     const _allOpp = ot ? ot.players.map(p=>({num:p.num,name:p.name})) : Array.from({length:Math.max(1,G.oppBatters)},(_,i)=>({num:String(i+1),name:""}));
     G.oppLineup = _allOpp.slice(0,12); G.oppBench = _allOpp.slice(12); if(ot) G.oppBatters=G.oppLineup.length; oppDefaultPositions(); }
   settingsMode=false; resetAlerts();
-  amActiveScorer=true; _myClaimAt=Date.now(); _claimStamped=false;   // starting a fresh game → I'm the active scorer
+  amActiveScorer=true; _myClaimAt=Date.now(); _claimStamped=false; _haveConfirmedOwnClaim=false;   // starting a fresh game → I'm the active scorer
   lineupTab="us"; hist=[];redoStack=[]; gameFeed=[]; resetUI(); mode="lineup"; render(); broadcast();
 }
 /* Opponent name from the New Game text field (no re-render, so typing keeps focus). */
@@ -1810,6 +1816,14 @@ let _myClaimAt=0;                    // when I last claimed scoring (vs another 
 // new game, resume, takeover); every other regular play publish omits activeUid entirely so merge:
 // true leaves whatever the doc currently holds untouched — letting a takeover actually stick.
 let _claimStamped=false;
+// Has THIS device seen ITS OWN activeUid write reflected back through watchLiveTakeover's own
+// subscription yet? Reset to false at every claim site (alongside _claimStamped/_myClaimAt). Needed
+// because the very first snapshot after (re)subscribing can reflect STALE pre-existing data — e.g. a
+// brand-new game's live doc left over with some OLD activeUid from a past game/session, before this
+// device's own fresh claim has even reached the server yet (broadcast() is debounced ~1s). Without
+// this, that stale value alone would look exactly like "another device already took over," and a
+// device starting a fresh game could relinquish before it ever really began.
+let _haveConfirmedOwnClaim=false;
 let _takeoverUnsub=null,_takeoverTeam=null;
 let _watchLiveUnsub=null;   // follower watching a live game from Home (read-only cloud subscription)
 let _liveGames={},_liveHomeSubs={};  // teamId → {summary,activeUid,activeName} for the Home "in progress" row
@@ -1824,7 +1838,16 @@ function watchLiveTakeover(teamId){
   _takeoverTeam=teamId;
   _takeoverUnsub=window.cloudSubscribeGameDoc(teamId+"-live",function(doc){
     if(!doc||!doc.activeUid) return;
-    if(doc.activeUid!==myCloudUid() && (doc.activeAt||0)>=_myClaimAt && amActiveScorer){
+    if(doc.activeUid===myCloudUid()){ _haveConfirmedOwnClaim=true; return; }   // our own write landed — nothing to relinquish
+    // Comparing doc.activeAt (the OTHER device's Date.now()) against _myClaimAt (THIS device's own
+    // Date.now()) used to be how this decided whether a mismatch was real — but that compares two
+    // different devices' clocks directly, and clock skew (even a device a few seconds fast/slow) could
+    // make a genuine, later takeover look "older" than our own claim and get silently ignored forever.
+    // (jford, 2026-07-06: "when i click takeover on one device its not moving the original scorer to
+    // viewer, causing conflict.") Wait for confirmation that OUR OWN claim was seen at least once
+    // first (purely local event ordering, no cross-device clock comparison at all) — after that, ANY
+    // activeUid that isn't ours is unambiguously a real takeover that happened after we started.
+    if(_haveConfirmedOwnClaim && amActiveScorer){
       amActiveScorer=false;
       try{ if(window.netLog)window.netLog("Relinquished active-scorer status"+(doc.activeName?(" to "+doc.activeName):"")+" — this device is now watch-only"); }catch(e){}
       try{ if(window.cloudCancelPublish)window.cloudCancelPublish(); }catch(e){}   // don't let a pending write re-claim
@@ -2130,6 +2153,12 @@ function chooseResult(r){
     if(onBase>1){mode="dppick";render();return;}
     plan=buildPlan("dp",G.bases,batterLabel(),batter().name,null,batterKeyOf(batter()));mode="runners";render();return;
   }
+  if(r.kind==="fc"){
+    result=Object.assign({},r);
+    const onBase=[G.bases[1],G.bases[2],G.bases[3]].filter(Boolean).length;
+    if(onBase>1){mode="fcpick";render();return;}   // more than one runner → who the defense chose is a real decision
+    plan=buildPlan("fc",G.bases,batterLabel(),batter().name,null,batterKeyOf(batter()));mode="runners";render();return;
+  }
   // From the full catalog ("something else"), let the user pick the actual fielder for fielder-dependent outs.
   if(showAll&&["out1","flyout","lineout","popout","sacfly"].includes(r.kind)){result=Object.assign({},r);mode="outpos";render();return;}
   result=r;const movers=buildPlan(r.kind,G.bases,batterLabel(),batter().name,null,batterKeyOf(batter()));plan=movers;
@@ -2147,6 +2176,9 @@ function setOutFielder(pos){
 }
 function setDpOut(base){
   plan=buildPlan("dp",G.bases,batterLabel(),batter().name,{dpOut:+base},batterKeyOf(batter()));mode="runners";render();
+}
+function setFcOut(base){
+  plan=buildPlan("fc",G.bases,batterLabel(),batter().name,{fcOut:+base},batterKeyOf(batter()));mode="runners";render();
 }
 function setErrorFielder(pos){
   const n=POSNUM[pos];
@@ -2962,7 +2994,7 @@ function diamondNoChip(){ noFieldChip=true; const s=diamondSVG(); noFieldChip=fa
 function fieldOverlays(){
   if(noFieldChip) return "";
   if(!isWide()) return "";   // phone: no in-field pitch chip (it crowded the small field); pitch count shows in the scorer's pitch line
-  if(["locate","contact","result","runners","errpos","outpos","dppick"].includes(mode)) return "";
+  if(["locate","contact","result","runners","errpos","outpos","dppick","fcpick"].includes(mode)) return "";
   const pc=currentPitchCount(),pn=currentPitcherName();
   const aH=sideHits("away"),hH=sideHits("home");
   const aE=(G.errors&&G.errors.away)||0,hE=(G.errors&&G.errors.home)||0;
@@ -4920,6 +4952,17 @@ function actionArea(){
       `<div style="display:flex;flex-direction:column;gap:8px">${opts}
         <button data-act="back-result" style="${ghost}">Back</button></div>`);
   }
+  if(mode==="fcpick"){
+    const BN={1:"1st",2:"2nd",3:"3rd"};
+    const lead=G.bases[3]?3:G.bases[2]?2:1;
+    const opts=[1,2,3].filter(b=>G.bases[b]).map(b=>{const r=G.bases[b],sel=b===lead;
+      return `<button data-act="fcout" data-arg="${b}" style="display:flex;align-items:center;justify-content:space-between;background:${sel?T.surface2:T.surface};border:2px solid ${sel?T.clay:T.line};border-left:4px solid ${r.color};color:${T.chalk};border-radius:10px;padding:13px 14px;font-size:14px;font-weight:700">
+        <span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${r.color};margin-right:8px;vertical-align:middle"></span>${r.label}${r.name?" "+r.name:""}</span>
+        <span style="font-family:${MONO};color:${T.sage};font-size:12px">on ${BN[b]}</span></button>`;}).join("");
+    return step("Who's out on the fielder's choice?","Batter reaches base safely — tap the runner the defense got instead. Defaults to the lead runner.",
+      `<div style="display:flex;flex-direction:column;gap:8px">${opts}
+        <button data-act="back-result" style="${ghost}">Back</button></div>`);
+  }
   if(mode==="errpos"){
     const order=cpMode()?["P","C","1B","2B","3B","SS","LF","LCF","RCF","RF"]:["P","C","1B","2B","3B","SS","LF","CF","RF"];
     const cells=order.map(p=>{const sel=p===tap.pos;return `<button data-act="errpos" data-arg="${p}" style="display:flex;flex-direction:column;align-items:center;gap:2px;background:${sel?T.clay:T.surface};border:none;border-radius:0;color:${T.chalk};padding:15px 4px;font-size:15px;font-weight:800">${p}<span style="font-size:10px;color:${T.sage};font-weight:600">${POSNUM[p]}</span></button>`;}).join("");
@@ -5418,7 +5461,7 @@ function render(){
   const toastEl=toast?`<div id="toastEl" style="position:absolute;bottom:12px;left:50%;transform:translateX(-50%);background:#0B0E13;color:${T.lime};border:2px solid ${T.lime};font-family:${MONO};font-weight:800;font-size:14px;letter-spacing:.5px;text-transform:uppercase;padding:7px 16px;border-radius:999px;white-space:nowrap;z-index:5;box-shadow:0 4px 16px rgba(0,0,0,.55)">${toast}</div>`:"";
   // GameChanger model: the field stays the big hero, and the pick-an-event steps
   // appear as a bottom-sheet MODAL over it (no inline scrolling to choose).
-  const pickerModal=(mode==="contact"||mode==="result"||mode==="errpos"||mode==="dppick"||mode==="outpos");
+  const pickerModal=(mode==="contact"||mode==="result"||mode==="errpos"||mode==="dppick"||mode==="fcpick"||mode==="outpos");
   // Focus the field while a play is being entered: drop the score box / video tabs / role
   // toggle so the diamond gets the room. Restored automatically when back to idle.
   const focusPlay=(mode==="locate"||mode==="runners"||pickerModal);
@@ -5921,6 +5964,7 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="errpos")setErrorFielder(arg);
   else if(act==="outpos")setOutFielder(arg);
   else if(act==="dpout")setDpOut(arg);
+  else if(act==="fcout")setFcOut(arg);
   else if(act==="showall"){showAll=!showAll;render();}
   else if(act==="back-contact"){mode="contact";render();}
   else if(act==="back-result"){mode="result";render();}
@@ -5993,7 +6037,7 @@ document.getElementById("app").addEventListener("click",e=>{
       if(bugDelay>0) setTimeout(apply, bugDelay*1000); else apply();
     });
     mode="idle"; render(); return; }
-  else if(act==="resume"){ amActiveScorer=true; _myClaimAt=Date.now(); _claimStamped=false; mode="idle"; render(); broadcast(); }
+  else if(act==="resume"){ amActiveScorer=true; _myClaimAt=Date.now(); _claimStamped=false; _haveConfirmedOwnClaim=false; mode="idle"; render(); broadcast(); }
   else if(act==="takeoverlive"){ const teamId=arg;
     if(!(window.cloudSubscribeGameDoc&&window.Cloud&&window.Cloud.user)){ flash("Sign in to take over scoring"); return; }
     flash("Loading game…");
@@ -6004,7 +6048,7 @@ document.getElementById("app").addEventListener("click",e=>{
       try{ const s=doc.state;
         G=s.G; if(Array.isArray(s.ROSTER))ROSTER=s.ROSTER; if(s.OUR)Object.assign(OUR,s.OUR); if(s.OPP)Object.assign(OPP,s.OPP);
         if(Array.isArray(s.gameFeed))gameFeed=s.gameFeed; if(s.curTeamId)curTeamId=s.curTeamId; if(s.oppTeamId!=null)oppTeamId=s.oppTeamId;
-        gameActive=true; G.cloudId=teamId+"-live"; amActiveScorer=true; _myClaimAt=Date.now(); _claimStamped=false; viewMode="scorer"; viewerLocked=false; _remoteLive=false;
+        gameActive=true; G.cloudId=teamId+"-live"; amActiveScorer=true; _myClaimAt=Date.now(); _claimStamped=false; _haveConfirmedOwnClaim=false; viewMode="scorer"; viewerLocked=false; _remoteLive=false;
         try{ if(window.cloudClaimScoring)window.cloudClaimScoring(teamId+"-live", myCloudName()); }catch(e){}
         try{ watchLiveTakeover(teamId); }catch(e){}
         hist=[];redoStack=[]; resetUI(); mode="idle"; flash("You're now scoring this game"); render(); broadcast();
@@ -6244,7 +6288,7 @@ function renderToolbar(){
   if(!playMode2){ tb.innerHTML=""; _barPieces={}; renderBarFloat(); return; }   // also clear any floating buttons on menu screens
   // While the scorer works through a play (locate/pick/runners), hide the top bar so the
   // field gets the room — it comes back when they're done.
-  if(["locate","contact","result","runners","errpos","outpos","dppick"].includes(mode)){ tb.innerHTML=""; _barPieces={}; renderBarFloat(); return; }
+  if(["locate","contact","result","runners","errpos","outpos","dppick","fcpick"].includes(mode)){ tb.innerHTML=""; _barPieces={}; renderBarFloat(); return; }
   // In a live game the title slot becomes the Scorer/Viewer role toggle (the matchup
   // already shows in the scorebug below — no need to repeat it here).
   const scorerLocked=!canScoreNow();   // signed-in follower (not a scorer) → grey the Scorer tab
@@ -6505,7 +6549,7 @@ window.appBack=function(){
     if(reviewBatter){reviewBatter=null;render();return true;}
     if(quickEditKey){quickEditKey=null;render();return true;}
     if(reviewInn){reviewInn=false;render();return true;}
-    if(["locate","contact","result","runners","errpos","outpos","dppick"].includes(mode)){ resetUI(); render(); return true; }
+    if(["locate","contact","result","runners","errpos","outpos","dppick","fcpick"].includes(mode)){ resetUI(); render(); return true; }
     if(mode==="editplayer"||mode==="pickpos"||mode==="pickplayer"){ mode="lineup"; render(); return true; }
     if(mode==="pickteam"){ mode="newgame"; render(); return true; }
     if(mode==="newgame"&&settingsMode){ settingsMode=false; mode="idle"; render(); return true; }
@@ -6825,7 +6869,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v371";
+var APP_VERSION="v372";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
