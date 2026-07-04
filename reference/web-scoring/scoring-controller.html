@@ -5250,9 +5250,11 @@ function tvBug(){
    minimal auto-styled controls. Mirror the device to a TV, or open ?tv=1 on the TV's own browser. */
 function tvPane(){
   const yt=viewerVid||streamYt(), live=(gameActive||_remoteLive);
+  // The monitor/viewer embeds already suppress default captions + annotations (iv_load_policy=3,
+  // cc_load_policy=0) via YT_CHROME_OFF — this one was missing them (jford, 2026-07-05).
   const tvBtn="height:40px;border-radius:10px;background:rgba(8,11,16,.66);border:1px solid rgba(255,255,255,.25);color:#fff;display:inline-flex;align-items:center;gap:7px;padding:0 14px;font-family:"+SANS+";font-weight:800;font-size:14px;cursor:pointer";
   const vid=yt
-    ? `<iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(yt)}?autoplay=1&mute=1&playsinline=1&modestbranding=1&rel=0&controls=${viewer360?1:0}" allow="${YT_ALLOW}" allowfullscreen style="position:absolute;inset:0;width:100%;height:100%;border:0"></iframe>`
+    ? `<iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(yt)}?autoplay=1&mute=1&playsinline=1&modestbranding=1&rel=0&iv_load_policy=3&cc_load_policy=0&controls=${viewer360?1:0}" allow="${YT_ALLOW}" allowfullscreen style="position:absolute;inset:0;width:100%;height:100%;border:0"></iframe>`
     : `<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;background:radial-gradient(circle at 50% 38%,#16202e,#05080c);text-align:center;padding:0 24px">
         <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="${T.sageDim}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
         <div style="font-family:${MONO};font-weight:800;letter-spacing:2px;color:${T.sage};font-size:18px">${live?"WAITING FOR VIDEO":"NO LIVE GAME YET"}</div>
@@ -6733,7 +6735,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v364";
+var APP_VERSION="v365";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
