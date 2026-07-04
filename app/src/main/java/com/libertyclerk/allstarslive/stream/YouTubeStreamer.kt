@@ -31,9 +31,23 @@ class YouTubeStreamer(
     private val width: Int,
     private val height: Int,
     private val fps: Int = 30,
-    bitRate: Int = (width * height * 5).coerceAtLeast(2_500_000),
+    // YouTube's own recommended encoding bitrate for 720p30 tops out around 4 Mbps assuming a
+    // solid connection — but this app is routinely used over cellular at the field (see
+    // NetworkRouter.bindProcessToCellular, added when the camera's own Wi-Fi has no internet at
+    // all), where rural/weak-signal LTE upload is often well under that. The old width*height*5
+    // formula (~4.6 Mbps at 720p) had nowhere to go but choke once actually pushed over cellular.
+    // (jford, 2026-07-06: "the YouTube stream is very choppy and does almost nothing but
+    // buffer.") 2.5 Mbps is YouTube's own suggested value for 720p30 and leaves real headroom
+    // on a mediocre uplink; MIN_BIT_RATE below is the floor the adaptive step-down (onNewBitrate)
+    // is allowed to fall to before it's not worth calling it "live" anymore.
+    bitRate: Int = (width * height * 3).coerceIn(MIN_BIT_RATE, 2_500_000),
     private val onStatus: (String) -> Unit,
 ) {
+    // The bitrate this stream STARTED at — the adaptive step-down (onNewBitrate) is only ever
+    // allowed to recover back UP to this ceiling, never past it (RootEncoder can suggest a bitrate
+    // above what we asked for once a squeeze clears; there's no reason to exceed our own target).
+    private val bitRateCeiling = bitRate
+
     // True between start() and stop(): while set, a dropped RTMP connection (e.g. the
     // camera glitched and the stream starved → "broken pipe") auto-reconnects instead of
     // ending the broadcast. Cleared by stop() so an intentional end doesn't retry.
@@ -74,7 +88,18 @@ class YouTubeStreamer(
             NetworkRouter.unbindProcess()   // this attempt is over, successful or not — always clear the bind
             onConnFailed(reason)
         }
-        override fun onNewBitrate(bitrate: Long) {}
+        // RootEncoder watches actual RTMP send throughput and periodically suggests a bitrate that
+        // roughly matches what the connection can currently sustain — this used to be silently
+        // discarded, so a stream that started fine but hit a bandwidth dip (a routine reality on
+        // the cellular fallback used at the field — see NetworkRouter.bindProcessToCellular) just
+        // kept trying to push the SAME too-high bitrate forever, backing up an ever-growing send
+        // queue that shows up to viewers as "does almost nothing but buffer." (jford, 2026-07-06.)
+        // Applying it live to the already-running MediaCodec encoder (no restart/reconnect needed)
+        // lets quality step down under a real squeeze and step back up once it clears.
+        override fun onNewBitrate(bitrate: Long) {
+            val clamped = bitrate.coerceIn(MIN_BIT_RATE.toLong(), bitRateCeiling.toLong()).toInt()
+            runCatching { encoder.setParameters(android.os.Bundle().apply { putInt(MediaCodec.PARAMETER_KEY_VIDEO_BITRATE, clamped) }) }
+        }
         override fun onDisconnect() { if (!shouldStream) onStatus("Stopped") }
         override fun onAuthError() = onStatus("Auth error — check the stream key")
         override fun onAuthSuccess() {}
@@ -320,5 +345,7 @@ class YouTubeStreamer(
         private const val AUDIO_DELAY_US = 0L
         // AAC sampling-frequency-index → Hz (from the AudioSpecificConfig).
         private val AAC_RATES = intArrayOf(96000, 88200, 64000, 48000, 44100, 32000, 24000, 22050, 16000, 12000, 11025, 8000, 7350)
+        /** Floor for the adaptive step-down in onNewBitrate — under this, "live" isn't worth much anyway. */
+        private const val MIN_BIT_RATE = 500_000
     }
 }
