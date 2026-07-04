@@ -175,6 +175,7 @@
         window._lastCloudPush = Date.now(); markClean(t);
         if (window.netLog && window._teamSyncWasFailing) window.netLog("Team sync: recovered, \"" + (t.name || t.id) + "\" pushed");
         window._teamSyncWasFailing = false;
+        t._syncRetries = 0;
       })
       .catch(function (e) {
         if (window.netLog && !window._teamSyncWasFailing) window.netLog("Team sync FAILED for \"" + (t.name || t.id) + "\": " + e.message);
@@ -192,7 +193,22 @@
         // dirty-tracking signature (teamSig() strips updatedAt before hashing) — it just guarantees
         // the NEXT retry carries a genuinely newer timestamp than this failed one, so it can actually
         // win the race instead of retrying the identical losing timestamp forever.
-        if (e && e.code === "permission-denied" && t) t.updatedAt = Date.now();
+        if (e && e.code === "permission-denied" && t) {
+          t.updatedAt = Date.now();
+          // But nothing was actually SCHEDULING that "next retry" — it only happened if some other
+          // edit later called saveDB() again. (jford, 2026-07-04: tablet's own Diagnostics log showed
+          // the whole story — a game ended, the auth state flickered signed-out/in twice within two
+          // seconds, the team push landed in that gap and got permission-denied, and then NOTHING
+          // retried it until "Refresh app" was tapped minutes later. The phone sat showing the
+          // pre-game record the entire time, with no error visible anywhere on either device.) A
+          // permission-denied here is almost always that kind of momentary hiccup, not a real rules
+          // problem, so self-heal with a short bounded backoff instead of waiting on the user.
+          t._syncRetries = (t._syncRetries || 0) + 1;
+          if (t._syncRetries <= 5) {
+            var delay = Math.min(30000, 2000 * Math.pow(2, t._syncRetries - 1));
+            setTimeout(function () { try { window.cloudSaveTeam(t); } catch (e2) {} }, delay);
+          }
+        }
       });
   };
 
