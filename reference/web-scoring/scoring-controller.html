@@ -1872,7 +1872,7 @@ let _seq=0,_event=null,_eventId=0,_pitch=null;
 // pitch-buttons grid itself since v321 — see koActive/koBanner/pitchGrid in the mode==="idle" render.)
 let phonePane="score";   // phone-only paging: "score" | "video" (large screens show both)
 let summaryTeam="us";    // end-game box score: which team's batting/pitching to show ("us" | "opp")
-let monitorOn=(()=>{try{ const p=new URLSearchParams(location.search); if(p.get("feed")==="1") return false; if(p.get("yt")) return true; return localStorage.getItem("al-monitor-on")!=="0";}catch(e){return true;}})();  // wide: video shown/hidden; shared ?feed=1 opens feed-only
+let monitorOn=(()=>{try{ const p=new URLSearchParams(location.search); if(p.get("feed")==="1") return false; if(p.get("yt")||p.get("vid")==="1") return true; return localStorage.getItem("al-monitor-on")!=="0";}catch(e){return true;}})();  // wide: video shown/hidden; shared ?feed=1 opens feed-only; ?vid=1 opens video-on without freezing WHICH video (see shareUrl)
 let viewMode=(()=>{try{ const p=new URLSearchParams(location.search); if(p.get("view")==="viewer") return "viewer"; return localStorage.getItem("al-view-mode")||"scorer";}catch(e){return "scorer";}})();  // "scorer" | "viewer"; shared links (?view=viewer) open as viewer
 let bcastMuted=(()=>{try{ return localStorage.getItem("al-bcast-mute")==="1"; }catch(e){ return false; }})();   // broadcast-audio mute (the YouTube audio is the tablet mic)
 let bcastCamAudio=(()=>{try{ return localStorage.getItem("al-bcast-camaudio")==="1"; }catch(e){ return false; }})();   // use the camera's audio (passthrough) instead of the tablet mic
@@ -6555,7 +6555,19 @@ function shareUrl(){
   try{ if(gameActive && !G.cloudId && window.Cloud && window.Cloud.user && curTeamId){ const ct=teamById(curTeamId);
       if(ct && window.cloudIsScorer && window.cloudIsScorer(ct)){ G.cloudId=curTeamId+"-live"; try{ broadcast(); }catch(e){} } } }catch(e){}   // stable per-team live doc — matches where broadcast() publishes
   const watchQ=(gameActive && G && G.cloudId)?("&watch="+encodeURIComponent(G.cloudId)):"";
-  if(shareMode==="video"){ const yt=streamYt(); if(yt) return base+"?view=viewer&yt="+encodeURIComponent(yt)+watchQ+teamQ; }
+  if(shareMode==="video"){ const yt=streamYt(); if(yt){
+    // Once there's a live game to subscribe to (watchQ), G.streamYtId already rides along on every
+    // broadcast() — a live-updating source of truth (v353). Baking the CURRENT id into the URL as a
+    // static ?yt= would freeze it forever for whoever has this link: streamYt() checks the url param
+    // FIRST, so if the scorer changes/re-pastes the video later, anyone holding a link with ?yt=
+    // baked in never sees the update. (jford, 2026-07-06: "people are telling me they still see the
+    // youtube link from last night" — a video-mode share link from a PRIOR game had the OLD id frozen
+    // into it, permanently outranking the live G.streamYtId for as long as that link stays open.)
+    // ?vid=1 just turns the video pane ON without freezing WHICH video plays — the live subscription
+    // supplies that. Only bake a static id when there's no live channel to keep it current at all.
+    if(watchQ) return base+"?view=viewer&vid=1"+watchQ+teamQ;
+    return base+"?view=viewer&yt="+encodeURIComponent(yt)+teamQ;
+  } }
   return base+"?view=viewer&feed=1"+watchQ+teamQ;   // feed-only viewer
 }
 // Generic link-share sheet (invite scorers / share team to follow): same QR + Email/Text/Copy
@@ -6805,7 +6817,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v369";
+var APP_VERSION="v370";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
