@@ -11,10 +11,13 @@ import android.util.Base64
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import android.view.Surface
 import android.view.TextureView
 import android.view.ViewGroup
+import android.webkit.ConsoleMessage
 import android.webkit.JavascriptInterface
+import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -89,6 +92,16 @@ fun createScorerWebView(context: Context): WebView {
                     return true
                 }
                 return false
+            }
+        }
+        // Forward JS console.* to logcat — plain console.log from the WebView is otherwise silently
+        // swallowed (no default WebChromeClient means Chromium never surfaces it anywhere visible).
+        // Lets `adb logcat` tail the web scorer's own troubleshooting log (window.netLog) live during
+        // a real game instead of only reviewing it after the fact on the Diagnostics page.
+        webChromeClient = object : WebChromeClient() {
+            override fun onConsoleMessage(msg: ConsoleMessage): Boolean {
+                Log.i("ScorerConsole", "${msg.message()} [${msg.sourceId()}:${msg.lineNumber()}]")
+                return true
             }
         }
         loadUrl(APP_URL)
