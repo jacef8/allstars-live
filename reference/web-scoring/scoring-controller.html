@@ -1351,8 +1351,12 @@ function maybeAlert(){
 function alertOverlay(){
   if(!activeAlert) return "";
   const a=activeAlert, accent=a.tone==="warn"?T.amber:T.lime;
+  // Card background was hardcoded to a fixed dark navy — never changed with the theme — while the
+  // body text (T.chalk) correctly flips to near-BLACK in day mode. Dark-on-dark result: rule-limit /
+  // run-rule popups read as "almost black writing with a very dark background." (jford, 2026-07-06.)
+  // Same bug class as several other hardcoded-dark-background fixes tonight — T.surface adapts.
   return `<div data-act="alertbackdrop" style="position:fixed;inset:0;z-index:120;display:flex;align-items:center;justify-content:center;background:rgba(6,9,14,.6);padding:18px">
-      <div data-act="noop" style="max-width:380px;width:100%;background:#0E1420;border:2px solid ${accent};border-radius:16px;box-shadow:0 18px 50px rgba(0,0,0,.6);padding:20px 22px">
+      <div data-act="noop" style="max-width:380px;width:100%;background:${T.surface};border:2px solid ${accent};border-radius:16px;box-shadow:0 18px 50px rgba(0,0,0,.6);padding:20px 22px">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px"><span style="font-size:22px">${a.tone==="warn"?IC('alert',20):IC('bell',20)}</span>
           <div style="font-family:${MONO};font-size:20px;font-weight:800;color:${accent};letter-spacing:.4px">${a.title}</div></div>
         <div style="font-size:15px;color:${T.chalk};line-height:1.45">${a.msg}</div>
@@ -6891,7 +6895,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v375";
+var APP_VERSION="v376";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
