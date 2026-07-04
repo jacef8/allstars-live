@@ -84,15 +84,26 @@
   /* Team-color tinted cards (batter card, team tiles): same frosted dark backing so text is
      readable over the turf, with the team color kept as the left accent (set inline). */
   .frost-card{ -webkit-backdrop-filter:blur(13px) saturate(1.1);backdrop-filter:blur(13px) saturate(1.1); }
-  /* v344: section-caption labels (e.g. "Roster — tap to edit…", "Recent games", "Owners") are plain
-     colored text dropped directly between cards — no card background of their own — so on busy/bright
-     turf they can be nearly unreadable (jford: circled one of these, "extremely hard to see"). A
-     translucent card bg can't fix bare text; give every instance of this caption style the same hard
-     outline+glow already used to keep the "ALL-STARS LIVE" wordmark readable on the turf, same
-     attribute-selector trick as the frost-window rule above — covers every current AND future caption
-     using this exact style, not just the ones reported so far. */
+  /* v344/v346/v347: section-caption labels (e.g. "Roster — tap to edit…", "Current teams", "Past
+     teams") are plain colored text dropped directly between cards — no card background of their own —
+     so on busy/bright turf they can be nearly unreadable (jford: circled one of these, "extremely hard
+     to see"). v344/v346 tried the hard outline+glow used on the "ALL-STARS LIVE" wordmark, but at
+     small caption size that reads as a muddy, mismatched blob instead of clean text (jford: "weird
+     mask... doesn't match any other windows. CONSISTANCY IS VERY IMPORTANT"). Fixed properly this
+     time: turn each caption into the same small solid badge/chip already used elsewhere in the app
+     (e.g. the "ENDED" pill on an archived team) instead of an outline effect — same frosted-window
+     backing as every other card, just a smaller pill shape. Same attribute-selector trick as the
+     frost-window rule above, so it covers every current AND future caption using this style. */
   [style*="text-transform:uppercase;color:var(--lime)"],
-  [style*="text-transform:uppercase;color:var(--sageDim)"]{text-shadow:var(--heroShadow)!important;}
+  [style*="text-transform:uppercase;color:var(--sageDim)"]{
+    /* width:fit-content (not display:inline-block) — these captions are usually direct children of a
+       `display:flex;flex-direction:column` page column, and flex/grid items get their outer display
+       "blockified" back to block even when told inline-block (CSS Display spec), so inline-block alone
+       silently stays full-width. fit-content shrinks the box to the text regardless of that. */
+    width:fit-content!important; background:var(--frost)!important;
+    -webkit-backdrop-filter:blur(13px) saturate(1.1);backdrop-filter:blur(13px) saturate(1.1);
+    border:1px solid var(--line)!important; border-radius:7px!important; padding:3px 9px!important;
+  }
   button{font-family:var(--sans);cursor:pointer;color:var(--chalk);
     /* Default to the light page text color. <button> does NOT inherit `color` (it resets to
        black), so any button that draws a currentColor icon without setting its own color was
@@ -6500,7 +6511,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v346";
+var APP_VERSION="v347";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
