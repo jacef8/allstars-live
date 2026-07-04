@@ -570,7 +570,14 @@
         summary: meta.summary || null,
       };
       if (meta.activeUid) { doc.activeUid = meta.activeUid; doc.activeName = meta.activeName || ""; doc.activeAt = Date.now(); }
-      d.collection("games").doc(id).set(doc, { merge: true }).catch(function (e) { console.warn("cloudPublishGame:", e.message); });
+      // Track success/failure so a silent, invisible publish failure (e.g. a transient signed-out
+      // moment) is diagnosable afterward instead of just "viewers saw nothing, no one knows why" —
+      // jford, 2026-07-03: scored a whole game live, a same-account viewer on another device never
+      // saw a single play update, and there was no way after the fact to tell whether the publish was
+      // ever even attempted. Surfaced on the Diagnostics page as "Live publish".
+      d.collection("games").doc(id).set(doc, { merge: true })
+        .then(function () { window._lastLivePublishOk = Date.now(); })
+        .catch(function (e) { window._lastLivePublishErr = { at: Date.now(), msg: e.message }; console.warn("cloudPublishGame:", e.message); });
     }, 1000);
   };
   // Cancel a pending debounced publish (used when relinquishing scoring, so a stale write can't

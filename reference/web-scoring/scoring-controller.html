@@ -1930,15 +1930,29 @@ function broadcast(){
   const _full={type:"full",G:G,ROSTER:ROSTER,OUR:OUR,OPP:OPP,curTeamId:curTeamId,oppTeamId:oppTeamId,gameFeed:gameFeed};
   try{ LINK.send(_full); }catch(e){}
   // Persist the game to the cloud so it survives a dead phone + co-scorers share it (owner/scorer only).
-  try{ if(window.Cloud&&window.Cloud.user&&curTeamId&&window.cloudPublishGame){ const _t=teamById(curTeamId);
-    if(_t&&window.cloudIsScorer&&window.cloudIsScorer(_t)&&amActiveScorer){
-      G.cloudId=curTeamId+"-live";                                   // stable per-team live doc (resumable cross-device)
-      if(!_myClaimAt)_myClaimAt=Date.now();
-      const _meta={ final:!!G.final, activeUid:myCloudUid(), activeName:myCloudName(),
-        summary:{a:TEAMS.away.short||"AWAY",h:TEAMS.home.short||"HOME",as:G.away|0,hs:G.home|0,inn:G.inning|0,half:G.half} };
-      window.cloudPublishGame(G.cloudId, Object.assign({teamId:curTeamId},_full), _meta);
-      try{ watchLiveTakeover(curTeamId); }catch(e){}
-    } } }catch(e){}
+  // Track WHY a publish attempt was skipped (not just whether it succeeded) — see the "Live publish"
+  // Diagnostics row: a scorer's device can look completely normal locally (LINK still sends fine) while
+  // silently never reaching Firestore at all, with zero visible symptom until a viewer notices nothing
+  // is updating. (jford, 2026-07-03: scored a full game live, a same-account viewer on another device
+  // never saw a single play, and there was no way after the fact to tell why.)
+  try{
+    if(!(window.Cloud&&window.Cloud.user)) window._livePublishSkip="Not signed in";
+    else if(!curTeamId) window._livePublishSkip="No team attached to this game";
+    else if(!window.cloudPublishGame) window._livePublishSkip="Cloud publish unavailable";
+    else { const _t=teamById(curTeamId);
+      if(!_t) window._livePublishSkip="Team not found locally";
+      else if(!(window.cloudIsScorer&&window.cloudIsScorer(_t))) window._livePublishSkip="Not recognized as a scorer for this team";
+      else if(!amActiveScorer) window._livePublishSkip="Another device is the active scorer";
+      else {
+        window._livePublishSkip=null;
+        G.cloudId=curTeamId+"-live";                                   // stable per-team live doc (resumable cross-device)
+        if(!_myClaimAt)_myClaimAt=Date.now();
+        const _meta={ final:!!G.final, activeUid:myCloudUid(), activeName:myCloudName(),
+          summary:{a:TEAMS.away.short||"AWAY",h:TEAMS.home.short||"HOME",as:G.away|0,hs:G.home|0,inn:G.inning|0,half:G.half} };
+        window.cloudPublishGame(G.cloudId, Object.assign({teamId:curTeamId},_full), _meta);
+        try{ watchLiveTakeover(curTeamId); }catch(e){}
+      } }
+  }catch(e){}
   _seq++; const k=battingKey(),b=batter();
   LINK.send({type:"state",seq:_seq,
     away:G.away,home:G.home,inning:G.inning,half:G.half,balls:G.balls,strikes:G.strikes,outs:G.outs,
@@ -4252,6 +4266,14 @@ function actionArea(){
       drow("Camera",IS_APP?(camLive?"Connected":"Not connected"):"App only",IS_APP?camLive:null,IS_APP?"":"Camera &amp; stream run in the Android app"),
       drow("Stream",phase==="LIVE"?("LIVE"+(yt?" · "+yt:"")):(phase==="STARTING"?"Going live…":"Offline"),phase==="LIVE"?true:(phase==="STARTING"?"warn":null)),
       drow("Live relay",hasRelay?(relayConn?"Connected":"Disconnected"):"Local only",hasRelay?relayConn:null,"Carries the live score to viewers"),
+      (function(){
+        if(!gameActive) return drow("Live publish","No active game",null,"Pushes each play to Firestore so a Watch viewer sees it");
+        if(window._livePublishSkip) return drow("Live publish","Blocked — "+window._livePublishSkip,false,"Pushes each play to Firestore so a Watch viewer sees it");
+        const errNewer=window._lastLivePublishErr&&(window._lastLivePublishErr.at>(window._lastLivePublishOk||0));
+        if(errNewer) return drow("Live publish","Error — "+window._lastLivePublishErr.msg,false,"Pushes each play to Firestore so a Watch viewer sees it");
+        if(window._lastLivePublishOk) return drow("Live publish",Math.max(0,Math.round((Date.now()-window._lastLivePublishOk)/1000))+"s ago",true,"Pushes each play to Firestore so a Watch viewer sees it");
+        return drow("Live publish","Not sent yet",null,"Pushes each play to Firestore so a Watch viewer sees it");
+      })(),
       drow("Cloud sync",(C&&C.enabled)?"Enabled":"Disabled",(C&&C.enabled)?true:null),
       drow("Signed in",signedIn?((C.user.email||"yes").replace(/</g,"")):"No",signedIn?true:null,signedIn?"BOTH devices must show THIS same email to sync":"Sign in on Home to sync across devices"),
       (function(){ var myUid=C&&C.user&&C.user.uid; var ts=DB.teams||[];
@@ -6511,7 +6533,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v349";
+var APP_VERSION="v350";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
