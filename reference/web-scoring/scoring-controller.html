@@ -907,7 +907,7 @@ const initGame=()=>({inning:1,half:"T",away:0,home:0,outs:0,balls:0,strikes:0,
   startedAt:null,  // wall-clock ms when the game ACTUALLY started (auto-set at first pitch / game start; editable in Game Setup) — drives the game timer
   lineup:{ order:[0,1,2,3,4,5,6,7,8],   // batting order: 9-12 entries (slots 10+ = extra hitters)
            pos:{P:0,C:1,"1B":2,"2B":3,"3B":4,SS:5,LF:6,CF:7,RF:8} }});
-let G=initGame(),hist=[],redoStack=[],mode="home",tap=null,contact=null,result=null,plan=null,toast=null,toastTimer=null,curResults=[],showAll=false,showZones=false,editSlot=null,confirmAct=null,gameActive=false,lineupTab="us",newgameFrom="home",brSheet=false,correctOpen=false,correctOpenAt=0,lineupView="list",fieldAssign=null,fieldHold=null,fieldDisplaced=null,lineEditSlot=null,luFromSetup=false,koPick=null,oppFieldSel=null,gcArrange=false,bugPreview=false,barEdit=false,editAB=null,gameEdit=null,statsSeason="all";
+let G=initGame(),hist=[],redoStack=[],mode="home",tap=null,contact=null,result=null,plan=null,toast=null,toastTimer=null,curResults=[],showAll=false,showZones=false,editSlot=null,confirmAct=null,gameActive=false,lineupTab="us",newgameFrom="home",brSheet=false,correctOpen=false,correctOpenAt=0,lineupView="list",fieldAssign=null,fieldHold=null,fieldDisplaced=null,lineEditSlot=null,luSelSlot=null,luFromSetup=false,koPick=null,oppFieldSel=null,gcArrange=false,bugPreview=false,barEdit=false,editAB=null,gameEdit=null,statsSeason="all";
 // Resume the last in-progress game (saved by saveGame) across reloads/app updates, so the
 // lineup/score is never lost. Stays on the home screen → shows "Resume". Re-links ROSTER
 // to the saved team so the lineup's player indices resolve correctly.
@@ -1105,6 +1105,17 @@ function oppFieldMapHtml(){
   return `<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px">
       <div style="position:relative;width:100%;max-width:400px;margin:0 auto;flex:none"><div style="position:relative;width:100%;height:0;padding-bottom:93.33%;border:2px solid ${T.line};border-radius:10px;overflow:hidden">${diamond}${FPOS.map(spot).join("")}</div></div>
       ${panel}</div>`;
+}
+// Tap-to-select + up/down arrows for reordering the batting order — see the row-rendering comment
+// for why this replaced drag entirely. selectLu toggles which slot shows its move arrows; moveLu
+// swaps it with its neighbor and keeps the SAME PLAYER selected (following them to their new slot)
+// so repeated taps walk them further up/down without having to re-select each time.
+function selectLu(slot){ luSelSlot=(luSelSlot===slot)?null:slot; render(); }
+function moveLu(slot,dir){
+  const ord=G.lineup.order; const j=dir==="up"?slot-1:slot+1;
+  if(j<0||j>=ord.length) return;
+  const tmp=ord[slot]; ord[slot]=ord[j]; ord[j]=tmp;
+  luSelSlot=j; render(); broadcast();
 }
 /* ---- continuous batting order: 9 fielders + extra hitters (bat only), up to 12 ---- */
 function addBatter(){const b=benchIdx();if(!b.length){flash("No bench players to add");return;}
@@ -1990,7 +2001,13 @@ let feedView=(()=>{try{return localStorage.getItem("al-feed-view")||"play";}catc
 // after the bcastEvent fix — this was the other call path with the same bug.)
 function feedPitch(label,detail,inn,half){
   if(!gameFeed)gameFeed=[];
-  gameFeed.push({id:++_eventId,inn:(inn!=null?inn:G.inning),half:(half!=null?half:G.half),type:"pitch",head:label,sub:detail||"",away:G.away,home:G.home});
+  const entry={id:++_eventId,inn:(inn!=null?inn:G.inning),half:(half!=null?half:G.half),type:"pitch",head:label,sub:detail||"",away:G.away,home:G.home};
+  // doFlip() already ran (see the inn/half comment above) and its "End of ..." divider is sitting at
+  // the end of gameFeed by now — appending after it would put the divider BEFORE the very pitch that
+  // ended the inning once the feed displays most-recent-first. (jford, 2026-07-06, from a screenshot:
+  // "shows the inning end indicator in the middle of an at-bat.") Insert just before it instead.
+  const tail=gameFeed[gameFeed.length-1];
+  if(tail&&tail.kind==="inningend") gameFeed.splice(gameFeed.length-1,0,entry); else gameFeed.push(entry);
   if(gameFeed.length>220)gameFeed.shift();
 }
 // Advanced pitch tracking: when on, the scorer arms a pitch type that's recorded with
@@ -2025,7 +2042,15 @@ function bcastEvent(kind,sub,team,bk,inn,half){
   // Append to the live game feed (play-by-play) shown to viewers. Carry kind + the post-play out
   // count so the feed can tag out-making plays with "· N out" (relevant context for that play).
   // bk = the batter's stat key (e.g. "o3"/"p5") so a completed at-bat can be edited from the feed.
-  gameFeed.push({id:_eventId,inn:(inn!=null?inn:G.inning),half:(half!=null?half:G.half),type:"play",kind:kind,outs:(G.outs|0),head,sub:sub||"",away:G.away,home:G.home,bk:bk||null});
+  const entry={id:_eventId,inn:(inn!=null?inn:G.inning),half:(half!=null?half:G.half),type:"play",kind:kind,outs:(G.outs|0),head,sub:sub||"",away:G.away,home:G.home,bk:bk||null};
+  // The play that ENDS a half-inning already gets its inn/half stamped correctly above (see the big
+  // comment) — but doFlip() runs BEFORE this call in every one of those paths, so its "End of ..."
+  // divider is already the last thing in gameFeed by the time we get here. Appending after it would
+  // put the divider BEFORE the very play that caused it once the feed shows most-recent-first — reads
+  // as the inning ending mid-play. (jford, 2026-07-06, from a screenshot: "shows the inning end
+  // indicator in the middle of an at-bat.") Insert just before it instead when present.
+  const tail=gameFeed[gameFeed.length-1];
+  if(tail&&tail.kind==="inningend") gameFeed.splice(gameFeed.length-1,0,entry); else gameFeed.push(entry);
   if(gameFeed.length>220)gameFeed.shift();
 }
 /* Assemble the live box score (per-batter rows + R/H/E totals), mapped to away/home. */
@@ -4740,18 +4765,33 @@ function actionArea(){
         <input value="${(p.name||"").replace(/"/g,"&quot;")}" oninput="luPName(${slot},this.value)" placeholder="Player name" style="${eCell};flex:1 1 150px;min-width:0">
         <button data-act="pickpos" data-arg="${slot}" style="background:${isP?OUR.color:T.surface2};border:2px solid ${isP?OUR.color:T.line};color:${isP?"#FFFFFF":T.chalk};border-radius:7px;padding:8px 12px;font-family:${MONO};font-size:15px;font-weight:800;flex:none">${pos}</button>
         <button data-act="editplayer" data-arg="${slot}" style="background:${T.lime};border:2px solid ${T.lime};color:#fff;border-radius:8px;padding:9px 15px;font-family:${SANS};font-size:14px;font-weight:800;flex:none">Done</button></div>`;
-      if(narrow) return `<div data-row data-ri="${ri}" style="display:flex;align-items:center;gap:9px;background:${_cur?"rgba(225,29,46,.12)":T.surface2};border:2px solid ${_cur?T.lime:T.line};border-radius:10px;padding:10px 9px">
-        <span data-drag style="cursor:grab;color:${T.sageDim};display:flex;align-items:center;padding:6px 2px;touch-action:none">${IC('<path d="M4 7h16M4 12h16M4 17h16"/>')}</span>
-        <span style="font-family:${MONO};font-size:18px;font-weight:800;color:${T.lime};width:20px;text-align:center;flex:none">${slot+1}</span>${_cur?curBadge:""}
+      // Tap-to-select + up/down arrows (replaces drag entirely) — jford, 2026-07-06: "battig order
+      // adjustments still arent working... just change it so that i touch to select a batter then
+      // click an up or down arrow to move them." Drag depended on a held gesture surviving for its
+      // whole duration without an interrupting re-render (v371 patched one cause of that but the
+      // mechanism is inherently fragile on a real device); a tap-select + discrete-move-button is
+      // immune to that whole class of bug — each move is a single, instant, atomic action.
+      const _sel=(luSelSlot===slot);
+      const _n=G.lineup.order.length;
+      const numBadge=`<button data-act="luselect" data-arg="${slot}" title="${_sel?"Deselect":"Select to move"}" style="background:transparent;border:none;font-family:${MONO};font-size:18px;font-weight:800;color:${T.lime};width:20px;text-align:center;flex:none;padding:0;cursor:pointer">${slot+1}</button>`;
+      const moveHandle=_sel
+        ? `<div style="display:flex;flex-direction:column;gap:2px;flex:none">
+            <button data-act="lumove" data-arg="${slot}:up" ${slot===0?"disabled":""} style="width:26px;height:22px;border-radius:5px 5px 0 0;background:${T.lime};border:none;color:#fff;display:flex;align-items:center;justify-content:center;opacity:${slot===0?.35:1};cursor:${slot===0?"default":"pointer"}">${IC('<path d="M18 15 12 9 6 15"/>',14)}</button>
+            <button data-act="lumove" data-arg="${slot}:down" ${slot===_n-1?"disabled":""} style="width:26px;height:22px;border-radius:0 0 5px 5px;background:${T.lime};border:none;color:#fff;display:flex;align-items:center;justify-content:center;opacity:${slot===_n-1?.35:1};cursor:${slot===_n-1?"default":"pointer"}">${IC('<path d="M6 9l6 6 6-6"/>',14)}</button>
+          </div>`
+        : `<button data-act="luselect" data-arg="${slot}" title="Select to move" style="cursor:pointer;color:${T.sageDim};background:transparent;border:none;display:flex;align-items:center;padding:6px 2px;flex:none">${IC('<path d="M4 7h16M4 12h16M4 17h16"/>')}</button>`;
+      if(narrow) return `<div data-row data-ri="${ri}" style="display:flex;align-items:center;gap:9px;background:${_sel?"rgba(59,232,90,.14)":_cur?"rgba(225,29,46,.12)":T.surface2};border:2px solid ${_sel?T.lime:_cur?T.lime:T.line};border-radius:10px;padding:10px 9px">
+        ${moveHandle}
+        ${numBadge}${_cur?curBadge:""}
         <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:7px">
           <button data-act="editplayer" data-arg="${slot}" style="text-align:left;background:transparent;border:none;color:${T.chalk};font-size:20px;font-weight:700;display:flex;align-items:center;gap:9px;padding:0;min-width:0"><span style="font-family:${MONO};color:${OUR.color};flex:none">#${p.num}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.name}</span></button>
           <div style="display:flex;align-items:center;gap:9px">
             <button data-act="pickpos" data-arg="${slot}" style="background:${isP?OUR.color:T.surface2};border:2px solid ${isP?OUR.color:T.line};color:${isP?"#FFFFFF":T.chalk};border-radius:7px;padding:7px 14px;font-family:${MONO};font-size:16px;font-weight:800;min-width:54px;flex:none">${pos}</button>
             <span style="font-size:12px;color:${T.sageDim}">${isP?"Pitcher":(pos==="—"?"Tap to set position":"Fielding "+pos)}</span>
           </div></div></div>`;
-      return `<div data-row data-ri="${ri}" style="display:flex;align-items:center;gap:6px;background:${_cur?"rgba(225,29,46,.12)":T.surface2};border:2px solid ${_cur?T.lime:T.line};border-radius:9px;padding:8px 8px">
-        <span data-drag style="cursor:grab;color:${T.sageDim};display:flex;align-items:center;padding:4px 2px;touch-action:none">${IC('<path d="M4 7h16M4 12h16M4 17h16"/>')}</span>
-        <span style="font-family:${MONO};font-size:17px;font-weight:800;color:${T.lime};width:18px;text-align:center">${slot+1}</span>${_cur?curBadge:""}
+      return `<div data-row data-ri="${ri}" style="display:flex;align-items:center;gap:6px;background:${_sel?"rgba(59,232,90,.14)":_cur?"rgba(225,29,46,.12)":T.surface2};border:2px solid ${_sel?T.lime:_cur?T.lime:T.line};border-radius:9px;padding:8px 8px">
+        ${moveHandle}
+        ${numBadge}${_cur?curBadge:""}
         <button data-act="editplayer" data-arg="${slot}" style="flex:1;min-width:0;text-align:left;background:transparent;border:none;color:${T.chalk};font-size:18px;font-weight:700;display:flex;align-items:center;gap:8px;overflow:hidden"><span style="font-family:${MONO};color:${OUR.color};min-width:34px">#${p.num}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.name}</span></button>
         <button data-act="pickpos" data-arg="${slot}" style="background:${isP?OUR.color:T.surface2};border:2px solid ${isP?OUR.color:T.line};color:${isP?"#FFFFFF":T.chalk};border-radius:7px;padding:8px 12px;font-family:${MONO};font-size:16px;font-weight:800;min-width:50px">${pos}</button></div>`;}).join("");
     const bench=benchIdx().map(ri=>`<span style="font-family:${MONO};font-size:14px;color:${T.sage};background:${T.surface};border:2px solid ${T.line};border-radius:6px;padding:5px 10px;white-space:nowrap">#${ROSTER[ri].num} ${ROSTER[ri].name}</span>`).join(" ");
@@ -5082,45 +5122,8 @@ function confirmOverlay(){
         <button data-act="confirm-yes" style="${bigBtn(confirmAct.danger?T.out:OUR.color)};flex:1;padding:13px">${confirmAct.yes||"Confirm"}</button></div>
     </div></div>`;
 }
-/* ---- drag-to-reorder the batting order (pointer-based; works on touch & mouse) ---- */
-function setupLineupDrag(){
-  const list=document.getElementById("lineup-list"); if(!list)return;
-  // Pointer-capture based (element listeners, NOT window) — matches setupFieldDrag's fix (v294). The old
-  // window-listener version leaked pointermove/pointerup on any pointercancel (very common when a touch
-  // starting near the drag handle conflicts with a scroll gesture): the leaked listener then kept firing
-  // on EVERY later touch anywhere in the list, silently reordering rows and eating the scroll — reported
-  // as "the list disappears and won't let me scroll." A 5px move threshold also means a touch that starts
-  // on the handle but never really moves (i.e. a scroll attempt that barely nudges) doesn't yank the row. (v311)
-  list.querySelectorAll('[data-drag]').forEach(handle=>{
-    handle.addEventListener('pointerdown',e=>{
-      e.preventDefault();
-      const row=handle.closest('[data-row]'); if(!row)return;
-      try{ handle.setPointerCapture(e.pointerId); }catch(_){}
-      const sy=e.clientY; let dragging=false;
-      const move=ev=>{
-        if(!dragging){ if(Math.abs(ev.clientY-sy)<5)return; dragging=true;
-          row.style.opacity='0.55'; row.style.boxShadow='0 6px 16px rgba(15,30,60,.25)'; document.body.style.userSelect='none'; }
-        const rows=[...list.querySelectorAll('[data-row]')];
-        for(const r of rows){ if(r===row)continue;
-          const b=r.getBoundingClientRect();
-          if(ev.clientY < b.top + b.height/2){ list.insertBefore(row,r); return; } }
-        list.appendChild(row);
-      };
-      const up=ev=>{
-        handle.removeEventListener('pointermove',move);
-        handle.removeEventListener('pointerup',up);
-        handle.removeEventListener('pointercancel',up);
-        try{ handle.releasePointerCapture(ev.pointerId); }catch(_){}
-        document.body.style.userSelect='';
-        row.style.opacity=''; row.style.boxShadow='';
-        if(dragging){ G.lineup.order=[...list.querySelectorAll('[data-row]')].map(r=>+r.dataset.ri); render(); broadcast(); }   // commit new batting order
-      };
-      handle.addEventListener('pointermove',move);
-      handle.addEventListener('pointerup',up);
-      handle.addEventListener('pointercancel',up);
-    });
-  });
-}
+// Batting-order reordering used to be drag-based here (removed — see the row-rendering comment by
+// luSelSlot for why: tap-select + up/down arrows replaced it entirely, v374).
 /* Field map drag-and-drop (BUMP-to-bench model, no confirm): drag any player — a fielder OR a bench chip —
    onto a spot. `fieldPlace` puts him there, vacates his old spot, and whoever was there drops to the Bench
    (no prompt). Drag a fielder onto the Bench to bench him. A short flag suppresses the tap that the same
@@ -5456,7 +5459,6 @@ function render(){
     _lastMode=mode; _lastSubTab=subTab;
     try{ const _sk=mode+"|"+subTab; if(scroll&&_scrollMem[_sk]!=null){ const c=document.querySelector("#content > div"); if(c)c.scrollTop=_scrollMem[_sk]; }
          if(mode==="lineup"&&_scrollMem["__lineup"]!=null){ const l=document.getElementById("lineup-list"); if(l)l.scrollTop=_scrollMem["__lineup"]; } }catch(e){}
-    if(mode==="lineup")setupLineupDrag();
     if(mode==="lineup"&&lineupTab==="opp")setupOppDrag();
     if(mode==="lineup"&&lineupView==="field")setupFieldDrag();
     if(building)setupBuilderDrag();
@@ -5971,6 +5973,8 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="outpos")setOutFielder(arg);
   else if(act==="dpout")setDpOut(arg);
   else if(act==="fcout")setFcOut(arg);
+  else if(act==="luselect")selectLu(+arg);
+  else if(act==="lumove"){ const [s,d]=arg.split(":"); moveLu(+s,d); }
   else if(act==="showall"){showAll=!showAll;render();}
   else if(act==="back-contact"){mode="contact";render();}
   else if(act==="back-result"){mode="result";render();}
@@ -5978,8 +5982,8 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="confirm")commit(result,plan);
   else if(act==="lineup"){mode="lineup";render();}
   else if(act==="lineupdone"){ luFromSetup=false; gameActive=true;mode="idle";render();broadcast(); }   // timer starts on first pitch (see recordPitch)
-  else if(act==="lutab"){lineupTab=arg;lineEditSlot=null;oppFieldSel=null;render();}
-  else if(act==="luview"){ lineupView=arg; fieldAssign=null; fieldHold=null; fieldDisplaced=null; lineEditSlot=null; oppFieldSel=null; render(); }   // batting-order list ↔ field map (C2)
+  else if(act==="lutab"){lineupTab=arg;lineEditSlot=null;luSelSlot=null;oppFieldSel=null;render();}
+  else if(act==="luview"){ lineupView=arg; fieldAssign=null; fieldHold=null; fieldDisplaced=null; lineEditSlot=null; luSelSlot=null; oppFieldSel=null; render(); }   // batting-order list ↔ field map (C2)
   else if(act==="oppfieldpos"){ oppFieldSel=(oppFieldSel===arg?null:arg); render(); }
   else if(act==="oppfieldassign"){ if(oppFieldSel){ oppAssignPos(+arg,oppFieldSel); oppFieldSel=null; render(); broadcast(); } }
   else if(act==="oppfieldcancel"){ oppFieldSel=null; render(); }
@@ -6875,7 +6879,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v373";
+var APP_VERSION="v374";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
