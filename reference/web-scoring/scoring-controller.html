@@ -2569,18 +2569,18 @@ function statusBar(standalone){
   // inline-flex + align-self:flex-start → content-sized BUG (no full-width dead space / vertical stretch).
   return `<div id="statusbar" data-longpress="correct" title="Tap the pencil (or hold) to correct the count / outs / score" style="position:relative;display:inline-flex;align-self:flex-start;max-width:100%;align-items:stretch;background:linear-gradient(180deg,${bg});border:1px solid ${brd};border-radius:9px;overflow:hidden;flex-shrink:0;box-shadow:0 10px 26px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.06);user-select:none;-webkit-user-select:none;-webkit-touch-callout:none">
     <div style="position:absolute;top:0;left:0;right:0;height:2.5px;display:flex;z-index:3"><span style="flex:1;background:${col("away")}"></span><span style="flex:1;background:${col("home")}"></span></div>
-    <div style="display:flex;flex-direction:column;justify-content:center;min-width:168px;max-width:290px;padding:3px 0 0">
+    <div style="display:flex;flex-direction:column;justify-content:center;min-width:140px;max-width:290px;padding:3px 0 0">
       ${tabRow("away",G.away,G.half==="T")}
       <div style="height:1px;background:${divCol};margin:0 0 0 4px"></div>
       ${tabRow("home",G.home,G.half==="B")}</div>
     <div style="width:1px;background:${brd}"></div>
-    <div style="display:flex;align-items:center;gap:9px;padding:0 10px;background:${panel2}">
-      <div style="display:flex;flex-direction:column;align-items:center;gap:1px">
+    <div style="display:flex;align-items:center;gap:6px;padding:0 8px;background:${panel2};min-width:0">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:1px;flex-shrink:0">
         <div style="font-family:${MONO};font-size:18px;font-weight:800;color:${txWhite};line-height:1">${G.half==="T"?"▲":"▼"}${G.inning}</div>
         <div style="font-family:${MONO};font-size:7.5px;font-weight:800;letter-spacing:1px;color:${txDim3}">${G.half==="T"?"TOP":"BOT"}</div></div>
-      <div style="display:flex;flex-direction:column;gap:3px">${pipRow("B","b",G.balls,3,"sb-balls")}${pipRow("S","s",G.strikes,2,"sb-strikes")}${pipRow("O","o",G.outs,3,"sb-outs")}</div>
-      <div style="display:flex;flex-direction:column;align-items:center;gap:2px">${diamond}<div style="font-family:${MONO};font-size:7.5px;font-weight:800;letter-spacing:1px;color:${txDim3}">BASES</div></div>
-      ${G.startedAt?`<div style="font-family:${MONO};font-size:11px;font-weight:700;color:${txDim};white-space:nowrap"><span class="game-clock">${gameClockStr()}</span></div>`:""}
+      <div style="display:flex;flex-direction:column;gap:3px;flex-shrink:0">${pipRow("B","b",G.balls,3,"sb-balls")}${pipRow("S","s",G.strikes,2,"sb-strikes")}${pipRow("O","o",G.outs,3,"sb-outs")}</div>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0">${diamond}<div style="font-family:${MONO};font-size:7.5px;font-weight:800;letter-spacing:1px;color:${txDim3}">BASES</div></div>
+      ${G.startedAt?`<div style="font-family:${MONO};font-size:11px;font-weight:700;color:${txDim};white-space:nowrap;flex-shrink:0"><span class="game-clock">${gameClockStr()}</span></div>`:""}
     </div>
   </div>`;
 }
@@ -2835,8 +2835,20 @@ window.__bcast = function(phase, videoId, status){
   const prev=window.__bcastPhase;
   window.__bcastPhase = phase || "OFFLINE";
   window.__bcastStatus = status || "";
-  if(videoId){ try{ localStorage.setItem("al-stream-yt", videoId); }catch(e){} }
-  else if(window.__bcastPhase==="OFFLINE"){ try{ localStorage.removeItem("al-stream-yt"); }catch(e){} }  // ended → reset the monitor
+  if(videoId){
+    try{ localStorage.setItem("al-stream-yt", videoId); }catch(e){}
+    // Share the REAL native broadcast id with every OTHER device watching this game — this used to
+    // only ever reach localStorage on the SCORER's OWN device, so no other device ever learned a
+    // native broadcast had gone live at all and just kept showing whatever it last had cached
+    // locally. (jford, 2026-07-06: tablet actively streaming to YouTube, but "when I try to watch
+    // from another device I see a pasted YouTube link from earlier.") G.streamYtId already rides
+    // along on every broadcast() and is the established live-updating source of truth (v353,
+    // see saveStream()) — just needed to actually be set here too.
+    if(typeof G!=="undefined" && G && G.streamYtId!==videoId){ G.streamYtId=videoId; try{ broadcast(); }catch(e){} }
+  } else if(window.__bcastPhase==="OFFLINE"){
+    try{ localStorage.removeItem("al-stream-yt"); }catch(e){}  // ended → reset the monitor
+    if(typeof G!=="undefined" && G && G.streamYtId){ G.streamYtId=""; try{ broadcast(); }catch(e){} }
+  }
   // Surface a YouTube/stream failure right on the scorer page (so you don't have to open
   // Camera setup to find out what went wrong). Flash it once, and a persistent pill stays
   // in the top bar (see renderToolbar) until it clears.
@@ -2894,24 +2906,33 @@ function monitorPane(){
   // no camera at all (or the camera not yet connected) could never use "watch with scorebug" either,
   // even though there was nothing native to show instead.
   const _camActuallyLive = IS_APP && (!!window.__camLive || window.__bcastPhase==="LIVE" || window.__bcastPhase==="STARTING");
-  // VIEWER pasted a YouTube-live link → embed it + lay the live scorebug on top. Handled before the
-  // IS_APP branch so it works on the native app too (the native transparent-camera path is for the
-  // SCORER's own broadcast, where the bug is composited natively — a viewer has no local camera).
-  // EXCLUDES the native app's own ACTIVE local broadcast/camera (IS_APP && !_remoteLive &&
-  // _camActuallyLive) even while toggled to the "Viewer" preview tab — jford, 2026-07-03: this
-  // branch pre-empted the native monitor entirely, so the camera settings gear (only rendered
-  // further down, in the IS_APP branch) never appeared at all while it was showing a stale pasted
-  // video instead — looked like "the youtube video buttons are on top of" the gear, and like an old
-  // video "still playing" after a new game. This branch's own controls row STILL never included the
-  // gear at all (jford, 2026-07-06: "where the YouTube is playing I think our gear icon is getting
-  // hidden by all the YouTube buttons") — setGear is prepended below now; it already no-ops for a
-  // real viewer/follower (its own canScoreNow()/viewMode guard), so this only ever shows it to the
-  // scorer, same as everywhere else it's used.
-  if(_isViewer && viewerVid && !(IS_APP && !_remoteLive && _camActuallyLive)){
+  // Prefer the REAL shared broadcast (streamYt(): the scorer's actual native go-live, or a manually
+  // pasted shared link — both ride along on G.streamYtId, live-updating via broadcast()/cloud sync)
+  // over this device's OWN personal pasted link — a personal paste is only meant as a fallback for
+  // when there's no official stream at all, not something that should permanently outrank the real
+  // one once it exists. (jford, 2026-07-06: tablet actively streaming to YouTube, but "when I try to
+  // watch from another device I see a pasted YouTube link from earlier" — that other device's own
+  // stale local viewerVid was unconditionally winning even after the real broadcast came online. See
+  // __bcast above for the other half of this fix — it now actually shares the native video id.)
+  const _embedYt = streamYt() || viewerVid;
+  // VIEWER pasted a YouTube-live link (or the real shared stream) → embed it + lay the live scorebug
+  // on top. Handled before the IS_APP branch so it works on the native app too (the native
+  // transparent-camera path is for the SCORER's own broadcast, where the bug is composited natively
+  // — a viewer has no local camera). EXCLUDES the native app's own ACTIVE local broadcast/camera
+  // (IS_APP && !_remoteLive && _camActuallyLive) even while toggled to the "Viewer" preview tab —
+  // jford, 2026-07-03: this branch pre-empted the native monitor entirely, so the camera settings
+  // gear (only rendered further down, in the IS_APP branch) never appeared at all while it was
+  // showing a stale pasted video instead — looked like "the youtube video buttons are on top of" the
+  // gear, and like an old video "still playing" after a new game. This branch's own controls row
+  // STILL never included the gear at all (jford, 2026-07-06: "where the YouTube is playing I think
+  // our gear icon is getting hidden by all the YouTube buttons") — setGear is prepended below now;
+  // it already no-ops for a real viewer/follower (its own canScoreNow() guard), so this only ever
+  // shows it to the scorer, same as everywhere else it's used.
+  if(_isViewer && _embedYt && !(IS_APP && !_remoteLive && _camActuallyLive)){
     const _mb="width:34px;height:34px;border-radius:9px;background:rgba(8,11,16,.66);border:1px solid rgba(255,255,255,.22);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer";
     const _linkIco=`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>`;
     return `<div id="monitor" style="position:relative;width:100%;flex:1;min-height:0;background:#0b0f15;border:2px solid ${T.line};border-radius:14px;overflow:hidden;box-shadow:0 6px 22px rgba(0,0,0,.4)">
-        <iframe id="ytembed" src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(viewerVid)}?autoplay=1&mute=${ytMuted?1:0}&playsinline=1&modestbranding=1&rel=0&${YT_CHROME_OFF}" allow="${YT_ALLOW}" allowfullscreen style="position:absolute;inset:0;width:100%;height:100%;border:0"></iframe>
+        <iframe id="ytembed" src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(_embedYt)}?autoplay=1&mute=${ytMuted?1:0}&playsinline=1&modestbranding=1&rel=0&${YT_CHROME_OFF}" allow="${YT_ALLOW}" allowfullscreen style="position:absolute;inset:0;width:100%;height:100%;border:0"></iframe>
         <div style="position:absolute;top:9px;left:10px;display:flex;align-items:center;gap:6px;background:rgba(8,11,16,.62);border-radius:999px;padding:4px 11px;z-index:3"><span style="width:8px;height:8px;border-radius:50%;background:${T.live};box-shadow:0 0 8px ${T.live}"></span><span style="font-family:${MONO};font-weight:800;font-size:11px;letter-spacing:1.6px;color:#fff">LIVE</span>${bugDelay?`<span style="font-family:${MONO};font-size:10px;font-weight:800;color:${T.amber};margin-left:3px">+${bugDelay}s</span>`:""}${viewer360?`<span style="font-family:${MONO};font-size:10px;font-weight:800;color:#7CC4FF;margin-left:3px">360° · drag</span>`:""}</div>
         <div style="position:absolute;top:9px;right:10px;display:flex;gap:6px;z-index:3">${setGear}${ytMuteBtn()}<button data-act="tventer" title="Full-screen TV mode" style="${_mb};width:auto;padding:0 11px;font-family:${MONO};font-weight:800;font-size:12px;letter-spacing:1px">TV</button>${canScoreNow()?`<button data-act="watchvidopen" title="Change video link / scorebug delay" style="${_mb}">${_linkIco}</button>`:""}</div>
         <div style="position:absolute;left:8px;right:8px;bottom:8px;z-index:2;pointer-events:none">${statusBar()}</div>
@@ -6965,7 +6986,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v382";
+var APP_VERSION="v383";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
