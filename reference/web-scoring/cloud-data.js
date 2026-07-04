@@ -28,6 +28,13 @@
       schedule: t.schedule || [], lineup: t.lineup || null, rulesUrl: t.rulesUrl || "",
       lineups: t.lineups || [], activeLineupId: t.activeLineupId || null,   // saved batting orders
       rulebookId: t.rulebookId || null,
+      league: t.league || "custom",                        // rules preset every NEW game starts from — was
+                                                              // NEVER in this whitelist, so it only ever
+                                                              // existed on whichever single device set it
+                                                              // (jford, 2026-07-03: "team management settings
+                                                              // are not the same" — set on one device, another
+                                                              // device never received it, silently fell back
+                                                              // to "custom" everywhere leagueById() is called)
       ownerUid: t.ownerUid || myUid(), ownerEmail: t.ownerEmail || myEmail(),
       scorers: t.scorers || [], followers: t.followers || [], coOwners: t.coOwners || [],
       members: t.members || [],                           // APPROVED members (emails) → team chat + photos
