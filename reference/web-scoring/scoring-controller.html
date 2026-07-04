@@ -1743,12 +1743,20 @@ function applyRemote(raw){
     // changed.) Fire a clear, one-time notice on the transition into final (not every update once it's
     // already final, and not on the very first snapshot if it happens to already be a finished game —
     // that's a normal "catching up on a game that already ended," not a live event worth flashing).
-    if(msg.G.final && !G.final && _remoteLive){ try{ flash("Game over — final score "+(msg.G.away|0)+"-"+(msg.G.home|0)); }catch(e){} }
+    const _justEnded=(msg.G.final && !G.final && _remoteLive);
+    if(_justEnded){ try{ flash("Game over — final score "+(msg.G.away|0)+"-"+(msg.G.home|0)); }catch(e){} }
     G=msg.G;
     if(Array.isArray(msg.ROSTER)) ROSTER=msg.ROSTER;
     if(msg.OUR) Object.assign(OUR,msg.OUR);
     if(msg.OPP) Object.assign(OPP,msg.OPP);
     if(Array.isArray(msg.gameFeed)) gameFeed=msg.gameFeed;
+    // The flash above disappears in a few seconds with nothing else marking it — jford, 2026-07-04:
+    // "it did not show on the game feed... if you missed it, you would have had no idea." A feed
+    // entry sits there permanently, scrollable, same as every other play — the natural persistent
+    // record. Only added once per transition, not re-added on every subsequent already-final update.
+    if(_justEnded){ try{ gameFeed.push({id:"final-"+Date.now(), inn:G.inning, half:G.half, type:"play", kind:"gameend",
+      head:"GAME FINAL", sub:(TEAMS.away.short||"AWAY")+" "+(G.away|0)+" – "+(G.home|0)+" "+(TEAMS.home.short||"HOME"),
+      away:G.away, home:G.home}); }catch(e){} }
     if(msg.curTeamId!=null) curTeamId=msg.curTeamId;
     if(msg.oppTeamId!=null) oppTeamId=msg.oppTeamId;
     gameActive=true; _remoteLive=true;
@@ -3028,12 +3036,21 @@ function feedPanel(){
         <span style="font-family:${MONO};font-size:${fpx(12)}px;font-weight:800;letter-spacing:.5px;color:${T.lime};white-space:nowrap;text-transform:uppercase">${e.head} &middot; ${e.sub}</span>
         <div style="flex:1;height:1px;background:${T.line};opacity:.22"></div></div>`;
     }
+    // Game-over marker: same divider treatment as inningend but in T.out (red/stop) so it visibly
+    // outranks an inning break — this is the PERMANENT record that a watched game finished (2026-07-04,
+    // jford: the toast alone "went away... if you missed it, you would have had no idea").
+    if(e.kind==="gameend"){
+      return `<div style="display:flex;align-items:center;gap:10px;padding:9px 15px;background:rgba(225,29,46,.13)">
+        <div style="flex:1;height:1.5px;background:${T.out};opacity:.4"></div>
+        <span style="font-family:${MONO};font-size:${fpx(13)}px;font-weight:800;letter-spacing:.6px;color:${T.out};white-space:nowrap;text-transform:uppercase">${e.head} &middot; ${e.sub}</span>
+        <div style="flex:1;height:1.5px;background:${T.out};opacity:.4"></div></div>`;
+    }
     const pit=e.type==="pitch";
     return `<div style="display:flex;align-items:baseline;gap:10px;padding:${pit?"6px 15px":"11px 15px"};border-bottom:1.5px solid rgba(255,255,255,.06);${pit?"background:rgba(255,255,255,.02)":""}">
       <span style="font-family:${MONO};font-size:${pit?fpx(13):fpx(15)}px;font-weight:800;color:${pit?T.sageDim:T.lime};min-width:38px">${e.half==="T"?"▲":"▼"}${e.inn}</span>
       <span style="flex:1;min-width:0;color:${pit?T.sage:T.chalk};font-size:${pit?fpx(14):fpx(17)}px;font-weight:${pit?"600":"700"}">${e.head}${e.sub?` <span style="color:${T.sageDim};font-weight:600">— ${e.sub}</span>`:""}${(!pit&&OUT_KINDS.includes(e.kind)&&e.outs!=null)?` <span style="font-family:${MONO};font-size:${fpx(12)}px;font-weight:800;color:${e.outs>=3?T.lime:T.sageDim};white-space:nowrap">&middot; ${e.outs} OUT${e.outs===1?"":"S"}</span>`:""}</span>
       ${_chg[e.id]?`<span style="font-family:${MONO};font-size:${fpx(15)}px;font-weight:800;color:${T.lime};white-space:nowrap;background:rgba(225,29,46,.12);border-radius:6px;padding:2px 8px">${TEAMS.away.short} ${e.away}-${e.home} ${TEAMS.home.short}</span>`:""}
-      ${(_editable&&!pit&&e.kind!=="inningend")?`<button data-act="abedit" data-arg="${e.id}" title="Edit this at-bat" style="flex:none;background:${T.surface2};border:1.5px solid ${T.line};color:${T.sage};border-radius:7px;padding:3px 9px;font-family:${MONO};font-size:11px;font-weight:800;letter-spacing:.5px;cursor:pointer">EDIT</button>`:""}
+      ${(_editable&&!pit&&e.kind!=="inningend"&&e.kind!=="gameend")?`<button data-act="abedit" data-arg="${e.id}" title="Edit this at-bat" style="flex:none;background:${T.surface2};border:1.5px solid ${T.line};color:${T.sage};border-radius:7px;padding:3px 9px;font-family:${MONO};font-size:11px;font-weight:800;letter-spacing:.5px;cursor:pointer">EDIT</button>`:""}
     </div>`;}).join("");
   const seg=(v,lbl)=>`<button data-act="feedview" data-arg="${v}" style="padding:5px 11px;border:none;font-family:${MONO};font-weight:800;font-size:11px;letter-spacing:.4px;cursor:pointer;background:${feedView===v?T.lime:"transparent"};color:${feedView===v?"#fff":T.sage}">${lbl}</button>`;
   const ssz=(v,lbl)=>`<button data-act="feedsize" data-arg="${v}" style="padding:5px 9px;border:none;font-family:${MONO};font-weight:800;font-size:11px;cursor:pointer;background:${fzKey===v?T.lime:"transparent"};color:${fzKey===v?"#fff":T.sage}">${lbl}</button>`;
@@ -6127,8 +6144,14 @@ function renderToolbar(){
   // The "LC vs FRA" matchup text had NO card/background of its own — just bare text floating on the
   // toolbar (which itself has no background either) — jford: "toward top left where it says LC vs
   // FRA, there is no window backing." Wrapped in the same card treatment as the WATCHING pill next to it.
+  // A viewer's own "WATCHING" pill never changed once the game actually ended — jford, 2026-07-04:
+  // a brief "Game over" toast (added earlier tonight) was the ONLY signal, and it disappeared in a
+  // few seconds with nothing persistent anywhere after — "if you missed it, you would have had no
+  // idea the game was over." This pill is visible the WHOLE time a viewer is watching, so flipping
+  // it to a distinct FINAL state here is the natural persistent indicator.
+  const _watchFinal=gameActive&&G.final;
   const chip=(playMode2&&viewerLocked)
-    ? `<div style="display:inline-flex;align-items:center;gap:8px"><span style="display:inline-flex;align-items:center;gap:5px;background:${T.surface};border:2px solid ${T.line};border-radius:999px;padding:5px 11px;font-family:${MONO};font-size:11px;font-weight:800;letter-spacing:1px;color:${T.lime}">${IC('eye',14)} WATCHING</span>${takeOverBtn}</div>`
+    ? `<div style="display:inline-flex;align-items:center;gap:8px"><span style="display:inline-flex;align-items:center;gap:5px;background:${_watchFinal?T.surface2:T.surface};border:2px solid ${_watchFinal?T.out:T.line};border-radius:999px;padding:5px 11px;font-family:${MONO};font-size:11px;font-weight:800;letter-spacing:1px;color:${_watchFinal?T.out:T.lime}">${_watchFinal?IC('<rect x="6" y="6" width="12" height="12" rx="1.5"/>',14):IC('eye',14)} ${_watchFinal?"FINAL":"WATCHING"}</span>${takeOverBtn}</div>`
     : playMode2
     ? `<div style="display:inline-flex;gap:2px;background:${T.line};border:2px solid ${T.line};border-radius:10px;overflow:hidden">${roleSeg("scorer","Scorer")}${roleSeg("viewer","Viewer")}</div>`
     : inGame
@@ -6650,7 +6673,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v358";
+var APP_VERSION="v359";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
