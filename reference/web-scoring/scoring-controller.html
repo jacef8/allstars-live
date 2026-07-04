@@ -1193,7 +1193,7 @@ function startNewGame(){
     const _allOpp = ot ? ot.players.map(p=>({num:p.num,name:p.name})) : Array.from({length:Math.max(1,G.oppBatters)},(_,i)=>({num:String(i+1),name:""}));
     G.oppLineup = _allOpp.slice(0,12); G.oppBench = _allOpp.slice(12); if(ot) G.oppBatters=G.oppLineup.length; oppDefaultPositions(); }
   settingsMode=false; resetAlerts();
-  amActiveScorer=true; _myClaimAt=Date.now();   // starting a fresh game → I'm the active scorer
+  amActiveScorer=true; _myClaimAt=Date.now(); _claimStamped=false;   // starting a fresh game → I'm the active scorer
   lineupTab="us"; hist=[]; gameFeed=[]; resetUI(); mode="lineup"; render(); broadcast();
 }
 /* Opponent name from the New Game text field (no re-render, so typing keeps focus). */
@@ -1775,6 +1775,17 @@ function applyRemote(raw){
    previous device relinquishes (drops to read-only). Other devices see it "in progress" on Home. ===== */
 let amActiveScorer=true;             // is THIS device the active scorer for the current game?
 let _myClaimAt=0;                    // when I last claimed scoring (vs another device's claim)
+// Has THIS device already stamped activeUid to the cloud for its CURRENT claim? broadcast() used to
+// re-stamp activeUid/activeAt on EVERY single play (not just once at claim time), via .set(...,
+// {merge:true}) — so a device that was already scoring, and simply hadn't yet PROCESSED another
+// device's takeover snapshot, would blindly overwrite that takeover's activeUid right back to itself
+// on its very next pitch, before its own watchLiveTakeover listener ever got a chance to notice and
+// relinquish. Two people both ended up able to keep scoring the same game. (jford, 2026-07-05:
+// "one of them clicks the takeover button, it's not preventing the other devices from becoming a
+// scorer.") Stamp activeUid to the cloud exactly ONCE per claim (reset to false at every claim site:
+// new game, resume, takeover); every other regular play publish omits activeUid entirely so merge:
+// true leaves whatever the doc currently holds untouched — letting a takeover actually stick.
+let _claimStamped=false;
 let _takeoverUnsub=null,_takeoverTeam=null;
 let _watchLiveUnsub=null;   // follower watching a live game from Home (read-only cloud subscription)
 let _liveGames={},_liveHomeSubs={};  // teamId → {summary,activeUid,activeName} for the Home "in progress" row
@@ -1995,8 +2006,9 @@ function broadcast(){
         window._livePublishSkip=null;
         G.cloudId=curTeamId+"-live";                                   // stable per-team live doc (resumable cross-device)
         if(!_myClaimAt)_myClaimAt=Date.now();
-        const _meta={ final:!!G.final, activeUid:myCloudUid(), activeName:myCloudName(),
+        const _meta={ final:!!G.final,
           summary:{a:TEAMS.away.short||"AWAY",h:TEAMS.home.short||"HOME",as:G.away|0,hs:G.home|0,inn:G.inning|0,half:G.half} };
+        if(!_claimStamped){ _meta.activeUid=myCloudUid(); _meta.activeName=myCloudName(); _claimStamped=true; }
         // Firestore's .set() flatly rejects ANY nested array anywhere in the document — and
         // G.anim.paths[].pts is exactly that: an array of [x,y] coordinate PAIRS, i.e. an array of
         // arrays (used for drawing the ball-flight/runner-path animation). Every push after a ball
@@ -5136,7 +5148,33 @@ document.addEventListener("focusin", function(e){
 });
 function restoreScroll(){ var m=window._scrollMemo||{}; for(var id in m){ if(m[id]>0){ var el=document.getElementById(id); if(el) el.scrollTop=m[id]; } } }
 /* Paint new HTML into #content and put the scroll positions back (no jump-to-top). */
-function paintContent(html){ var c=document.getElementById("content"); if(!c) return; c.innerHTML=html; restoreScroll(); }
+// A YouTube <iframe> lives inside this innerHTML like everything else, so it gets torn down and
+// recreated on EVERY render() — even when nothing about the video changed — because setting
+// .innerHTML wholesale-replaces every child. Recreating an iframe always reloads it from scratch.
+// During a live game (frequent renders as plays come in) a pasted stream would load for a moment,
+// then get destroyed and reloaded again on the next render, over and over. (jford, 2026-07-05:
+// "tries to load for a second and then flashes... loading and flashes very quickly.") Fix: if an
+// #ytembed iframe is already showing and the new markup would produce the IDENTICAL src, keep
+// playing the existing (already-loaded) node instead of swapping in a fresh, unloaded one. The old
+// node is moved to a detached holder BEFORE the wholesale replace (so it's never actually removed
+// from `document`, only reparented — the browsing context is torn down on removal, not reparenting)
+// and moved back into place afterward if the src still matches; otherwise it's discarded normally.
+function paintContent(html){
+  var c=document.getElementById("content"); if(!c) return;
+  var oldFrame=document.getElementById("ytembed"), oldSrc=null, holder=null;
+  if(oldFrame){
+    oldSrc=oldFrame.src;
+    holder=document.createElement("div"); holder.style.display="none";
+    document.body.appendChild(holder); holder.appendChild(oldFrame);
+  }
+  c.innerHTML=html;
+  if(oldFrame && oldSrc){
+    var fresh=document.getElementById("ytembed");
+    if(fresh && fresh.src===oldSrc && fresh.parentNode) fresh.parentNode.replaceChild(oldFrame, fresh);
+  }
+  if(holder) holder.remove();
+  restoreScroll();
+}
 /* Auto-fit a scroll page to the screen: measure the content's natural height vs the visible area, then
    ENLARGE a short page to fill (capped — bigger screens only) and VERTICALLY CENTER it, or SHRINK a
    slightly-too-tall page just enough that no scrolling is needed (down to a readable floor). Beyond that
@@ -5889,7 +5927,7 @@ document.getElementById("app").addEventListener("click",e=>{
       if(bugDelay>0) setTimeout(apply, bugDelay*1000); else apply();
     });
     mode="idle"; render(); return; }
-  else if(act==="resume"){ amActiveScorer=true; _myClaimAt=Date.now(); mode="idle"; render(); broadcast(); }
+  else if(act==="resume"){ amActiveScorer=true; _myClaimAt=Date.now(); _claimStamped=false; mode="idle"; render(); broadcast(); }
   else if(act==="takeoverlive"){ const teamId=arg;
     if(!(window.cloudSubscribeGameDoc&&window.Cloud&&window.Cloud.user)){ flash("Sign in to take over scoring"); return; }
     flash("Loading game…");
@@ -5900,7 +5938,7 @@ document.getElementById("app").addEventListener("click",e=>{
       try{ const s=doc.state;
         G=s.G; if(Array.isArray(s.ROSTER))ROSTER=s.ROSTER; if(s.OUR)Object.assign(OUR,s.OUR); if(s.OPP)Object.assign(OPP,s.OPP);
         if(Array.isArray(s.gameFeed))gameFeed=s.gameFeed; if(s.curTeamId)curTeamId=s.curTeamId; if(s.oppTeamId!=null)oppTeamId=s.oppTeamId;
-        gameActive=true; G.cloudId=teamId+"-live"; amActiveScorer=true; _myClaimAt=Date.now(); viewMode="scorer"; viewerLocked=false; _remoteLive=false;
+        gameActive=true; G.cloudId=teamId+"-live"; amActiveScorer=true; _myClaimAt=Date.now(); _claimStamped=false; viewMode="scorer"; viewerLocked=false; _remoteLive=false;
         try{ if(window.cloudClaimScoring)window.cloudClaimScoring(teamId+"-live", myCloudName()); }catch(e){}
         try{ watchLiveTakeover(teamId); }catch(e){}
         hist=[]; resetUI(); mode="idle"; flash("You're now scoring this game"); render(); broadcast();
@@ -6547,7 +6585,18 @@ document.getElementById("ytmodal").addEventListener("click",e=>{
   if(e.target.id==="ytmodal"){ closeStream(); return; }       // tap backdrop to close
   const a=e.target.closest("[data-act]"); if(!a)return;
   if(a.dataset.act==="savestream") saveStream();
-  else if(a.dataset.act==="clearstream"){ try{localStorage.removeItem("al-stream-yt");}catch(e){} closeStream(); render(); }
+  else if(a.dataset.act==="clearstream"){
+    // #ytmodal is a STATIC element outside #content — the app's main delegated act="..." dispatcher
+    // (which has its OWN, fully-correct clearstream case) never sees clicks in here at all, so this
+    // local listener is the only code that ever actually runs for this button. It had gone stale: it
+    // only removed the legacy localStorage key, never al-ext-stream, never G.streamYtId, never
+    // broadcast() — so the video (driven by G.streamYtId) just kept playing, and reopening the modal
+    // read G.streamYtId right back. (jford, 2026-07-05: "I click disconnect... the video keeps
+    // playing... the link is back.") Brought to parity with the dispatcher's version.
+    clearStaleStreamLink();
+    if(typeof G!=="undefined"&&G){ G.streamYtId=""; try{ broadcast(); }catch(e){} }
+    closeStream(); render();
+  }
   else if(a.dataset.act==="closestream") closeStream();
 });
 document.getElementById("streamInput").addEventListener("keydown",e=>{ if(e.key==="Enter")saveStream(); });
@@ -6684,7 +6733,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v362";
+var APP_VERSION="v363";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
