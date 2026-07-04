@@ -1943,8 +1943,16 @@ function canScoreNow(){
 let watchTeamName=(()=>{try{ return new URLSearchParams(location.search).get("tn")||""; }catch(e){return "";}})();  // team name carried on a watch link (for the "no game yet" lobby)
 // Track recent user interaction so BACKGROUND re-renders (cloud snapshots) never rebuild the DOM
 // while the user is mid-tap — on phones that race closed native <select>/date dropdowns instantly.
+// pointermove is included so a HELD drag (batting-order reorder, field-map assign, etc.) counts as
+// "busy" for its whole duration, not just the initial pointerdown — jford, 2026-07-06: "the screen
+// opens, but dragging to reorder does nothing" mid-game specifically (not during pre-game setup,
+// when far fewer background cloud renders are in flight). Without this, only the INITIAL touch
+// refreshed _lastInteract; a drag that took the user more than 1.5s to decide where to drop (common —
+// carefully repositioning a batter) let a queued cloud-snapshot render() slip through mid-gesture,
+// which repaints #content from scratch and destroys the very DOM node being dragged, silently
+// killing the reorder with no visible error.
 let _lastInteract=0;
-["pointerdown","touchstart","keydown","focusin","change"].forEach(function(ev){ try{ window.addEventListener(ev,function(){ _lastInteract=Date.now(); },true); }catch(e){} });
+["pointerdown","pointermove","touchstart","keydown","focusin","change"].forEach(function(ev){ try{ window.addEventListener(ev,function(){ _lastInteract=Date.now(); },true); }catch(e){} });
 function uiBusy(){ try{ const ae=document.activeElement; if(ae&&/^(INPUT|SELECT|TEXTAREA)$/.test(ae.tagName)) return true; }catch(e){} return (Date.now()-_lastInteract)<1500; }
 let noFieldChip=false;  // when true, diamondSVG draws no in-field pitch chip (used for the tiny viewer thumbnail)
 let gameFeed=[];   // live feed (most recent last). Each entry is type "play" (an at-bat result) or "pitch".
@@ -6817,7 +6825,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v370";
+var APP_VERSION="v371";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
