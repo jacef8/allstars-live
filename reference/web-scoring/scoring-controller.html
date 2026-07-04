@@ -4170,12 +4170,14 @@ function actionArea(){
       const rows=lu.order.map((id,i)=>{ const p=t.players.find(x=>x.id===id)||{num:"",name:"?"};
         const cur=Object.keys(lu.pos||{}).find(k=>lu.pos[k]===id)||"";
         const _sel=(luBuilderSel===i);
+        // Same size bump as the in-game version — jford, 2026-07-06: "I like the buttons but they
+        // are too small." 44px = the standard minimum comfortable touch target.
         const moveHandle=_sel
-          ? `<div style="display:flex;flex-direction:column;gap:2px;flex:none">
-              <button data-act="lubmove" data-arg="${i}:up" ${i===0?"disabled":""} style="width:24px;height:20px;border-radius:5px 5px 0 0;background:${T.lime};border:none;color:#fff;display:flex;align-items:center;justify-content:center;opacity:${i===0?.35:1};cursor:${i===0?"default":"pointer"}">${IC('<path d="M18 15 12 9 6 15"/>',13)}</button>
-              <button data-act="lubmove" data-arg="${i}:down" ${i===n-1?"disabled":""} style="width:24px;height:20px;border-radius:0 0 5px 5px;background:${T.lime};border:none;color:#fff;display:flex;align-items:center;justify-content:center;opacity:${i===n-1?.35:1};cursor:${i===n-1?"default":"pointer"}">${IC('<path d="M6 9l6 6 6-6"/>',13)}</button>
+          ? `<div style="display:flex;flex-direction:column;gap:3px;flex:none">
+              <button data-act="lubmove" data-arg="${i}:up" ${i===0?"disabled":""} style="width:44px;height:36px;border-radius:8px 8px 0 0;background:${T.lime};border:none;color:#fff;display:flex;align-items:center;justify-content:center;opacity:${i===0?.35:1};cursor:${i===0?"default":"pointer"}">${IC('<path d="M18 15 12 9 6 15"/>',22)}</button>
+              <button data-act="lubmove" data-arg="${i}:down" ${i===n-1?"disabled":""} style="width:44px;height:36px;border-radius:0 0 8px 8px;background:${T.lime};border:none;color:#fff;display:flex;align-items:center;justify-content:center;opacity:${i===n-1?.35:1};cursor:${i===n-1?"default":"pointer"}">${IC('<path d="M6 9l6 6 6-6"/>',22)}</button>
             </div>`
-          : `<button data-act="lubselect" data-arg="${i}" title="Select to move" style="cursor:pointer;color:${T.sageDim};background:transparent;border:none;display:flex;align-items:center;padding:4px 1px;flex:none">${IC('<path d="M4 7h16M4 12h16M4 17h16"/>')}</button>`;
+          : `<button data-act="lubselect" data-arg="${i}" title="Select to move" style="cursor:pointer;color:${T.sageDim};background:transparent;border:none;display:flex;align-items:center;justify-content:center;width:44px;height:44px;flex:none">${IC('<path d="M4 7h16M4 12h16M4 17h16"/>',22)}</button>`;
         return `<div data-lurow data-id="${id}" style="display:flex;align-items:center;gap:5px;background:${_sel?"rgba(59,232,90,.14)":T.surface2};border:2px solid ${_sel?T.lime:T.line};border-radius:9px;padding:7px 8px">
           ${moveHandle}
           <button data-act="lubselect" data-arg="${i}" title="Select to move" style="background:transparent;border:none;font-family:${MONO};font-size:16px;font-weight:800;color:${T.lime};width:16px;text-align:center;padding:0;cursor:pointer">${i+1}</button>
@@ -4802,12 +4804,14 @@ function actionArea(){
       const _sel=(luSelSlot===slot);
       const _n=G.lineup.order.length;
       const numBadge=`<button data-act="luselect" data-arg="${slot}" title="${_sel?"Deselect":"Select to move"}" style="background:transparent;border:none;font-family:${MONO};font-size:18px;font-weight:800;color:${T.lime};width:20px;text-align:center;flex:none;padding:0;cursor:pointer">${slot+1}</button>`;
+      // Bumped from 26x22 to 44x36 per slot (44px = the standard minimum comfortable touch target) —
+      // jford, 2026-07-06: "I like the buttons but they are too small."
       const moveHandle=_sel
-        ? `<div style="display:flex;flex-direction:column;gap:2px;flex:none">
-            <button data-act="lumove" data-arg="${slot}:up" ${slot===0?"disabled":""} style="width:26px;height:22px;border-radius:5px 5px 0 0;background:${T.lime};border:none;color:#fff;display:flex;align-items:center;justify-content:center;opacity:${slot===0?.35:1};cursor:${slot===0?"default":"pointer"}">${IC('<path d="M18 15 12 9 6 15"/>',14)}</button>
-            <button data-act="lumove" data-arg="${slot}:down" ${slot===_n-1?"disabled":""} style="width:26px;height:22px;border-radius:0 0 5px 5px;background:${T.lime};border:none;color:#fff;display:flex;align-items:center;justify-content:center;opacity:${slot===_n-1?.35:1};cursor:${slot===_n-1?"default":"pointer"}">${IC('<path d="M6 9l6 6 6-6"/>',14)}</button>
+        ? `<div style="display:flex;flex-direction:column;gap:3px;flex:none">
+            <button data-act="lumove" data-arg="${slot}:up" ${slot===0?"disabled":""} style="width:44px;height:36px;border-radius:8px 8px 0 0;background:${T.lime};border:none;color:#fff;display:flex;align-items:center;justify-content:center;opacity:${slot===0?.35:1};cursor:${slot===0?"default":"pointer"}">${IC('<path d="M18 15 12 9 6 15"/>',22)}</button>
+            <button data-act="lumove" data-arg="${slot}:down" ${slot===_n-1?"disabled":""} style="width:44px;height:36px;border-radius:0 0 8px 8px;background:${T.lime};border:none;color:#fff;display:flex;align-items:center;justify-content:center;opacity:${slot===_n-1?.35:1};cursor:${slot===_n-1?"default":"pointer"}">${IC('<path d="M6 9l6 6 6-6"/>',22)}</button>
           </div>`
-        : `<button data-act="luselect" data-arg="${slot}" title="Select to move" style="cursor:pointer;color:${T.sageDim};background:transparent;border:none;display:flex;align-items:center;padding:6px 2px;flex:none">${IC('<path d="M4 7h16M4 12h16M4 17h16"/>')}</button>`;
+        : `<button data-act="luselect" data-arg="${slot}" title="Select to move" style="cursor:pointer;color:${T.sageDim};background:transparent;border:none;display:flex;align-items:center;justify-content:center;width:44px;height:44px;flex:none">${IC('<path d="M4 7h16M4 12h16M4 17h16"/>',22)}</button>`;
       if(narrow) return `<div data-row data-ri="${ri}" style="display:flex;align-items:center;gap:9px;background:${_sel?"rgba(59,232,90,.14)":_cur?"rgba(225,29,46,.12)":T.surface2};border:2px solid ${_sel?T.lime:_cur?T.lime:T.line};border-radius:10px;padding:10px 9px">
         ${moveHandle}
         ${numBadge}${_cur?curBadge:""}
@@ -6883,7 +6887,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v377";
+var APP_VERSION="v378";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
