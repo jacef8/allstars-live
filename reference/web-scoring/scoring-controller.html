@@ -4847,7 +4847,7 @@ function actionArea(){
     return `<div class="frost-card" style="flex-shrink:0;display:flex;align-items:center;gap:10px;background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:10px 12px">
         <button data-act="lineupback" style="${ghost};padding:9px 13px;flex:none">&lsaquo; Back</button>
         <div style="flex:1;min-width:0"><div style="font-family:${MONO};font-size:20px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:${T.lime}">Lineups</div>
-          <div style="font-size:11px;color:${T.sage};margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${OUR.name} &middot; batting ${n}${n>9?" (continuous)":""} &middot; drag to reorder</div></div></div>
+          <div style="font-size:11px;color:${T.sage};margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${OUR.name} &middot; batting ${n}${n>9?" (continuous)":""} &middot; tap &#9776; to move</div></div></div>
       ${luToggle}
       <div style="flex-shrink:0;display:flex;gap:2px;background:${T.line};border:2px solid ${T.line};border-radius:9px;overflow:hidden">
         <button data-act="luview" data-arg="list" style="flex:1;background:${lineupView==="list"?T.lime:T.surface2};color:${lineupView==="list"?"#fff":T.sage};border:none;border-radius:0;padding:9px;font-family:${MONO};font-weight:800;font-size:13px;letter-spacing:.4px">${IC('list',15)} Batting order</button>
@@ -6902,7 +6902,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v379";
+var APP_VERSION="v380";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
