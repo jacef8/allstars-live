@@ -2365,7 +2365,7 @@ let _clockTimer=null;
 function startClock(){ if(_clockTimer)return; _clockTimer=setInterval(function(){ const t=gameClockStr(); document.querySelectorAll(".game-clock").forEach(el=>{el.textContent=t;}); },1000); }
 window.ngStartTime=function(v){ if(!v)return; const a=v.split(":"); const d=new Date(); d.setHours(+a[0]||0,+a[1]||0,0,0); G.startedAt=d.getTime(); try{saveGame();}catch(e){} render(); };
 
-function statusBar(){
+function statusBar(standalone){
   // B1 redesign: a clearer, bigger GRID scoreboard. Each team gets a colour band + tint when batting,
   // and the count/outs/bases sit in labelled cells so it's obvious what's what. Animation hooks
   // (sb-score-*, sb-balls/strikes/outs, sb-base-*) are preserved so the pops/rolls still fire.
@@ -2373,33 +2373,49 @@ function statusBar(){
   // ESPN-modeled MLB scorebug: near-black horizontal bar, two stacked team rows (logo · ABBR · score,
   // away over home, batting team brightened) on the LEFT, then the game situation (inning · count/outs ·
   // bases) on the RIGHT. Animation hooks kept (sb-score-*/.digit, sb-balls/strikes/outs, sb-base-*).
+  // [standalone]: this same compact bar is ALSO used as the plain phone scoreboard (scorer AND viewer,
+  // no video underneath) — not just burned into the broadcast video. The "stays dark by design, matches
+  // what's on YouTube" reasoning only holds for the ACTUAL overlay use; reused standalone on a
+  // day-mode page it just looked like a jarring dark box (jford, 2026-07-03: "the scoreboard is black
+  // when all other windows in daytime mode are white"). Default (falsy/omitted) keeps every existing
+  // overlay call site byte-for-byte identical — only the two standalone phone call sites pass true.
+  const dk=!standalone;
+  const bg=dk?"#11151c 0%,#070a0e 100%":"var(--panel-hi) 0%,var(--panel) 100%";
+  const brd=dk?"rgba(255,255,255,.13)":"var(--line)";
+  const txWhite=dk?"#fff":"var(--ink)";
+  const txDim=dk?"#9AA6B8":"var(--textmid)";
+  const txDim2=dk?"#C2CBD8":"var(--textmid)";
+  const txDim3=dk?"#6B7686":"var(--textdim)";
+  const divCol=dk?"rgba(255,255,255,.08)":"var(--sbdiv)";
+  const panel2=dk?"rgba(0,0,0,.25)":"var(--sbpanel2)";
+  const pipOff=dk?"#5C6675":"var(--sbpipoff)";
   const tabRow=(t,val,act)=>{const c=col(t),lg=(TEAMS.away.logo&&TEAMS.home.logo)?TEAMS[t].logo:null;return `<div style="position:relative;display:flex;align-items:center;gap:9px;height:30px;padding:0 12px 0 0;background:${act?`linear-gradient(90deg,${c}33,transparent 75%)`:"transparent"}">
       <span style="width:4px;align-self:stretch;background:${c};flex:none"></span>
       ${lg?`<img src="${lg}" alt="" style="width:20px;height:20px;object-fit:contain;border-radius:4px;background:#fff;flex:none;${act?"":"opacity:.55"}">`:`<span style="width:20px;height:20px;border-radius:4px;flex:none;background:${c};display:inline-flex;align-items:center;justify-content:center;font-family:${MONO};font-size:11px;font-weight:800;color:${idealText(c)}">${(TEAMS[t].short||"?").slice(0,1)}</span>`}
-      <span style="font-family:${MONO};font-weight:800;font-size:15px;letter-spacing:.6px;color:${act?"#fff":"#9AA6B8"};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${TEAMS[t].short}</span>
+      <span style="font-family:${MONO};font-weight:800;font-size:15px;letter-spacing:.6px;color:${act?txWhite:txDim};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${TEAMS[t].short}</span>
       ${act?`<span title="at bat" style="width:5px;height:5px;border-radius:50%;background:${c};box-shadow:0 0 6px ${c};flex:none"></span>`:`<span style="width:5px;flex:none"></span>`}
-      <span class="sb-score num" id="sb-score-${t}" style="margin-left:auto;padding-left:10px;font-weight:800;font-size:25px;line-height:1;color:${act?"#fff":"#C2CBD8"}"><span class="digit">${val}</span></span>
+      <span class="sb-score num" id="sb-score-${t}" style="margin-left:auto;padding-left:10px;font-weight:800;font-size:25px;line-height:1;color:${act?txWhite:txDim2}"><span class="digit">${val}</span></span>
     </div>`;};
-  const b=G.bases,base=(x,y,on,id)=>`<rect id="${id}" class="sb-base" x="${x-6.5}" y="${y-6.5}" width="13" height="13" rx="2" transform="rotate(45 ${x} ${y})" fill="${on?T.clay:"none"}" stroke="${on?T.clay:"#5C6675"}" stroke-width="2"/>`;
+  const b=G.bases,base=(x,y,on,id)=>`<rect id="${id}" class="sb-base" x="${x-6.5}" y="${y-6.5}" width="13" height="13" rx="2" transform="rotate(45 ${x} ${y})" fill="${on?T.clay:"none"}" stroke="${on?T.clay:pipOff}" stroke-width="2"/>`;
   const diamond=`<svg width="38" height="34" viewBox="0 0 48 44" style="overflow:visible">${base(24,11,b[2],"sb-base-2")}${base(37,24,b[1],"sb-base-1")}${base(11,24,b[3],"sb-base-3")}</svg>`;
   const pipRow=(label,cls,n,max,id)=>`<div class="bso-row" id="${id}" style="display:flex;align-items:center;gap:4px;height:12px">
-      <span style="font-family:${MONO};font-size:9px;font-weight:800;color:#6B7686;width:8px">${label}</span>
+      <span style="font-family:${MONO};font-size:9px;font-weight:800;color:${txDim3};width:8px">${label}</span>
       ${Array.from({length:max},(_,i)=>`<span class="bso-pip ${cls}${i<n?" on":""}"></span>`).join("")}</div>`;
   // inline-flex + align-self:flex-start → content-sized BUG (no full-width dead space / vertical stretch).
-  return `<div id="statusbar" data-longpress="correct" title="Tap the pencil (or hold) to correct the count / outs / score" style="position:relative;display:inline-flex;align-self:flex-start;max-width:100%;align-items:stretch;background:linear-gradient(180deg,#11151c 0%,#070a0e 100%);border:1px solid rgba(255,255,255,.13);border-radius:9px;overflow:hidden;flex-shrink:0;box-shadow:0 10px 26px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.06);user-select:none;-webkit-user-select:none;-webkit-touch-callout:none">
+  return `<div id="statusbar" data-longpress="correct" title="Tap the pencil (or hold) to correct the count / outs / score" style="position:relative;display:inline-flex;align-self:flex-start;max-width:100%;align-items:stretch;background:linear-gradient(180deg,${bg});border:1px solid ${brd};border-radius:9px;overflow:hidden;flex-shrink:0;box-shadow:0 10px 26px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.06);user-select:none;-webkit-user-select:none;-webkit-touch-callout:none">
     <div style="position:absolute;top:0;left:0;right:0;height:2.5px;display:flex;z-index:3"><span style="flex:1;background:${col("away")}"></span><span style="flex:1;background:${col("home")}"></span></div>
     <div style="display:flex;flex-direction:column;justify-content:center;min-width:168px;max-width:290px;padding:3px 0 0">
       ${tabRow("away",G.away,G.half==="T")}
-      <div style="height:1px;background:rgba(255,255,255,.08);margin:0 0 0 4px"></div>
+      <div style="height:1px;background:${divCol};margin:0 0 0 4px"></div>
       ${tabRow("home",G.home,G.half==="B")}</div>
-    <div style="width:1px;background:rgba(255,255,255,.13)"></div>
-    <div style="display:flex;align-items:center;gap:9px;padding:0 10px;background:rgba(0,0,0,.25)">
+    <div style="width:1px;background:${brd}"></div>
+    <div style="display:flex;align-items:center;gap:9px;padding:0 10px;background:${panel2}">
       <div style="display:flex;flex-direction:column;align-items:center;gap:1px">
-        <div style="font-family:${MONO};font-size:18px;font-weight:800;color:#fff;line-height:1">${G.half==="T"?"▲":"▼"}${G.inning}</div>
-        <div style="font-family:${MONO};font-size:7.5px;font-weight:800;letter-spacing:1px;color:#6B7686">${G.half==="T"?"TOP":"BOT"}</div></div>
+        <div style="font-family:${MONO};font-size:18px;font-weight:800;color:${txWhite};line-height:1">${G.half==="T"?"▲":"▼"}${G.inning}</div>
+        <div style="font-family:${MONO};font-size:7.5px;font-weight:800;letter-spacing:1px;color:${txDim3}">${G.half==="T"?"TOP":"BOT"}</div></div>
       <div style="display:flex;flex-direction:column;gap:3px">${pipRow("B","b",G.balls,3,"sb-balls")}${pipRow("S","s",G.strikes,2,"sb-strikes")}${pipRow("O","o",G.outs,3,"sb-outs")}</div>
-      <div style="display:flex;flex-direction:column;align-items:center;gap:2px">${diamond}<div style="font-family:${MONO};font-size:7.5px;font-weight:800;letter-spacing:1px;color:#6B7686">BASES</div></div>
-      ${G.startedAt?`<div style="font-family:${MONO};font-size:11px;font-weight:700;color:#9AA6B8;white-space:nowrap"><span class="game-clock">${gameClockStr()}</span></div>`:""}
+      <div style="display:flex;flex-direction:column;align-items:center;gap:2px">${diamond}<div style="font-family:${MONO};font-size:7.5px;font-weight:800;letter-spacing:1px;color:${txDim3}">BASES</div></div>
+      ${G.startedAt?`<div style="font-family:${MONO};font-size:11px;font-weight:700;color:${txDim};white-space:nowrap"><span class="game-clock">${gameClockStr()}</span></div>`:""}
     </div>
   </div>`;
 }
@@ -2441,7 +2457,13 @@ function batterCard(){
   const lp=batterLineParts();
   const ord=ordinal(battingSlot()+1);
   const big=b.ours?b.num:b.num;
-  const nameLine=b.ours?pBug(b):((b.name||"").trim()||("#"+(b.num||"?")));   // batter name, never the team name
+  // No real name entered for an opponent batter → nameLine used to fall back to "#4", repeating the
+  // same digit already shown big on the left AND in "4th batter" below (jford, 2026-07-03: "the number
+  // 4 in 3 different places [makes] that window a little too large"). hasRealName gates the whole name
+  // row off entirely in that case instead — shorter card, no redundant text, and sub already says which
+  // team + batting order.
+  const hasRealName=b.ours?true:!!((b.name||"").trim());
+  const nameLine=b.ours?pBug(b):((b.name||"").trim());   // batter name, never the team name
   const abp=(G.ab&&G.ab.pitches)?G.ab.pitches.length:0;   // pitches to THIS batter this at-bat (resets each AB)
   const sub=b.ours
     ? `${TEAMS[k].short}${b.pos?` · ${b.pos}`:""} &middot; ${ord} in order`
@@ -2467,7 +2489,7 @@ function batterCard(){
         <div style="flex:1"></div>
         <button data-act="quickeditbatter" data-arg="${batterKeyOf(b)}" title="Quick edit name/number" style="flex:none;background:${T.surface2};border:2px solid ${T.line};color:${T.chalk};border-radius:9px;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:14px">&#9998;</button>
       </div>
-      <div style="font-family:${MONO};font-size:29px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;line-height:1.1;color:${T.chalk};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${nameLine}</div>
+      ${hasRealName?`<div style="font-family:${MONO};font-size:29px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;line-height:1.1;color:${T.chalk};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${nameLine}</div>`:""}
       <div style="font-size:13px;color:${T.sage};font-weight:600">${sub}</div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:2px;background:${T.line};border-radius:9px;overflow:hidden;margin-top:2px">
         ${statCell("COUNT",G.balls+"-"+G.strikes,T.chalk)}${statCell(abp===1?"PITCH":"PITCHES",abp,c)}${statCell("TODAY",lp.line,T.chalk)}</div>
@@ -2478,7 +2500,7 @@ function batterCard(){
     <span style="font-family:${MONO};font-size:34px;font-weight:700;color:${c};line-height:1;min-width:46px;text-align:center">${big}</span>
     <div style="flex:1;min-width:0">
       <div style="display:flex;align-items:center;gap:7px;margin-bottom:4px">${teamBadge}</div>
-      <div style="font-family:${MONO};font-size:23px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;line-height:1;color:${T.chalk};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${nameLine}</div>
+      ${hasRealName?`<div style="font-family:${MONO};font-size:23px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;line-height:1;color:${T.chalk};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${nameLine}</div>`:""}
       <div style="font-size:11px;color:${T.sage};font-weight:500;margin-top:3px">${sub}</div></div>
     <div style="text-align:center;line-height:1;flex:none;border-left:1.5px solid ${T.line};border-right:1.5px solid ${T.line};padding:0 13px">
       <div style="font-family:${MONO};font-size:24px;font-weight:800;color:${T.chalk}">${G.balls}-${G.strikes}</div>
@@ -5400,12 +5422,12 @@ function render(){
       ? `<div style="flex:1;min-height:0;display:flex;flex-direction:column;justify-content:center;gap:11px">${monitorPane()}</div>`
       : isView
         ? (function(){var vp=viewerPhone;var vseg=(id,l)=>`<button data-act="viewerphone" data-arg="${id}" style="flex:1;background:${vp===id?T.lime:T.surface2};color:${vp===id?"#fff":T.sage};border:none;border-radius:0;padding:9px;font-family:${MONO};font-weight:800;font-size:12.5px;letter-spacing:.4px;text-transform:uppercase">${l}</button>`;
-          return `<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px">${statusBar()}${batterCard()}<div style="display:flex;gap:2px;flex:none;background:${T.line};border:2px solid ${T.line};border-radius:9px;overflow:hidden">${vseg("both","Both")}${vseg("field","Field")}${vseg("feed","Feed")}</div>${vp==="feed"?"":fieldEl}${vp==="field"?"":feedPanel()}</div>`;})()
+          return `<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px">${statusBar(true)}${batterCard()}<div style="display:flex;gap:2px;flex:none;background:${T.line};border:2px solid ${T.line};border-radius:9px;overflow:hidden">${vseg("both","Both")}${vseg("field","Field")}${vseg("feed","Feed")}</div>${vp==="feed"?"":fieldEl}${vp==="field"?"":feedPanel()}</div>`;})()
         // Phone scoreboard: team-name column widened (statusBar()'s min-width 128→168) so short names
         // like "LC AA" stop truncating; batterCard() below got a taller phone-only stacked layout so the
         // name is readable and the empty space under it gets used. (v323, jford: "cant even see the team
         // names... expand those windows to use some of the empty space")
-        : `<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px">${(focusPlay||floatActive)?"":statusBar()}${floatActive?"":batterCard()}${focusPlay?fieldEl:pcLine+'<div style="flex:1;min-height:0"></div>'}${actionEl}${controls}</div>`;
+        : `<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px">${(focusPlay||floatActive)?"":statusBar(true)}${floatActive?"":batterCard()}${focusPlay?fieldEl:pcLine+'<div style="flex:1;min-height:0"></div>'}${actionEl}${controls}</div>`;
     body=`<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:9px">
         ${focusPlay?"":`<div style="display:flex;gap:8px;flex:none">${tab("score",isView?ICN.inplay+" Field":ICN.dot+" Scoring")}${tab("video",ICN.play+" Video")}</div>`}
         ${pane}
@@ -5414,7 +5436,7 @@ function render(){
   // Free-layout (BETA): a "⊞ Windows" toggle on the wide scorer view, and — when on — a fixed
   // overlay holding the draggable/resizable AT BAT window (prototype panel).
   const floatToggleBtn = "";   // toggle moved into the toolbar (renderToolbar) so it can't cover scoring controls
-  const floatLayer = floatActive ? `<div id="float-layer" style="position:fixed;inset:0;z-index:35;pointer-events:none">${floatWindow("score","Scoreboard",statusBar(),{x:20,y:8,w:360,h:130})}${floatWindow("batter","At Bat",batterCard(),{x:24,y:150,w:340,h:168})}</div>` : "";
+  const floatLayer = floatActive ? `<div id="float-layer" style="position:fixed;inset:0;z-index:35;pointer-events:none">${floatWindow("score","Scoreboard",statusBar(true),{x:20,y:8,w:360,h:130})}${floatWindow("batter","At Bat",batterCard(),{x:24,y:150,w:340,h:168})}</div>` : "";
   paintContent(`
     ${body}${confirmOverlay()}${alertOverlay()}
     ${reviewBatter?batterReviewModal():""}
@@ -6072,7 +6094,7 @@ function renderToolbar(){
   // toolbar (which itself has no background either) — jford: "toward top left where it says LC vs
   // FRA, there is no window backing." Wrapped in the same card treatment as the WATCHING pill next to it.
   const chip=(playMode2&&viewerLocked)
-    ? `<div style="display:inline-flex;align-items:center;gap:8px"><span style="display:inline-flex;align-items:center;gap:5px;background:${T.surface};border:2px solid ${T.line};border-radius:999px;padding:5px 11px;font-family:${MONO};font-size:11px;font-weight:800;letter-spacing:1px;color:${T.lime}">${IC('eye',14)} WATCHING</span><span style="display:inline-flex;align-items:center;background:${T.surface};border:2px solid ${T.line};border-radius:999px;padding:5px 12px;font-family:${MONO};font-weight:700;font-size:15px;color:${T.chalk}">${OUR.short||"US"} <span style="color:${T.sageDim};font-weight:600">&nbsp;vs&nbsp;</span> ${OPP.short||"OPP"}</span>${takeOverBtn}</div>`
+    ? `<div style="display:inline-flex;align-items:center;gap:8px"><span style="display:inline-flex;align-items:center;gap:5px;background:${T.surface};border:2px solid ${T.line};border-radius:999px;padding:5px 11px;font-family:${MONO};font-size:11px;font-weight:800;letter-spacing:1px;color:${T.lime}">${IC('eye',14)} WATCHING</span>${takeOverBtn}</div>`
     : playMode2
     ? `<div style="display:inline-flex;gap:2px;background:${T.line};border:2px solid ${T.line};border-radius:10px;overflow:hidden">${roleSeg("scorer","Scorer")}${roleSeg("viewer","Viewer")}</div>`
     : inGame
@@ -6142,9 +6164,13 @@ function renderToolbar(){
   // this fully removes it from the scorer's set (both the toolbar row AND the float layer, since
   // renderBarFloat() only draws pieces that are still present in _barPieces) rather than just relocating
   // it. (v320)
+  // Home button: scorer's own game-controls row (inCtl), OR any viewer/watcher — jford, 2026-07-03:
+  // "there is no home button on the viewer screen." act==="home" already correctly tears down a
+  // borrowed watch session (unsubscribes, drops the game) regardless of viewMode, it just never had
+  // a reachable button outside the scorer's row.
   const barPieces={ videotoggle:vidToggle, share:shareBtnTop, sound:soundBtn, live:(viewMode==="viewer")?liveDot:"", swap:vsw,
     lineup:inCtl?gcBtn("lineup"):"", inninglog:inCtl?gcBtn("inninglog"):"", ingamesettings:inCtl?gcBtn("ingamesettings"):"",
-    home:inCtl?gcBtn("home"):"", endgame:inCtl?gcBtn("endgame"):"", undo:inCtl?gcBtn("undo"):"" };
+    home:(inCtl||viewMode==="viewer"||viewerLocked)?gcBtn("home"):"", endgame:inCtl?gcBtn("endgame"):"", undo:inCtl?gcBtn("undo"):"" };
   _barPieces=barPieces;   // the float layer renders the moved-out buttons from this
   const wrap=k=>{ const html=barPieces[k]; if(!html)return"";
     return `<span data-baritem="${k}" style="display:inline-flex;align-items:center;flex:none;${barEdit?`outline:2px dashed ${T.lime};outline-offset:2px;border-radius:11px;cursor:grab;touch-action:none`:""}">${html}</span>`; };
@@ -6584,7 +6610,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v353";
+var APP_VERSION="v354";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
