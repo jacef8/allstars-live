@@ -364,9 +364,13 @@ window.netLog=function(msg){
   try{
     if(!window._netLog){ try{window._netLog=JSON.parse(localStorage.getItem("al-netlog")||"[]");}catch(e){window._netLog=[];} }
     const d=new Date(),p=n=>String(n).padStart(2,"0");
-    window._netLog.push(`${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}  ${msg}`);
+    const line=`${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}  ${msg}`;
+    window._netLog.push(line);
     if(window._netLog.length>200)window._netLog=window._netLog.slice(-200);
     try{localStorage.setItem("al-netlog",JSON.stringify(window._netLog));}catch(e){}
+    // Also emit to console — lets a live "adb logcat" tail watch these events as they happen during a
+    // real game, instead of only reviewing the persisted list afterward on the Diagnostics page.
+    try{console.log("[netlog] "+line);}catch(e){}
   }catch(e){}
 };
 try{
@@ -2459,7 +2463,6 @@ function batterCard(){
     return `<div data-act="reviewbatter" data-arg="${batterKeyOf(b)}" class="frost-card" style="display:flex;flex-direction:column;gap:7px;background:var(--frost);border:2px solid ${c}66;border-left:5px solid ${c};border-radius:12px;padding:12px 14px;flex-shrink:0;cursor:pointer">
       <div style="display:flex;align-items:center;gap:10px">
         <span style="font-family:${MONO};font-size:22px;font-weight:800;color:${c};line-height:1">${big}</span>
-        <div style="display:inline-flex;align-items:center;background:${c};color:#fff;border-radius:999px;padding:3px 10px;font-family:${MONO};font-size:10px;font-weight:800;letter-spacing:1px;line-height:1">AT BAT</div>
         ${teamBadge}
         <div style="flex:1"></div>
         <button data-act="quickeditbatter" data-arg="${batterKeyOf(b)}" title="Quick edit name/number" style="flex:none;background:${T.surface2};border:2px solid ${T.line};color:${T.chalk};border-radius:9px;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:14px">&#9998;</button>
@@ -2474,7 +2477,7 @@ function batterCard(){
   return `<div data-act="reviewbatter" data-arg="${batterKeyOf(b)}" class="frost-card" style="display:flex;align-items:center;gap:13px;background:var(--frost);border:2px solid ${c}66;border-left:5px solid ${c};border-radius:10px;padding:9px 14px;flex-shrink:0;cursor:pointer">
     <span style="font-family:${MONO};font-size:34px;font-weight:700;color:${c};line-height:1;min-width:46px;text-align:center">${big}</span>
     <div style="flex:1;min-width:0">
-      <div style="display:flex;align-items:center;gap:7px;margin-bottom:4px"><div style="display:inline-flex;align-items:center;background:${c};color:#fff;border-radius:999px;padding:2px 9px;font-family:${MONO};font-size:10px;font-weight:800;letter-spacing:1px;line-height:1">AT BAT</div>${teamBadge}</div>
+      <div style="display:flex;align-items:center;gap:7px;margin-bottom:4px">${teamBadge}</div>
       <div style="font-family:${MONO};font-size:23px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;line-height:1;color:${T.chalk};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${nameLine}</div>
       <div style="font-size:11px;color:${T.sage};font-weight:500;margin-top:3px">${sub}</div></div>
     <div style="text-align:center;line-height:1;flex:none;border-left:1.5px solid ${T.line};border-right:1.5px solid ${T.line};padding:0 13px">
@@ -2600,8 +2603,10 @@ function setupFloatWins(){
   });
 }
 
-/* Which YouTube stream the monitor shows: ?yt= wins, else the device-saved one. */
-function streamYt(){ try{ return new URLSearchParams(location.search).get("yt") || localStorage.getItem("al-stream-yt") || ""; }catch(e){ return new URLSearchParams(location.search).get("yt")||""; } }
+/* Which YouTube stream the monitor shows: ?yt= wins, then the SHARED game-level id (set by the
+   scorer via "Paste a YouTube link" and broadcast to every device watching this game — see
+   saveStream()), else this device's own locally-saved one (legacy fallback / same-device only). */
+function streamYt(){ try{ return new URLSearchParams(location.search).get("yt") || (G&&G.streamYtId) || localStorage.getItem("al-stream-yt") || ""; }catch(e){ return new URLSearchParams(location.search).get("yt")||""; } }
 /* Accept a full YouTube link (watch?v=, youtu.be/, /live/, /embed/) or a bare id. */
 // A real YouTube video id is always exactly 11 chars of [A-Za-z0-9_-].
 const _YT_ID_RE=/^[A-Za-z0-9_-]{11}$/;
@@ -5731,7 +5736,7 @@ document.getElementById("app").addEventListener("click",e=>{
   if(act==="setstream"){ openStream(); return; }
   if(act==="videosetup"){ if(IS_APP&&window.AllStars&&window.AllStars.openVideo){ try{AllStars.openVideo();}catch(e){} } else { openStream(); } return; }
   if(act==="savestream"){ saveStream(); return; }
-  if(act==="clearstream"){ try{localStorage.removeItem("al-stream-yt");localStorage.removeItem("al-ext-stream");}catch(e){} closeStream(); render(); return; }
+  if(act==="clearstream"){ try{localStorage.removeItem("al-stream-yt");localStorage.removeItem("al-ext-stream");}catch(e){} if(typeof G!=="undefined"&&G){ G.streamYtId=""; try{ broadcast(); }catch(e){} } closeStream(); render(); return; }
   if(act==="closestream"){ closeStream(); return; }
   if(act==="ball"||act==="strike"||act==="foul")pitch(act);
   else if(act==="inplay")startInPlay();
@@ -6429,6 +6434,12 @@ function saveStream(){
   const id=parseYouTubeId(document.getElementById("streamInput").value);
   if(!id){ document.getElementById("streamHint").textContent="Couldn't find a video ID — paste the full YouTube link (watch?v=… or youtu.be/…)."; return; }
   try{ localStorage.setItem("al-stream-yt", id); localStorage.setItem("al-ext-stream","1"); }catch(e){}   // flag: a manually-pasted EXTERNAL link → show it in the native monitor even when not self-broadcasting
+  // Share this with every device watching the game (Home "Watch" viewers) — jford, 2026-07-03: this was
+  // ALWAYS meant to be the scorer declaring "the camera's going straight to YouTube, the app isn't doing
+  // the broadcast" for everyone watching, not a per-device setting. G rides along wholesale in every
+  // broadcast() (LINK + the cloud live-game doc), so setting it here is enough for it to reach viewers —
+  // no separate plumbing needed. streamYt() already prefers this over the old local-only fallback.
+  if(typeof G!=="undefined"&&G){ G.streamYtId=id; try{ broadcast(); }catch(e){} }
   closeStream(); render();
 }
 function closeStream(){ document.getElementById("ytmodal").style.display="none"; }
@@ -6573,7 +6584,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v352";
+var APP_VERSION="v353";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
