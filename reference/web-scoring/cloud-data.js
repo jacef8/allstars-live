@@ -254,10 +254,28 @@
       .catch(function (e) { console.warn("cloudRemoveCoOwner:", e.message); });
   };
 
-  // On sign-in: claim ownership of un-owned local teams, seed content baselines, then live-subscribe.
-  // We do NOT blanket-push every local team here — a device that loaded STALE data must not overwrite
-  // newer cloud copies on sign-in. Instead we wait for the first owned-teams snapshot and upload only
-  // the teams the cloud is genuinely MISSING (see uploadMissing). Changed teams sync normally after.
+  // On sign-in: claim ownership of un-owned local teams, then live-subscribe. We do NOT blanket-push
+  // OR blanket-markClean every local team here — a device that loaded STALE data must not overwrite
+  // newer cloud copies on sign-in, and a team whose last push genuinely never reached the cloud must
+  // not get silently laundered into looking already-synced. Instead we wait for the real onSnapshot:
+  // uploadMissing() force-pushes teams the cloud doesn't have at all, and merge() below only
+  // markClean()s a team once it has ACTUALLY compared local vs cloud timestamps and confirmed they
+  // agree (cTs >= lTs, identical content) — never just because this is the first time this device-
+  // session has looked at it.
+  //
+  // v349, jford 2026-07-03: this function used to blanket-markClean every team upfront ("existing
+  // data isn't a fresh edit"), meant only for a brand-new device's very first sign-in. But it ALSO ran
+  // on every "Refresh app" tap and every subsequent sign-in, unconditionally re-baselining ALL teams
+  // to their current content — including a team whose actual cloudSaveTeam() push had genuinely
+  // failed (e.g. a transient network blip right at End Game). That silently erased the "still needs
+  // to push" signal before the normal debounced push ever got a chance to retry it — and since _sig
+  // is in-memory only, this re-happened on every fresh reload too, not just once. Symptom: a finished
+  // game with a real win stayed local-only on the tablet — every OTHER device stuck at 0-2 — through
+  // repeated sign-out/in and Refresh app taps, because each one silently "confirmed" a push that had
+  // never actually gone through. Removed entirely; a team that's genuinely behind now keeps retrying
+  // via the normal debounced push (cloudPushSoon, fired by any saveDB) until merge() honestly confirms
+  // the cloud has caught up. Worst case for an already-in-sync team is one harmless redundant write
+  // right at sign-in (a no-op merge, or rejected outright by the server's stale-updatedAt rule).
   window.cloudSyncTeams = function () {
     var d = fdb(), u = myUid(), em = myEmail();
     if (!d || !u) return;
@@ -265,7 +283,6 @@
     try {
       (DB.teams || []).forEach(function (t) { if (!t.ownerUid) { t.ownerUid = u; t.ownerEmail = em; t.updatedAt = Date.now(); } });
       saveDB();
-      (DB.teams || []).forEach(markClean);   // baseline = current content; existing data isn't a fresh "edit"
     } catch (e) {}
     // After the cloud tells us which of my teams it already has, push up only the ones it's missing.
     function uploadMissing(cloudIds) {
