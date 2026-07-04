@@ -5905,6 +5905,14 @@ document.getElementById("app").addEventListener("click",e=>{
     // which locked-viewer context it was; re-watching later goes back through Home's own "in
     // progress" card or a fresh watch link either way.
     viewerLocked=false;
+    // The ?watch=<id> URL param that put us here in the first place was never cleared — so leaving
+    // only fixed THIS session's in-memory state. The page's address itself still said "watch this
+    // game," and the very next reload (an app auto-update, reopening the app, anything) re-ran that
+    // bootstrap from scratch and forced right back into viewer mode. (jford, 2026-07-05: "I've
+    // dismissed that game a couple times, but it still keeps coming back" — sitting on Home, an app
+    // update landed and flipped the phone straight back to the viewer screen.) Strip it so a future
+    // reload actually starts at Home like it looks like it should.
+    try{ const u=new URL(location.href); const _wp=["watch","view","tn","feed"]; if(_wp.some(function(k){return u.searchParams.has(k);})){ _wp.forEach(function(k){u.searchParams.delete(k);}); history.replaceState(null,"",u.pathname+u.search); } }catch(e){}
     mode="home";render();}
   else if(act==="watchlive"){ const teamId=arg;
     if(!(window.Cloud&&window.Cloud.db&&window.cloudSubscribeGameDoc)){ flash("Watching live needs an internet connection"); return; }   // NO login needed — live games are world-readable
@@ -6736,7 +6744,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v366";
+var APP_VERSION="v367";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
