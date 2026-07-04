@@ -1753,8 +1753,13 @@ function applyRemote(raw){
     // The flash above disappears in a few seconds with nothing else marking it — jford, 2026-07-04:
     // "it did not show on the game feed... if you missed it, you would have had no idea." A feed
     // entry sits there permanently, scrollable, same as every other play — the natural persistent
-    // record. Only added once per transition, not re-added on every subsequent already-final update.
-    if(_justEnded){ try{ gameFeed.push({id:"final-"+Date.now(), inn:G.inning, half:G.half, type:"play", kind:"gameend",
+    // record. NOT gated on _justEnded alone: cloudEndGame() sets the doc's `final` flag immediately,
+    // separately from the (debounced) state/gameFeed write, so the viewer can get a SECOND snapshot
+    // shortly after the first "final" one whose msg.gameFeed is the server's real feed (no synthetic
+    // entry yet) — that would silently wipe the entry the first transition just added, right back out,
+    // since gameFeed gets wholesale-replaced on every update. Self-heal instead: on ANY update where
+    // the game is final, make sure the marker is present rather than only injecting it once.
+    if(G.final && !gameFeed.some(e=>e.kind==="gameend")){ try{ gameFeed.push({id:"final-"+Date.now(), inn:G.inning, half:G.half, type:"play", kind:"gameend",
       head:"GAME FINAL", sub:(TEAMS.away.short||"AWAY")+" "+(G.away|0)+" – "+(G.home|0)+" "+(TEAMS.home.short||"HOME"),
       away:G.away, home:G.home}); }catch(e){} }
     if(msg.curTeamId!=null) curTeamId=msg.curTeamId;
@@ -6673,7 +6678,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v359";
+var APP_VERSION="v360";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
