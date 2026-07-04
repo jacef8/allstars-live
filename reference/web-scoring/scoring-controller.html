@@ -1487,6 +1487,7 @@ function brWPCommit(){ const label=brWPMove||"Wild pitch"; const ov={}; [3,2,1].
 function brWPApply(type){   // type: "ball" | "strike"
   const label=brPitchPick||"Wild pitch"; brPitchPick=null;
   snapshot();
+  const inn0=G.inning,half0=G.half;
   recordPitch(type); try{ Snd.pip(type); }catch(e){}
   // Advance all runners; RETURN the names of any who scored so the feed line can credit them
   // (e.g. "Wild pitch — Filer scores"). Runs are resolved BEFORE the feed line is written so the
@@ -1495,12 +1496,12 @@ function brWPApply(type){   // type: "ball" | "strike"
   const _adv=sc=>"runners advance"+(sc.length?" · "+sc.join(", "):"");
   if(type==="ball"){
     G.balls++;
-    if(G.balls>=4){ applyPlanInline("walk"); feedPitch(label,"ball four · walk"); }   // walk handles the forced advance
+    if(G.balls>=4){ applyPlanInline("walk"); feedPitch(label,"ball four · walk",inn0,half0); }   // walk handles the forced advance
     else { const sc=advance(); feedPitch(label,_adv(sc)); }
   } else {
     G.strikes++;
     if(G.strikes>=3){ G.outs++; creditBatter("strikeout",0); nextBatter();
-      if(G.outs>=3){ doFlip(); feedPitch(label,"strike three · inning over"); }
+      if(G.outs>=3){ doFlip(); feedPitch(label,"strike three · inning over",inn0,half0); }
       else { const sc=advance(); feedPitch(label,"strike three · "+_adv(sc)); } }
     else { const sc=advance(); feedPitch(label,"strike · "+_adv(sc)); }
   }
@@ -1982,9 +1983,14 @@ let gameFeed=[];   // live feed (most recent last). Each entry is type "play" (a
 // Feed view: "play" = one line per at-bat (default); "pitch" = every pitch + the result. Per-device.
 let feedView=(()=>{try{return localStorage.getItem("al-feed-view")||"play";}catch(e){return "play";}})();
 // Log one pitch (ball/strike/foul) to the feed — only surfaced in "pitch" view.
-function feedPitch(label,detail){
+// inn/half: same optional pre-flip override as bcastEvent (see its comment) — a caller that resolves
+// an out/flip BEFORE logging the pitch (brWPApply's walk-four and strikeout-ending-the-inning branches
+// do exactly this) needs to stamp the entry with when the pitch actually happened, not wherever
+// G.inning/G.half ended up by the time this runs. (jford, 2026-07-06: still saw feed/inning desync
+// after the bcastEvent fix — this was the other call path with the same bug.)
+function feedPitch(label,detail,inn,half){
   if(!gameFeed)gameFeed=[];
-  gameFeed.push({id:++_eventId,inn:G.inning,half:G.half,type:"pitch",head:label,sub:detail||"",away:G.away,home:G.home});
+  gameFeed.push({id:++_eventId,inn:(inn!=null?inn:G.inning),half:(half!=null?half:G.half),type:"pitch",head:label,sub:detail||"",away:G.away,home:G.home});
   if(gameFeed.length>220)gameFeed.shift();
 }
 // Advanced pitch tracking: when on, the scorer arms a pitch type that's recorded with
@@ -6869,7 +6875,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v372";
+var APP_VERSION="v373";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
