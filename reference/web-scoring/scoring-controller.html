@@ -6211,13 +6211,19 @@ function renderToolbar(){
   const barHtml = barOrder().filter(k=>!lay[k]).map(wrap).join("");   // only buttons NOT moved out stay in the row
   // No "drag anywhere" hint label here — it pushed the narrow phone row into a horizontal scroll; the
   // flash on entering edit mode says it instead.
+  // Rearrange-the-buttons toggle only means anything for the scorer — a viewer's own row (WATCHING
+  // chip, share, sound, live dot, Home) has nothing draggable in it at all (every actually-movable
+  // piece — lineup/log/settings/end/undo — is inCtl-gated to the scorer's own wide-idle row). Showing
+  // it anyway just ate real space on an already-tight phone row. (jford, 2026-07-04: "the top row of
+  // viewer page on phone is still cramped and cant see all info".)
+  const showEditToggle=(viewMode==="scorer");
   tb.innerHTML=`<div style="display:flex;align-items:center;gap:${isWide()?"8px":"6px"};padding:4px 2px 2px;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none">
     <div style="flex:0 1 auto;min-width:0;font-family:${MONO};font-weight:700;font-size:16px;letter-spacing:.5px;color:${T.chalk};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${chip}</div>
     ${barHtml}
     ${bErr}
     <div style="flex:1;min-width:8px"></div>
-    ${resetBtn}
-    ${editToggle}
+    ${showEditToggle?resetBtn:""}
+    ${showEditToggle?editToggle:""}
   </div>`;
   if(barEdit) setupBarDrag();   // flow buttons: drag lifts them out to a free position
   renderBarFloat();             // draw + (in edit mode) wire the free-floating buttons
@@ -6644,7 +6650,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v357";
+var APP_VERSION="v358";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
