@@ -19,6 +19,9 @@ build/
 .cxx
 *.apk
 *.aab
+# Exception: the single "latest build" APK deployed via Railway's download page (see
+# reference/web-scoring/download.html) — overwritten in place on every build, not accumulated.
+!reference/web-scoring/AllStarsLive.apk
 
 # ── IDE / editors ───────────────────────────────
 .idea/
