@@ -934,8 +934,14 @@ private fun SetupGuideSheet(
             }
 
             // ----- Before you leave -----
+            // With Hotspot mode (the recommended setup), this device's own internet never goes
+            // away — it stays on cellular the whole time, since the CAMERA joins US, not the other
+            // way around. So signing in at the field works fine now too; doing it here is just a
+            // convenience, not a hard requirement like it used to be. (jford, 2026-07-06: "that's
+            // not our process anymore... we're no longer connecting our mobile device to the
+            // camera wifi, right?" — right, and this line hadn't caught up to that yet.)
             GuideSectionLabel("BEFORE YOU LEAVE THE HOUSE")
-            GuideBullet("Sign in to YouTube here in Camera setup — needs REAL internet, so do it before you're anywhere near the camera's Wi-Fi.")
+            GuideBullet("Sign in to YouTube here in Camera setup, if you haven't already — with Hotspot mode this isn't order-dependent anymore, it just saves a step later.")
             GuideBullet("Confirm the tablet's cellular data is on and has signal.")
             GuideBullet("Charge the tablet, the phone, and the camera.")
 
@@ -978,7 +984,7 @@ private fun SetupGuideSheet(
             GuideStep(4, "Match the toggles in Camera setup", "Turn on whichever of Hotspot / Repeater match what you just set up.")
             GuideStep(5, "Copy the RTMP address, paste into the camera", "The address updates live — copy it fresh now, don't reuse one from last time.")
             GuideStep(6, "Confirm the camera is actually connected", "Look for \"✓ Camera connected — receiving video\" before moving on.")
-            GuideStep(7, "Confirm YouTube still says Connected", "It should — you signed in before touching any of this.")
+            GuideStep(7, "Confirm YouTube says Connected", "With Hotspot mode this should just work — this device's own internet never went away. If it's not connected yet, sign in now; the order doesn't matter here.")
             GuideStep(8, "Start game stream → confirm LIVE", "Wait for the status to actually flip to LIVE before you start scoring.")
             GuideStep(9, "Start scoring", null)
 
@@ -986,7 +992,7 @@ private fun SetupGuideSheet(
             GuideSectionLabel("IF SOMETHING'S WRONG")
             GuideTrouble("No camera picture", "Re-copy the RTMP address — a stale one silently fails. Confirm the camera and tablet are on the same network.")
             GuideTrouble("\"This Wi-Fi has no internet\" banner", "Expected and harmless if Hotspot mode is on. If it's not on, turn it on.")
-            GuideTrouble("YouTube sign-in fails / \"Sign-in cancelled\"", "You connected to the camera's network before signing in. Disconnect, sign in with real internet, then redo the setup from Step 1.")
+            GuideTrouble("YouTube sign-in fails / \"Sign-in cancelled\"", "Only happens in the fallback setup (joining the camera's Wi-Fi directly) — that Wi-Fi has no internet, so sign-in can't finish. With Hotspot mode (recommended) this shouldn't happen at all; if it does, double-check the Hotspot toggle is actually ON in Camera setup.")
             GuideTrouble("Live score not updating for viewers", "Settings → Diagnostics → check the Network/sync log.")
             GuideTrouble("A finished game is missing from the record", "Check the season filter on Stats & games first. If truly gone, use \"+ Add a past game\" to record the final score by hand.")
         }
