@@ -117,12 +117,19 @@ fun SrtIngestScreen(onUseTestPattern: () -> Unit = {}) {
     // The tablet's own default network route then never changes (stays cellular the whole time), so
     // YouTube sign-in, the RTMP push, and the live-score cloud sync all just work as plain
     // single-network Android traffic — no NetworkRouter/bindProcessToNetwork juggling needed at all.
-    // Mutually exclusive with usingOpal (they're alternative ways to solve the same problem).
     // (jford, 2026-07-06, reviewing the dual-network sign-in dead end with another AI: "the Hotspot
     // Model is the only truly repeatable architecture" for non-technical users at scale.) The RTMP
     // address shown below already works unmodified — RtmpHub.localWifiIp() enumerates ANY up,
     // non-loopback, site-local interface, which already covers the tablet's OWN hotspot/AP
     // interface exactly the same as it covers a normal Wi-Fi client connection.
+    //
+    // NOT mutually exclusive with usingOpal — jford, 2026-07-06: "does this method benefit from the
+    // travel router at all" — yes, for RANGE: a phone/tablet hotspot radio is weaker than a
+    // dedicated travel router, so if the camera sits far from wherever the tablet is scoring, the
+    // Opal can join THIS TABLET's hotspot and repeat/extend it so the camera can reach it. Same
+    // "camera can't reach the tablet directly, needs the repeater's own address instead" situation
+    // usingOpal already solves — just with the tablet's hotspot as the upstream source instead of
+    // the camera's own Wi-Fi. Both toggles can be on at once for that combined setup.
     var usingHotspot by remember { mutableStateOf(prefs.getBoolean("using_hotspot", false)) }
 
     fun isDevice() = setupMode == "allInOne"
@@ -298,11 +305,11 @@ fun SrtIngestScreen(onUseTestPattern: () -> Unit = {}) {
                 lensBack = lensBack,
                 onLens = { lensBack = it; prefs.edit().putBoolean("lens_back", it).apply(); if (isDevice()) restart() },
                 usingOpal = usingOpal,
-                onUsingOpal = { usingOpal = it; prefs.edit().putBoolean("using_opal", it).apply(); if (it && usingHotspot) { usingHotspot = false; prefs.edit().putBoolean("using_hotspot", false).apply() } },
+                onUsingOpal = { usingOpal = it; prefs.edit().putBoolean("using_opal", it).apply() },
                 opalWanIp = opalWanIp,
                 onOpalWanIp = { opalWanIp = it; prefs.edit().putString("opal_wan_ip", it).apply() },
                 usingHotspot = usingHotspot,
-                onUsingHotspot = { usingHotspot = it; prefs.edit().putBoolean("using_hotspot", it).apply(); if (it && usingOpal) { usingOpal = false; prefs.edit().putBoolean("using_opal", false).apply() } },
+                onUsingHotspot = { usingHotspot = it; prefs.edit().putBoolean("using_hotspot", it).apply() },
                 onRestart = { restart() },
                 onClose = {
                     showSetup = false
@@ -671,11 +678,22 @@ private fun CameraSetupSheet(
                             .padding(12.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
-                        listOf(
+                        // Combined with the Opal/repeater toggle below: the camera is too far from the
+                        // tablet's own (weaker) hotspot radio to join it directly, so the repeater joins
+                        // the hotspot instead and re-broadcasts it with real range — same idea as the
+                        // existing Opal setup, just with the tablet's hotspot as the upstream source
+                        // instead of the camera's own Wi-Fi. (jford, 2026-07-06: "does this method
+                        // benefit from the travel router at all" — yes, for range.)
+                        (if (usingOpal) listOf(
+                            "On THIS tablet: Settings → Network & internet → Hotspot & tethering → turn on Mobile Hotspot.",
+                            "Connect your Wi-Fi repeater (Opal, etc.) to THIS TABLET's hotspot — use the name/password shown in the Hotspot settings above.",
+                            "In the camera's OWN app, choose \"Join a Network\" and connect it to the REPEATER's network (not the tablet's hotspot directly — the repeater is extending it).",
+                            "Type the repeater's WAN-side IP into the box below (see the Repeater section) — that's the address the camera actually pushes to.",
+                        ) else listOf(
                             "On THIS tablet: Settings → Network & internet → Hotspot & tethering → turn on Mobile Hotspot.",
                             "In the camera's OWN app, choose \"Join a Network\" (not \"Create a Network\") and connect it to this tablet's hotspot — use the name/password shown in the Hotspot settings above.",
                             "Paste the address below into the camera's RTMP destination, same as always.",
-                        ).forEachIndexed { i, step ->
+                        )).forEachIndexed { i, step ->
                             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                                 Text("${i + 1}", color = Color(0xFFA3E635), fontSize = 14.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
                                 Text(step, color = Color(0xFFE8EAED), fontSize = 13.sp)
@@ -709,7 +727,7 @@ private fun CameraSetupSheet(
                         )
                     }
                     Text(
-                        "Using a Wi-Fi repeater (Opal, etc.) between the camera and this tablet",
+                        if (usingHotspot) "Using a Wi-Fi repeater (Opal, etc.) to extend my hotspot's range" else "Using a Wi-Fi repeater (Opal, etc.) between the camera and this tablet",
                         color = Color(0xFFE8EAED), fontSize = 13.sp, fontWeight = FontWeight.Medium,
                         modifier = Modifier.weight(1f),
                     )
@@ -723,7 +741,10 @@ private fun CameraSetupSheet(
                         modifier = Modifier.fillMaxWidth(),
                     )
                     Text(
-                        "This is the repeater's own address on the camera's network — not this tablet's address. Check the repeater's admin page after it connects to the camera's Wi-Fi.",
+                        if (usingHotspot)
+                            "This is the repeater's own address on the CAMERA's side — after the repeater joins this tablet's hotspot, check the repeater's admin page for the address it hands the camera."
+                        else
+                            "This is the repeater's own address on the camera's network — not this tablet's address. Check the repeater's admin page after it connects to the camera's Wi-Fi.",
                         color = Color(0xFF6B7585), fontSize = 12.sp,
                     )
                 }
