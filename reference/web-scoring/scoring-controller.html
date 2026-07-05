@@ -835,15 +835,29 @@ function buildPlan(kind,bases,batterLabel,batterName,opt,batterKey){
       // lead one. opt.fcOut (from the fcpick screen, same pattern as dp's opt.dpOut) lets the scorer
       // say who, defaulting to the lead runner when unspecified. (jford, 2026-07-06: "need to have the
       // ability to change who got out on fielders choice... no way to pick 'out' as an option.")
+      // dest is ALWAYS start+1 here, out or not — every on-base runner is forced to attempt the next
+      // base on a fielder's choice; the out one just gets thrown out AT that base instead of reaching
+      // it. Previously the out runner's dest was their OWN base (as if they never left), so nothing
+      // ever showed them actually running to — and being retired at — the force base. (jford,
+      // 2026-07-06: runner on 1st, FC to short, "it does not show the runner from first going to 2nd
+      // where he got out. it only shows an x at first base but really the out was made at 2nd.")
+      // resolve()/planState() both skip m.out entries entirely when placing runners on bases, so
+      // this dest is purely informational (where the play/animation shows them) — safe to correct.
       add(batterLabel,batterName,batterColor,0,1,{isBatter:1});
       const lead=(opt&&opt.fcOut)?opt.fcOut:(r3?3:r2?2:1);
-      if(r3)add(r3.label,nm(r3),col(r3),3,lead===3?3:4,{out:lead===3});
-      if(r2)add(r2.label,nm(r2),col(r2),2,lead===2?2:3,{out:lead===2});
-      if(r1)add(r1.label,nm(r1),col(r1),1,lead===1?1:2,{out:lead===1});break;}
+      if(r3)add(r3.label,nm(r3),col(r3),3,4,{out:lead===3});
+      if(r2)add(r2.label,nm(r2),col(r2),2,3,{out:lead===2});
+      if(r1)add(r1.label,nm(r1),col(r1),1,2,{out:lead===1});break;}
     case"dp":{
       add(batterLabel,batterName,batterColor,0,1,{isBatter:1,out:1});
       const lead=(opt&&opt.dpOut)?opt.dpOut:(r1?1:r2?2:3);
-      if(r1)add(r1.label,nm(r1),col(r1),1,1,{out:lead===1});if(r2)add(r2.label,nm(r2),col(r2),2,2,{out:lead===2});if(r3)add(r3.label,nm(r3),col(r3),3,3,{out:lead===3});break;}
+      // Only the actually-forced/out runner attempted (and was retired at) the next base; the
+      // OTHER on-base runners aren't part of the force and hold their base by default (unlike fc
+      // above, where every runner is assumed forced) — same "the out runner's dest was their own
+      // base, not the force base" bug as fc, just fixed only for whichever runner is out=true here.
+      if(r1)add(r1.label,nm(r1),col(r1),1,lead===1?2:1,{out:lead===1});
+      if(r2)add(r2.label,nm(r2),col(r2),2,lead===2?3:2,{out:lead===2});
+      if(r3)add(r3.label,nm(r3),col(r3),3,lead===3?4:3,{out:lead===3});break;}
     case"out1":case"flyout":case"lineout":case"popout":
       add(batterLabel,batterName,batterColor,0,1,{isBatter:1,out:1});
       if(r1)add(r1.label,nm(r1),col(r1),1,1);if(r2)add(r2.label,nm(r2),col(r2),2,2);if(r3)add(r3.label,nm(r3),col(r3),3,3);break;
@@ -2291,7 +2305,10 @@ function planPaths(movers){
   return moving.map((m,idx)=>{
     const scale=1-idx*0.085; // stagger as nested loops so paths don't overlap
     const off=p=>[cx+(p[0]-cx)*scale,cy+(p[1]-cy)*scale];
-    if(m.out)return {out:true,color:T.out,pts:[off(BPATH[m.start])]};
+    // m.dest is the force base (start+1) even when out — the X now lands where the play actually
+    // happened, not frozen at the runner's original base. (jford, 2026-07-06: "the out was made at
+    // 2nd," not shown at all before.)
+    if(m.out)return {out:true,color:T.out,pts:[off(BPATH[m.dest])]};
     const pts=[];for(let k=m.start;k<=m.dest;k++)pts.push(off(BPATH[k]));
     return {out:false,scored:m.dest===4,color:m.color,pts};
   });
@@ -5182,14 +5199,20 @@ function actionArea(){
     const defs=[...new Set(movers.map(m=>m.color))].map(c=>
       `<marker id="${idOf(c)}" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="${c}"/></marker>`).join("");
     const marks=plan.map(m=>{
-      const from=P[m.start]||P[0];
-      if(m.out){
-        return `<circle cx="${from.x}" cy="${from.y}" r="8" fill="${T.out}"/>
-          <path d="M${from.x-3.5} ${from.y-3.5}L${from.x+3.5} ${from.y+3.5}M${from.x+3.5} ${from.y-3.5}L${from.x-3.5} ${from.y+3.5}" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/>`;
-      }
-      const to=P[m.dest]||P[0];
+      const from=P[m.start]||P[0],to=P[m.dest]||P[0];
       const mx=(from.x+to.x)/2,my=(from.y+to.y)/2,dx=mx-50,dy=my-50,len=Math.hypot(dx,dy)||1,bow=13;
       const cx=mx+dx/len*bow,cy=my+dy/len*bow;
+      if(m.out){
+        // Show the RUN, not just a dot at the start — a dashed path to where the force actually
+        // happened (m.dest, now the base they were forced to attempt, not their own base), ending in
+        // an X instead of an arrowhead. (jford, 2026-07-06, runner on 1st forced to 2nd on an FC: "it
+        // does not show the runner from first going to 2nd where he got out. it only shows an x at
+        // first base but really the out was made at 2nd.")
+        return `<path d="M${from.x} ${from.y} Q${cx} ${cy} ${to.x} ${to.y}" fill="none" stroke="${T.out}" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="3.5 3"/>
+          <circle cx="${from.x}" cy="${from.y}" r="4" fill="${T.out}" stroke="${T.surface}" stroke-width="1.2"/>
+          <circle cx="${to.x}" cy="${to.y}" r="8" fill="${T.out}"/>
+          <path d="M${to.x-3.5} ${to.y-3.5}L${to.x+3.5} ${to.y+3.5}M${to.x+3.5} ${to.y-3.5}L${to.x-3.5} ${to.y+3.5}" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/>`;
+      }
       return `<path d="M${from.x} ${from.y} Q${cx} ${cy} ${to.x} ${to.y}" fill="none" stroke="${m.color}" stroke-width="3" stroke-linecap="round" marker-end="url(#${idOf(m.color)})"/>
         <circle cx="${from.x}" cy="${from.y}" r="5" fill="${m.color}" stroke="${T.surface}" stroke-width="1.5"/>`;
     }).join("");
@@ -5235,7 +5258,12 @@ function actionArea(){
             <span style="font-size:13px;font-weight:800;color:${T.out};font-family:${MONO};background:rgba(225,29,46,.14);border-radius:5px;padding:3px 8px">OUT ON PLAY</span></div></div>`;
       }
       const floor=m.start===0?1:m.start;
-      const destTxt=m.out?"OUT":(m.dest===4?"HOME":BN[m.dest]);
+      // m.dest is now the FORCE base (start+1) for an out runner too, not their own base — so this
+      // reads "OUT AT 2ND", not just "OUT", telling you where the play actually happened. (jford,
+      // 2026-07-06, runner on 1st forced to 2nd on an FC: "it does not show the runner from first
+      // going to 2nd where he got out. it only shows an x at first base but really the out was made
+      // at 2nd.")
+      const destTxt=m.dest===4?"HOME":BN[m.dest];
       const destBg=m.out?T.out:(m.dest===4?T.safe:m.color);
       const destColor=m.out?"#FFFFFF":(m.dest===4?"#FFFFFF":T.ink);
       // Two labeled, color-matched pills (not just plain "1st → 3rd" text) so it's unambiguous
@@ -5250,7 +5278,7 @@ function actionArea(){
         </div>
         <span style="color:${T.sageDim};font-size:15px">&rarr;</span>
         <div style="display:flex;flex-direction:column;align-items:center;gap:1px">
-          <span style="font-size:8px;font-weight:800;letter-spacing:.5px;color:${T.sageDim}">${m.out?"":"TO"}</span>
+          <span style="font-size:8px;font-weight:800;letter-spacing:.5px;color:${T.sageDim}">${m.out?"OUT AT":"TO"}</span>
           <span style="font-family:${MONO};font-size:12px;font-weight:800;color:${destColor};background:${destBg};border-radius:5px;padding:1px 7px">${destTxt}</span>
         </div></div>`;
       const baseCells=[1,2,3,4].map(c=>{
@@ -7057,7 +7085,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v388";
+var APP_VERSION="v389";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
