@@ -112,6 +112,18 @@ fun SrtIngestScreen(onUseTestPattern: () -> Unit = {}) {
     // this tablet can't see into, so it's typed in once and remembered, not auto-detected.
     var usingOpal by remember { mutableStateOf(prefs.getBoolean("using_opal", false)) }
     var opalWanIp by remember { mutableStateOf(prefs.getString("opal_wan_ip", "") ?: "") }
+    // "Hotspot mode": instead of this tablet joining the camera's own (internet-less) Wi-Fi, the
+    // CAMERA joins THIS TABLET's mobile hotspot instead — inverts which device is the access point.
+    // The tablet's own default network route then never changes (stays cellular the whole time), so
+    // YouTube sign-in, the RTMP push, and the live-score cloud sync all just work as plain
+    // single-network Android traffic — no NetworkRouter/bindProcessToNetwork juggling needed at all.
+    // Mutually exclusive with usingOpal (they're alternative ways to solve the same problem).
+    // (jford, 2026-07-06, reviewing the dual-network sign-in dead end with another AI: "the Hotspot
+    // Model is the only truly repeatable architecture" for non-technical users at scale.) The RTMP
+    // address shown below already works unmodified — RtmpHub.localWifiIp() enumerates ANY up,
+    // non-loopback, site-local interface, which already covers the tablet's OWN hotspot/AP
+    // interface exactly the same as it covers a normal Wi-Fi client connection.
+    var usingHotspot by remember { mutableStateOf(prefs.getBoolean("using_hotspot", false)) }
 
     fun isDevice() = setupMode == "allInOne"
 
@@ -286,9 +298,11 @@ fun SrtIngestScreen(onUseTestPattern: () -> Unit = {}) {
                 lensBack = lensBack,
                 onLens = { lensBack = it; prefs.edit().putBoolean("lens_back", it).apply(); if (isDevice()) restart() },
                 usingOpal = usingOpal,
-                onUsingOpal = { usingOpal = it; prefs.edit().putBoolean("using_opal", it).apply() },
+                onUsingOpal = { usingOpal = it; prefs.edit().putBoolean("using_opal", it).apply(); if (it && usingHotspot) { usingHotspot = false; prefs.edit().putBoolean("using_hotspot", false).apply() } },
                 opalWanIp = opalWanIp,
                 onOpalWanIp = { opalWanIp = it; prefs.edit().putString("opal_wan_ip", it).apply() },
+                usingHotspot = usingHotspot,
+                onUsingHotspot = { usingHotspot = it; prefs.edit().putBoolean("using_hotspot", it).apply(); if (it && usingOpal) { usingOpal = false; prefs.edit().putBoolean("using_opal", false).apply() } },
                 onRestart = { restart() },
                 onClose = {
                     showSetup = false
@@ -493,6 +507,8 @@ private fun CameraSetupSheet(
     onUsingOpal: (Boolean) -> Unit,
     opalWanIp: String,
     onOpalWanIp: (String) -> Unit,
+    usingHotspot: Boolean,
+    onUsingHotspot: (Boolean) -> Unit,
     onRestart: () -> Unit,
     onClose: () -> Unit,
 ) {
@@ -613,6 +629,64 @@ private fun CameraSetupSheet(
                         }
                     }
                 }
+                // ----- Hotspot mode: invert who's the access point. The camera joins THIS TABLET's
+                // mobile hotspot instead of the tablet joining the camera's own (internet-less) Wi-Fi.
+                // The tablet's default route then stays cellular the entire time — YouTube sign-in,
+                // Go Live, and the live-score sync all just work as ordinary single-network traffic,
+                // no dual-network juggling required. Recommended over the Opal/repeater path below. -----
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier.fillMaxWidth().clickable { onUsingHotspot(!usingHotspot) },
+                ) {
+                    Box(
+                        Modifier
+                            .size(width = 40.dp, height = 24.dp)
+                            .background(if (usingHotspot) Color(0xFFA3E635) else Color(0xFF222B36), RoundedCornerShape(999.dp))
+                            .padding(3.dp),
+                    ) {
+                        Box(
+                            Modifier
+                                .size(18.dp)
+                                .background(Color.White, RoundedCornerShape(999.dp))
+                                .then(Modifier.padding(start = if (usingHotspot) 16.dp else 0.dp)),
+                        )
+                    }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            "Use my Mobile Hotspot (recommended)",
+                            color = Color(0xFFE8EAED), fontSize = 13.sp, fontWeight = FontWeight.Medium,
+                        )
+                        Text(
+                            "Fixes YouTube sign-in / Go Live failing on the camera's Wi-Fi",
+                            color = Color(0xFF6B7585), fontSize = 11.sp,
+                        )
+                    }
+                }
+                if (usingHotspot) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(Color(0xFF101720), RoundedCornerShape(10.dp))
+                            .padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        listOf(
+                            "On THIS tablet: Settings → Network & internet → Hotspot & tethering → turn on Mobile Hotspot.",
+                            "In the camera's OWN app, choose \"Join a Network\" (not \"Create a Network\") and connect it to this tablet's hotspot — use the name/password shown in the Hotspot settings above.",
+                            "Paste the address below into the camera's RTMP destination, same as always.",
+                        ).forEachIndexed { i, step ->
+                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                Text("${i + 1}", color = Color(0xFFA3E635), fontSize = 14.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+                                Text(step, color = Color(0xFFE8EAED), fontSize = 13.sp)
+                            }
+                        }
+                        Text(
+                            "Your tablet's own cellular data stays on the whole time — this just shares it with the camera over a local Wi-Fi bubble, so nothing else about signing in or streaming needs to change.",
+                            color = Color(0xFF6B7585), fontSize = 11.sp,
+                        )
+                    }
+                }
                 // ----- Repeater (e.g. GL.iNet Opal) toggle: the camera has to push to a different
                 // address when there's a Wi-Fi repeater between it and this tablet, since this
                 // tablet's own IP is then behind the repeater's NAT and unreachable to the camera. -----
@@ -673,7 +747,7 @@ private fun CameraSetupSheet(
                         .padding(horizontal = 12.dp, vertical = 10.dp),
                 ) {
                     Text(
-                        url.ifEmpty { "Connect the tablet to the camera's Wi-Fi first…" },
+                        url.ifEmpty { if (usingHotspot) "Turn on this tablet's Mobile Hotspot first…" else "Connect the tablet to the camera's Wi-Fi first…" },
                         color = if (url.isNotEmpty()) Color(0xFFA3E635) else Color(0xFF9AA0A6),
                         fontSize = 15.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace,
                         modifier = Modifier.weight(1f),
