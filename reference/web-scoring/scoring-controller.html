@@ -5118,7 +5118,13 @@ function actionArea(){
   }
   if(mode==="errpos"){
     const order=cpMode()?["P","C","1B","2B","3B","SS","LF","LCF","RCF","RF"]:["P","C","1B","2B","3B","SS","LF","CF","RF"];
-    const cells=order.map(p=>{const sel=p===tap.pos;return `<button data-act="errpos" data-arg="${p}" style="display:flex;flex-direction:column;align-items:center;gap:2px;background:${sel?T.clay:T.surface};border:none;border-radius:0;color:${T.chalk};padding:15px 4px;font-size:15px;font-weight:800">${p}<span style="font-size:10px;color:${T.sage};font-weight:600">${POSNUM[p]}</span></button>`;}).join("");
+    // Selected cell's text stayed T.chalk regardless — fine in dark mode (T.clay is a light-ish
+    // orange there), but T.clay in day mode is a DARK brown ("darken warm accents so they read on
+    // white" — meant for use as a border/accent on a light card, not as a fill with dark text on
+    // top of it), so a selected cell was near-black text on a dark background. (jford, 2026-07-06:
+    // "the select color is dark and the black letters are dark.") White text on the selected cell
+    // matches the same selected-state pattern used elsewhere (chip(), etc.)
+    const cells=order.map(p=>{const sel=p===tap.pos;return `<button data-act="errpos" data-arg="${p}" style="display:flex;flex-direction:column;align-items:center;gap:2px;background:${sel?T.clay:T.surface};border:none;border-radius:0;color:${sel?"#FFFFFF":T.chalk};padding:15px 4px;font-size:15px;font-weight:800">${p}<span style="font-size:10px;color:${sel?"rgba(255,255,255,.8)":T.sage};font-weight:600">${POSNUM[p]}</span></button>`;}).join("");
     return step("Error charged to which fielder?","Defaults to where the ball went — tap another fielder if the error was elsewhere.",
       `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:2px;background:${T.line};border:2px solid ${T.line};border-radius:10px;overflow:hidden">${cells}</div>
        <button data-act="back-result" style="${ghost};margin-top:10px;width:100%">Back</button>`);
@@ -5181,7 +5187,11 @@ function actionArea(){
       return `<path d="M${from.x} ${from.y} Q${cx} ${cy} ${to.x} ${to.y}" fill="none" stroke="${m.color}" stroke-width="3" stroke-linecap="round" marker-end="url(#${idOf(m.color)})"/>
         <circle cx="${from.x}" cy="${from.y}" r="5" fill="${m.color}" stroke="${T.surface}" stroke-width="1.5"/>`;
     }).join("");
-    return `<div style="flex-shrink:0;display:flex;justify-content:center;padding:4px 0">
+    // No card of its own — it sat straight on the page's turf background, where the thin diamond
+    // outline and light-colored strokes had nothing opaque behind them to show up against. (jford,
+    // 2026-07-06: "hard to see without a background.") Matches the same T.surface card pattern
+    // every other block on this screen already uses.
+    return `<div class="frost-card" style="flex-shrink:0;display:flex;justify-content:center;background:${T.surface};border:2px solid ${T.line};border-radius:10px;padding:8px 0">
       <svg viewBox="0 0 100 100" style="width:100%;max-width:150px;height:auto"><defs>${defs}</defs>
         <path d="${outline}" fill="none" stroke="${T.line}" stroke-width="2"/>
         ${marks}
@@ -7045,7 +7055,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v385";
+var APP_VERSION="v386";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
