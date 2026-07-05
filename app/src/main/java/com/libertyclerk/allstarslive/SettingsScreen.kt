@@ -63,11 +63,27 @@ fun YouTubeAccountSection(modifier: Modifier = Modifier) {
     }
 
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { res ->
+        com.libertyclerk.allstarslive.net.NetworkRouter.unbindProcess()
         runCatching {
             val result = YouTubeAuth.client(ctx).getAuthorizationResultFromIntent(res.data)
             val token = result.accessToken
             if (token != null) verify(token) else { status = "No token returned"; working = false }
-        }.onFailure { status = "Sign-in cancelled"; working = false }
+        }.onFailure {
+            // This ALSO used to be a blanket "Sign-in cancelled" no matter what actually happened —
+            // including when the picker activity itself couldn't reach Google to finish the exchange
+            // because the active network is the camera's Wi-Fi. A real user-tapped cancel and a
+            // silent network failure looked identical, so there was nothing to act on. (jford,
+            // 2026-07-06: "still getting the youtube sign in cancel error... after i am connected to
+            // the mevo wifi.")
+            status = if (com.libertyclerk.allstarslive.net.NetworkRouter.noInternet.value) {
+                "No internet reachable on this Wi-Fi — the sign-in screen couldn't finish. Sign in to " +
+                    "YouTube BEFORE connecting to the camera (or briefly turn Wi-Fi off so this device " +
+                    "uses cellular), then reconnect to the camera."
+            } else {
+                "Sign-in cancelled"
+            }
+            working = false
+        }
     }
 
     fun connect() {
@@ -81,14 +97,17 @@ fun YouTubeAccountSection(modifier: Modifier = Modifier) {
         com.libertyclerk.allstarslive.net.NetworkRouter.bindProcessToCellular()
         YouTubeAuth.client(ctx).authorize(YouTubeAuth.request())
             .addOnSuccessListener { result ->
-                com.libertyclerk.allstarslive.net.NetworkRouter.unbindProcess()
                 val pi = result.pendingIntent
                 val token = result.accessToken
                 when {
-                    result.hasResolution() && pi != null ->
+                    result.hasResolution() && pi != null -> {
+                        // Keep the cellular bind through the picker activity too, in case ITS network
+                        // exchange (not just this initial authorize() call) also runs in-process —
+                        // unbound in the launcher callback above once that activity returns.
                         launcher.launch(IntentSenderRequest.Builder(pi.intentSender).build())
-                    token != null -> verify(token)
-                    else -> { status = "No authorization result"; working = false }
+                    }
+                    token != null -> { com.libertyclerk.allstarslive.net.NetworkRouter.unbindProcess(); verify(token) }
+                    else -> { com.libertyclerk.allstarslive.net.NetworkRouter.unbindProcess(); status = "No authorization result"; working = false }
                 }
             }
             .addOnFailureListener {
