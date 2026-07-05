@@ -5075,9 +5075,15 @@ function actionArea(){
         // room for it — dropped on phone specifically (jford: "page does not need a baserunning button"
         // on his phone; the feature itself isn't gone, just off the cramped phone row).
         const cells=[];
+        // Base run had a lone accent border (T.safe) with nothing matching on HBP/End inning next to
+        // it in the same row — an inconsistency, not a deliberate "this one's special" choice (jford,
+        // 2026-07-06: "why does the baserunning button have a blue line under it and the end inning
+        // button next to it doesn't have any border"). Gave HBP and End inning their own accent
+        // border too, each matching that button's own icon color, so all three follow the same
+        // pattern instead of just one of them standing out.
         if(isWide()) cells.push(`<button data-act="brsheet" title="Steal, WP/PB, balk, pickoff, caught stealing" style="${flatBtn};border:none;border-radius:0;flex-direction:column;gap:1px;border-bottom:3px solid ${T.safe}"><span style="display:flex;align-items:center;gap:5px"><span style="color:${T.safe};font-size:15px;line-height:1">&#9826;</span>Base run</span><span style="color:${T.sage};font-weight:600;font-size:10px;text-transform:none;letter-spacing:0">steal · WP/PB</span></button>`);
-        if(!_cp) cells.push(`<button data-act="hbp" style="${flatBtn};border:none;border-radius:0"><span style="color:${T.sage}">${ICN.hbp}</span>HBP</button>`);
-        cells.push(`<button data-act="endinning" style="${flatBtn};border:none;border-radius:0;flex-direction:column;gap:1px"><span style="display:flex;align-items:center;gap:5px"><span style="color:${T.amber}">${ICN.inning}</span>End inn</span><span style="color:${T.sage};font-weight:600;font-size:10px;text-transform:none;letter-spacing:0">${halfLabel} · ${G.outs} out${G.outs===1?"":"s"}</span></button>`);
+        if(!_cp) cells.push(`<button data-act="hbp" style="${flatBtn};border:none;border-radius:0;border-bottom:3px solid ${T.clay}"><span style="color:${T.clay}">${ICN.hbp}</span>HBP</button>`);
+        cells.push(`<button data-act="endinning" style="${flatBtn};border:none;border-radius:0;flex-direction:column;gap:1px;border-bottom:3px solid ${T.amber}"><span style="display:flex;align-items:center;gap:5px"><span style="color:${T.amber}">${ICN.inning}</span>End inn</span><span style="color:${T.sage};font-weight:600;font-size:10px;text-transform:none;letter-spacing:0">${halfLabel} · ${G.outs} out${G.outs===1?"":"s"}</span></button>`);
         return `<div style="display:grid;grid-template-columns:repeat(${cells.length},1fr);gap:2px;background:${T.line};border:2px solid ${T.line};border-radius:10px;overflow:hidden">${cells.join("")}</div>`;
       })()}`;
   }
@@ -7055,7 +7061,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v386";
+var APP_VERSION="v387";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
