@@ -927,7 +927,7 @@ const initGame=()=>({inning:1,half:"T",away:0,home:0,outs:0,balls:0,strikes:0,
   startedAt:null,  // wall-clock ms when the game ACTUALLY started (auto-set at first pitch / game start; editable in Game Setup) — drives the game timer
   lineup:{ order:[0,1,2,3,4,5,6,7,8],   // batting order: 9-12 entries (slots 10+ = extra hitters)
            pos:{P:0,C:1,"1B":2,"2B":3,"3B":4,SS:5,LF:6,CF:7,RF:8} }});
-let G=initGame(),hist=[],redoStack=[],mode="home",tap=null,contact=null,result=null,plan=null,toast=null,toastTimer=null,curResults=[],showAll=false,showZones=false,editSlot=null,confirmAct=null,gameActive=false,lineupTab="us",newgameFrom="home",brSheet=false,correctOpen=false,correctOpenAt=0,lineupView="list",fieldAssign=null,fieldHold=null,fieldDisplaced=null,lineEditSlot=null,luSelSlot=null,luBuilderSel=null,luFromSetup=false,koPick=null,oppFieldSel=null,gcArrange=false,bugPreview=false,barEdit=false,editAB=null,gameEdit=null,statsSeason="all";
+let G=initGame(),hist=[],redoStack=[],mode="home",tap=null,contact=null,result=null,plan=null,toast=null,toastTimer=null,curResults=[],showAll=false,showZones=false,editSlot=null,confirmAct=null,gameActive=false,lineupTab="us",newgameFrom="home",brSheet=false,correctOpen=false,correctOpenAt=0,lineupView="list",fieldAssign=null,fieldHold=null,fieldDisplaced=null,lineEditSlot=null,luSelSlot=null,luBuilderSel=null,luFromSetup=false,koPick=null,oppFieldSel=null,gcArrange=false,bugPreview=false,barEdit=false,editAB=null,gameEdit=null,statsSeason="all",pgOpen=false,pgSide="home";
 // Resume the last in-progress game (saved by saveGame) across reloads/app updates, so the
 // lineup/score is never lost. Stays on the home screen → shows "Resume". Re-links ROSTER
 // to the saved team so the lineup's player indices resolve correctly.
@@ -4407,7 +4407,28 @@ function actionArea(){
     }
     const recomputeBtn=`<button data-act="recomputeseason" style="${ghost};display:flex;align-items:center;justify-content:center;gap:9px;width:100%">${IC('refresh',17)} Recompute season stats from the game log</button>
         <div style="font-size:11px;color:${T.sageDim};text-align:center;margin-top:-4px">Rebuilds the season totals to match exactly the finished games above.</div>`;
-    if(teamTab==="stats") return secWrap(`${secHdr("Stats &amp; games")}${seasonPicker}${recEditor}${gamesBlock}${statTable}${recomputeBtn}`);
+    // Manual recovery for a game that finished but never showed up here (a bug, a crash, whatever
+    // the cause) — records at least the final score/opponent/date so the W-L-T record is right,
+    // even with no play-by-play. addPastGame() already existed as a dev-console-only helper (for
+    // GameChanger imports); this is the first real UI in front of it. (jford, 2026-07-06: a finished
+    // game against Desoto never appeared, even after the stale-season-filter fix — that fix only
+    // helps games ended FROM NOW ON, it can't retroactively recover one that already vanished.)
+    const pgInput="width:100%;box-sizing:border-box;background:"+T.surface2+";border:2px solid "+T.line+";color:"+T.ink+";border-radius:10px;padding:12px 14px;font-family:"+SANS+";font-size:15px;font-weight:700;outline:none";
+    const pgSideBtn=(s,lbl2)=>`<button data-act="pgside" data-arg="${s}" style="flex:1;padding:12px;border-radius:9px;border:2px solid ${pgSide===s?T.lime:T.line};background:${pgSide===s?T.lime:T.surface2};color:${pgSide===s?"#fff":T.ink};font-weight:800;font-size:14px">${lbl2}</button>`;
+    const pastAddCard=pgOpen?`<div class="frost-card" style="background:${T.surface};border:2px solid ${T.lime};border-radius:14px;padding:16px 18px;display:flex;flex-direction:column;gap:10px">
+        <div style="font-size:14px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime}">Add a past game</div>
+        <div style="font-size:12px;color:${T.sage};line-height:1.4">For a finished game that never showed up above. Records the final score so the record stays right — no pitch-by-pitch detail.</div>
+        <input id="pgOpp" placeholder="Opponent name" autocomplete="off" style="${pgInput}">
+        <input id="pgDate" type="date" value="${todayLocal()}" style="${pgInput}">
+        <div style="display:flex;gap:8px">${pgSideBtn("home","We're Home")}${pgSideBtn("away","We're Away")}</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input id="pgUs" type="number" inputmode="numeric" min="0" placeholder="Our runs" style="${pgInput};text-align:center">
+          <span style="font-weight:800;color:${T.sageDim}">&ndash;</span>
+          <input id="pgThem" type="number" inputmode="numeric" min="0" placeholder="Their runs" style="${pgInput};text-align:center">
+        </div>
+        <div style="display:flex;gap:8px;margin-top:2px"><button data-act="pgcancel" style="${ghost};flex:1">Cancel</button><button data-act="pgsave" style="${bigBtn(T.lime,'')};flex:2">Save game</button></div>
+      </div>`:`<button data-act="pgopen" style="${ghost};display:flex;align-items:center;justify-content:center;gap:8px;width:100%">${IC('plus',16)} Add a past game (missing/recovery)</button>`;
+    if(teamTab==="stats") return secWrap(`${secHdr("Stats &amp; games")}${seasonPicker}${recEditor}${gamesBlock}${pastAddCard}${statTable}${recomputeBtn}`);
     if(teamTab==="access"){ teamTab="manage"; return actionArea(); }   // access folded into Team management
     if(teamTab==="rules"){ teamTab="manage"; return actionArea(); }     // rules folded into Team management
     if(teamTab==="photos"&&!PHOTOS_ENABLED){ teamTab="hub"; return actionArea(); }   // gallery gated off
@@ -6107,6 +6128,20 @@ document.getElementById("app").addEventListener("click",e=>{
   if(act==="delphoto"){ const t=teamById(openTeamId); if(!t)return; const pid=arg; confirmAct={title:"Delete this photo?",msg:"It will be removed from the team gallery for everyone.",yes:"Delete",danger:true,run:function(){ if(window.cloudDeletePhoto)window.cloudDeletePhoto(t.id,pid); photoZoom=null; photoListTeam=null; render(); }}; render(); return; }
   if(act==="rewatchgame"){ const u="https://www.youtube.com/watch?v="+encodeURIComponent(arg); if(IS_APP&&window.AllStars&&window.AllStars.openExternal)AllStars.openExternal(u); else window.open(u,"_blank","noopener"); return; }
   if(act==="recomputeseason"){ const t=teamById(openTeamId); if(!t)return; confirmAct={title:"Recompute season stats?",msg:"Rebuilds this team's season batting totals from the finished games in the log — fixes drifted totals or resets to only the games actually recorded.",yes:"Recompute",run:function(){ recomputeSeasonFromGames(t); render(); flash("Season stats rebuilt from the game log"); }}; render(); return; }
+  if(act==="pgopen"){ pgOpen=true; pgSide="home"; render(); return; }
+  if(act==="pgcancel"){ pgOpen=false; render(); return; }
+  if(act==="pgside"){ pgSide=arg; render(); return; }
+  if(act==="pgsave"){
+    const t=teamById(openTeamId); if(!t){ flash("No team open"); return; }
+    const opp=(document.getElementById("pgOpp")?.value||"").trim();
+    const date=document.getElementById("pgDate")?.value||todayLocal();
+    const us=+(document.getElementById("pgUs")?.value||0), them=+(document.getElementById("pgThem")?.value||0);
+    if(!opp){ flash("Enter the opponent's name"); return; }
+    const ok=window.addPastGame({teamId:t.id,date,opp,oppShort:(opp.replace(/[^A-Za-z0-9]/g,"").slice(0,3)||"OPP").toUpperCase(),us,them,ourSide:pgSide,bat:[]});
+    if(ok){ pgOpen=false; statsSeason="all"; render(); flash("Game added — final score recorded"); }   // addPastGame() already saveDB()s + syncs to cloud
+    else flash("Couldn't add that game");
+    return;
+  }
   if(act==="endseason"){ const t=teamById(arg)||teamById(openTeamId); if(!t)return; confirmAct={title:"End season for "+(t.name||"this team")+"?",msg:"It moves off the Home screen (kept under Teams → Ended seasons). The record &amp; stats stay, and you can reopen it anytime.",yes:"End season",run:function(){ t.archived=true; t.updatedAt=Date.now(); saveDB(); try{ if(window.cloudSaveTeam)cloudSaveTeam(t,true); }catch(e){} flash("Season ended — "+(t.name||"team")+" moved off Home"); teamTab="manage"; render(); }}; render(); return; }
   if(act==="reopenseason"){ const t=teamById(arg)||teamById(openTeamId); if(!t)return; t.archived=false; t.updatedAt=Date.now(); saveDB(); try{ if(window.cloudSaveTeam)cloudSaveTeam(t,true); }catch(e){} flash((t.name||"Team")+" is active again"); render(); return; }
   // ===== Membership approvals (owner). ATOMIC cloud array writes (arrayUnion/arrayRemove) so a concurrent
@@ -7114,7 +7149,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v390";
+var APP_VERSION="v391";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
