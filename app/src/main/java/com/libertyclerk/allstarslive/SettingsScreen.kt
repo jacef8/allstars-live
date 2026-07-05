@@ -72,8 +72,16 @@ fun YouTubeAccountSection(modifier: Modifier = Modifier) {
 
     fun connect() {
         status = "Opening Google sign-in…"; working = true
+        // Google Play Services' Authorization API runs its own network call, most likely inside the
+        // separate com.google.android.gms process rather than this app's — so bindProcessToCellular
+        // (which only affects THIS process's own sockets) may not reach it at all. Applying it here
+        // anyway costs nothing if it doesn't help, and might if some part of this flow does run
+        // in-process. (jford, 2026-07-06: on the camera's Wi-Fi, "reconnect to youtube... sign in
+        // error immediately.")
+        com.libertyclerk.allstarslive.net.NetworkRouter.bindProcessToCellular()
         YouTubeAuth.client(ctx).authorize(YouTubeAuth.request())
             .addOnSuccessListener { result ->
+                com.libertyclerk.allstarslive.net.NetworkRouter.unbindProcess()
                 val pi = result.pendingIntent
                 val token = result.accessToken
                 when {
@@ -83,7 +91,22 @@ fun YouTubeAccountSection(modifier: Modifier = Modifier) {
                     else -> { status = "No authorization result"; working = false }
                 }
             }
-            .addOnFailureListener { status = "Failed: ${it.message}"; working = false }
+            .addOnFailureListener {
+                com.libertyclerk.allstarslive.net.NetworkRouter.unbindProcess()
+                // The generic "Failed: <exception message>" gave no clue this was almost always a
+                // network problem, not an account/credentials problem — Google's own sign-in flow
+                // needs to actually reach the internet, and it does NOT ride over this app's cellular
+                // fallback (that only covers the RTMP video upload). Telling the operator what to
+                // check saves a support round-trip.
+                status = if (com.libertyclerk.allstarslive.net.NetworkRouter.noInternet.value) {
+                    "No internet reachable on this Wi-Fi. Sign in to YouTube BEFORE connecting to the " +
+                        "camera (or briefly turn Wi-Fi off so this device uses cellular), then reconnect " +
+                        "to the camera — Go Live itself already works over cellular once signed in."
+                } else {
+                    "Failed: ${it.message}"
+                }
+                working = false
+            }
     }
 
     Column(
