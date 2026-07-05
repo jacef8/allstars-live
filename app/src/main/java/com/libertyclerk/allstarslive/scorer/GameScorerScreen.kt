@@ -252,6 +252,16 @@ fun GameScorerScreen(webView: WebView) {
         webView.evaluateJavascript("window.__cam && window.__cam(${if (camLive) "true" else "false"})", null)
     }
 
+    // Surface NetworkRouter's cellular-fallback trail on the in-app Diagnostics page (window.netLog)
+    // — previously the ONLY way to see whether the cellular workaround engaged at all was adb
+    // logcat, which isn't available at the field. (jford, 2026-07-05: "once i connect to camera wifi
+    // i cant connect to cellular for streaming" — with zero visibility into where it broke down.)
+    val netRouterEvent by com.libertyclerk.allstarslive.net.NetworkRouter.events.collectAsStateWithLifecycle()
+    LaunchedEffect(netRouterEvent) {
+        val msg = netRouterEvent ?: return@LaunchedEffect
+        webView.evaluateJavascript("window.netLog && window.netLog(" + org.json.JSONObject.quote(msg) + ")", null)
+    }
+
     // Where the web wants the live camera shown (its monitor region, in dp).
     val rect by AppUi.previewRect.collectAsStateWithLifecycle()
 

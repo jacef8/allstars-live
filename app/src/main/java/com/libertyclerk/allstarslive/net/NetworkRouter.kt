@@ -40,13 +40,26 @@ object NetworkRouter {
     /** True when the device's ACTIVE/default network has no validated internet (e.g. the Mevo Wi-Fi). */
     val noInternet: StateFlow<Boolean> = _noInternet
 
+    // Field-troubleshooting trail for the cellular fallback specifically — the "wifi/cellular fix
+    // isn't working" reports so far have had NO visibility into WHERE it actually breaks down (never
+    // got a cellular network at all? got one but the bind call itself failed? bound fine but the
+    // stream still failed for some OTHER reason?). Every line here also lands in `window.netLog` via
+    // GameScorerScreen's bridge, so it shows up on the in-app Diagnostics page without needing
+    // logcat/adb at the field. (jford, 2026-07-05: "once i connect to camera wifi i cant connect to
+    // cellular for streaming.")
+    private val _events = MutableStateFlow<String?>(null)
+    val events: StateFlow<String?> = _events
+    private fun event(msg: String) { Log.i(TAG, msg); _events.value = msg }
+
     private var cellCb: ConnectivityManager.NetworkCallback? = null
     private var defCb: ConnectivityManager.NetworkCallback? = null
 
     fun start(context: Context) {
         if (cm != null) return
-        val c = context.applicationContext.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager ?: return
+        val c = context.applicationContext.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+        if (c == null) { event("NetworkRouter: no ConnectivityManager — cellular fallback unavailable"); return }
         cm = c
+        event("NetworkRouter: started, requesting cellular…")
 
         // Hold a cellular network up + available so the internet stays reachable even when the
         // default route is a no-internet Wi-Fi. (Does NOT move normal Wi-Fi traffic onto cellular.)
@@ -55,19 +68,24 @@ object NetworkRouter {
             .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
             .build()
         cellCb = object : ConnectivityManager.NetworkCallback() {
-            override fun onAvailable(network: Network) { cellular = network; Log.i(TAG, "cellular available") }
-            override fun onLost(network: Network) { if (cellular == network) cellular = null }
+            override fun onAvailable(network: Network) { cellular = network; event("Cellular network acquired — available for fallback") }
+            override fun onLost(network: Network) { if (cellular == network) { cellular = null; event("Cellular network LOST") } }
+            override fun onUnavailable() { event("Cellular network request came back UNAVAILABLE — check the SIM/data plan is active") }
         }
-        runCatching { c.requestNetwork(req, cellCb!!) }.onFailure { Log.w(TAG, "requestNetwork(cellular) failed", it) }
+        runCatching { c.requestNetwork(req, cellCb!!) }
+            .onSuccess { event("Cellular requestNetwork() registered — waiting for the system to grant it") }
+            .onFailure { event("requestNetwork(cellular) THREW: ${it.message}") }
 
         // Watch the ACTIVE network: no VALIDATED internet → surface the warning.
         defCb = object : ConnectivityManager.NetworkCallback() {
             override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) {
-                _noInternet.value = !caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+                val no = !caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+                if (no != _noInternet.value) event(if (no) "Active network has NO validated internet (expected on the camera's Wi-Fi)" else "Active network has internet again")
+                _noInternet.value = no
             }
             override fun onLost(network: Network) { _noInternet.value = true }
         }
-        runCatching { c.registerDefaultNetworkCallback(defCb!!) }.onFailure { Log.w(TAG, "registerDefaultNetworkCallback failed", it) }
+        runCatching { c.registerDefaultNetworkCallback(defCb!!) }.onFailure { event("registerDefaultNetworkCallback THREW: ${it.message}") }
     }
 
     /**
@@ -106,9 +124,13 @@ object NetworkRouter {
      * through to whatever the default route already does, no worse than before this existed.
      */
     fun bindProcessToCellular(): Boolean {
-        val c = cm ?: return false
-        val cell = cellular ?: return false
-        return runCatching { c.bindProcessToNetwork(cell) }.getOrDefault(false)
+        val c = cm
+        if (c == null) { event("bindProcessToCellular: NetworkRouter never started (no ConnectivityManager)"); return false }
+        val cell = cellular
+        if (cell == null) { event("bindProcessToCellular: SKIPPED — no cellular network available yet (check mobile data/SIM)"); return false }
+        val ok = runCatching { c.bindProcessToNetwork(cell) }.getOrDefault(false)
+        event(if (ok) "bindProcessToCellular: bound OK — the connect attempt should go out over cellular" else "bindProcessToCellular: bindProcessToNetwork() returned false")
+        return ok
     }
 
     /** Restore normal (default-network) routing for future sockets. Safe to call even if never bound. */
