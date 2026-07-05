@@ -98,7 +98,11 @@ function serveStatic(req, res) {
     let cache = "public, max-age=3600";
     if (ext === ".html" || /(^|\/)(sw|firebase-config)\.js$/.test(urlPath)) cache = "no-cache";
     else if (urlPath.startsWith("/icons/") || urlPath.startsWith("/lib/")) cache = "public, max-age=86400";
-    res.writeHead(200, { "Content-Type": type, "Cache-Control": cache });
+    // Content-Length: without it Node falls back to chunked transfer, which works fine for a
+    // download but hides the size from a plain HEAD request — the download page's live
+    // size/last-modified readout (see download.html) needs this to show anything at all.
+    res.writeHead(200, { "Content-Type": type, "Cache-Control": cache, "Content-Length": st.size, "Last-Modified": st.mtime.toUTCString() });
+    if (req.method === "HEAD") { res.end(); return; }
     fs.createReadStream(safe).pipe(res);
   });
 }
