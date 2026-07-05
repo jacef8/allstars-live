@@ -740,6 +740,12 @@ window.uploadTeamPhotos=function(input,teamId){ try{ const files=input&&input.fi
 // Upload a team logo: downscale to <=240px on a canvas (keeps the synced team doc small),
 // store as a data URL on t.logo. Shows on team cards, the lineup card, etc.
 window.uploadTeamLogo=function(input){ try{ const f=input&&input.files&&input.files[0]; if(!f)return; const t=teamById(openTeamId); if(!t)return; if(f.size>8*1024*1024){flash("Image too large (max 8MB)");return;} const r=new FileReader(); r.onload=function(){ const img=new Image(); img.onload=function(){ try{ const max=240; let w=img.width,h=img.height; const sc=Math.min(1,max/Math.max(w,h)); w=Math.max(1,Math.round(w*sc)); h=Math.max(1,Math.round(h*sc)); const cv=document.createElement("canvas"); cv.width=w; cv.height=h; cv.getContext("2d").drawImage(img,0,0,w,h); t.logo=cv.toDataURL("image/png"); saveDB(); render(); flash("Logo updated"); }catch(e){ flash("Couldn't process that image"); } }; img.onerror=function(){ flash("Couldn't read that image"); }; img.src=r.result; }; r.readAsDataURL(f); }catch(e){} };
+// Same idea as uploadTeamLogo, but for THIS game's opponent directly — an ad-hoc typed-in opponent
+// has no team record to attach a logo to at all (only setOppColor existed, and even that was never
+// actually wired into the New Game screen). (jford, 2026-07-06: "we dont have a way to edit opponent
+// logos, colors.") Sets OPP.logo for this session/game only, same scope setOppColor already had —
+// doesn't touch a linked team's own saved record.
+window.uploadOppLogo=function(input){ try{ const f=input&&input.files&&input.files[0]; if(!f)return; if(f.size>8*1024*1024){flash("Image too large (max 8MB)");return;} const r=new FileReader(); r.onload=function(){ const img=new Image(); img.onload=function(){ try{ const max=240; let w=img.width,h=img.height; const sc=Math.min(1,max/Math.max(w,h)); w=Math.max(1,Math.round(w*sc)); h=Math.max(1,Math.round(h*sc)); const cv=document.createElement("canvas"); cv.width=w; cv.height=h; cv.getContext("2d").drawImage(img,0,0,w,h); OPP.logo=cv.toDataURL("image/png"); render(); try{broadcast();}catch(e){} flash("Opponent logo updated"); }catch(e){ flash("Couldn't process that image"); } }; img.onerror=function(){ flash("Couldn't read that image"); }; img.src=r.result; }; r.readAsDataURL(f); }catch(e){} };
 const POSLIST=["P","C","1B","2B","3B","SS","LF","CF","RF"];
 const POSFULL={P:"Pitcher",C:"Catcher","1B":"First base","2B":"Second base","3B":"Third base",SS:"Shortstop",LF:"Left field",CF:"Center field",RF:"Right field"};
 const DESTNAME={1:"1st",2:"2nd",3:"3rd",4:"SCORED"};
@@ -1230,12 +1236,26 @@ function endGame(){snapshot();G.final=true;
       if(_t.games.length>60)_t.games=_t.games.slice(0,60);   // cap (each carries a compact box score)
       _t.record=teamRec(_t);          // keep the stored/synced record in lockstep with the log
       G.rolledUp=true;
+      // The game list is filtered by statsSeason (a year, or "all") — if the scorer had been
+      // browsing a PAST season and never switched back, the freshly-finished game (correctly
+      // archived, correctly dated) would file under the CURRENT year but stay invisible behind
+      // that stale filter, reading as "the game is missing" even though nothing was lost. (jford,
+      // 2026-07-06: "the game that was just played is missing on the tablet that just scored it.")
+      // Snap the filter to "all" so the game you JUST finished is always immediately visible.
+      statsSeason="all";
     }
     // ALWAYS push on End game (even a re-end): if a prior end archived the game locally but never reached
     // the cloud, this re-syncs it so other devices' records update. Bump updatedAt so it wins any merge.
     _t.updatedAt=Date.now(); saveDB();
     try{ if(window.cloudSaveTeam)window.cloudSaveTeam(_t,true); }catch(e){}
-  } else if(!G.rolledUp){ try{ flash("Game ended — but no team was attached, so the record couldn't be saved."); }catch(e){} }
+  } else if(!G.rolledUp){
+    try{ flash("Game ended — but no team was attached, so the record couldn't be saved."); }catch(e){}
+    // A toast alone vanishes in a few seconds and this is a real "the finished game is just gone"
+    // failure mode — log it somewhere that outlives the toast (the same Diagnostics network log
+    // used for the cellular-fallback trail) so it's checkable after the fact, not just in the
+    // instant it happened.
+    try{ if(window.netLog) window.netLog("End game: no team attached, record NOT saved (OUR.name=\""+(OUR&&OUR.name||"")+"\")"); }catch(e){}
+  }
   gameActive=false;   // the game is OVER — clear the active flag so Home stops offering "Resume game"
   resetUI();mode="summary";render();broadcast();}   // broadcast() persists gameActive:false via saveGame()
 /* The team's W-L-T record, computed from its finished-game log so the two are always consistent. */
@@ -4731,10 +4751,17 @@ function actionArea(){
     // Opponent colour picker — so two same-ish team colours can be made distinct for the scoreboard.
     // Single "Opponent color" button → native colour picker (no swatch wall). Set it so a same-ish
     // opponent colour can be made distinct from your team on the scoreboard.
-    const oppColorRow=`<label title="Pick the opponent's colour" style="display:inline-flex;align-items:center;gap:10px;align-self:flex-start;background:${T.surface2};border:2px solid ${T.line};border-radius:11px;padding:11px 16px;cursor:pointer;position:relative">
+    // (jford, 2026-07-06: "we dont have a way to edit opponent logos, colors" — this row existed in
+    // code but was never actually inserted into the rendered New Game screen, and there was no
+    // opponent logo control at all. Both are wired in below, next to the opponent's own row.)
+    const oppColorRow=`<label title="Pick the opponent's colour" style="display:inline-flex;align-items:center;gap:10px;background:${T.surface2};border:2px solid ${T.line};border-radius:11px;padding:11px 16px;cursor:pointer;position:relative">
         <span style="width:26px;height:26px;border-radius:7px;background:${OPP.color};box-shadow:0 0 0 1px ${T.line}"></span>
         <span style="font-weight:800;color:${T.ink};font-size:14px">Opponent color</span>${ICN.palette}
         <input type="color" value="${OPP.color||"#E11D2E"}" onchange="window.setOppColor(this.value)" style="position:absolute;left:0;top:0;width:100%;height:100%;opacity:0;cursor:pointer"></label>`;
+    const oppLogoCtl=`<div style="width:44px;height:44px;flex:none;border-radius:10px;border:2px solid ${T.line};background:${OPP.logo?"#fff":T.surface2}${OPP.logo?`;background-image:url('${OPP.logo}');background-size:contain;background-repeat:no-repeat;background-position:center`:""};display:flex;align-items:center;justify-content:center;color:${T.sageDim}">${OPP.logo?"":IC('flag',18)}</div>
+        <label style="display:inline-flex;align-items:center;gap:6px;background:${T.surface2};border:2px solid ${T.line};border-radius:9px;padding:9px 13px;cursor:pointer;font-size:13.5px;font-weight:700;color:${T.ink}">&#8593; ${OPP.logo?"Change logo":"Add logo"}<input type="file" accept="image/*" onchange="window.uploadOppLogo(this)" style="display:none"></label>
+        ${OPP.logo?`<button data-act="rmopplogo" style="background:none;border:2px solid ${T.line};color:${T.out};border-radius:9px;padding:9px 11px;font-weight:700;font-size:12.5px">Remove</button>`:""}`;
+    const oppBrandRow=`<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">${oppLogoCtl}${oppColorRow}</div>`;
     // Actual new-game setup gets the Start button right in the header bar. Mid-game Game Settings
     // (setMode) does NOT — starting there would reset the live game; it keeps its Done button.
     const startTop=setMode?"":`<button data-act="ng-start" style="flex:none;background:${T.lime};border:none;color:#fff;border-radius:11px;padding:12px 20px;font-family:${MONO};font-weight:800;font-size:16px;letter-spacing:.5px;display:inline-flex;align-items:center;gap:7px;box-shadow:0 4px 14px rgba(225,29,46,.28)">Start game &rarr;</button>`;
@@ -4805,7 +4832,7 @@ function actionArea(){
       return `<div style="min-height:100%;display:flex;flex-direction:column;gap:14px;justify-content:safe center">
           ${header}
           <div style="width:100%;max-width:1180px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start">
-            <div style="display:flex;flex-direction:column;gap:12px">${teamRow("Your team",OUR.name,OUR.short,OUR.color,"pickour")}${teamRow("Opponent",OPP.name,OPP.short,OPP.color,"pickopp")}<button data-act="editopproster" style="${ghost};border-color:${OPP.color||T.lime};color:${T.ink};display:flex;align-items:center;justify-content:center;gap:8px;width:100%;flex:none;margin-top:-6px">${IC('users',16)} Add / edit ${(OPP.short||"opponent").replace(/</g,"&lt;")} lineup &rsaquo;</button>${sideSel}<div style="display:flex;gap:12px"><div style="flex:1;min-width:0">${runCapCard}</div><div style="flex:1;min-width:0">${hittersCard}</div></div>${startCard}</div>
+            <div style="display:flex;flex-direction:column;gap:12px">${teamRow("Your team",OUR.name,OUR.short,OUR.color,"pickour")}${teamRow("Opponent",OPP.name,OPP.short,OPP.color,"pickopp")}${oppBrandRow}<button data-act="editopproster" style="${ghost};border-color:${OPP.color||T.lime};color:${T.ink};display:flex;align-items:center;justify-content:center;gap:8px;width:100%;flex:none;margin-top:-6px">${IC('users',16)} Add / edit ${(OPP.short||"opponent").replace(/</g,"&lt;")} lineup &rsaquo;</button>${sideSel}<div style="display:flex;gap:12px"><div style="flex:1;min-width:0">${runCapCard}</div><div style="flex:1;min-width:0">${hittersCard}</div></div>${startCard}</div>
             <div style="display:flex;flex-direction:column;gap:12px">${leagueCard}${rulebookCard}${alertsCard}${pitchCatchCard}${pitchTypeCard}${detailedCard}</div>
           </div>
           <div style="width:100%;max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:10px">${lineupCardBtn}</div>
@@ -4816,6 +4843,7 @@ function actionArea(){
         ${header}
         ${teamRow("Your team",OUR.name,OUR.short,OUR.color,"pickour")}
         ${teamRow("Opponent",OPP.name,OPP.short,OPP.color,"pickopp")}
+        ${oppBrandRow}
         <button data-act="editopproster" style="${ghost};border-color:${OPP.color||T.lime};color:${T.ink};display:flex;align-items:center;justify-content:center;gap:8px;width:100%;flex:none;margin-top:-6px">${IC('users',16)} Add / edit ${(OPP.short||"opponent").replace(/</g,"&lt;")} lineup &rsaquo;</button>
         ${sideSel}${ruleCards}${lineupCardBtn}
       </div>`;
@@ -6347,6 +6375,7 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="favteam"){const t=teamById(arg);if(t){t.fav=!t.fav;saveDB();}render();}
   else if(act==="teamcolor"){const t=teamById(openTeamId);if(t){t.color=arg;saveDB();}render();}
   else if(act==="rmlogo"){const t=teamById(openTeamId);if(t){delete t.logo;saveDB();render();}}
+  else if(act==="rmopplogo"){OPP.logo=null;render();try{broadcast();}catch(e){}}
   else if(act==="lineupcard"){const t=teamById(openTeamId);if(t){const lu=activeLineup(t);printLineupCard(t,lu?{lineup:lineupToIdx(t,lu)}:undefined);}}
   else if(act==="newteam"){const t=newTeam("");openTeamId=t.id;teamTab="hub";openTeamFrom=(mode==="home"?"home":"teams");mode="team";render();}   // remember where we came from so Back returns there
   else if(act==="teamsback"){mode="teams";render();}
@@ -7085,7 +7114,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v389";
+var APP_VERSION="v390";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
