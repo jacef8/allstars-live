@@ -95,6 +95,11 @@ fun SrtIngestScreen(onUseTestPattern: () -> Unit = {}) {
 
     var surface by remember { mutableStateOf<Surface?>(null) }
     var showSetup by remember { mutableStateOf(false) }
+    // In-app "Game Day Setup" reference — the checklist/flowchart jford asked to have built INTO
+    // the app instead of a separate page, so it's there at the field with no internet needed to
+    // view it. Reachable from Camera setup's header. Some of it reflects LIVE state (YouTube
+    // connected, camera receiving, live on YouTube) so it's a real checklist, not just static text.
+    var showGuide by remember { mutableStateOf(false) }
     // Which camera the operator uses — picks the right setup instructions. Persisted.
     val prefs = remember { ctx.getSharedPreferences("allstars", android.content.Context.MODE_PRIVATE) }
     var cameraProfile by remember { mutableStateOf(prefs.getString("cam_profile", "mevo") ?: "mevo") }
@@ -311,11 +316,23 @@ fun SrtIngestScreen(onUseTestPattern: () -> Unit = {}) {
                 usingHotspot = usingHotspot,
                 onUsingHotspot = { usingHotspot = it; prefs.edit().putBoolean("using_hotspot", it).apply() },
                 onRestart = { restart() },
+                onOpenGuide = { showGuide = true },
                 onClose = {
                     showSetup = false
                     // Refresh YouTube status in case the user just connected.
                     ytChannel = prefs.getString("yt_channel", null)
                 },
+            )
+        }
+
+        if (showGuide) {
+            SetupGuideSheet(
+                ytConnected = ytChannel != null,
+                cameraConnected = playing,
+                broadcastPhase = bcast.phase,
+                usingHotspot = usingHotspot,
+                usingOpal = usingOpal,
+                onClose = { showGuide = false },
             )
         }
     }
@@ -517,6 +534,7 @@ private fun CameraSetupSheet(
     usingHotspot: Boolean,
     onUsingHotspot: (Boolean) -> Unit,
     onRestart: () -> Unit,
+    onOpenGuide: () -> Unit,
     onClose: () -> Unit,
 ) {
     val clipboard = LocalClipboardManager.current
@@ -548,7 +566,12 @@ private fun CameraSetupSheet(
                 .pointerInput(Unit) { detectTapGestures { } },
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text("Camera setup", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                Text("Camera setup", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                // Full checklist/flowchart for the whole game-day setup — jford, 2026-07-06: "The
+                // step by step guide built into the app." (previously a separate reference page).
+                TextButton(onClick = onOpenGuide) { Text("📋 Setup guide", color = Color(0xFFA3E635), fontSize = 13.sp, fontWeight = FontWeight.Bold) }
+            }
             Text(
                 if (isDevice) "This tablet's own camera films AND streams — point it at the field and tap Go Live."
                 else "The camera streams to this tablet; we add the scorebug and send it to YouTube.",
@@ -856,6 +879,190 @@ private fun CameraSetupSheet(
             )
             TextButton(onClick = onClose) { Text("Close", color = Color(0xFF9AA0A6)) }
         }
+    }
+}
+
+/**
+ * "Game Day Setup" — the full checklist + decision guide for getting YouTube, the camera, and live
+ * scoring all working together, built INTO the app instead of a separate reference page (jford,
+ * 2026-07-06: "The step by step guide built into the app.") so it's there at the field with no
+ * internet needed to read it. The three status rows at the top reflect REAL app state, not just
+ * static text — the rest is reference material for the setup sequence and common failures.
+ */
+@Composable
+private fun SetupGuideSheet(
+    ytConnected: Boolean,
+    cameraConnected: Boolean,
+    broadcastPhase: Broadcast.Phase,
+    usingHotspot: Boolean,
+    usingOpal: Boolean,
+    onClose: () -> Unit,
+) {
+    val liveOnYouTube = broadcastPhase == Broadcast.Phase.LIVE
+    Box(
+        Modifier.fillMaxSize().background(Color(0xCC05080C)).clickable(onClick = onClose).imePadding(),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            Modifier
+                .widthIn(max = 560.dp)
+                .padding(16.dp)
+                .background(Color(0xFF141A22), RoundedCornerShape(16.dp))
+                .padding(20.dp)
+                .verticalScroll(rememberScrollState())
+                .pointerInput(Unit) { detectTapGestures { } },
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                Text("Game Day Setup", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                TextButton(onClick = onClose) { Text("Close", color = Color(0xFF9AA0A6)) }
+            }
+            Text(
+                "Do these in order and the camera, YouTube, and live scoring all come up clean.",
+                color = Color(0xFF9AA0A6), fontSize = 13.sp,
+            )
+
+            // ----- Live status: real state, not reference text -----
+            GuideSectionLabel("RIGHT NOW")
+            Column(
+                Modifier.fillMaxWidth().background(Color(0xFF0F151C), RoundedCornerShape(12.dp)).padding(4.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                GuideStatusRow("YouTube signed in", ytConnected)
+                GuideStatusRow("Camera receiving video", cameraConnected)
+                GuideStatusRow("Live on YouTube", liveOnYouTube)
+            }
+
+            // ----- Before you leave -----
+            GuideSectionLabel("BEFORE YOU LEAVE THE HOUSE")
+            GuideBullet("Sign in to YouTube here in Camera setup — needs REAL internet, so do it before you're anywhere near the camera's Wi-Fi.")
+            GuideBullet("Confirm the tablet's cellular data is on and has signal.")
+            GuideBullet("Charge the tablet, the phone, and the camera.")
+
+            // ----- Decision: which network setup -----
+            GuideSectionLabel("WHICH NETWORK SETUP?")
+            Column(
+                Modifier.fillMaxWidth().background(Color(0x14F0B43E), RoundedCornerShape(10.dp))
+                    .border(1.dp, Color(0xFFF0B43E), RoundedCornerShape(10.dp)).padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Text("DECISION", color = Color(0xFFF0B43E), fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                Text(
+                    "Can the camera reach the tablet's Wi-Fi signal directly from where it's mounted?",
+                    color = Color(0xFFE8EAED), fontSize = 14.sp,
+                )
+            }
+            GuideOutcome(
+                label = "YES — close by", labelColor = Color(0xFFA3E635), active = usingHotspot && !usingOpal,
+                lines = listOf(
+                    "Turn on the tablet's Mobile Hotspot",
+                    "Camera setup → toggle \"Use my Mobile Hotspot\" ON",
+                    "Leave the repeater toggle OFF",
+                ),
+            )
+            GuideOutcome(
+                label = "NO — too far / walls, fences", labelColor = Color(0xFFFF6B6B), active = usingHotspot && usingOpal,
+                lines = listOf(
+                    "Turn on the tablet's Mobile Hotspot",
+                    "Connect the Opal to the TABLET's hotspot",
+                    "Camera setup → toggle BOTH Hotspot and Repeater ON",
+                ),
+            )
+            GuideBullet("Fallback only, no cellular data at all: join the camera's own Wi-Fi directly, both toggles OFF. YouTube sign-in and live scoring may not work in this mode.")
+
+            // ----- Numbered sequence -----
+            GuideSectionLabel("AT THE FIELD")
+            GuideStep(1, "Turn on the tablet's Mobile Hotspot", "Settings → Network & internet → Hotspot & tethering.")
+            GuideStep(2, "Connect the repeater to the hotspot (only if using one)", "Join the Opal to the tablet's hotspot network, not the camera's.")
+            GuideStep(3, "Point the camera at the right network", "In the camera's own app: \"Join a Network\" (not Create) → the tablet's hotspot, or the repeater's network if using one.")
+            GuideStep(4, "Match the toggles in Camera setup", "Turn on whichever of Hotspot / Repeater match what you just set up.")
+            GuideStep(5, "Copy the RTMP address, paste into the camera", "The address updates live — copy it fresh now, don't reuse one from last time.")
+            GuideStep(6, "Confirm the camera is actually connected", "Look for \"✓ Camera connected — receiving video\" before moving on.")
+            GuideStep(7, "Confirm YouTube still says Connected", "It should — you signed in before touching any of this.")
+            GuideStep(8, "Start game stream → confirm LIVE", "Wait for the status to actually flip to LIVE before you start scoring.")
+            GuideStep(9, "Start scoring", null)
+
+            // ----- Troubleshooting -----
+            GuideSectionLabel("IF SOMETHING'S WRONG")
+            GuideTrouble("No camera picture", "Re-copy the RTMP address — a stale one silently fails. Confirm the camera and tablet are on the same network.")
+            GuideTrouble("\"This Wi-Fi has no internet\" banner", "Expected and harmless if Hotspot mode is on. If it's not on, turn it on.")
+            GuideTrouble("YouTube sign-in fails / \"Sign-in cancelled\"", "You connected to the camera's network before signing in. Disconnect, sign in with real internet, then redo the setup from Step 1.")
+            GuideTrouble("Live score not updating for viewers", "Settings → Diagnostics → check the Network/sync log.")
+            GuideTrouble("A finished game is missing from the record", "Check the season filter on Stats & games first. If truly gone, use \"+ Add a past game\" to record the final score by hand.")
+        }
+    }
+}
+
+@Composable
+private fun GuideSectionLabel(text: String) {
+    Text(text, color = Color(0xFFA3E635), fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp)
+}
+
+@Composable
+private fun GuideStatusRow(label: String, done: Boolean) {
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Box(
+            Modifier.size(9.dp).background(if (done) Color(0xFF3FB950) else Color(0xFF3A4552), RoundedCornerShape(999.dp)),
+        )
+        Text(label, color = Color(0xFFE8EAED), fontSize = 14.sp, modifier = Modifier.weight(1f))
+        Text(
+            if (done) "Ready" else "Not yet", color = if (done) Color(0xFF3FB950) else Color(0xFF6B7585),
+            fontSize = 12.sp, fontWeight = FontWeight.Bold,
+        )
+    }
+}
+
+@Composable
+private fun GuideBullet(text: String) {
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("·", color = Color(0xFF6B7585), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+        Text(text, color = Color(0xFFC7CDD6), fontSize = 13.sp, lineHeight = 18.sp)
+    }
+}
+
+/** One branch of the network-setup decision, with a live "this is what's active right now" tag. */
+@Composable
+private fun GuideOutcome(label: String, labelColor: Color, active: Boolean, lines: List<String>) {
+    Column(
+        Modifier.fillMaxWidth().background(Color(0xFF1A222C), RoundedCornerShape(10.dp))
+            .border(1.dp, if (active) Color(0xFF2E6BE6) else Color(0xFF2A3644), RoundedCornerShape(10.dp))
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(label, color = labelColor, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = .5.sp, modifier = Modifier.weight(1f))
+            if (active) Text("ACTIVE NOW", color = Color(0xFF7CC4FF), fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = .5.sp)
+        }
+        lines.forEach { l -> GuideBullet(l) }
+    }
+}
+
+@Composable
+private fun GuideStep(n: Int, title: String, detail: String?) {
+    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Box(
+            Modifier.size(24.dp).background(Color(0xFF222B36), RoundedCornerShape(6.dp)),
+            contentAlignment = Alignment.Center,
+        ) { Text("$n", color = Color(0xFFA3E635), fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace) }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, color = Color(0xFFE8EAED), fontSize = 14.sp, fontWeight = FontWeight.Medium)
+            if (detail != null) Text(detail, color = Color(0xFF9AA0A6), fontSize = 12.sp, lineHeight = 16.sp)
+        }
+    }
+}
+
+@Composable
+private fun GuideTrouble(symptom: String, fix: String) {
+    Column(
+        Modifier.fillMaxWidth().background(Color(0xFF1A222C), RoundedCornerShape(10.dp)).padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text(symptom, color = Color(0xFFE8EAED), fontSize = 13.sp, fontWeight = FontWeight.Bold)
+        Text(fix, color = Color(0xFF9AA0A6), fontSize = 12.sp, lineHeight = 17.sp)
     }
 }
 
