@@ -2306,7 +2306,16 @@ function setErrorFielder(pos){
   result=Object.assign({},result,{label:`Reached on error (${pos})`,note:`E${n}`,fielder:n});
   plan=buildPlan("error",G.bases,batterLabel(),batter().name,null,batterKeyOf(batter()));mode="runners";render();
 }
-function setDest(i,c){const m=plan[i];if(!m||m.out)return;const floor=m.start===0?1:m.start;if(c<floor)return;m.dest=c;render();}
+function setDest(i,c){const m=plan[i];if(!m)return;
+  // fc/dp's out runner is ALWAYS out at the force base (start+1) — that's what a force play means,
+  // never ambiguous, so their dest stays locked. Any OTHER out runner (a ball-in-play advancement
+  // where they were thrown out trying for an extra base) can be corrected to wherever they actually
+  // were retired — was hard-locked to start+1 too, which showed e.g. "OUT AT 3RD" for a runner
+  // thrown out at HOME trying to score from 2nd on a single, with no way to fix it (jford's "runner
+  // out on a ball in play" report).
+  const reassignKind=(result.kind==="fc"||result.kind==="dp")?result.kind:null;
+  if(m.out&&(m.isBatter||reassignKind))return;
+  const floor=m.start===0?1:m.start;if(c<floor)return;m.dest=c;render();}
 function commit(r,movers){
   snapshot();recordPitch("inplay");
   // The actual outs THIS play produced — counted straight off the confirmed plan, not just a fixed
@@ -5368,8 +5377,14 @@ function actionArea(){
           <span style="font-size:8px;font-weight:800;letter-spacing:.5px;color:${T.sageDim}">${m.out?"OUT AT":"TO"}</span>
           <span style="font-family:${MONO};font-size:12px;font-weight:800;color:${destColor};background:${destBg};border-radius:5px;padding:1px 7px">${destTxt}</span>
         </div></div>`;
+      // A generic-markout out runner (canMarkGeneric — anyone but fc/dp's own forced-out runner)
+      // keeps their base cells LIVE even once out, so the scorer can correct WHICH base they were
+      // actually retired at (defaults to start+1 when first marked, but a runner can be thrown out
+      // trying for an extra base beyond that). fc/dp's out runner stays locked to the force base —
+      // never ambiguous, so nothing to correct.
+      const editableOut=m.out&&canMarkGeneric;
       const baseCells=[1,2,3,4].map(c=>{
-        const sel=!m.out&&m.dest===c,disabled=m.out||c<floor,home=c===4,origin=(c===m.start&&m.start>0&&!sel),selBg=home?T.safe:m.color;
+        const sel=(m.out?editableOut:true)&&m.dest===c,disabled=(m.out&&!editableOut)||c<floor,home=c===4,origin=(c===m.start&&m.start>0&&!sel),selBg=m.out?T.out:(home?T.safe:m.color);
         const bg=disabled?"transparent":sel?selBg:T.surface2;
         const color=disabled?T.sageDim:sel?(home?"#FFFFFF":T.ink):T.chalk;
         const bord=sel?selBg:origin?m.color:T.line;
