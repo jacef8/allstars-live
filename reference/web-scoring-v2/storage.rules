@@ -1,0 +1,27 @@
+rules_version = '2';
+// All-Stars Live — Cloud Storage rules for the team photo gallery.
+// Photos live at  teams/{teamId}/photos/{photoId}.jpg . Access mirrors the Firestore photo
+// rules: only a team's members (owner / co-owner / scorer / approved member) can read or write its
+// photos. Casual followers (fans) are NOT members. Storage rules read Firestore via firestore.get().
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /teams/{teamId}/photos/{photoId} {
+      function team() {
+        return firestore.get(/databases/(default)/documents/teams/$(teamId)).data;
+      }
+      function isMember() {
+        return request.auth != null && (
+          team().ownerUid == request.auth.uid ||
+          (team().coOwners is list && (request.auth.token.email in team().coOwners)) ||
+          (team().scorers is list && (request.auth.token.email in team().scorers)) ||
+          (team().members is list && (request.auth.token.email in team().members))
+        );
+      }
+      allow read: if isMember();
+      allow write: if isMember()
+        && request.resource.size < 8 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+      allow delete: if isMember();
+    }
+  }
+}

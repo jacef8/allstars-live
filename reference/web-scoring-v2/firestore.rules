@@ -1,0 +1,155 @@
+rules_version = '2';
+// All-Stars Live — Firestore security rules.
+// Paste into: Firebase console → Build → Firestore Database → Rules → Publish.
+//
+// Teams are owned by ownerUid. Authorized SCORERS (email in `scorers`) can score/edit.
+// FOLLOWERS (email in `followers`) are parents/fans — they can read the team and read+post
+// in team chat, but cannot edit the team or score. Team CHAT lives in teams/{id}/messages.
+// Live GAMES live in /games and are publicly readable (so a watch link works for anyone),
+// but only the team's owner/scorers can write them.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /teams/{teamId} {
+      function isOwner()    { return request.auth != null && resource.data.ownerUid == request.auth.uid; }
+      // NOTE: no `is list` guard here on purpose — it breaks Cloud Firestore's QUERY analyzer
+      // (the `where('scorers','array-contains', myEmail)` listener in cloud-data.js gets denied
+      // outright). Team docs always create scorers/followers as [], so the field always exists.
+      function isScorer()   { return request.auth != null && (request.auth.token.email in resource.data.scorers); }
+      function isFollower() { return request.auth != null && (request.auth.token.email in resource.data.followers); }
+      // MEMBER = approved parent/player (email in `members`) — gets team chat + photos. Guard existence
+      // (older docs predate the field). Followers are now just fans (scores/stats), NOT chat members.
+      function isApprovedMember() { return request.auth != null && ('members' in resource.data) && (request.auth.token.email in resource.data.members); }
+      // Co-owners get full management access (like a second owner) but can't change ownerUid or
+      // the coOwners list themselves. Guard the field existence — older docs have no coOwners.
+      function isCoOwner()  { return request.auth != null && ('coOwners' in resource.data) && (request.auth.token.email in resource.data.coOwners); }
+      // STALE-WRITE GUARD: never let an update move updatedAt backwards. A device holding older data
+      // carries that data's older updatedAt (the client no longer regenerates it to "now" on push),
+      // so this rejects its write and the newer copy survives — the authoritative protection against
+      // an out-of-date device clobbering fresh data. Writes that don't touch updatedAt pass (the
+      // post-write value equals the stored one); all our writes include a numeric updatedAt.
+      function updatedAtOk() {
+        return request.resource.data.updatedAt is number
+          && (!('updatedAt' in resource.data) || request.resource.data.updatedAt >= resource.data.updatedAt);
+      }
+
+      // Public teams (owner set public:true) are readable by anyone — powers the searchable
+      // team directory. The `where('public','==',true)` query authorizes against this clause.
+      allow read: if isOwner() || isCoOwner() || isScorer() || isFollower() || isApprovedMember() || resource.data.public == true;
+
+      // Create: must stamp yourself as the owner.
+      allow create: if request.auth != null && request.resource.data.ownerUid == request.auth.uid;
+
+      allow update: if updatedAtOk() && (
+        // Owner = anything.
+        isOwner()
+        // Co-owner = anything EXCEPT changing the owner or the co-owners list.
+        || (
+          isCoOwner() &&
+          request.resource.data.ownerUid == resource.data.ownerUid &&
+          request.resource.data.coOwners == resource.data.coOwners
+        )
+        // Scorer = anything EXCEPT changing owner / scorers / followers.
+        || (
+          isScorer() &&
+          request.resource.data.ownerUid == resource.data.ownerUid &&
+          request.resource.data.scorers == resource.data.scorers &&
+          request.resource.data.followers == resource.data.followers
+        )
+        // Self-join as a SCORER (texted ?invite= link): append ONLY your own email.
+        || (
+          request.auth != null &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['scorers', 'updatedAt']) &&
+          !(request.auth.token.email in resource.data.scorers) &&
+          (request.auth.token.email in request.resource.data.scorers) &&
+          request.resource.data.scorers.size() == resource.data.scorers.size() + 1
+        )
+        // Self-join as a FOLLOWER (?follow= link): append ONLY your own email.
+        || (
+          request.auth != null &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['followers', 'updatedAt']) &&
+          !(request.auth.token.email in resource.data.followers) &&
+          (request.auth.token.email in request.resource.data.followers) &&
+          request.resource.data.followers.size() == resource.data.followers.size() + 1
+        )
+        // Self-REQUEST membership: append ONLY your own email to memberRequests (owner approves later).
+        // Size must grow by exactly 1 and your email must be newly added — can't tamper with others'.
+        || (
+          request.auth != null &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberRequests', 'updatedAt']) &&
+          (request.auth.token.email in request.resource.data.memberRequests) &&
+          !(('memberRequests' in resource.data) && (request.auth.token.email in resource.data.memberRequests)) &&
+          request.resource.data.memberRequests.size() == (('memberRequests' in resource.data) ? resource.data.memberRequests.size() : 0) + 1
+        )
+        // A MEMBER (or scorer/owner) may bump ONLY the chat-activity stamp (powers home unread badges).
+        || (
+          (isOwner() || isCoOwner() || isScorer() || isApprovedMember()) &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastMsgAt', 'updatedAt'])
+        )
+      );
+
+      allow delete: if isOwner();
+
+      // ===== Team chat =====
+      match /messages/{msgId} {
+        function team() { return get(/databases/$(database)/documents/teams/$(teamId)).data; }
+        function isMemberOfTeam() {
+          return request.auth != null && (
+            team().ownerUid == request.auth.uid ||
+            (team().coOwners is list && (request.auth.token.email in team().coOwners)) ||
+            (team().scorers is list && (request.auth.token.email in team().scorers)) ||
+            (team().members is list && (request.auth.token.email in team().members))
+          );
+        }
+        allow read:   if isMemberOfTeam();
+        allow create: if isMemberOfTeam() && request.resource.data.authorUid == request.auth.uid;
+        allow update: if false;
+        allow delete: if request.auth != null &&
+          (resource.data.authorUid == request.auth.uid || team().ownerUid == request.auth.uid);
+      }
+
+      // ===== Team photo gallery ===== (members read + add; author or owner deletes)
+      match /photos/{photoId} {
+        function pteam() { return get(/databases/$(database)/documents/teams/$(teamId)).data; }
+        function isMember() {
+          return request.auth != null && (
+            pteam().ownerUid == request.auth.uid ||
+            (pteam().coOwners is list && (request.auth.token.email in pteam().coOwners)) ||
+            (pteam().scorers is list && (request.auth.token.email in pteam().scorers)) ||
+            (pteam().members is list && (request.auth.token.email in pteam().members))
+          );
+        }
+        allow read:   if isMember();
+        allow create: if isMember() && request.resource.data.authorUid == request.auth.uid;
+        allow update: if false;
+        allow delete: if request.auth != null &&
+          (resource.data.authorUid == request.auth.uid || pteam().ownerUid == request.auth.uid);
+      }
+    }
+
+    // ===== Live / persistent games =====
+    match /games/{gameId} {
+      function canWriteTeam(tid) {
+        return request.auth != null && tid is string
+          && exists(/databases/$(database)/documents/teams/$(tid))
+          && (
+            get(/databases/$(database)/documents/teams/$(tid)).data.ownerUid == request.auth.uid ||
+            (get(/databases/$(database)/documents/teams/$(tid)).data.coOwners is list &&
+             (request.auth.token.email in get(/databases/$(database)/documents/teams/$(tid)).data.coOwners)) ||
+            (get(/databases/$(database)/documents/teams/$(tid)).data.scorers is list &&
+             (request.auth.token.email in get(/databases/$(database)/documents/teams/$(tid)).data.scorers))
+          );
+      }
+      allow read: if true;                                       // anyone with the link can watch
+      allow create: if canWriteTeam(request.resource.data.teamId);
+      allow update: if canWriteTeam(resource.data.teamId);
+      allow delete: if canWriteTeam(resource.data.teamId);
+    }
+
+    // ===== Per-user preferences (UI layout — e.g. the floating scorer windows). Each signed-in
+    // user reads/writes ONLY their own doc, keyed by their uid, so the layout follows them. =====
+    match /userPrefs/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "name": "allstars-live-v2-sandbox",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Isolated sandbox for All-Stars Live's mainstream-readiness refactor. NOT deployed anywhere (Firebase/Railway configs both point at reference/web-scoring, not this directory) — safe to break.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test \"test/**/*.test.js\""
+  },
+  "dependencies": {
+    "ws": "^8.18.0",
+    "firebase-admin": "^12.7.0"
+  }
+}

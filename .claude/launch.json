@@ -6,6 +6,12 @@
       "runtimeExecutable": "python",
       "runtimeArgs": ["-m", "http.server", "8123", "--directory", "reference/web-scoring"],
       "port": 8123
+    },
+    {
+      "name": "web-scoring-v2",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "8124", "--directory", "reference/web-scoring-v2"],
+      "port": 8124
     }
   ]
 }
