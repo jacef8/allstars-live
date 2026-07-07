@@ -294,11 +294,19 @@
 <!-- Cloud accounts/sync config + loader. DORMANT until firebase-config.js has an apiKey. -->
 <script src="firebase-config.js"></script>
 <script src="auth.js"></script>
+<!-- Pure cross-device merge logic (unionGames/unionSchedule) — extracted so it's unit-testable
+     outside the browser (see test/sync-logic.test.js). Must load before cloud-data.js, which uses
+     these as bare globals (classic-script shared scope, same pattern as game-logic.js below). -->
+<script src="sync-logic.js"></script>
 <script src="cloud-data.js"></script>
 <!-- Pure scoring rules (buildPlan, teamRec, etc.) — extracted so they're unit-testable outside the
      browser (see test/game-logic.test.js). Must load before the main script below, which still
      uses them as bare globals (classic-script shared scope, same as auth.js/cloud-data.js). -->
 <script src="game-logic.js"></script>
+<!-- The ONE correct HTML-escaping function (see its own header for why this exists — an audit
+     found 9 different, inconsistently-complete ad hoc escapers scattered through the main
+     script). Must load before it for the same reason as game-logic.js. -->
+<script src="html-safe.js"></script>
 <script>
 /* ----------------------------------------------------------------------
    Field-as-input baseball scoring controller — interaction prototype
@@ -487,7 +495,7 @@ function showPrintable(html){
  * record and a standard batting-order grid + substitutes + pitcher log. */
 function printLineupCard(t,ctx){
   if(!t)return; ctx=ctx||{};
-  const esc=s=>(s==null?"":String(s)).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+  const esc=escHtml; // was a local ad hoc escaper — see html-safe.js
   const R=teamRec(t), rec=`${R.w}-${R.l}${R.t?"-"+R.t:""}`;
   const today=ctx.date||new Date().toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric",year:"numeric"});
   const color=esc(t.color||"#2E6BE6");
@@ -539,7 +547,7 @@ window.exportGame=function(){ downloadJSON("game-"+((OUR.short||"home"))+"-vs-"+
 // Render the branded scorecard from a normalized model (used by both the LIVE game and a stored
 // past game). M = {A,H,maxI,date,winA,winH, line(side,inning), totals(side), bat(side), pitch(side)}.
 function openScorecard(M){
-  const esc=s=>(s==null?"":String(s)).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+  const esc=escHtml; // was a local ad hoc escaper — see html-safe.js
   const A=M.A, H=M.H, maxI=M.maxI;
   let lhead='<th class="tm"></th>'; for(let i=1;i<=maxI;i++)lhead+='<th>'+i+'</th>'; lhead+='<th class="rhe">R</th><th class="rhe">H</th><th class="rhe">E</th>';
   const lrow=(side,m)=>{ let c='<td class="tm">'+esc(m.short)+'</td>'; for(let i=1;i<=maxI;i++)c+='<td>'+(M.line(side,i)||0)+'</td>'; const t=M.totals(side)||{r:0,h:0,e:0}; c+='<td class="rhe b">'+t.r+'</td><td class="rhe">'+t.h+'</td><td class="rhe">'+t.e+'</td>'; return '<tr>'+c+'</tr>'; };
@@ -2553,7 +2561,7 @@ function statusBar(standalone){
   const tabRow=(t,val,act)=>{const c=col(t),lg=(TEAMS.away.logo&&TEAMS.home.logo)?TEAMS[t].logo:null;return `<div style="position:relative;display:flex;align-items:center;gap:9px;height:30px;padding:0 12px 0 0;background:${act?`linear-gradient(90deg,${c}33,transparent 75%)`:"transparent"}">
       <span style="width:4px;align-self:stretch;background:${c};flex:none"></span>
       ${lg?`<img src="${lg}" alt="" style="width:20px;height:20px;object-fit:contain;border-radius:4px;background:#fff;flex:none;${act?"":"opacity:.55"}">`:`<span style="width:20px;height:20px;border-radius:4px;flex:none;background:${c};display:inline-flex;align-items:center;justify-content:center;font-family:${MONO};font-size:11px;font-weight:800;color:${idealText(c)}">${(TEAMS[t].short||"?").slice(0,1)}</span>`}
-      <span style="font-family:${MONO};font-weight:800;font-size:15px;letter-spacing:.6px;color:${act?txWhite:txDim};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${TEAMS[t].short}</span>
+      <span style="font-family:${MONO};font-weight:800;font-size:15px;letter-spacing:.6px;color:${act?txWhite:txDim};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(TEAMS[t].short)}</span>
       ${act?`<span title="at bat" style="width:5px;height:5px;border-radius:50%;background:${c};box-shadow:0 0 6px ${c};flex:none"></span>`:`<span style="width:5px;flex:none"></span>`}
       <span class="sb-score num" id="sb-score-${t}" style="margin-left:auto;padding-left:10px;font-weight:800;font-size:25px;line-height:1;color:${act?txWhite:txDim2}"><span class="digit">${val}</span></span>
     </div>`;};
@@ -2627,14 +2635,14 @@ function batterCard(){
   const nameLine=b.ours?pBug(b):((b.name||"").trim());   // batter name, never the team name
   const abp=(G.ab&&G.ab.pitches)?G.ab.pitches.length:0;   // pitches to THIS batter this at-bat (resets each AB)
   const sub=b.ours
-    ? `${TEAMS[k].short}${b.pos?` · ${b.pos}`:""} &middot; ${ord} in order`
-    : `${TEAMS[k].short||"OPP"} &middot; ${ord} batter`;   // include the team so it's unmistakable
+    ? `${escHtml(TEAMS[k].short)}${b.pos?` · ${escHtml(b.pos)}`:""} &middot; ${ord} in order`
+    : `${escHtml(TEAMS[k].short||"OPP")} &middot; ${ord} batter`;   // include the team so it's unmistakable
   // A colored team badge next to AT BAT — the team short name was already in the `sub` text line,
   // but as small grey text it didn't read as a clear "which team is up" indicator at a glance
   // (jford, 2026-07-03: "need something in the current batter window indicating what team the
   // player is on or what team is batting"). Outlined in the team's own color so it's distinct from
   // the solid AT BAT pill next to it.
-  const teamBadge=`<div title="${(TEAMS[k].name||TEAMS[k].short||"").replace(/</g,"&lt;")} batting" style="display:inline-flex;align-items:center;background:${c}22;border:1.5px solid ${c};color:${c};border-radius:999px;padding:2px 9px;font-family:${MONO};font-size:10px;font-weight:800;letter-spacing:.6px;line-height:1;white-space:nowrap">${(TEAMS[k].short||"?").replace(/</g,"&lt;")}</div>`;
+  const teamBadge=`<div title="${escHtml(TEAMS[k].name||TEAMS[k].short||"")} batting" style="display:inline-flex;align-items:center;background:${c}22;border:1.5px solid ${c};color:${c};border-radius:999px;padding:2px 9px;font-family:${MONO};font-size:10px;font-weight:800;letter-spacing:.6px;line-height:1;white-space:nowrap">${escHtml(TEAMS[k].short||"?")}</div>`;
   if(!isWide()){
     // PHONE: the old single-row 4-column squeeze truncated the batter's name to fit alongside the
     // count/pitches/today stats. Stack instead — the name gets its OWN full-width row, using vertical
@@ -2692,7 +2700,7 @@ function batterStrip(){
     <span title="Lineup spot" style="font-family:${MONO};font-size:30px;font-weight:800;color:${c};line-height:1;flex:none">${ord}</span>
     <div style="flex:1;min-width:0;text-align:left;display:flex;flex-direction:column;gap:3px">
       <div style="font-size:10px;letter-spacing:1.5px;font-weight:800;color:${T.sageDim};line-height:1">BATTING ${ordinal(ord)} &middot; <span style="color:${c}">${(TEAMS[k].short||"?").replace(/</g,"&lt;")}</span></div>
-      <div style="font-family:${MONO};font-size:21px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;line-height:1;color:${T.chalk};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${nameLine}</div></div>
+      <div style="font-family:${MONO};font-size:21px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;line-height:1;color:${T.chalk};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(nameLine)}</div></div>
     <div style="flex:none;text-align:right;line-height:1.15">
       <div style="font-family:${MONO};font-size:19px;font-weight:800;color:${T.chalk}">${G.balls}-${G.strikes}</div>
       <div style="font-size:9px;font-weight:800;letter-spacing:1px;color:${T.sageDim}">${abp} ${abp===1?"PITCH":"PITCHES"}</div></div>
@@ -3052,7 +3060,7 @@ function scoreBar(){
   const tabRow=(t,val,act)=>{const c=col(t),lg=(TEAMS.away.logo&&TEAMS.home.logo)?TEAMS[t].logo:null;return `<div style="position:relative;display:flex;align-items:center;gap:13px;height:52px;padding:0 18px 0 0;background:${act?`linear-gradient(90deg,${c}33,transparent 75%)`:"transparent"}">
       <span style="width:6px;align-self:stretch;background:${c};flex:none"></span>
       ${lg?`<img src="${lg}" alt="" style="width:32px;height:32px;object-fit:contain;border-radius:6px;background:#fff;flex:none;${act?"":"opacity:.55"}">`:`<span style="width:32px;height:32px;border-radius:6px;flex:none;background:${c};display:inline-flex;align-items:center;justify-content:center;font-family:${MONO};font-size:16px;font-weight:800;color:${idealText(c)}">${(TEAMS[t].short||"?").slice(0,1)}</span>`}
-      <span style="font-family:${MONO};font-weight:800;font-size:24px;letter-spacing:.5px;color:${act?"var(--ink)":"var(--textmid)"};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${TEAMS[t].short}</span>
+      <span style="font-family:${MONO};font-weight:800;font-size:24px;letter-spacing:.5px;color:${act?"var(--ink)":"var(--textmid)"};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(TEAMS[t].short)}</span>
       ${act?`<span title="at bat" style="width:8px;height:8px;border-radius:50%;background:${c};box-shadow:0 0 8px ${c};flex:none"></span>`:`<span style="width:8px;flex:none"></span>`}
       <span style="margin-left:auto;padding-left:14px;font-family:${MONO};font-weight:800;font-size:42px;line-height:1;color:${act?"var(--ink)":"var(--textmid)"}">${val}</span></div>`;};
   const b=G.bases,base=(x,y,on)=>`<rect x="${x-8.5}" y="${y-8.5}" width="17" height="17" rx="2.5" transform="rotate(45 ${x} ${y})" fill="${on?T.clay:"none"}" stroke="${on?T.clay:"var(--sbpipoff)"}" stroke-width="2.5"/>`;
@@ -3141,8 +3149,8 @@ function paRowHtml(pa,idx,total){
 function batterReviewModal(){
   const key=reviewBatter,list=(G.pa&&G.pa[key])||[],s=G.stats&&G.stats[key];
   let title="Batter";
-  if(key&&key[0]==="o"){ const ri=+key.slice(1),p=ROSTER[ri]; if(p)title=`#${p.num} ${p.name}`; }
-  else if(s&&s.name) title=`#${s.num} ${s.name}`;
+  if(key&&key[0]==="o"){ const ri=+key.slice(1),p=ROSTER[ri]; if(p)title=`#${escHtml(p.num)} ${escHtml(p.name)}`; }
+  else if(s&&s.name) title=`#${escHtml(s.num)} ${escHtml(s.name)}`;
   const gl=s?`${s.h}-${s.ab}${s.r?` · ${s.r} R`:""}${s.rbi?` · ${s.rbi} RBI`:""}${s.bb?` · ${s.bb} BB`:""}${s.k?` · ${s.k} K`:""}`:"0-0";
   const rows=list.length?list.map((pa,i)=>paRowHtml(pa,i,list.length)).reverse().join("")
     :`<div style="color:${T.sageDim};padding:18px;text-align:center">No at-bats yet — this is their first time up.</div>`;
@@ -3185,7 +3193,7 @@ function inningLogModal(){
         <span style="font-family:${MONO};font-size:13px;color:${T.sage}">${e.runs} R · ${e.hits} H · ${e.pitches} P${e.lob?` · ${e.lob} LOB`:""}</span></div>`).join("")
     :`<div style="color:${T.sageDim};padding:14px;text-align:center">No completed innings yet.</div>`;
   // C5: in-game lineup/position changes recorded for the historical record.
-  const esc=s=>(s==null?"":String(s)).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  const esc=escHtml; // was a local ad hoc escaper — see html-safe.js
   const ll=G.lineupLog||[];
   const luSec=ll.length?`
       <div style="margin-top:14px;font-family:${MONO};font-size:12px;font-weight:800;letter-spacing:.05em;color:${T.sage}">LINEUP CHANGES</div>
@@ -3424,7 +3432,7 @@ window._acFilter=function(inp, listFnName){
   if(q){ const pre=items.filter(x=>String(x).toLowerCase().startsWith(q)); const sub=items.filter(x=>{const s=String(x).toLowerCase(); return !s.startsWith(q)&&s.indexOf(q)>=0;}); items=pre.concat(sub); }
   items=items.slice(0,8);
   if(!items.length){ _ddClose(); return; }
-  const esc=s=>String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;");
+  const esc=escHtml; // was a local ad hoc escaper — see html-safe.js
   const html=items.map(x=>{
     let disp=esc(x); if(q){ const s=String(x); const i=s.toLowerCase().indexOf(q); if(i>=0) disp=esc(s.slice(0,i))+`<b style="color:#E11D2E">`+esc(s.slice(i,i+q.length))+`</b>`+esc(s.slice(i+q.length)); }
     return `<div role="option" onmousedown="event.preventDefault()" onclick="window._acPick('${inp.id}','${encodeURIComponent(String(x))}')" style="padding:12px 13px;border-radius:8px;font-family:${SANS};font-weight:700;font-size:16px;color:${T.ink};cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${disp}</div>`;
@@ -3647,6 +3655,15 @@ function actionArea(){
     // Show ALL teams (favorites first), so the count and the cards always match — previously a single
     // favorite hid every other team while the header still said "My teams (N)".
     const list=DB.teams.slice().sort((a,b)=>(b.fav?1:0)-(a.fav?1:0));
+    // A team is "runnable" (owner/co-owner/scorer) vs. merely watchable (plain follower, or a
+    // public-directory follow). t.external alone used to decide the card's MANAGE/VIEW label, but
+    // external is ONLY true for public-directory watches — a plain follower invited via a share
+    // link (in `followers`, not `scorers`) has external:false and so incorrectly saw "MANAGE TEAM"
+    // on a team they have zero control over. cloudIsScorer(t) is the real, already-existing
+    // capability check (owner/coOwner/scorer) — use it instead. Falls back to true when Cloud is
+    // disabled (native app / no sign-in), where every local team is trivially "yours".
+    const canRunTeam=t=>!t.external&&(typeof window.cloudIsScorer!=="function"||window.cloudIsScorer(t));
+    const hasRunnableTeam=list.some(t=>!t.archived&&canRunTeam(t));
     const card=(t,full)=>{const R=teamRec(t);const rec=`${R.w}-${R.l}${R.t?"-"+R.t:""}`;const games=R.w+R.l+R.t;
       const sub=(()=>{const n=new Date(),today=n.getFullYear()+"-"+String(n.getMonth()+1).padStart(2,"0")+"-"+String(n.getDate()).padStart(2,"0");const up=(t.schedule||[]).filter(s=>s.date&&s.date>=today).sort((a,b)=>((a.date+(a.time||""))<(b.date+(b.time||""))?-1:1))[0];if(up){try{return "Next · "+new Date(up.date+"T00:00").toLocaleDateString(undefined,{month:"short",day:"numeric"});}catch(e){return "Next game set";}}return games?(games+" game"+(games===1?"":"s")):"New season";})();
       const unread=teamHasUnread(t);
@@ -3655,10 +3672,10 @@ function actionArea(){
           <div style="display:flex;align-items:center;gap:9px;padding-right:${t.external?"30px":"2px"}">
             ${t.logo?`<img src="${t.logo}" alt="" style="width:36px;height:36px;flex:none;border-radius:8px;object-fit:contain;background:#fff;box-shadow:0 0 0 1px ${T.line}">`:""}
             ${unread?`<span title="New chat messages" style="flex:none;display:inline-flex;align-items:center;gap:4px;background:${T.amber};color:#10141A;border-radius:999px;padding:3px 9px;font-family:${MONO};font-weight:800;font-size:11px;letter-spacing:.4px">${IC('chat',12)} NEW</span>`:""}
-            <div style="font-family:${MONO};font-size:23px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1">${t.name}</div></div>
+            <div style="font-family:${MONO};font-size:23px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1">${escHtml(t.name)}</div></div>
           <div style="display:flex;align-items:baseline;gap:9px;margin-top:7px">
             <span style="font-family:${MONO};font-size:28px;font-weight:800;color:${t.color};line-height:1">${rec}</span><span style="font-size:13px;color:${T.sage}">${sub}</span></div>
-          <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:14px;background:${t.color};color:#fff;border-radius:9px;padding:13px;font-family:${MONO};font-weight:800;font-size:16px;letter-spacing:.8px;pointer-events:none">${IC(GEAR)} ${t.external?"VIEW TEAM":"MANAGE TEAM"}</div></div>`;};
+          <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:14px;background:${t.color};color:#fff;border-radius:9px;padding:13px;font-family:${MONO};font-weight:800;font-size:16px;letter-spacing:.8px;pointer-events:none">${IC(GEAR)} ${canRunTeam(t)?"MANAGE TEAM":"VIEW TEAM"}</div></div>`;};
     // Collapsible section headers (drawers) for Home — tap to open/close the list beneath.
     // Collapsible drawer: the label is the HEADER of the box that holds the content (one window),
     // not a separate little toggle box above the cards.
@@ -3737,10 +3754,16 @@ function actionArea(){
           <span style="display:flex;align-items:center;gap:10px;min-width:0"><span style="width:10px;height:10px;border-radius:50%;flex:none;background:#E11D2E;box-shadow:0 0 7px #E11D2E"></span><span style="min-width:0"><span style="font-size:18px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block">${_esc(s.a||"")} ${s.as|0}–${s.hs|0} ${_esc(s.h||"")}</span><span style="font-size:13.5px;color:${T.sage}">${sub}</span></span></span>
           <span style="font-family:${MONO};font-size:15px;font-weight:800;color:${T.lime};white-space:nowrap;flex:none">Watch &rsaquo;</span></button>
         ${takeoverPill}${endPill}</div>`; }).join("");
-    const newGameBtn = `<button data-act="newgamestart" style="${bigBtn(T.lime,"font-size:21px;padding:17px;border:2px solid rgba(255,255,255,.92);box-shadow:0 8px 22px rgba(225,29,46,.34)")}">${IC(PLAY)} New Game</button>`;
-    const manageBtn = DB.teams.length
+    // New Game only makes sense if this account can actually run at least one team — a pure
+    // follower (every team they have is watch-only) has nothing to start, so the button (and its
+    // scoring-jargon sibling below) simply don't show for them, rather than opening onto a picker
+    // with nothing they're allowed to use.
+    const newGameBtn = hasRunnableTeam ? `<button data-act="newgamestart" style="${bigBtn(T.lime,"font-size:21px;padding:17px;border:2px solid rgba(255,255,255,.92);box-shadow:0 8px 22px rgba(225,29,46,.34)")}">${IC(PLAY)} New Game</button>` : "";
+    const manageBtn = !DB.teams.length
+      ? `<button data-act="gototeams" style="${bigBtn(T.lime,"font-size:19px;padding:17px;border:2px solid rgba(255,255,255,.92);box-shadow:0 8px 22px rgba(225,29,46,.34)")}">${IC('<path d="M12 5v14M5 12h14"/>')} Create Your First Team</button>`
+      : hasRunnableTeam
       ? `<button data-act="gototeams" style="${ghost};width:100%;padding:17px;font-size:17px;border:2px solid rgba(255,255,255,.55);color:${T.ink};display:flex;align-items:center;justify-content:center;gap:9px">${IC('<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>')} Manage teams &amp; rosters</button>`
-      : `<button data-act="gototeams" style="${bigBtn(T.lime,"font-size:19px;padding:17px;border:2px solid rgba(255,255,255,.92);box-shadow:0 8px 22px rgba(225,29,46,.34)")}">${IC('<path d="M12 5v14M5 12h14"/>')} Create Your First Team</button>`;
+      : `<button data-act="gototeams" style="${ghost};width:100%;padding:17px;font-size:17px;border:2px solid rgba(255,255,255,.55);color:${T.ink};display:flex;align-items:center;justify-content:center;gap:9px">${IC('<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>')} View my teams</button>`;
     // Share only makes sense once a game (and its stream link) exists.
     // "Share game link" only makes sense once a game is live (it shares the viewer/watch link).
     // No game in progress → no button (was confusing on a fresh home screen).
@@ -3811,12 +3834,6 @@ function actionArea(){
       // Title full-width on top; two equal tiles fill the rest evenly (no scrolling).
       // Solid tile heights (min-height, not flex:1) so they can never collapse on the tablet's
       // zoomed layout. The page scrolls if it's tight, instead of overlapping the logo.
-      const tile=(act,label,bg,fg,svg,sub)=>`<button data-act="${act}" style="min-height:clamp(150px,calc(var(--avh) * 26),220px);width:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:${bg};color:${fg};border:none;border-radius:16px;cursor:pointer;box-shadow:0 8px 22px rgba(0,0,0,.35)">
-          <svg viewBox="0 0 24 24" width="42" height="42" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${svg}</svg>
-          <span style="font-family:${MONO};font-weight:800;font-size:27px;letter-spacing:.6px">${label}</span>
-          ${sub?`<span style="font-size:13px;font-weight:600;opacity:.85">${sub}</span>`:""}</button>`;
-      const newTile=tile('newgamestart','New Game',T.lime,'#fff','<path d="M8 5l11 7-11 7z" fill="currentColor" stroke="none"/>','Score + stream a game');
-      const manageTile=tile('gototeams','Manage Teams',T.surface2,T.ink,'<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>','Rosters · records · stats');
       // Scroll a long team list in its own column. NOTE: use a JS-computed px max-height, NOT
       // `46vh` — in the Android WebView `vh` was resolving to 0px, collapsing this wrapper to
       // height:0 and clipping ALL team cards out of view (cards were in the DOM at top:428 but
@@ -3824,11 +3841,6 @@ function actionArea(){
       const teamsMaxH = Math.max(220, Math.round((window.innerHeight || 700) * 0.5));
       // Cards only (no "My teams" label) so the card tops line up with the New Game tile.
       const cardsGrid = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;align-content:start">${list.map(card).join("")}</div>`;
-      const rightCell = showTeams && DB.teams.length
-        ? `<div style="display:flex;flex-direction:column;gap:10px;min-height:0;flex:1">
-             <div style="flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;display:flex;flex-direction:column;gap:10px">${cardsGrid}</div>
-             <div style="flex:none">${manageBtn}</div></div>`
-        : manageTile;
       // Fill exactly the available height (no page scroll). The hero + tiles are fixed; the team
       // list flexes to fill what's left and scrolls INSIDE its own column if it's long.
       // New layout: a compact action ROW on top (normal-height buttons, not a giant tile), then
@@ -3843,7 +3855,10 @@ function actionArea(){
           <span style="display:flex;align-items:center;gap:9px;font-family:${MONO};font-weight:800;font-size:19px;letter-spacing:.5px"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${PLAYP}</svg>Resume game</span>
           <span style="font-family:${MONO};font-size:13px;font-weight:700;color:${T.navy}">${(OUR.short||"US").replace(/</g,"")} ${ourRuns()} &middot; ${(OPP.short||"OPP").replace(/</g,"")} ${oppRuns()} &nbsp;—&nbsp; ${G.half==="T"?"Top":"Bot"} ${ordinal(G.inning)}</span></button>
           <button data-act="discardgame" title="Discard this in-progress game" style="position:absolute;top:8px;right:8px;width:34px;height:34px;border-radius:9px;background:rgba(225,29,46,.16);border:1.5px solid ${T.out};color:${T.out};font-weight:800;font-size:18px;line-height:1;display:flex;align-items:center;justify-content:center;cursor:pointer">&times;</button></div>`:"";
-      const actionsRow=`<div style="flex:none;display:flex;gap:12px;flex-wrap:wrap;align-items:stretch">${resumeWide}${aBtn("newgamestart","New Game",T.lime,"#fff",PLAYP,1,"rgba(225,29,46,.34)")}${aBtn("gototeams","Manage Teams",T.surface2,T.ink,PEOPLE,1)}</div>`;
+      // Same gate as the phone layout's newGameBtn/manageBtn: a pure follower (no runnable team)
+      // never sees New Game, and "Manage Teams" relabels to "View Teams" since there's nothing
+      // here for them to manage.
+      const actionsRow=`<div style="flex:none;display:flex;gap:12px;flex-wrap:wrap;align-items:stretch">${resumeWide}${hasRunnableTeam?aBtn("newgamestart","New Game",T.lime,"#fff",PLAYP,1,"rgba(225,29,46,.34)"):""}${aBtn("gototeams",hasRunnableTeam?"Manage Teams":"View Teams",T.surface2,T.ink,PEOPLE,1)}</div>`;
       const _activeTeams=list.filter(t=>!t.archived);   // ended-season teams drop off Home (still in Manage Teams)
       const teamsArea=(showTeams&&_activeTeams.length)
         ? `<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px">
@@ -3897,7 +3912,7 @@ function actionArea(){
         ${(window.cloudIsScorer&&window.cloudIsScorer(t))?"":`<button data-act="favteam" data-arg="${t.id}" title="Follow this team" style="background:none;border:none;color:${t.fav?T.amber:T.sageDim};font-size:25px;line-height:1;padding:2px 4px;cursor:pointer">${t.fav?IC('starFill',23):IC('star',23)}</button>`}
         <button data-act="opent" data-arg="${t.id}" style="flex:1;min-width:0;display:flex;align-items:center;gap:10px;text-align:left;background:none;border:none;padding:6px 2px;cursor:pointer">
           <div style="flex:1;min-width:0">
-            <div style="font-family:${MONO};font-size:22px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.name}${ended?` <span style="font-family:${SANS};font-size:11px;font-weight:800;letter-spacing:.5px;color:${T.sageDim};background:${T.surface2};border:1px solid ${T.line};border-radius:6px;padding:2px 7px;vertical-align:middle">ENDED</span>`:""}</div>
+            <div style="font-family:${MONO};font-size:22px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(t.name)}${ended?` <span style="font-family:${SANS};font-size:11px;font-weight:800;letter-spacing:.5px;color:${T.sageDim};background:${T.surface2};border:1px solid ${T.line};border-radius:6px;padding:2px 7px;vertical-align:middle">ENDED</span>`:""}</div>
             <div style="display:flex;align-items:baseline;gap:9px;margin-top:5px"><span style="font-family:${MONO};font-size:26px;font-weight:800;color:${t.color};line-height:1">${rec}</span><span style="font-size:13px;color:${T.sage}">${sub}</span></div></div>
           <span style="color:${t.color};font-weight:800;font-size:15px;letter-spacing:.5px;white-space:nowrap">MANAGE &rsaquo;</span></button>
         ${liveBadge}</div>`;};
@@ -3957,7 +3972,7 @@ function actionArea(){
           return themedSelect("statsSeasonSel",opts,_sel,{onpick:"setStatsSeason",css:cell+";width:100%;flex:1;min-width:170px;font-family:"+MONO+";font-weight:800;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px;text-align:left"});})()}</div></div>`;
     const _vd="border-left:1px solid rgba(255,255,255,.14)";   // vertical column dividers for the stat table
     const sRows=t.players.map(p=>{const s=_statOf(p.id);const ab=s.ab||0,h=s.h||0;const avg=ab?(h/ab).toFixed(3).replace(/^0/,""):"—";
-      return `<tr style="border-top:1.5px solid ${T.line}"><td style="text-align:left;padding:10px 8px;font-weight:700;white-space:nowrap">#${p.num} ${p.name}</td><td style="padding:10px 6px;${_vd}">${ab}</td><td style="padding:10px 6px;${_vd}">${s.r||0}</td><td style="padding:10px 6px;${_vd}">${h}</td><td style="padding:10px 6px;${_vd}">${s.rbi||0}</td><td style="padding:10px 6px;${_vd}">${s.bb||0}</td><td style="padding:10px 6px;${_vd}">${s.k||0}</td><td style="padding:10px 6px;${_vd};font-weight:800">${avg}</td></tr>`;}).join("");
+      return `<tr style="border-top:1.5px solid ${T.line}"><td style="text-align:left;padding:10px 8px;font-weight:700;white-space:nowrap">#${escHtml(p.num)} ${escHtml(p.name)}</td><td style="padding:10px 6px;${_vd}">${ab}</td><td style="padding:10px 6px;${_vd}">${s.r||0}</td><td style="padding:10px 6px;${_vd}">${h}</td><td style="padding:10px 6px;${_vd}">${s.rbi||0}</td><td style="padding:10px 6px;${_vd}">${s.bb||0}</td><td style="padding:10px 6px;${_vd}">${s.k||0}</td><td style="padding:10px 6px;${_vd};font-weight:800">${avg}</td></tr>`;}).join("");
     const statTable=`<div class="frost-card" style="background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:14px 18px;overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-family:${MONO};font-size:18px;color:${T.chalk};text-align:center">
         <thead><tr style="color:${T.sageDim};font-size:14px;letter-spacing:.5px"><th style="text-align:left;padding:0 8px 10px">${_seasonLabel} · BATTING</th><th style="${_vd}">AB</th><th style="${_vd}">R</th><th style="${_vd}">H</th><th style="${_vd}">RBI</th><th style="${_vd}">BB</th><th style="${_vd}">K</th><th style="${_vd}">AVG</th></tr></thead>
         <tbody>${sRows}</tbody></table>
@@ -4054,7 +4069,7 @@ function actionArea(){
           <span style="width:34px;height:34px;flex:none;display:flex;align-items:center;justify-content:center;border-radius:8px;background:${rc};color:#10141A;font-family:${MONO};font-weight:800;font-size:16px">${g.result||""}</span>
           <div style="flex:1;min-width:0"><div style="font-weight:800;color:${T.ink};font-size:18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">vs ${(g.opp||"Opponent").replace(/</g,"&lt;")}</div><div style="font-size:14px;color:${T.sage};margin-top:2px">${gdt}</div></div>
           <div style="text-align:right;flex:none;line-height:1.05"><div style="font-family:${MONO};font-size:9px;font-weight:800;letter-spacing:1.2px;color:${rc}">${resWord} &middot; FINAL</div>
-            <div style="font-family:${MONO};font-weight:800;font-size:21px;color:${T.chalk}"><span title="${(t.short||'Us')}">${g.us}</span>&ndash;<span title="${(g.oppShort||g.opp||'Opp')}">${g.them}</span></div>
+            <div style="font-family:${MONO};font-weight:800;font-size:21px;color:${T.chalk}"><span title="${escHtml(t.short||'Us')}">${g.us}</span>&ndash;<span title="${escHtml(g.oppShort||g.opp||'Opp')}">${g.them}</span></div>
             <div style="font-size:9px;color:${T.sageDim};letter-spacing:.3px">${(t.short||"US")} &ndash; ${(g.oppShort||(g.opp||"OPP").slice(0,3)).toUpperCase()}</div></div>
           <span style="color:${T.lime};font-weight:800;font-size:18px">&rsaquo;</span></button>`;}).join("");
     const pastGamesCard=`<div class="frost-card" style="background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:16px 18px;display:flex;flex-direction:column;gap:9px">
@@ -4129,7 +4144,7 @@ function actionArea(){
     // Owner-only: approve parents/players as MEMBERS (team chat + photos + full updates). Fans who follow
     // only see scores/stats/viewer. Pending requests come in here for Approve / Deny.
     const membersSection = (owner && C&&C.enabled) ? (function(){
-      const esc=s=>(s==null?"":String(s)).replace(/</g,"&lt;");
+      const esc=escHtml; // was a local ad hoc escaper — see html-safe.js
       const reqs=(t.memberRequests||[]), mems=(t.members||[]);
       const reqRows=reqs.map(em=>`<div style="display:flex;align-items:center;gap:8px;background:${T.surface2};border:2px solid ${T.amber};border-radius:10px;padding:9px 12px">
           <span style="flex:1;min-width:0;font-size:14.5px;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(em)}</span>
@@ -4154,7 +4169,7 @@ function actionArea(){
     const secWrap=(inner)=>`<div style="width:100%;max-width:880px;margin:0 auto;display:flex;flex-direction:column;gap:12px">${inner}</div>`;
     if(teamTab==="roster"){
       const canMng=!(C&&C.enabled)||(window.cloudIsScorer&&window.cloudIsScorer(t));
-      const esc=s=>(s==null?"":String(s)).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+      const esc=escHtml; // was a local ad hoc escaper — see html-safe.js
       // ---- saved lineups card ----
       const LUs=teamLineups(t), actId=t.activeLineupId||(LUs[0]&&LUs[0].id);
       // v327: the whole card is now ONE tap target (open the lineup) — jford: with Make default/Print/
@@ -4191,7 +4206,7 @@ function actionArea(){
     if(teamTab==="lineupedit"){
       const lu=lineupById(t,editLineupId);
       if(!lu){ teamTab="roster"; return actionArea(); }
-      const esc=s=>(s==null?"":String(s)).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+      const esc=escHtml; // was a local ad hoc escaper — see html-safe.js
       lu.order=(lu.order||[]).filter(id=>t.players.some(p=>p.id===id));   // drop any released players
       const n=lu.order.length;
       const back=`<div class="frost-card" style="display:flex;align-items:center;gap:12px;background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:12px 14px">
@@ -4304,7 +4319,7 @@ function actionArea(){
     if(teamTab==="schedule") return `<div style="width:100%;max-width:1080px;margin:0 auto;display:flex;flex-direction:column;gap:14px">${secHdr("Schedule")}${scheduleSection}</div>`;
     if(teamTab==="gameview"){
       const g=(t.games||[]).find(x=>x.id===viewGameId);
-      const esc=s=>(s==null?"":String(s)).replace(/</g,"&lt;");
+      const esc=escHtml; // was a local ad hoc escaper — see html-safe.js
       if(!g) return secWrap(`${secHdr("Game")}<div style="font-size:13px;color:${T.sage};padding:8px">Game not found.</div>`);
       const _canEdit = !(window.Cloud&&window.Cloud.enabled&&window.Cloud.user) || (window.cloudCanManage&&window.cloudCanManage(t));
       // ===== EDIT a finished game: fix the final score, opponent, date, and the per-batter box score.
@@ -4423,7 +4438,7 @@ function actionArea(){
           ${showManage?hb("manage",IC('gear',26),"Team management"):""}
           ${hbAct("shareteam",IC('share',26),"Share &amp; invite","grid-column:1/-1")}
         </div>`;})()}
-        <button data-act="startteam" style="${bigBtn(t.color)}">${IC('<path d="M8 5l11 7-11 7z" fill="currentColor" stroke="none"/>')} Start game with ${t.short}</button>
+        <button data-act="startteam" style="${bigBtn(t.color)}">${IC('<path d="M8 5l11 7-11 7z" fill="currentColor" stroke="none"/>')} Start game with ${escHtml(t.short)}</button>
         <button data-act="lineupcard" style="${ghost};display:flex;align-items:center;justify-content:center;gap:9px">${ICN.doc} Lineup card (PDF)</button>
         <div style="display:flex;justify-content:flex-end;margin-top:2px">
           <button data-act="deleteteam" style="background:${T.out};border:2px solid #fff;color:#fff;border-radius:9px;padding:11px 18px;font-family:${MONO};font-size:13px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;box-shadow:0 4px 14px rgba(0,0,0,.5)">${IC('trash',14)} Delete team</button></div>
@@ -4453,7 +4468,7 @@ function actionArea(){
     // ---- OUR-team picker: pick from your saved teams (or make one). ----
     const sortedTeams=DB.teams.slice().sort((a,b)=>((a.name||"").toLowerCase()<(b.name||"").toLowerCase()?-1:1));
     const cards=sortedTeams.map(t=>{const R=teamRec(t),rec=R.w+"-"+R.l+(R.t?"-"+R.t:"");return `<button data-act="setteam" data-arg="${t.id}" data-tname="${(t.name||'').toLowerCase().replace(/"/g,'&quot;')}" style="display:flex;align-items:center;gap:12px;background:${T.surface};border:2px solid ${T.line};border-left:5px solid ${t.color};border-radius:10px;padding:12px 14px;text-align:left;width:100%">
-        <div style="flex:1;min-width:0"><div style="font-family:${MONO};font-size:17px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.name}</div>
+        <div style="flex:1;min-width:0"><div style="font-family:${MONO};font-size:17px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(t.name)}</div>
           <div style="font-family:${MONO};font-size:15px;font-weight:800;color:${t.color};margin-top:3px">${rec}</div></div>
         <span style="color:${t.color};font-weight:800;font-size:12px">PICK &rsaquo;</span></button>`;}).join("")
       ||`<div style="color:${T.sage};font-size:13px;text-align:center;padding:16px 8px;border:1px dashed ${T.line};border-radius:10px">No saved teams yet — create one below.</div>`;
@@ -4737,7 +4752,7 @@ function actionArea(){
           <button data-act="${setMode?"settingsdone":"gohome"}" style="${ghost};padding:9px 11px;flex:none">&lsaquo; ${setMode?"Done":"Home"}</button>
           <div style="flex:1;min-width:0;font-family:${MONO};font-size:23px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:${T.lime};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${setMode?"Game Settings":"New Game"}</div>${startTop}</div>`;
     const sideSel=`<div class="frost-card" style="background:${T.surface};border:2px solid ${T.line};border-radius:12px;padding:16px 20px;display:flex;flex-direction:column;gap:11px;box-shadow:0 2px 6px rgba(15,30,60,.07)">
-          <div style="font-weight:800;color:${T.ink};font-size:19px">Is ${OUR.name} home or away?</div>
+          <div style="font-weight:800;color:${T.ink};font-size:19px">Is ${escHtml(OUR.name)} home or away?</div>
           <div style="display:flex;gap:2px;background:${T.line};border:2px solid ${T.line};border-radius:11px;overflow:hidden">${sideBtn("home","Home")}${sideBtn("away","Away")}</div></div>`;
     const selStyle=`background:${T.surface2};border:2px solid ${T.line};color:${T.ink};border-radius:10px;padding:13px 12px;font-family:${MONO};font-size:16px;font-weight:800;outline:none;max-width:190px`;
     const curL=leagueById(G.league);
@@ -4843,7 +4858,7 @@ function actionArea(){
       return `<div class="frost-card" style="flex-shrink:0;display:flex;align-items:center;gap:10px;background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:10px 12px">
           <button data-act="lineupback" style="${ghost};padding:9px 13px;flex:none">&lsaquo; Back</button>
           <div style="flex:1;min-width:0"><div style="font-family:${MONO};font-size:20px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:${T.lime}">Lineups</div>
-            <div style="font-size:11px;color:${T.sage};margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${OPP.name} &middot; batting ${n} &middot; drag to reorder</div></div></div>
+            <div style="font-size:11px;color:${T.sage};margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(OPP.name)} &middot; batting ${n} &middot; drag to reorder</div></div></div>
         ${luToggle}
         <div style="flex-shrink:0;display:flex;gap:2px;background:${T.line};border:2px solid ${T.line};border-radius:9px;overflow:hidden">
           <button data-act="luview" data-arg="list" style="flex:1;background:${lineupView==="list"?T.lime:T.surface2};color:${lineupView==="list"?"#fff":T.sage};border:none;border-radius:0;padding:9px;font-family:${MONO};font-weight:800;font-size:13px;letter-spacing:.4px">${IC('list',15)} Batting order</button>
@@ -4904,7 +4919,7 @@ function actionArea(){
         ${moveHandle}
         ${numBadge}${_cur?curBadge:""}
         <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:7px">
-          <button data-act="editplayer" data-arg="${slot}" style="text-align:left;background:transparent;border:none;color:${T.chalk};font-size:20px;font-weight:700;display:flex;align-items:center;gap:9px;padding:0;min-width:0"><span style="font-family:${MONO};color:${OUR.color};flex:none">#${p.num}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.name}</span></button>
+          <button data-act="editplayer" data-arg="${slot}" style="text-align:left;background:transparent;border:none;color:${T.chalk};font-size:20px;font-weight:700;display:flex;align-items:center;gap:9px;padding:0;min-width:0"><span style="font-family:${MONO};color:${OUR.color};flex:none">#${escHtml(p.num)}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(p.name)}</span></button>
           <div style="display:flex;align-items:center;gap:9px">
             <button data-act="pickpos" data-arg="${slot}" style="background:${isP?OUR.color:T.surface2};border:2px solid ${isP?OUR.color:T.line};color:${isP?"#FFFFFF":T.chalk};border-radius:7px;padding:7px 14px;font-family:${MONO};font-size:16px;font-weight:800;min-width:54px;flex:none">${pos}</button>
             <span style="font-size:12px;color:${T.sageDim}">${isP?"Pitcher":(pos==="—"?"Tap to set position":"Fielding "+pos)}</span>
@@ -4912,15 +4927,15 @@ function actionArea(){
       return `<div data-row data-ri="${ri}" style="display:flex;align-items:center;gap:6px;background:${_rowBg};border:2px solid ${_sel?T.lime:_cur?T.lime:T.line};border-radius:9px;padding:8px 8px">
         ${moveHandle}
         ${numBadge}${_cur?curBadge:""}
-        <button data-act="editplayer" data-arg="${slot}" style="flex:1;min-width:0;text-align:left;background:transparent;border:none;color:${T.chalk};font-size:18px;font-weight:700;display:flex;align-items:center;gap:8px;overflow:hidden"><span style="font-family:${MONO};color:${OUR.color};min-width:34px">#${p.num}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.name}</span></button>
+        <button data-act="editplayer" data-arg="${slot}" style="flex:1;min-width:0;text-align:left;background:transparent;border:none;color:${T.chalk};font-size:18px;font-weight:700;display:flex;align-items:center;gap:8px;overflow:hidden"><span style="font-family:${MONO};color:${OUR.color};min-width:34px">#${escHtml(p.num)}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(p.name)}</span></button>
         <button data-act="pickpos" data-arg="${slot}" style="background:${isP?OUR.color:T.surface2};border:2px solid ${isP?OUR.color:T.line};color:${isP?"#FFFFFF":T.chalk};border-radius:7px;padding:8px 12px;font-family:${MONO};font-size:16px;font-weight:800;min-width:50px">${pos}</button></div>`;}).join("");
-    const bench=benchIdx().map(ri=>`<span style="font-family:${MONO};font-size:14px;color:${T.sage};background:${T.surface};border:2px solid ${T.line};border-radius:6px;padding:5px 10px;white-space:nowrap">#${ROSTER[ri].num} ${ROSTER[ri].name}</span>`).join(" ");
+    const bench=benchIdx().map(ri=>`<span style="font-family:${MONO};font-size:14px;color:${T.sage};background:${T.surface};border:2px solid ${T.line};border-radius:6px;padding:5px 10px;white-space:nowrap">#${escHtml(ROSTER[ri].num)} ${escHtml(ROSTER[ri].name)}</span>`).join(" ");
     const pit=playerAtPos("P");
     const n=G.lineup.order.length;
     return `<div class="frost-card" style="flex-shrink:0;display:flex;align-items:center;gap:10px;background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:10px 12px">
         <button data-act="lineupback" style="${ghost};padding:9px 13px;flex:none">&lsaquo; Back</button>
         <div style="flex:1;min-width:0"><div style="font-family:${MONO};font-size:20px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:${T.lime}">Lineups</div>
-          <div style="font-size:11px;color:${T.sage};margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${OUR.name} &middot; batting ${n}${n>9?" (continuous)":""} &middot; tap &#9776; to move</div></div></div>
+          <div style="font-size:11px;color:${T.sage};margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(OUR.name)} &middot; batting ${n}${n>9?" (continuous)":""} &middot; tap &#9776; to move</div></div></div>
       ${luToggle}
       <div style="flex-shrink:0;display:flex;gap:2px;background:${T.line};border:2px solid ${T.line};border-radius:9px;overflow:hidden">
         <button data-act="luview" data-arg="list" style="flex:1;background:${lineupView==="list"?T.lime:T.surface2};color:${lineupView==="list"?"#fff":T.sage};border:none;border-radius:0;padding:9px;font-family:${MONO};font-weight:800;font-size:13px;letter-spacing:.4px">${IC('list',15)} Batting order</button>
@@ -4928,7 +4943,7 @@ function actionArea(){
       ${lineupView==="field" ? fieldMapHtml() : `
       <div style="flex-shrink:0;display:flex;align-items:center;justify-content:space-between;background:${T.surface2};border:2px solid ${T.line};border-radius:9px;padding:9px 12px">
         <span style="font-size:14px;color:${T.sage}">Pitcher</span>
-        <button data-act="pickpitch" style="background:transparent;border:none;color:${T.chalk};font-size:18px;font-weight:700;display:flex;align-items:center;gap:8px">${pit?`<span style="font-family:${MONO};color:${OUR.color}">#${pit.num}</span>${pit.name}<span style="font-size:12px;color:${OUR.color};font-weight:700;margin-left:4px">CHANGE</span>`:`<span style="color:${T.sageDim}">— Tap to set pitcher</span>`}</button></div>
+        <button data-act="pickpitch" style="background:transparent;border:none;color:${T.chalk};font-size:18px;font-weight:700;display:flex;align-items:center;gap:8px">${pit?`<span style="font-family:${MONO};color:${OUR.color}">#${escHtml(pit.num)}</span>${escHtml(pit.name)}<span style="font-size:12px;color:${OUR.color};font-weight:700;margin-left:4px">CHANGE</span>`:`<span style="color:${T.sageDim}">— Tap to set pitcher</span>`}</button></div>
       <div id="lineup-list" style="flex:1 1 auto;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:6px">${rows}</div>
       <div style="flex-shrink:0;display:flex;gap:8px">
         <button data-act="addbatter" style="${ghost};flex:1" ${n>=12?"disabled":""}>+ Add batter (EH)</button>
@@ -4937,7 +4952,7 @@ function actionArea(){
         <div style="display:flex;flex-wrap:wrap;gap:5px">${bench||`<span style="font-size:12px;color:${T.sageDim}">No bench players</span>`}</div></div>
       ${(function(){ const ct=curTeam(); if(!ct)return ""; const sl=teamLineups(ct);
         return `<div style="flex-shrink:0;display:flex;gap:8px;align-items:center">
-          ${sl.length?`<div style="flex:1;min-width:0">${themedSelect("loadLineupSel",[{v:"",label:"↓ Load saved lineup…"}].concat(sl.map(l=>({v:l.id,label:l.name||"Lineup"}))),"",{onpick:"applySavedLineup",placeholder:"↓ Load saved lineup…",css:ghost+";width:100%;flex:1;text-transform:none;padding:11px;color:"+T.chalk+";display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer;text-align:left"})}</div>`:`<span style="flex:1;font-size:11px;color:${T.sageDim};padding:0 4px">No saved lineups yet for ${ct.short||ct.name}</span>`}
+          ${sl.length?`<div style="flex:1;min-width:0">${themedSelect("loadLineupSel",[{v:"",label:"↓ Load saved lineup…"}].concat(sl.map(l=>({v:l.id,label:l.name||"Lineup"}))),"",{onpick:"applySavedLineup",placeholder:"↓ Load saved lineup…",css:ghost+";width:100%;flex:1;text-transform:none;padding:11px;color:"+T.chalk+";display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer;text-align:left"})}</div>`:`<span style="flex:1;font-size:11px;color:${T.sageDim};padding:0 4px">No saved lineups yet for ${escHtml(ct.short||ct.name)}</span>`}
           <button data-act="savecurlineup" style="${ghost};flex:none;padding:11px 14px">Save as&hellip;</button></div>`; })()}
       <button data-act="lineupdone" style="${bigBtn(T.lime,"")}flex-shrink:0">Done</button>`;
   }
@@ -4946,7 +4961,7 @@ function actionArea(){
     const list=ROSTER.map((p,ri)=>{const inL=G.lineup.order.indexOf(ri),pos=posOfPlayer(ri),here=ri===cur;
       const tag=inL>=0?`bats ${inL+1}${pos?` · ${pos}`:""}`:"bench";
       return `<button data-act="setplayer" data-arg="${ri}" style="display:flex;justify-content:space-between;align-items:center;background:${here?T.surface2:T.surface};border:2px solid ${here?OUR.color:T.line};color:${T.chalk};border-radius:9px;padding:11px 13px;font-size:14px;font-weight:700">
-        <span style="display:flex;gap:9px;align-items:center"><span style="font-family:${MONO};color:${OUR.color};min-width:32px">#${p.num}</span>${p.name}</span>
+        <span style="display:flex;gap:9px;align-items:center"><span style="font-family:${MONO};color:${OUR.color};min-width:32px">#${escHtml(p.num)}</span>${escHtml(p.name)}</span>
         <span style="font-family:${MONO};font-size:11px;color:${T.sage}">${tag}</span></button>`;}).join("");
     return step(pitcherPick?"Pitching change":`Batting ${editSlot+1} — choose player`,
       pitcherPick?"Pick the new pitcher — a bench arm subs in for the current one.":"A bench player subs in; a starter swaps spots.",
@@ -5020,7 +5035,7 @@ function actionArea(){
     const maxI=Math.max(1,G.inning);
     const _vL=`border-right:1.5px solid ${T.line}`, _totL=`border-left:2px solid ${T.line}`;
     const lineHead=`<th style="text-align:left;padding:4px 6px;${_vL}">Team</th>`+Array.from({length:maxI},(_,i)=>`<th style="padding:10px 7px;${_vL}">${i+1}</th>`).join("")+`<th style="padding:10px 7px;${_totL}">R</th><th style="padding:10px 7px">H</th><th style="padding:10px 7px">E</th>`;
-    const lineRow=side=>{let c=`<td style="text-align:left;padding:4px 6px;font-weight:800;${_vL}">${TEAMS[side].short}</td>`;for(let i=1;i<=maxI;i++)c+=`<td style="padding:10px 7px;${_vL}">${(G.line[side]&&G.line[side][i])||0}</td>`;c+=`<td style="padding:10px 7px;font-weight:800;color:${T.ink};${_totL}">${box.totals[side].r}</td><td style="padding:10px 7px">${box.totals[side].h}</td><td style="padding:10px 7px">${box.totals[side].e}</td>`;return `<tr style="border-top:1.5px solid ${T.line}">${c}</tr>`;};
+    const lineRow=side=>{let c=`<td style="text-align:left;padding:4px 6px;font-weight:800;${_vL}">${escHtml(TEAMS[side].short)}</td>`;for(let i=1;i<=maxI;i++)c+=`<td style="padding:10px 7px;${_vL}">${(G.line[side]&&G.line[side][i])||0}</td>`;c+=`<td style="padding:10px 7px;font-weight:800;color:${T.ink};${_totL}">${box.totals[side].r}</td><td style="padding:10px 7px">${box.totals[side].h}</td><td style="padding:10px 7px">${box.totals[side].e}</td>`;return `<tr style="border-top:1.5px solid ${T.line}">${c}</tr>`;};
     // ----- Box score for EITHER team (toggle). selSide = the chosen team's batting side. -----
     const oppSide=G.ourSide==="home"?"away":"home";
     const selSide=summaryTeam==="us"?G.ourSide:oppSide;
@@ -6761,7 +6776,7 @@ window.openRulebook=function(src,title){
 function closeRules(){ const m=document.getElementById("rulesmodal"); if(m)m.style.display="none"; }
 window.rulesSearch=function(q){
   const body=document.getElementById("rulesBody"), cnt=document.getElementById("rulesCount"); if(!body||!_rulesParas)return;
-  const esc=s=>s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  const esc=escHtml; // was a local ad hoc escaper — see html-safe.js
   q=(q||"").trim();
   if(!q){ body.innerHTML=_rulesParas.map(p=>`<p style="margin:0 0 12px">${esc(p)}</p>`).join(""); if(cnt)cnt.textContent=_rulesParas.length+" sections"; body.scrollTop=0; return; }
   const ql=q.toLowerCase(); const re=new RegExp("("+q.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+")","ig");
