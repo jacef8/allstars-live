@@ -3879,12 +3879,6 @@ function actionArea(){
       // Title full-width on top; two equal tiles fill the rest evenly (no scrolling).
       // Solid tile heights (min-height, not flex:1) so they can never collapse on the tablet's
       // zoomed layout. The page scrolls if it's tight, instead of overlapping the logo.
-      const tile=(act,label,bg,fg,svg,sub)=>`<button data-act="${act}" style="min-height:clamp(150px,calc(var(--avh) * 26),220px);width:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:${bg};color:${fg};border:none;border-radius:16px;cursor:pointer;box-shadow:0 8px 22px rgba(0,0,0,.35)">
-          <svg viewBox="0 0 24 24" width="42" height="42" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${svg}</svg>
-          <span style="font-family:${MONO};font-weight:800;font-size:27px;letter-spacing:.6px">${label}</span>
-          ${sub?`<span style="font-size:13px;font-weight:600;opacity:.85">${sub}</span>`:""}</button>`;
-      const newTile=tile('newgamestart','New Game',T.lime,'#fff','<path d="M8 5l11 7-11 7z" fill="currentColor" stroke="none"/>','Score + stream a game');
-      const manageTile=tile('gototeams','Manage Teams',T.surface2,T.ink,'<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>','Rosters · records · stats');
       // Scroll a long team list in its own column. NOTE: use a JS-computed px max-height, NOT
       // `46vh` — in the Android WebView `vh` was resolving to 0px, collapsing this wrapper to
       // height:0 and clipping ALL team cards out of view (cards were in the DOM at top:428 but
@@ -3892,11 +3886,6 @@ function actionArea(){
       const teamsMaxH = Math.max(220, Math.round((window.innerHeight || 700) * 0.5));
       // Cards only (no "My teams" label) so the card tops line up with the New Game tile.
       const cardsGrid = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;align-content:start">${list.map(card).join("")}</div>`;
-      const rightCell = showTeams && DB.teams.length
-        ? `<div style="display:flex;flex-direction:column;gap:10px;min-height:0;flex:1">
-             <div style="flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;display:flex;flex-direction:column;gap:10px">${cardsGrid}</div>
-             <div style="flex:none">${manageBtn}</div></div>`
-        : manageTile;
       // Fill exactly the available height (no page scroll). The hero + tiles are fixed; the team
       // list flexes to fill what's left and scrolls INSIDE its own column if it's long.
       // New layout: a compact action ROW on top (normal-height buttons, not a giant tile), then
