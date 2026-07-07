@@ -102,7 +102,13 @@ service cloud.firestore {
           );
         }
         allow read:   if isMemberOfTeam();
-        allow create: if isMemberOfTeam() && request.resource.data.authorUid == request.auth.uid;
+        // Bound `text`/`authorName` server-side too — the app already truncates client-side
+        // (cloudSendMessage slices text to 2000 chars), but rules only checked authorUid before this,
+        // so anyone hitting the Firestore SDK directly with a valid member token (bypassing the app's
+        // own truncation) could push an unbounded string into every other member's live chat listener.
+        allow create: if isMemberOfTeam() && request.resource.data.authorUid == request.auth.uid
+          && request.resource.data.text is string && request.resource.data.text.size() <= 2000
+          && (!('authorName' in request.resource.data) || (request.resource.data.authorName is string && request.resource.data.authorName.size() <= 100));
         allow update: if false;
         allow delete: if request.auth != null &&
           (resource.data.authorUid == request.auth.uid || team().ownerUid == request.auth.uid);
@@ -120,7 +126,10 @@ service cloud.firestore {
           );
         }
         allow read:   if isMember();
-        allow create: if isMember() && request.resource.data.authorUid == request.auth.uid;
+        // Same server-side bound as chat messages — caption is client-truncated to 200 chars
+        // (cloudAddPhoto), but the rule itself didn't enforce that before this change.
+        allow create: if isMember() && request.resource.data.authorUid == request.auth.uid
+          && (!('caption' in request.resource.data) || (request.resource.data.caption is string && request.resource.data.caption.size() <= 200));
         allow update: if false;
         allow delete: if request.auth != null &&
           (resource.data.authorUid == request.auth.uid || pteam().ownerUid == request.auth.uid);
