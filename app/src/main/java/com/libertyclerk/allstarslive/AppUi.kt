@@ -44,4 +44,12 @@ object AppUi {
     private val _previewRect = MutableStateFlow<PreviewRect?>(null)
     val previewRect: StateFlow<PreviewRect?> = _previewRect
     fun setPreviewRect(r: PreviewRect?) { _previewRect.value = r }
+
+    /** Whether the scorebug overlay should be burned into the camera preview/broadcast. The web
+     *  owns this preference (a toggle next to "Hide video", persisted in localStorage) and pushes
+     *  it here via the JS bridge — same pattern as [setBroadcastMuted]-style prefs. Defaults to
+     *  visible so a fresh install/process restart never silently drops the bug. */
+    private val _bugVisible = MutableStateFlow(true)
+    val bugVisible: StateFlow<Boolean> = _bugVisible
+    fun setBugVisible(v: Boolean) { _bugVisible.value = v }
 }

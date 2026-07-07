@@ -2001,6 +2001,7 @@ let monitorOn=(()=>{try{ const p=new URLSearchParams(location.search); if(p.get(
 let viewMode=(()=>{try{ const p=new URLSearchParams(location.search); if(p.get("view")==="viewer") return "viewer"; return localStorage.getItem("al-view-mode")||"scorer";}catch(e){return "scorer";}})();  // "scorer" | "viewer"; shared links (?view=viewer) open as viewer
 let bcastMuted=(()=>{try{ return localStorage.getItem("al-bcast-mute")==="1"; }catch(e){ return false; }})();   // broadcast-audio mute (the YouTube audio is the tablet mic)
 let bcastCamAudio=(()=>{try{ return localStorage.getItem("al-bcast-camaudio")==="1"; }catch(e){ return false; }})();   // use the camera's audio (passthrough) instead of the tablet mic
+let bugVisible=(()=>{try{ return localStorage.getItem("al-bug-visible")!=="0"; }catch(e){ return true; }})();   // scorebug burned into the camera preview/broadcast — on by default, so a missing/corrupt pref never silently drops it
 let viewerRight=(()=>{try{return localStorage.getItem("al-viewer-right")||"field";}catch(e){return "field";}})();  // viewer + video on: which of field/feed is the big one
 let viewerPhone=(()=>{try{return localStorage.getItem("al-viewer-phone")||"both";}catch(e){return "both";}})();  // phone viewer: "both" | "field" (only) | "feed" (only)
 // Opened via a watch/share link → this person is ONLY a viewer (no scoring). Lock them to viewer
@@ -3086,6 +3087,12 @@ function monitorPane(){
   const endBtn=`<button data-act="appstop" title="End broadcast" style="height:32px;border-radius:8px;background:#FF3B5C;border:1px solid #FF3B5C;color:#fff;display:flex;align-items:center;justify-content:center;padding:0 12px;font-family:${SANS};font-weight:800;font-size:12px;cursor:pointer">End</button>`;
   const muteBtn=`<button data-act="mutebcast" title="${bcastMuted?'Broadcast audio is OFF — tap to unmute':'Mute the broadcast audio'}" style="${monBtn};${bcastMuted?'background:#FF3B5C;border-color:#FF3B5C':''}">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4z"/>${bcastMuted?'<path d="M22 9l-6 6M16 9l6 6"/>':'<path d="M15.5 8.5a5 5 0 0 1 0 7"/>'}</svg></button>`;
+  // Independent of "Hide video" (which hides the whole monitor pane) — this only strips the
+  // scorebug graphic from the camera preview + outgoing broadcast, camera feed stays up. (jford's
+  // "scorebug toggle" backlog item — the compositor already supported hiding it, nothing in the UI
+  // called that until now.)
+  const bugBtn=`<button data-act="togglebug" title="${bugVisible?'Scorebug is showing on the broadcast — tap to hide':'Scorebug is hidden from the broadcast — tap to show'}" style="${monBtn};${!bugVisible?'background:#FF3B5C;border-color:#FF3B5C':''}">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="14" width="18" height="7" rx="1.5"/><path d="M6.5 17.5h3M12 17.5h3"/>${!bugVisible?'<path d="M2 2l20 20"/>':''}</svg></button>`;
   const _audSrc=bcastMuted?"MUTED":(bcastCamAudio?"CAM":"MIC"), _audCol=bcastMuted?"#FF8F8F":(bcastCamAudio?"#8FE6A4":"#FFFFFF");
   const _audIco=bcastCamAudio?`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>`:`<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3"/></svg>`;
   // Audio-source badge on the live monitor: shows whether YouTube is getting the tablet MIC, the
@@ -3094,6 +3101,7 @@ function monitorPane(){
   const ctrls=`<div style="position:absolute;top:9px;right:10px;display:flex;gap:6px;z-index:3">
       ${audBadge}
       ${IS_APP&&appLive()?muteBtn:""}
+      ${IS_APP&&appLive()?bugBtn:""}
       ${IS_APP&&appLive()?endBtn:""}
       ${setGear}
       ${yt?ytMuteBtn():""}
@@ -6293,10 +6301,15 @@ document.getElementById("app").addEventListener("click",e=>{
   if(act==="fullscreen"){ const m=document.getElementById("monitor"); const r=m&&(m.requestFullscreen||m.webkitRequestFullscreen); if(r)r.call(m); return; }
   if(act==="ytopen"){ const ytv=streamYt(); if(ytv){ const u="https://www.youtube.com/watch?v="+encodeURIComponent(ytv); if(IS_APP&&window.AllStars.openExternal)AllStars.openExternal(u); else window.open(u,"_blank","noopener"); } return; }
   if(act==="bcasterr"){ const m=window.__bcastStatus||"Stream error"; try{ flash(m); }catch(e){} try{ alert("Stream error\n\n"+m); }catch(e){} return; }
-  if(act==="appgolive"){ try{ if(window.AllStars&&window.AllStars.setBroadcastMuted)window.AllStars.setBroadcastMuted(bcastMuted); }catch(e){} try{ if(window.AllStars&&window.AllStars.setUseCameraAudio)window.AllStars.setUseCameraAudio(bcastCamAudio); }catch(e){} try{ window.AllStars.requestGoLive(); }catch(e){} return; }
+  if(act==="appgolive"){ try{ if(window.AllStars&&window.AllStars.setBroadcastMuted)window.AllStars.setBroadcastMuted(bcastMuted); }catch(e){} try{ if(window.AllStars&&window.AllStars.setUseCameraAudio)window.AllStars.setUseCameraAudio(bcastCamAudio); }catch(e){} try{ if(window.AllStars&&window.AllStars.setBugVisible)window.AllStars.setBugVisible(bugVisible); }catch(e){} try{ window.AllStars.requestGoLive(); }catch(e){} return; }
   if(act==="togglecamaudio"){ bcastCamAudio=!bcastCamAudio; try{ localStorage.setItem("al-bcast-camaudio",bcastCamAudio?"1":"0"); }catch(e){} try{ if(window.AllStars&&window.AllStars.setUseCameraAudio)window.AllStars.setUseCameraAudio(bcastCamAudio); }catch(e){} flash(bcastCamAudio?"Broadcast audio: camera (beta)":"Broadcast audio: tablet mic"); render(); return; }
   if(act==="appstop"){ try{ window.AllStars.stopStream(); }catch(e){} return; }
   if(act==="mutebcast"){ bcastMuted=!bcastMuted; try{ localStorage.setItem("al-bcast-mute",bcastMuted?"1":"0"); }catch(e){} try{ if(window.AllStars&&window.AllStars.setBroadcastMuted)window.AllStars.setBroadcastMuted(bcastMuted); }catch(e){} flash(bcastMuted?"Broadcast audio muted":"Broadcast audio on"); render(); return; }
+  // Independent of "Hide video" (togglevideo, which hides the whole monitor pane) — this only
+  // strips the scorebug graphic from the camera preview + outgoing YouTube broadcast, camera feed
+  // stays up. render() re-fires AllStars.setScore() on every call, which redraws (or clears) the
+  // overlay immediately — no separate "push current score now" step needed.
+  if(act==="togglebug"){ bugVisible=!bugVisible; try{ localStorage.setItem("al-bug-visible",bugVisible?"1":"0"); }catch(e){} try{ if(window.AllStars&&window.AllStars.setBugVisible)window.AllStars.setBugVisible(bugVisible); }catch(e){} flash(bugVisible?"Scorebug shown on broadcast":"Scorebug hidden from broadcast"); render(); return; }
   if(act==="setstream"){ openStream(); return; }
   if(act==="videosetup"){ if(IS_APP&&window.AllStars&&window.AllStars.openVideo){ try{AllStars.openVideo();}catch(e){} } else { openStream(); } return; }
   if(act==="savestream"){ saveStream(); return; }

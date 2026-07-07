@@ -179,6 +179,17 @@ private class ScorerBridge(private val appContext: Context) {
     @JavascriptInterface
     fun setBroadcastMuted(muted: Boolean) { main.post { Broadcast.setMuted(muted) } }
 
+    /** Show/hide the scorebug overlay on the camera preview + broadcast. The web owns the
+     *  preference (a toggle next to "Hide video") and calls this on toggle and when going live —
+     *  same pattern as [setBroadcastMuted]. Hiding clears the compositor immediately; showing it
+     *  again takes effect on the next setScore() call, which render() already fires on every
+     *  score/state change, so there's no separate "redraw now" path needed. */
+    @JavascriptInterface
+    fun setBugVisible(visible: Boolean) {
+        AppUi.setBugVisible(visible)
+        if (!visible) RtmpHub.videoCompositor?.setOverlay(null)
+    }
+
     @JavascriptInterface
     fun isBroadcastMuted(): Boolean = Broadcast.muted
 
@@ -218,6 +229,7 @@ private class ScorerBridge(private val appContext: Context) {
         inning: Int, topHalf: Boolean, balls: Int, strikes: Int, outs: Int,
     ) {
         val comp = RtmpHub.videoCompositor ?: return
+        if (!AppUi.bugVisible.value) { comp.setOverlay(null); return }
         val bmp = runCatching {
             buildScorebugOverlay(1280, 720, away, home, awayScore, homeScore, inning, topHalf, balls, strikes, outs, awayLogo, homeLogo)
         }.getOrNull() ?: return
