@@ -720,8 +720,30 @@ window.quickEditName=function(key,v){ const tg=_quickEditTarget(key); if(!tg)ret
 window.quickEditCommit=function(){ try{broadcast();}catch(e){} };   // push the edited name/number to the live scorebug once typing settles (onchange, not every keystroke)
 window.luName=function(v){const t=teamById(openTeamId);const lu=t&&lineupById(t,editLineupId);if(lu){lu.name=(v||"").trim()||"Lineup";saveDB();}};
 window.applySavedLineup=function(id){ if(!id)return; const t=curTeam(); const lu=t&&lineupById(t,id); const idx=lu&&lineupToIdx(t,lu);
-  if(idx&&idx.order.length>=9){ G.lineup={order:idx.order.slice(),pos:Object.assign({},idx.pos)}; t.activeLineupId=id; saveDB(); render(); try{broadcast();}catch(e){} }
-  else { try{alert("That lineup needs 9+ active players to load.");}catch(e){} render(); } };
+  if(idx&&idx.order.length>=9){
+    G.lineup={order:idx.order.slice(),pos:Object.assign({},idx.pos)}; t.activeLineupId=id; saveDB();
+    // If this loads mid-game (not just at setup), the batting-order pointers are raw indices into
+    // G.lineup.order — clamp them into the new order's range so a shorter reload can't leave them
+    // pointing past the end (an undefined "current batter").
+    const ordLen=G.lineup.order.length;
+    if(gameActive){ if(G.awayPtr>=ordLen)G.awayPtr=0; if(G.homePtr>=ordLen)G.homePtr=0; }
+    render(); try{broadcast();}catch(e){}
+    // Warn (don't block) if a saved position's player is no longer on the roster — the batting
+    // order still loaded fine, but that spot on the field needs a re-pick.
+    const missingPos=POSLIST.filter(P=>idx.pos[P]==null);
+    flash(missingPos.length ? "\""+(lu.name||"Lineup")+"\" loaded — "+missingPos.join("/")+" still needs a player" : "\""+(lu.name||"Lineup")+"\" loaded");
+  } else {
+    // alert() silently does nothing inside the native app's WebView (no WebChromeClient — see
+    // allstars-webview-confirm-trap) — this made a failed load look exactly like "loading a saved
+    // lineup doesn't work," with no error shown at all. flash() instead, and say how many of the
+    // saved players are actually gone rather than a generic "needs 9+" message.
+    const savedCount=lu?(lu.order||[]).length:0, keptCount=idx?idx.order.length:0, goneCount=Math.max(0,savedCount-keptCount);
+    const reason=!lu?"That lineup no longer exists"
+      :goneCount>0?goneCount+" of its "+savedCount+" player"+(savedCount===1?"":"s")+" "+(goneCount===1?"isn't":"aren't")+" on the roster anymore (need 9+ left)"
+      :"it was only saved with "+savedCount+" player"+(savedCount===1?"":"s")+" (need 9+)";
+    flash(lu ? "Can't load \""+(lu.name||"Lineup")+"\" — "+reason : reason);
+    render();
+  } };
 window.luSetPos=function(id,pos){const t=teamById(openTeamId);const lu=t&&lineupById(t,editLineupId);if(!lu)return; if(!lu.pos)lu.pos={};
   // clear this player's old position, free the chosen position from whoever held it, then assign
   Object.keys(lu.pos).forEach(P=>{if(lu.pos[P]===id)delete lu.pos[P];});
@@ -5984,12 +6006,28 @@ document.getElementById("app").addEventListener("click",e=>{
   // sheet (mobile ghost-click) — otherwise the modal flashes open and shuts. The Done button and a
   // deliberate later backdrop tap still close it.
   if(act==="correctclose"){ if(Date.now()-correctOpenAt<450) return; correctOpen=false; render(); return; }
-  if(act==="corr"){ const i=arg.indexOf(":"),f=arg.slice(0,i),d=+arg.slice(i+1); snapshot();
+  if(act==="corr"){
+    // Same ghost-click risk as the backdrop above (correctclose): if the long-press that opened
+    // this sheet lands on an inner button instead of the backdrop, it fires an unwanted correction
+    // right on open — worst when it's "half", since a mis-tap there used to silently swap which
+    // team is batting. Guard every correction tap the same window the backdrop already uses.
+    if(Date.now()-correctOpenAt<450) return;
+    const i=arg.indexOf(":"),f=arg.slice(0,i),d=+arg.slice(i+1); snapshot();
     if(f==="balls") G.balls=Math.max(0,Math.min(3,G.balls+d));
     else if(f==="strikes") G.strikes=Math.max(0,Math.min(2,G.strikes+d));
-    else if(f==="outs") G.outs=Math.max(0,Math.min(3,G.outs+d));
+    else if(f==="outs"){ G.outs=Math.max(0,Math.min(3,G.outs+d));
+      // Correcting outs UP to 3 must end the half right here — otherwise G.outs sits at 3 with
+      // nothing visibly different, and the NEXT unrelated play (a different batter's next pitch)
+      // trips flipIfNeeded()'s outs>=3 check and flips on a play that had nothing to do with it.
+      // That's a real cause of "the inning swapped when I didn't expect it."
+      if(G.outs>=3) flipIfNeeded(); }
     else if(f==="inning") G.inning=Math.max(1,G.inning+d);
-    else if(f==="half") G.half=(G.half==="T"?"B":"T");
+    // Flip the half the SAME way doFlip() does — clear outs/count/bases/per-half tallies — instead
+    // of just swapping the letter. A bare swap left the old half's count/baserunners attached to
+    // the new batting team, which read as "the inning flipped AND everything's wrong" (jford's
+    // "unwanted inning half-swap" report). This is a manual correction, so no run-cap/inning-bump
+    // logic and no inningend feed entry — just the letter plus the state that must follow it.
+    else if(f==="half"){ G.half=(G.half==="T"?"B":"T"); G.outs=0;G.balls=0;G.strikes=0;G.bases={1:null,2:null,3:null};G.halfRuns=0;G.halfPitches=0;G.halfHits=0;G.ab={pitches:[],loc:null}; }
     else if(f==="away"||f==="home"){ G[f]=Math.max(0,(G[f]||0)+d); if(!G.line)G.line={away:[],home:[]}; if(!G.line[f])G.line[f]=[]; G.line[f][G.inning]=Math.max(0,(G.line[f][G.inning]||0)+d); }
     else if(f==="pitch"){ if(!G.pitches)G.pitches={}; const k=currentPitcherKey(); G.pitches[k]=Math.max(0,(G.pitches[k]||0)+d); G.halfPitches=Math.max(0,(G.halfPitches||0)+d); }
     else if(f==="batter"){ const k=G.half==="T"?"awayPtr":"homePtr"; G[k]=Math.max(0,(G[k]||0)+d); G.balls=0; G.strikes=0; G.ab={pitches:[],loc:null}; }   // skip / go back a batter (C3) — fresh count
@@ -6393,7 +6431,7 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="setplayer"){const ri=+arg;if(editSlot===-1)makePitcher(ri);else assignSlot(editSlot,ri);mode="lineup";render();broadcast();}
   else if(act==="setpos"){assignPos(G.lineup.order[editSlot],arg);mode="lineup";render();broadcast();}
   else if(act==="backlineup"){mode="lineup";render();}
-  else if(act==="endinning")endInning();
+  else if(act==="endinning"){ confirmAct={title:"End "+(G.half==="T"?"Top":"Bottom")+" "+G.inning+"?",msg:"Closes out the half-inning early, at "+G.outs+" out"+(G.outs===1?"":"s")+". Use this for a walk-off or a missed 3rd out — otherwise just keep playing, it'll flip on its own. Undoable.",yes:"End inning",run:endInning}; render(); }
   else if(act==="endgame"){confirmAct={title:"End game?",msg:curTeam()?"This finishes the game and saves season stats to "+OUR.name+".":"This finishes the game.",yes:"End game",danger:true,run:endGame};render();}
   else if(act==="confirm-no"){confirmAct=null;render();}
   else if(act==="confirm-yes"){const r=confirmAct&&confirmAct.run;confirmAct=null;if(r)r();else render();}
