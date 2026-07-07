@@ -97,6 +97,10 @@ dependencies {
     // QR generation for "use a phone as the camera" (Larix Grove deep-link → QR in camera setup).
     implementation("com.google.zxing:core:3.5.3")
 
+    // Keystore-backed encryption for CameraSettings' stored Wi-Fi passphrase (was plaintext
+    // SharedPreferences — a security audit flagged it as the one real secret-at-rest in the app).
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
+
     debugImplementation("androidx.compose.ui:ui-tooling")
 
     // Push notifications (FCM). NOTE: reliable registration also needs google-services.json + the
