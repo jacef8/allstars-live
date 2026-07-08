@@ -6769,7 +6769,19 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="playerback"){mode=(openPlayerFrom==="team"?"team":"home");if(mode==="team")teamTab="roster";render();}
   else if(act==="playertab"){playerTab=(arg==="schedule"?"schedule":"stats");render();}
   else if(act==="followplayer"){const i=arg.indexOf(":");toggleFollowPlayer(arg.slice(0,i),arg.slice(i+1));render();}
-  else if(act==="linkplayerprofile"){const i=arg.indexOf("|");linkPlayerToProfile(arg.slice(0,i),arg.slice(i+1));flash("Linked — combined stats now track together");render();}
+  else if(act==="linkplayerprofile"){
+    // Was just flashing a message and re-rendering the SAME player page — the linkCard DID update
+    // (to "Linked with..." + a View button), but that's a subtle change easy to miss, and the flash
+    // alone doesn't say what to do next. jford: "i see the link button but when i click it i dont
+    // really know what to do after that." Now jumps straight to the combined-stats page it just
+    // created — seeing the merged career totals immediately IS the confirmation it worked.
+    const i=arg.indexOf("|"), key=arg.slice(0,i), withKey=arg.slice(i+1);
+    linkPlayerToProfile(key,withKey);
+    const prof=profileForKey(key);
+    if(prof){ openProfileId=prof.id; mode="playerprofile"; flash("Linked — here's their combined career stats"); }
+    else flash("Linked");
+    render();
+  }
   else if(act==="unlinkplayerprofile"){unlinkFromProfile(arg);flash("Unlinked");render();}
   else if(act==="openplayerprofile"){openProfileId=arg;mode="playerprofile";render();}
   else if(act==="openfollowcal"){calYM=null;calSelDay=null;mode="followcal";render();}
@@ -7560,7 +7572,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v395";
+var APP_VERSION="v396";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
