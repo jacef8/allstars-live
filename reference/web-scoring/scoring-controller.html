@@ -2853,6 +2853,9 @@ window.applyCloudPrefs=function(p){ if(!p)return;
   // unfollow propagate: adopt the cloud list wholesale when it's at least as new as our local change.
   try{ if(Array.isArray(p.followPlayers)){ var cloudAt=+p.followAt||0, localAt=+(localStorage.getItem("al-follow-at")||0);
       if(cloudAt>=localAt){ localStorage.setItem("al-follow-players",JSON.stringify(p.followPlayers)); localStorage.setItem("al-follow-at",String(cloudAt)); } } }catch(e){}
+  // Player profiles — same last-write-wins pattern as follows themselves, just a second key.
+  try{ if(Array.isArray(p.playerProfiles)){ var cloudAt2=+p.playerProfilesAt||0, localAt2=+(localStorage.getItem("al-player-profiles-at")||0);
+      if(cloudAt2>=localAt2){ localStorage.setItem("al-player-profiles",JSON.stringify(p.playerProfiles)); localStorage.setItem("al-player-profiles-at",String(cloudAt2)); } } }catch(e){}
 };
 function loadCloudFloat(){ try{ if(!window.cloudLoadPrefs)return; window.cloudLoadPrefs().then(function(p){
     window.applyCloudPrefs(p);   // applies cloud→local when present + newer (safe on null)
@@ -3700,6 +3703,7 @@ let dirResults=null, viewTeam=null;
    t.season[pid] and their schedule is their team's schedule. Stored locally. Drives the player
    detail screen, the Home "Following" drawer, and the combined multi-player calendar. ---- */
 let openPlayer=null, openPlayerFrom="home", playerTab="stats";
+let openProfileId=null;   // mode==="playerprofile": which linked-player-profile is open
 let teamsOpen=(()=>{try{return localStorage.getItem("al-teams-open")!=="0";}catch(e){return true;}})();
 let followOpen=(()=>{try{return localStorage.getItem("al-follow-open")!=="0";}catch(e){return true;}})();
 let followHidden=(()=>{try{return JSON.parse(localStorage.getItem("al-follow-hidden")||"{}");}catch(e){return {};}})();
@@ -3708,6 +3712,76 @@ function setFollowKeys(a){var now=Date.now();try{localStorage.setItem("al-follow
 function isFollowingPlayer(tid,pid){return followKeys().indexOf(tid+":"+pid)>=0;}
 function toggleFollowPlayer(tid,pid){var k=tid+":"+pid,a=followKeys(),i=a.indexOf(k);if(i>=0)a.splice(i,1);else a.push(k);setFollowKeys(a);}
 function followedPlayers(){return followKeys().map(function(k){var i=k.indexOf(":"),t=teamById(k.slice(0,i));if(!t)return null;var p=(t.players||[]).find(function(x){return x.id===k.slice(i+1);});return p?{key:k,team:t,player:p}:null;}).filter(Boolean);}
+
+
+/* ===== Player profiles: link the SAME real kid across different teams/seasons/leagues, from the
+   PARENT's side — no cooperation from other coaches needed, since you're only linking roster entries
+   you can already see (your own teams, or any team you follow). jford: "if I am a parent and I would
+   like to see all time stats or progression from year to year... each coach may be brand new to my
+   child, but I still want to track their stats... in collaboration with their stats and information
+   in other leagues in different seasons and different years."
+   A profile is just {id, name, keys:[teamId:playerId, ...]} — a GROUPING over existing follow keys,
+   not a replacement for them. A key with no profile is implicitly its own group of one (nothing
+   changes for anyone who never links). Synced the same last-write-wins-by-timestamp way as follows
+   themselves (see setFollowKeys/applyCloudPrefs) so it survives across your devices. */
+function playerProfiles(){try{return JSON.parse(localStorage.getItem("al-player-profiles")||"[]");}catch(e){return [];}}
+function setPlayerProfiles(a){var now=Date.now();try{localStorage.setItem("al-player-profiles",JSON.stringify(a));localStorage.setItem("al-player-profiles-at",String(now));}catch(e){} try{ if(window.cloudSavePrefs)window.cloudSavePrefs({playerProfiles:a,playerProfilesAt:now}); }catch(e){}}
+function profileForKey(key){return playerProfiles().find(function(pr){return (pr.keys||[]).indexOf(key)>=0;})||null;}
+// Link `key` into the same profile as `withKey` (creating one from withKey's own key if it doesn't
+// have one yet). `key` is pulled out of any OTHER profile it was already in first, so it's never in two.
+function linkPlayerToProfile(key,withKey){
+  if(!key||!withKey||key===withKey)return;
+  var profs=playerProfiles().map(function(pr){return Object.assign({},pr,{keys:(pr.keys||[]).slice()});});
+  var existing=profs.find(function(pr){return pr.keys.indexOf(withKey)>=0;});
+  profs.forEach(function(pr){ var i=pr.keys.indexOf(key); if(i>=0 && pr!==existing)pr.keys.splice(i,1); });
+  profs=profs.filter(function(pr){return pr.keys.length>0;});
+  if(existing){ if(existing.keys.indexOf(key)<0)existing.keys.push(key); }
+  else{ var wp=followedPlayers().find(function(f){return f.key===withKey;});
+    profs.push({id:nextId("pp"),name:(wp&&wp.player&&(wp.player.name||"").trim())||"Player",keys:[withKey,key]}); }
+  setPlayerProfiles(profs);
+}
+// Remove `key` from whatever profile it's in. A profile down to 1 (or 0) member dissolves — a single
+// leftover key doesn't need a "profile", it's just a normal followed player again.
+function unlinkFromProfile(key){
+  var profs=playerProfiles().map(function(pr){return Object.assign({},pr,{keys:(pr.keys||[]).filter(function(k){return k!==key;})});}).filter(function(pr){return pr.keys.length>1;});
+  setPlayerProfiles(profs);
+}
+function renameProfile(id,name){
+  var profs=playerProfiles().map(function(pr){return pr.id===id?Object.assign({},pr,{name:(name||"").trim()||pr.name}):pr;});
+  setPlayerProfiles(profs);
+}
+// Pitching mirror of seasonStatsFor (batting) — per-player pitching totals for a season filter
+// ("all" or a year key), computed from the game log. Pitch rows only carry a name (no jersey number),
+// so matching is name-only, same fallback matchRosterPlayer already uses when a number isn't there.
+function pitchStatsFor(t,sel){
+  const map={};
+  (t&&t.games||[]).forEach(g=>{ if(sel!=="all" && gameSeason(g)!==sel) return;
+    const rows=(g.pitch&&g.pitch[g.ourSide])||[];
+    rows.forEach(x=>{ const nm=(x.name||"").trim().toLowerCase(); if(!nm)return;
+      const p=(t.players||[]).find(y=>(y.name||"").trim().toLowerCase()===nm); if(!p)return;
+      const m=map[p.id]||(map[p.id]={outs:0,h:0,r:0,bb:0,k:0});
+      m.outs+=(x.outs||0); m.h+=(x.h||0); m.r+=(x.r||0); m.bb+=(x.bb||0); m.k+=(x.k||0); }); });
+  return map;
+}
+// Combined career totals across EVERY team+player entry linked into a profile — the whole point of
+// this feature: a kid's stats from a team a totally different coach ran, three years ago, in a
+// different league, all rolled into one line. Also returns the per-entry breakdown for the season/
+// team-by-team view (each entry's own team name, season key, and that entry's own totals).
+function profileCareerStats(profile){
+  const bat={ab:0,r:0,h:0,rbi:0,bb:0,k:0,sb:0,cs:0}, pitch={outs:0,h:0,r:0,bb:0,k:0};
+  const rows=[];
+  (profile&&profile.keys||[]).forEach(function(key){
+    const i=key.indexOf(":"), t=teamById(key.slice(0,i)), pid=key.slice(i+1);
+    if(!t)return; const p=(t.players||[]).find(x=>x.id===pid); if(!p)return;
+    const b=seasonStatsFor(t,"all")[pid]||{ab:0,r:0,h:0,rbi:0,bb:0,k:0,sb:0,cs:0};
+    const pt=pitchStatsFor(t,"all")[pid]||{outs:0,h:0,r:0,bb:0,k:0};
+    ["ab","r","h","rbi","bb","k","sb","cs"].forEach(k=>bat[k]+=(b[k]||0));
+    ["outs","h","r","bb","k"].forEach(k=>pitch[k]+=(pt[k]||0));
+    const seasons=teamSeasons(t).filter(s=>s.count>0).map(s=>s.key);
+    rows.push({key,team:t,player:p,seasons:seasons.join(", ")||"—",bat:b,pitch:pt});
+  });
+  return {bat,pitch,rows};
+}
 // Upcoming games/practices (next 24h) for anyone followed — jford: "if a player has an activity such
 // as practice, scrimmage, game... within 24hrs or that day... the app shows that upcoming info."
 // Excludes archived (season-ended) teams, same as the Home "ended-season teams drop off Home" rule —
@@ -3862,15 +3936,34 @@ function actionArea(){
     // player on one shouldn't linger here forever with a stale team name once their season's over.
     // jford: "I'm good with the team name dropping from the player info on homescreen."
     const _fps=followedPlayers().filter(f=>!f.team.archived);
-    const followCard=f=>`<button data-act="openplayer" data-arg="${f.key}" style="display:flex;align-items:center;gap:${_w?14:11}px;width:100%;text-align:left;background:${T.surface};border:2px solid ${T.line};border-left:${_w?7:5}px solid ${playerHue(f.key)};border-radius:12px;padding:${_w?"15px 17px":"11px 13px"};cursor:pointer">
-        <span style="width:${_w?44:34}px;height:${_w?44:34}px;flex:none;border-radius:9px;background:${f.team.color};color:#fff;display:flex;align-items:center;justify-content:center;font-family:${MONO};font-weight:800;font-size:${_w?20:15}px">${(f.player.num||"–")}</span>
-        <div style="flex:1;min-width:0"><div style="font-weight:800;color:${T.ink};font-size:${_w?22:16}px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${(f.player.name||"Player").replace(/</g,"&lt;")}</div>
-          <div style="font-size:${_w?14:12}px;color:${T.sage}">${(f.team.name||"").replace(/</g,"&lt;")}</div></div>
-        <span style="color:${T.lime};font-weight:800;font-size:${_w?22:16}px">&rsaquo;</span></button>`;
-    const _followCount=watchedTeams.length+_fps.length;
+    // Group followed entries that are linked into the same player profile — jford's "track the same
+    // kid across teams/seasons" feature — so Home shows ONE row per real person, not one per team
+    // they've ever been rostered on. An entry with no profile just renders as it always has.
+    const _fpsGrouped=(()=>{ const seen={},out=[];
+      _fps.forEach(f=>{ const prof=profileForKey(f.key);
+        if(prof){ if(seen[prof.id])return; seen[prof.id]=true; out.push({profile:prof,primary:f}); }
+        else out.push({single:f}); });
+      return out; })();
+    const followCard=g=>{
+      if(g.profile){ const f=g.primary;
+        const teamNames=g.profile.keys.map(k=>{const i=k.indexOf(":"),ot=teamById(k.slice(0,i));return ot?(ot.short||ot.name||""):"";}).filter(Boolean);
+        return `<button data-act="openplayerprofile" data-arg="${g.profile.id}" style="display:flex;align-items:center;gap:${_w?14:11}px;width:100%;text-align:left;background:${T.surface};border:2px solid ${T.amber}88;border-left:${_w?7:5}px solid ${T.amber};border-radius:12px;padding:${_w?"15px 17px":"11px 13px"};cursor:pointer">
+            <span style="width:${_w?44:34}px;height:${_w?44:34}px;flex:none;border-radius:9px;background:${f.team.color};color:#fff;display:flex;align-items:center;justify-content:center;font-family:${MONO};font-weight:800;font-size:${_w?20:15}px">${(f.player.num||"–")}</span>
+            <div style="flex:1;min-width:0"><div style="font-weight:800;color:${T.ink};font-size:${_w?22:16}px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${(g.profile.name||"Player").replace(/</g,"&lt;")}</div>
+              <div style="font-size:${_w?14:12}px;color:${T.sage}">&#128279; ${teamNames.map(n=>n.replace(/</g,"&lt;")).join(" &middot; ")}</div></div>
+            <span style="color:${T.lime};font-weight:800;font-size:${_w?22:16}px">&rsaquo;</span></button>`;
+      }
+      const f=g.single;
+      return `<button data-act="openplayer" data-arg="${f.key}" style="display:flex;align-items:center;gap:${_w?14:11}px;width:100%;text-align:left;background:${T.surface};border:2px solid ${T.line};border-left:${_w?7:5}px solid ${playerHue(f.key)};border-radius:12px;padding:${_w?"15px 17px":"11px 13px"};cursor:pointer">
+          <span style="width:${_w?44:34}px;height:${_w?44:34}px;flex:none;border-radius:9px;background:${f.team.color};color:#fff;display:flex;align-items:center;justify-content:center;font-family:${MONO};font-weight:800;font-size:${_w?20:15}px">${(f.player.num||"–")}</span>
+          <div style="flex:1;min-width:0"><div style="font-weight:800;color:${T.ink};font-size:${_w?22:16}px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${(f.player.name||"Player").replace(/</g,"&lt;")}</div>
+            <div style="font-size:${_w?14:12}px;color:${T.sage}">${(f.team.name||"").replace(/</g,"&lt;")}</div></div>
+          <span style="color:${T.lime};font-weight:800;font-size:${_w?22:16}px">&rsaquo;</span></button>`;
+    };
+    const _followCount=watchedTeams.length+_fpsGrouped.length;
     const _twoCol = _w && _followCount>0;   // wide screens with something to follow → side-by-side teams|following
     const _subHd=`font-size:${_w?14:11}px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.sageDim};margin:0 2px ${_w?9:7}px`;
-    const _followContent=`${watchedTeams.length?`<div style="${_subHd}">Teams I'm watching</div><div style="display:flex;flex-direction:column;gap:10px;margin-bottom:${_fps.length?12:0}px">${watchedTeams.map(t=>card(t,true)).join("")}</div>`:""}${_fps.length?`<div style="${_subHd}">Players I'm following</div><div style="display:flex;flex-direction:column;gap:${_w?10:8}px">${_fps.map(followCard).join("")}<button data-act="openfollowcal" style="${ghost};display:flex;align-items:center;justify-content:center;gap:9px;margin-top:2px;${_w?"font-size:15px;padding:13px":""}">${IC('calendar',_w?20:18)} Players calendar</button></div>`:""}`;
+    const _followContent=`${watchedTeams.length?`<div style="${_subHd}">Teams I'm watching</div><div style="display:flex;flex-direction:column;gap:10px;margin-bottom:${_fpsGrouped.length?12:0}px">${watchedTeams.map(t=>card(t,true)).join("")}</div>`:""}${_fpsGrouped.length?`<div style="${_subHd}">Players I'm following</div><div style="display:flex;flex-direction:column;gap:${_w?10:8}px">${_fpsGrouped.map(followCard).join("")}<button data-act="openfollowcal" style="${ghost};display:flex;align-items:center;justify-content:center;gap:9px;margin-top:2px;${_w?"font-size:15px;padding:13px":""}">${IC('calendar',_w?20:18)} Players calendar</button></div>`:""}`;
     // Phone: cap the open Following drawer so a long watched-teams + followed-players list scrolls INSIDE
     // it (jford's wasn't scrolling). JS px — vh/--avh resolve to 0 in the Android WebView. Wide keeps the
     // full list (it scrolls in its own right-hand column).
@@ -4866,6 +4959,33 @@ function actionArea(){
         <button data-act="followplayer" data-arg="${t.id}:${p.id}" title="${following?"Following":"Follow this player"}" style="background:none;border:none;color:${following?T.amber:T.sageDim};line-height:1;padding:4px;cursor:pointer">${following?IC('starFill',26):IC('star',26)}</button></div>`;
     const tab=(id,lbl)=>`<button data-act="playertab" data-arg="${id}" style="flex:1;background:${playerTab===id?T.lime:T.surface2};color:${playerTab===id?"#fff":T.sage};border:2px solid ${playerTab===id?T.lime:T.line};border-radius:9px;padding:10px;font-family:${MONO};font-weight:800;font-size:14px;letter-spacing:.4px;text-transform:uppercase">${lbl}</button>`;
     const tabs=`<div style="display:flex;gap:8px">${tab("stats","Stats")}${tab("schedule","Schedule")}</div>`;
+    // Link this roster entry to the SAME real kid tracked on another team/season — jford: "how do we
+    // track players from season to season... in collaboration with their stats and information in
+    // other leagues in different seasons and different years." Only offered once you're following
+    // this entry (linking an entry you're not tracking at all doesn't make sense yet).
+    const key=t.id+":"+p.id;
+    const profile=following?profileForKey(key):null;
+    const linkCard=!following?"":(()=>{
+      if(profile){
+        const others=profile.keys.filter(k=>k!==key).map(k=>{ const i=k.indexOf(":"),ot=teamById(k.slice(0,i)); return ot?(ot.name||"a team"):"a team"; });
+        return `<div class="frost-card" style="background:${T.surface};border:2px solid ${T.amber};border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:8px">
+            <div style="font-size:13px;font-weight:800;color:${T.amber}">&#128279; Linked with ${others.length} other team entr${others.length===1?"y":"ies"}</div>
+            <div style="font-size:12.5px;color:${T.sage}">${others.map(n=>n.replace(/</g,"&lt;")).join(", ")}</div>
+            <div style="display:flex;gap:8px">
+              <button data-act="openplayerprofile" data-arg="${profile.id}" style="${ghost};flex:1;padding:9px;font-size:13px">View combined stats</button>
+              <button data-act="unlinkplayerprofile" data-arg="${key}" style="background:none;border:2px solid ${T.out};color:${T.out};border-radius:9px;padding:9px 13px;font-weight:700;font-size:13px">Unlink</button>
+            </div></div>`;
+      }
+      const others=followedPlayers().filter(f=>f.key!==key);
+      if(!others.length)return "";
+      const rows=others.map(f=>`<button data-act="linkplayerprofile" data-arg="${key}|${f.key}" style="display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:${T.surface2};border:2px solid ${T.line};border-radius:9px;padding:9px 12px">
+          <span style="flex:1;min-width:0"><span style="font-weight:700;color:${T.ink};font-size:13.5px">#${f.player.num||"–"} ${(f.player.name||"").replace(/</g,"&lt;")}</span><span style="display:block;font-size:11.5px;color:${T.sageDim}">${(f.team.name||"").replace(/</g,"&lt;")}</span></span>
+          <span style="color:${T.lime};font-weight:700;font-size:12px">Link &rsaquo;</span></button>`).join("");
+      return `<div class="frost-card" style="background:${T.surface};border:2px solid ${T.line};border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:8px">
+          <div style="font-size:13px;font-weight:800;color:${T.lime}">Same kid as someone you already follow?</div>
+          <div style="font-size:12px;color:${T.sageDim}">Link them so stats and Following carry across teams/seasons.</div>
+          <div style="display:flex;flex-direction:column;gap:6px">${rows}</div></div>`;
+    })();
     let body;
     if(playerTab==="schedule"){
       body=calendarHtml(t);
@@ -4878,7 +4998,38 @@ function actionArea(){
           ${pitchBlk}
           <div style="font-size:12px;color:${T.sageDim};margin-top:12px">Season totals across ${(t.name||"the team").replace(/</g,"&lt;")}&#39;s scored games.</div></div>`;
     }
-    return `<div style="display:flex;flex-direction:column;gap:12px">${head}${tabs}${body}</div>`;
+    return `<div style="display:flex;flex-direction:column;gap:12px">${head}${linkCard}${tabs}${body}</div>`;
+  }
+  if(mode==="playerprofile"){
+    const profile=(playerProfiles()||[]).find(pr=>pr.id===openProfileId);
+    if(!profile){ mode="home"; return actionArea(); }
+    const cs=profileCareerStats(profile);
+    const b=cs.bat, avg=b.ab?(b.h/b.ab).toFixed(3).replace(/^0/,""):"—";
+    const pt=cs.pitch, ip=Math.floor(pt.outs/3)+"."+(pt.outs%3);
+    const stat=(l,v)=>`<div style="flex:1;min-width:64px;background:${T.surface2};border:2px solid ${T.line};border-radius:10px;padding:10px 6px;text-align:center"><div style="font-family:${MONO};font-size:23px;font-weight:800;color:${T.ink}">${v}</div><div style="font-size:11px;font-weight:800;letter-spacing:.5px;color:${T.sageDim};margin-top:2px">${l}</div></div>`;
+    const head=`<div class="frost-card" style="display:flex;align-items:center;gap:10px;background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:12px 14px">
+        <button data-act="gohome" style="${ghost};padding:9px 13px;flex:none">&lsaquo; Home</button>
+        <div style="flex:1;min-width:0">
+          <div style="font-family:${MONO};font-size:20px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${(profile.name||"Player").replace(/</g,"&lt;")}</div>
+          <div style="font-size:12px;color:${T.sage}">Career &middot; ${cs.rows.length} team${cs.rows.length===1?"":"s"}</div></div></div>`;
+    const pitchBlk=(pt.outs||pt.k||pt.bb||pt.h||pt.r)?`<div style="font-size:13.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin:14px 0 10px">Career &middot; Pitching</div><div style="display:flex;flex-wrap:wrap;gap:8px">${stat("IP",ip)}${stat("K",pt.k)}${stat("BB",pt.bb)}${stat("H",pt.h)}${stat("R",pt.r)}</div>`:"";
+    const totalsCard=`<div class="frost-card" style="background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:14px">
+        <div style="font-size:13.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin-bottom:10px">Career &middot; Batting</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px">${stat("AVG",avg)}${stat("AB",b.ab)}${stat("H",b.h)}${stat("R",b.r)}${stat("RBI",b.rbi)}${stat("BB",b.bb)}${stat("K",b.k)}</div>
+        ${pitchBlk}
+        <div style="font-size:12px;color:${T.sageDim};margin-top:12px">Combined across every linked team.</div></div>`;
+    const rowsHtml=cs.rows.map(r=>{
+      const rb=r.bat, ravg=rb.ab?(rb.h/rb.ab).toFixed(3).replace(/^0/,""):"—";
+      return `<button data-act="openplayer" data-arg="${r.team.id}:${r.player.id}" style="display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:${T.surface};border:2px solid ${r.team.color}66;border-left:5px solid ${r.team.color};border-radius:12px;padding:12px 14px">
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:800;color:${T.ink};font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${(r.team.name||"").replace(/</g,"&lt;")}</div>
+            <div style="font-size:12px;color:${T.sage}">${r.seasons} &middot; #${r.player.num||"–"} &middot; ${ravg} AVG, ${rb.h||0}H ${rb.rbi||0}RBI</div></div>
+          <span style="color:${T.lime};font-weight:800;font-size:16px">&rsaquo;</span></button>`;
+    }).join("");
+    const breakdownCard=`<div class="frost-card" style="background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:8px">
+        <div style="font-size:13.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime}">By team &amp; season</div>
+        ${rowsHtml}</div>`;
+    return `<div style="display:flex;flex-direction:column;gap:12px">${head}${totalsCard}${breakdownCard}</div>`;
   }
   if(mode==="followcal"){
     const fps=followedPlayers();
@@ -6617,6 +6768,9 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="playerback"){mode=(openPlayerFrom==="team"?"team":"home");if(mode==="team")teamTab="roster";render();}
   else if(act==="playertab"){playerTab=(arg==="schedule"?"schedule":"stats");render();}
   else if(act==="followplayer"){const i=arg.indexOf(":");toggleFollowPlayer(arg.slice(0,i),arg.slice(i+1));render();}
+  else if(act==="linkplayerprofile"){const i=arg.indexOf("|");linkPlayerToProfile(arg.slice(0,i),arg.slice(i+1));flash("Linked — combined stats now track together");render();}
+  else if(act==="unlinkplayerprofile"){unlinkFromProfile(arg);flash("Unlinked");render();}
+  else if(act==="openplayerprofile"){openProfileId=arg;mode="playerprofile";render();}
   else if(act==="openfollowcal"){calYM=null;calSelDay=null;mode="followcal";render();}
   else if(act==="calfollowtog"){followHidden[arg]=!followHidden[arg];try{localStorage.setItem("al-follow-hidden",JSON.stringify(followHidden));}catch(e){}render();}
   else if(act==="refresh"){ try{ if(window.cloudSyncTeams)cloudSyncTeams(); }catch(e){} flash("Refreshed"); render(); }
