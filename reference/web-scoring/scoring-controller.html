@@ -224,7 +224,7 @@
       <button data-act="sharecopy" style="flex:1;display:flex;align-items:center;justify-content:center;gap:8px;background:#324056;border:1px solid #4A5870;color:#EAEDF2;border-radius:10px;padding:13px;font-family:'Barlow',sans-serif;font-size:15px;font-weight:800;cursor:pointer">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#EAEDF2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>Copy</button>
     </div>
-    <button data-act="shareoverlay" title="For OBS / Streamlabs / vMix — a transparent scorebug to burn into a stream" style="width:100%;margin-top:8px;display:flex;align-items:center;justify-content:center;gap:7px;background:#1A2233;border:1px solid #2A3650;color:#B7C2D6;border-radius:10px;padding:11px;font-family:'Barlow',sans-serif;font-size:12.5px;font-weight:700;cursor:pointer">&#128250; Copy OBS overlay link</button>
+    <button id="shareOverlayBtn" data-act="shareoverlay" title="For OBS / Streamlabs / vMix — a transparent scorebug to burn into a stream" style="width:100%;margin-top:8px;display:flex;align-items:center;justify-content:center;gap:7px;background:#1A2233;border:1px solid #2A3650;color:#B7C2D6;border-radius:10px;padding:11px;font-family:'Barlow',sans-serif;font-size:12.5px;font-weight:700;cursor:pointer">&#128250; Copy OBS overlay link</button>
     <button data-act="closeshare" style="width:100%;margin-top:8px;background:transparent;border:none;color:#B7C2D6;padding:8px;font-family:'Barlow',sans-serif;font-size:13px;font-weight:700;cursor:pointer">Done</button>
   </div>
 </div>
@@ -1027,6 +1027,15 @@ function openMapLoc(loc){ loc=(loc||"").trim(); if(!loc)return;
   const url="https://www.google.com/maps/search/?api=1&query="+encodeURIComponent(loc);
   try{ if(IS_APP&&window.AllStars&&window.AllStars.openExternal){ window.AllStars.openExternal(url); return; } }catch(e){}
   try{ window.open(url,"_blank","noopener"); }catch(e){ try{ location.href=url; }catch(x){} }
+}
+// mailto:/sms: links don't open from inside the native tablet WebView — hand them to the OS via the
+// same bridge the scorer-invite flow already used (that flow worked; the share modal's Email/Text
+// buttons were a separate code path that never got this treatment, so they silently did nothing on
+// the tablet app). Browser fallback is location.href (not window.open — a new tab isn't the right
+// target for mailto:/sms:, unlike openMapLoc's http(s) links above).
+function openExternalUri(u){
+  try{ if(IS_APP&&window.AllStars&&window.AllStars.openExternal){ window.AllStars.openExternal(u); return true; } }catch(e){}
+  try{ location.href=u; return true; }catch(e){ return false; }
 }
 function fielderLabel(pos){const nm=fielderName(pos);return nm?`${nm} (${pos})`:`${pos} (${POSNUM[pos]})`;}
 /* ---- lineup edits ---- */
@@ -6236,8 +6245,8 @@ document.getElementById("app").addEventListener("click",e=>{
   if(act==="alertsilence"){ if(activeAlert)dismissedAlerts.add(activeAlert.key); activeAlert=null; render(); return; }
   if(act==="schedshare"){ const t=teamById(openTeamId); if(!t)return; const s=(t.schedule||[]).find(x=>x.id===arg);   // D1: share a watch link from the schedule
     const nm=(t.name||"our team"), opp=(s&&s.opp)?(" vs "+s.opp):"";
-    const url=appBaseUrl()+"?view=viewer&feed=1&watch="+encodeURIComponent(t.id+"-live")+"&team="+encodeURIComponent(t.id)+"&tn="+encodeURIComponent(t.short||t.name||"");
-    openShareLink({ url:url, title:"SHARE THE GAME", sub:'Opens the live scoreboard &amp; play-by-play — no login. Shows a "waiting" screen until you start, then goes live.',
+    const url=appBaseUrl()+"?view=viewer&feed=1&watch="+encodeURIComponent(t.id+"-live")+"&tn="+encodeURIComponent(t.short||t.name||"");
+    openShareLink({ url:url, title:"SHARE THE GAME", shareTitle:nm+opp, sub:'Opens the live scoreboard &amp; play-by-play — no login. Shows a "waiting" screen until you start, then goes live.',
       subject:"Watch "+nm+opp+" live", body:"Watch "+nm+opp+" live on All-Stars Live — no app or login needed, just tap the link:" }); return; }
   if(act==="schedstart"){ const t=teamById(openTeamId); if(!t)return; const s=(t.schedule||[]).find(x=>x.id===arg);
     newgameFrom="team"; selectTeam(t.id); G=initGame(); clearStaleStreamLink(); applyTeamDefaultRules(); loadTeamLineup(teamById(curTeamId)); hist=[];redoStack=[]; resetUI(); resetOpponent();
@@ -6362,13 +6371,12 @@ document.getElementById("app").addEventListener("click",e=>{
     // pre-filled with the join link — no extra copy step.
     const body="You're invited to join "+team+" on All-Stars Live (a free youth-baseball scoreboard). Open this link and sign in once to score games or follow the team: "+url;
     // mailto:/sms: don't open from inside the tablet WebView — hand them to the OS via the bridge.
-    const openExt=(u)=>{ try{ if(IS_APP&&window.AllStars&&window.AllStars.openExternal){ window.AllStars.openExternal(u); return true; } }catch(e){} try{ location.href=u; return true; }catch(e){ return false; } };
     try{ if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(url); }catch(e){}   // copy the link as a fallback
     if(isEmail){
-      openExt("mailto:"+encodeURIComponent(v)+"?subject="+encodeURIComponent("Join "+team+" on All-Stars Live")+"&body="+encodeURIComponent(body));
+      openExternalUri("mailto:"+encodeURIComponent(v)+"?subject="+encodeURIComponent("Join "+team+" on All-Stars Live")+"&body="+encodeURIComponent(body));
       flash("✓ "+v+" can now score · invite link copied, your email is opening");
     } else {
-      openExt("sms:"+encodeURIComponent(v.replace(/[^\d+]/g,""))+"?body="+encodeURIComponent(body));
+      openExternalUri("sms:"+encodeURIComponent(v.replace(/[^\d+]/g,""))+"?body="+encodeURIComponent(body));
       flash("✓ Invite link copied · opening a text to "+v);
     }
     e.value="";
@@ -6598,7 +6606,7 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="toggleteams"){teamsOpen=!teamsOpen;try{localStorage.setItem("al-teams-open",teamsOpen?"1":"0");}catch(e){}render();}
   else if(act==="togglefollow"){followOpen=!followOpen;try{localStorage.setItem("al-follow-open",followOpen?"1":"0");}catch(e){}render();}
   else if(act==="openplayer"){const i=arg.indexOf(":");openPlayer={teamId:arg.slice(0,i),pid:arg.slice(i+1)};openPlayerFrom=(mode==="team"?"team":"home");playerTab="stats";mode="player";render();}
-  else if(act==="shareplayer"){ const i=arg.indexOf(":"); const tt=teamById(arg.slice(0,i)); const pp=tt&&(tt.players||[]).find(x=>x.id===arg.slice(i+1)); const nm=pp?(("#"+(pp.num||"")+" "+(pp.name||"Player")).trim()):"this player"; const pn=pp?(pp.name||"this player"):"this player"; const tnm=tt?(tt.name||"the team"):"the team"; openShareLink({ url:appBaseUrl()+"?player="+encodeURIComponent(arg), title:"SHARE PLAYER", sub:"Opens "+nm.replace(/</g,"&lt;")+"&#39;s stats. The team must be Public (Team management &rarr; Discovery) for others to open it.", subject:pn+"'s stats on All-Stars Live", body:"See "+nm+" ("+tnm+") on All-Stars Live, a free youth-baseball app — batting & pitching stats, game log, and schedule. Tap to view:" }); }
+  else if(act==="shareplayer"){ const i=arg.indexOf(":"); const tt=teamById(arg.slice(0,i)); const pp=tt&&(tt.players||[]).find(x=>x.id===arg.slice(i+1)); const nm=pp?(("#"+(pp.num||"")+" "+(pp.name||"Player")).trim()):"this player"; const pn=pp?(pp.name||"this player"):"this player"; const tnm=tt?(tt.name||"the team"):"the team"; openShareLink({ url:appBaseUrl()+"?player="+encodeURIComponent(arg), title:"SHARE "+nm.toUpperCase().replace(/</g,"&lt;"), shareTitle:nm, sub:"Opens "+nm.replace(/</g,"&lt;")+"&#39;s stats. The team must be Public (Team management &rarr; Discovery) for others to open it.", subject:pn+"'s stats on All-Stars Live", body:"See "+nm+" ("+tnm+") on All-Stars Live, a free youth-baseball app — batting & pitching stats, game log, and schedule. Tap to view:" }); }
   else if(act==="playerback"){mode=(openPlayerFrom==="team"?"team":"home");if(mode==="team")teamTab="roster";render();}
   else if(act==="playertab"){playerTab=(arg==="schedule"?"schedule":"stats");render();}
   else if(act==="followplayer"){const i=arg.indexOf(":");toggleFollowPlayer(arg.slice(0,i),arg.slice(i+1));render();}
@@ -6621,12 +6629,12 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="newteam"){const t=newTeam("");openTeamId=t.id;teamTab="hub";openTeamFrom=(mode==="home"?"home":"teams");mode="team";render();}   // remember where we came from so Back returns there
   else if(act==="teamsback"){mode="teams";render();}
   else if(act==="deleteteam"){ const delId=openTeamId; const td=teamById(delId); if(!td)return; confirmAct={title:"Delete "+(td.name||"team")+"?",msg:"This removes the roster and all season stats and can't be undone.",yes:"Delete",danger:true,run:function(){ try{ if(window.cloudDeleteTeam)cloudDeleteTeam(delId); }catch(e){} DB.teams=DB.teams.filter(t=>t.id!==delId); if(curTeamId===delId)curTeamId=null; openTeamId=null; teamTab="hub"; saveDB(); mode="teams"; render(); }}; render(); }
-  else if(act==="shareapp"){ openShareLink({ url:appDownloadUrl(), title:"SHARE ALL-STARS LIVE",
+  else if(act==="shareapp"){ openShareLink({ url:appDownloadUrl(), title:"SHARE ALL-STARS LIVE", shareTitle:"All-Stars Live",
       sub:'Send the app to a coach, parent, or scorekeeper &mdash; <b style="color:#E11D2E">scan</b> or send the link.',
       subject:"Check out All-Stars Live",
       body:"All-Stars Live is a free youth-baseball app — keep score, live-stream games to YouTube with a scorebug, and let parents follow the team & chat. Get it here:" }); return; }
   else if(act==="shareteam"){ const t=teamById(openTeamId); if(!t)return; const url=appBaseUrl()+"?follow="+encodeURIComponent(openTeamId); const nm=(t.name||"our team"); const nmE=nm.replace(/</g,"&lt;");
-    openShareLink({ url:url, title:"SHARE "+nm.toUpperCase().replace(/</g,"&lt;"),
+    openShareLink({ url:url, title:"SHARE "+nm.toUpperCase().replace(/</g,"&lt;"), shareTitle:nm,
       sub:`Parents &amp; fans can <b style="color:#E11D2E">follow ${nmE}</b> — watch live &amp; chat (no scoring).`,
       subject:"Follow "+nm+" on All-Stars Live",
       body:nm+" posts live games on All-Stars Live, a free youth-baseball scoreboard app. Follow the team to watch games live, see the schedule, and join the team chat:" }); }
@@ -7082,10 +7090,11 @@ function appDownloadUrl(){ return "https://allstars-live.web.app/"; }
 let shareMode="feed";   // "feed" = scorebug + play-by-play only (no video); "video" = include the stream
 function shareUrl(){
   const base=appBaseUrl();
-  // Carry the team (id + short name) so a viewer who opens the link before the game starts sees a
-  // "waiting for <team>" lobby instead of a blank/Home screen.
+  // Carry the team's short name so a viewer who opens the link before the game starts sees a
+  // "waiting for <team>" lobby instead of a blank/Home screen. (Used to also carry &team=<id>, but
+  // nothing ever read that param — dead weight on every link, removed.)
   const t=teamById(openTeamId)||curTeam();
-  const teamQ=t?("&team="+encodeURIComponent(t.id)+"&tn="+encodeURIComponent(t.short||t.name||"")):"";
+  const teamQ=t?("&tn="+encodeURIComponent(t.short||t.name||"")):"";
   // CRITICAL: carry the live CLOUD GAME id (?watch=) so a fan on any network subscribes to the cloud
   // game and sees the live feed — not just the scorer's local relay. (Without this the shared viewer
   // sat on the "no game in progress" lobby even though the game was live.) Make sure the id exists for
@@ -7113,6 +7122,16 @@ function shareUrl(){
 let shareCtx=null;
 function openShareLink(ctx){ shareCtx=ctx||null; openShare(); }
 function curShareUrl(){ return shareCtx?shareCtx.url:shareUrl(); }
+// Resolves the cloud-game id the OBS overlay link should point at: prefer whatever's already in the
+// CURRENT share URL (the default game share, and a schedule-game share, both carry ?watch=), else
+// fall back to the scorer's own live game if one's active — the overlay's whole point is "show the
+// live scorebug," true regardless of which share screen got you here (App/Team/Player shares never
+// carry a watch id of their own). Returns null only when there's truly nothing live to show — was
+// silently producing a permanently-blank overlay link from those 3 screens before this fallback.
+function overlayWatchId(){
+  try{ const u=new URL(curShareUrl()); const w=u.searchParams.get("watch"); if(w)return w; }catch(e){}
+  return (gameActive&&G&&G.cloudId)?G.cloudId:null;
+}
 function openShare(){
   // Title + subtitle: game share by default, custom when sharing an invite/team link.
   const tEl=document.getElementById("qrTitle"), sEl=document.getElementById("qrSub");
@@ -7135,7 +7154,13 @@ function openShare(){
     try{ new QRCode(box,{text:url,width:220,height:220,colorDark:"#10141A",colorLight:"#FFFFFF",correctLevel:QRCode.CorrectLevel.M}); }
     catch(e){ box.style.background="transparent"; box.textContent="Couldn't render QR — copy the link below."; }
   } else { box.style.background="transparent"; box.textContent="QR didn't load — copy the link below."; }
-  const nb=document.getElementById("navShareBtn"); if(nb) nb.style.display = navigator.share ? "flex" : "none";
+  // Overlay button reflects whether it'll actually produce a working link right now (see
+  // overlayWatchId()) — dimmed + explained instead of silently copying a dead link on tap.
+  const ob=document.getElementById("shareOverlayBtn");
+  if(ob){ const has=!!overlayWatchId();
+    ob.style.opacity=has?"1":".5";
+    ob.title=has?"For OBS / Streamlabs / vMix — a transparent scorebug to burn into a stream":"No live game right now — start scoring first, then this link will work";
+  }
   document.getElementById("qrmodal").style.display="flex";
 }
 function closeShare(){ document.getElementById("qrmodal").style.display="none"; shareCtx=null; }
@@ -7147,10 +7172,15 @@ document.getElementById("qrmodal").addEventListener("click",e=>{
     const u=curShareUrl(); if(!u)return;
     const mt=(OUR.name||"Our team")+" vs "+(OPP.name||"Opponent");
     const subj=shareCtx?(shareCtx.subject||"All-Stars Live"):("Watch "+mt+" — live");
+    // Custom shareCtx bodies (app/team/player/schedule) already introduce "All-Stars Live" in their
+    // own first sentence — only append the generic tagline when they DON'T, instead of always
+    // restating it (was producing "All-Stars Live" 3x / the tagline twice in the same email).
+    const ctxBody=shareCtx?(shareCtx.body||""):"";
     const body=shareCtx
-      ? ((shareCtx.body||"")+"\n\n"+u+"\n\nAll-Stars Live is a free youth-baseball scoreboard app.")
+      ? (ctxBody+"\n\n"+u+(ctxBody.indexOf("All-Stars Live")>=0?"":"\n\nAll-Stars Live is a free youth-baseball scoreboard app."))
       : (mt+" is being scored live on All-Stars Live, a free youth-baseball scoreboard. Tap the link to follow the live score and play-by-play (and the video stream, if one is running):\n\n"+u);
-    location.href="mailto:?subject="+encodeURIComponent(subj)+"&body="+encodeURIComponent(body);
+    // mailto: doesn't open from inside the native tablet WebView — see openExternalUri().
+    openExternalUri("mailto:?subject="+encodeURIComponent(subj)+"&body="+encodeURIComponent(body));
   }
   else if(a.dataset.act==="sharetext"){
     const u=curShareUrl(); if(!u)return;
@@ -7160,9 +7190,13 @@ document.getElementById("qrmodal").addEventListener("click",e=>{
     // Prefer the OS share sheet — it carries the LINK into Messages/any app reliably (the raw sms: URI
     // drops the body on some phones). Fall back to a PLATFORM-AWARE sms: link: iOS Messages needs
     // `&body=`, Android needs `?body=` — using ?body= on iOS was why the link wasn't coming through.
-    if(navigator.share){ navigator.share({ title:(shareCtx?(shareCtx.title||"All-Stars Live"):mt), text:lead, url:u }).catch(function(){}); return; }
+    // shareTitle is the natural-case name for THIS share (e.g. a player's or team's actual name) —
+    // shareCtx.title is the ALL-CAPS modal heading ("SHARE PLAYER" etc.), never meant to be user-
+    // facing message copy, but was leaking straight into the OS share sheet's title field before this.
+    if(navigator.share){ navigator.share({ title:(shareCtx?(shareCtx.shareTitle||shareCtx.title||"All-Stars Live"):mt), text:lead, url:u }).catch(function(){}); return; }
     const isIOS=/iP(hone|ad|od)/.test(navigator.userAgent||"")||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
-    location.href="sms:"+(isIOS?"&":"?")+"body="+encodeURIComponent(body);
+    // sms: doesn't open from inside the native tablet WebView either — see openExternalUri().
+    openExternalUri("sms:"+(isIOS?"&":"?")+"body="+encodeURIComponent(body));
   }
   else if(a.dataset.act==="sharemode"){ shareMode=a.dataset.arg; openShare(); return; }
   else if(a.dataset.act==="sharecopy"){
@@ -7171,11 +7205,13 @@ document.getElementById("qrmodal").addEventListener("click",e=>{
     if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(u).then(done).catch(done); } else { done(); }
   }
   else if(a.dataset.act==="shareoverlay"){   // H1: the transparent OBS overlay = JUST the live data + overlay=1
-    let u=curShareUrl(); if(!u)return;
-    // The overlay renders only the scorebug, so strip the viewer/feed/video params — keep just ?watch= +
-    // overlay=1 for a short, reliable URL (no pointless YouTube id riding along).
-    try{ const _u=new URL(u); const w=_u.searchParams.get("watch"); u=_u.origin+_u.pathname+"?"+(w?("watch="+encodeURIComponent(w)+"&"):"")+"overlay=1"; }
-    catch(e){ u=u+(u.indexOf("?")>=0?"&":"?")+"overlay=1"; }
+    // Was always stripping curShareUrl() down to ?watch=+overlay=1 — but App/Team/Player shares have
+    // no watch id of their own, so this silently produced a permanently-blank overlay from those 3
+    // screens. overlayWatchId() falls back to the scorer's own live game when the current share
+    // context doesn't carry one; returns null only when there's truly nothing live.
+    const w=overlayWatchId();
+    if(!w){ flash("No live game right now — start scoring first, then this link will work"); return; }
+    const u=appBaseUrl()+"?watch="+encodeURIComponent(w)+"&overlay=1";
     const done=()=>{ const o=a.innerHTML; a.innerHTML="Overlay link copied &#10003;"; setTimeout(()=>{ a.innerHTML=o; },1700); };
     if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(u).then(done).catch(done); } else { done(); }
   }
