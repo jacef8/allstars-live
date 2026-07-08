@@ -777,11 +777,20 @@ const DESTNAME={1:"1st",2:"2nd",3:"3rd",4:"SCORED"};
 function zoneFromPoint(x,y){
   const dx=x-150,dy=250-y,dist=Math.hypot(dx,dy),ang=Math.atan2(dx,dy)*180/Math.PI;
   if(dist<24)return{pos:"C",zone:"to the catcher"};
-  if(dist<66&&Math.abs(ang)<18)return{pos:"P",zone:"to the pitcher"};
+  // Same self-consistency check as the infield fix below caught this too: the pitcher's own
+  // position-map dot sits at dist~74 from home, past the old <66 cutoff, so a tap right on the
+  // mound itself fell through to "up the middle" (2B) instead of crediting the pitcher.
+  if(dist<80&&Math.abs(ang)<18)return{pos:"P",zone:"to the pitcher"};
   // Infield catch-zone: a diamond around the infield. Sized generously (well past the base
   // paths) so a ball placed just BEHIND an infielder — e.g. in the 5.5/6 hole behind the SS —
   // still credits the infielder, not the outfielder standing further out.
-  const infield=(Math.abs(x-150)+Math.abs(y-186))<=104;
+  // jford: "trying to tap a ball to shortstop or second base, it was associating with third base
+  // or first base or the left/right fielder." Root cause, confirmed by checking what this function
+  // returns for a tap on each fielder's OWN position-map dot (fieldMapHtml's FXY coords, converted
+  // into this same 300x280 space): 1B/3B's own dot is Manhattan-distance 105 from (150,186) — one
+  // unit past the OLD <=104 cutoff — so tapping exactly on the 1B/3B fielder fell through to the
+  // outfield branch entirely (misread as "down the line"). Bumped to 130 for real margin.
+  const infield=(Math.abs(x-150)+Math.abs(y-186))<=130;
   if(!infield){ // outfield — the zones that matter
     if(cpMode()){ // COACH PITCH: FOUR outfielders — center splits into left-center / right-center
       if(ang<-30)return{pos:"LF",zone:"down the left-field line"};
@@ -799,10 +808,14 @@ function zoneFromPoint(x,y){
     if(ang<32) return{pos:"RF",zone:"to right field"};
     return{pos:"RF",zone:"down the right-field line"};
   }
-  // infield: fielder only, plain language
-  if(ang<-16)return{pos:"3B",zone:"to third base"};
-  if(ang<-2) return{pos:"SS",zone:"to shortstop"};
-  if(ang<14) return{pos:"2B",zone:"up the middle"};
+  // infield: fielder only, plain language. Boundaries are the ANGULAR MIDPOINTS between each
+  // fielder's own position-map dot (3B/SS/2B/1B sit at roughly -46.7/-16.9/+16.9/+46.7°, symmetric
+  // by design in fieldMapHtml's FXY table) — so SS and 2B each now get the full ~32° between
+  // themselves and their neighbor, instead of the old, badly lopsided -16/-2/14 split that gave
+  // SS only 14° and 2B only 16° while 3B/1B silently soaked up everything past that unbounded.
+  if(ang<-32)return{pos:"3B",zone:"to third base"};
+  if(ang<0)  return{pos:"SS",zone:"to shortstop"};
+  if(ang<32) return{pos:"2B",zone:"up the middle"};
   return{pos:"1B",zone:"to first base"};
 }
 const isOF=p=>["LF","CF","RF","LCF","RCF"].includes(p);   // LCF/RCF = coach-pitch 4th-outfielder spots
