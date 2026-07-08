@@ -3302,13 +3302,22 @@ function quickEditModal(){
 /* Inning log — totals by half-inning (pitches, runs, hits, LOB) for review. */
 function inningLogModal(){
   const log=G.innLog||[];
+  // Running per-team totals through each half (backlog: "inning log running totals") — each row
+  // used to show only that ONE half's isolated R/H/P, with no sense of how the game built up to
+  // that point (e.g. "away has 5 runs total after top 3" vs. just "top 3: 2 runs"). Walk the log in
+  // chronological order accumulating per-team sums, then attach each half's running total alongside
+  // its own tally — rendered newest-first below, same as before, just with more context per row.
+  const _cumR={},_cumH={},_cumP={};
+  const withCum=log.map(e=>{ const k=e.batteam; _cumR[k]=(_cumR[k]||0)+(e.runs||0); _cumH[k]=(_cumH[k]||0)+(e.hits||0); _cumP[k]=(_cumP[k]||0)+(e.pitches||0);
+    return Object.assign({},e,{cumR:_cumR[k],cumH:_cumH[k],cumP:_cumP[k]}); });
+  const curTeam=battingKey(), curCumR=(_cumR[curTeam]||0)+(G.halfRuns||0);
   const cur=`<div style="display:flex;align-items:center;justify-content:space-between;background:${T.surface2};border:1px dashed ${T.lime};border-radius:10px;padding:11px 13px">
       <span style="font-family:${MONO};font-size:14px;font-weight:800;color:${T.lime}">${G.half==="T"?"Top":"Bot"} ${G.inning} · now</span>
-      <span style="font-family:${MONO};font-size:13px;color:${T.sage}">${G.halfRuns||0} R · ${G.halfHits||0} H · ${G.halfPitches||0} P</span></div>`;
-  const rows=log.length?log.slice().reverse().map(e=>`
+      <span style="font-family:${MONO};font-size:13px;color:${T.sage}">${G.halfRuns||0} R · ${G.halfHits||0} H · ${G.halfPitches||0} P<span style="color:${T.sageDim}"> · ${TEAMS[curTeam].short} ${curCumR} total</span></span></div>`;
+  const rows=withCum.length?withCum.slice().reverse().map(e=>`
       <div style="display:flex;align-items:center;justify-content:space-between;background:${T.surface};border:2px solid ${T.line};border-radius:10px;padding:11px 13px">
         <span style="font-family:${MONO};font-size:14px;font-weight:800;color:${T.chalk}">${e.half==="T"?"Top":"Bot"} ${e.inning}<span style="color:${T.sage};font-weight:600;font-size:12px"> · ${TEAMS[e.batteam].short} batting</span></span>
-        <span style="font-family:${MONO};font-size:13px;color:${T.sage}">${e.runs} R · ${e.hits} H · ${e.pitches} P${e.lob?` · ${e.lob} LOB`:""}</span></div>`).join("")
+        <span style="font-family:${MONO};font-size:13px;color:${T.sage}">${e.runs} R · ${e.hits} H · ${e.pitches} P${e.lob?` · ${e.lob} LOB`:""}<span style="color:${T.sageDim}"> · ${e.cumR} total</span></span></div>`).join("")
     :`<div style="color:${T.sageDim};padding:14px;text-align:center">No completed innings yet.</div>`;
   // C5: in-game lineup/position changes recorded for the historical record.
   const esc=s=>(s==null?"":String(s)).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
