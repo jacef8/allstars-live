@@ -1162,6 +1162,18 @@ function moveLu(slot,dir){
   const tmp=ord[slot]; ord[slot]=ord[j]; ord[j]=tmp;
   luSelSlot=j; render(); broadcast();
 }
+// Jump a batter straight to a typed slot number — a REORDER (removes from its current slot, re-
+// inserts at the target, shifting everyone between the two by one), not a repeated swap. jford,
+// 2026-07-07: "might make it a little bit easier if you have a lot of adjustments to make a lot
+// less clicks up and down, up and down for each one of the batters." Keeps the up/down arrows too
+// — this is an addition, not a replacement, for a big single jump vs. fine 1-slot nudges.
+window.moveLuToSlot=function(slot,toSlot){
+  const ord=G.lineup.order;
+  toSlot=Math.max(0,Math.min(ord.length-1,toSlot));
+  if(toSlot===slot){ render(); return; }   // re-render to snap a bad typed value back to the current slot
+  const item=ord.splice(slot,1)[0]; ord.splice(toSlot,0,item);
+  luSelSlot=toSlot; render(); broadcast();
+};
 // Same tap-select + up/down pattern, for the SAVED-lineup builder screen (Team management → a named
 // lineup's own batting order) — a separate data model (lu.order, an array of PLAYER IDS keyed against
 // t.players) and a separate screen from the in-game one above, so it needed its own selection state
@@ -2978,7 +2990,14 @@ if(typeof window!=="undefined"){
 /* All-in-one broadcast monitor: the live feed (saved YouTube stream or ?yt=, else a
    placeholder) with the scorebug overlaid — exactly what streams to YouTube.
    This is the web mirror of the native tablet console (monitor + scorer in one). */
-function monitorPane(){
+function monitorPane(hideBug){
+  // hideBug: skip the scorebug overlay burned onto the video itself. Only the wide layouts that
+  // ALSO show a full scoreBar() right next to the monitor pass this — jford, 2026-07-07 (screenshot):
+  // "do we need both scoreboards on the screen in this view?" — no, the on-video overlay is a nice-
+  // to-have when the monitor is the ONLY scoreboard on screen (phone's video tab, an embedded real
+  // stream with nothing else nearby), but pure clutter once scoreBar() already covers it a few
+  // pixels away. Native (IS_APP) is unaffected — there the scorebug is composited server-side into
+  // the actual camera pixels, not drawn by this function at all.
   // In the app, the monitor is a TRANSPARENT region: the native layer draws the live
   // camera (with the scorebug already composited) behind the WebView, positioned to this
   // div's rect (see alignPreview). So the operator aims + confirms the feed right here —
@@ -3031,7 +3050,7 @@ function monitorPane(){
         <iframe id="ytembed" src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(_embedYt)}?autoplay=1&mute=${ytMuted?1:0}&playsinline=1&modestbranding=1&rel=0&${YT_CHROME_OFF}" allow="${YT_ALLOW}" allowfullscreen style="position:absolute;inset:0;width:100%;height:100%;border:0"></iframe>
         <div style="position:absolute;top:9px;left:10px;display:flex;align-items:center;gap:6px;background:rgba(8,11,16,.62);border-radius:999px;padding:4px 11px;z-index:3"><span style="width:8px;height:8px;border-radius:50%;background:${T.live};box-shadow:0 0 8px ${T.live}"></span><span style="font-family:${MONO};font-weight:800;font-size:11px;letter-spacing:1.6px;color:#fff">LIVE</span>${bugDelay?`<span style="font-family:${MONO};font-size:10px;font-weight:800;color:${T.amber};margin-left:3px">+${bugDelay}s</span>`:""}${viewer360?`<span style="font-family:${MONO};font-size:10px;font-weight:800;color:#7CC4FF;margin-left:3px">360° · drag</span>`:""}</div>
         <div style="position:absolute;top:9px;right:10px;display:flex;gap:6px;z-index:3">${setGear}${ytMuteBtn()}<button data-act="tventer" title="Full-screen TV mode" style="${_mb};width:auto;padding:0 11px;font-family:${MONO};font-weight:800;font-size:12px;letter-spacing:1px">TV</button>${canScoreNow()?`<button data-act="watchvidopen" title="Change video link / scorebug delay" style="${_mb}">${_linkIco}</button>`:""}</div>
-        <div style="position:absolute;left:8px;right:8px;bottom:8px;z-index:2;pointer-events:none">${statusBar()}</div>
+        ${hideBug?"":`<div style="position:absolute;left:8px;right:8px;bottom:8px;z-index:2;pointer-events:none">${statusBar()}</div>`}
       </div>`;
   }
   if(IS_APP){
@@ -3120,7 +3139,7 @@ function monitorPane(){
       ${feed}
       ${bareLiveDot}
       ${ctrls}
-      <div style="position:absolute;left:8px;right:8px;bottom:8px;z-index:2;pointer-events:none">${statusBar()}</div>
+      ${hideBug?"":`<div style="position:absolute;left:8px;right:8px;bottom:8px;z-index:2;pointer-events:none">${statusBar()}</div>`}
     </div>`;
 }
 
@@ -4920,7 +4939,7 @@ function actionArea(){
       if(!G.oppLineup)G.oppLineup=Array.from({length:Math.max(1,G.oppBatters)},(_,i)=>({num:String(i+1),name:""}));
       if(!G.oppLineup.some(e=>e&&e.pos))oppDefaultPositions();
       const L=oppList(), bench=oppBenchList(), n=L.length, pit=oppPitcher();
-      const orows=L.map((e,i)=>{ const pos=(e.pos)||"—",isP=pos==="P"; const nm=((e.name||"").trim())||"Hitter";
+      const orows=L.map((e,i)=>{ const pos=(e.pos)||"—",isP=pos==="P"; const nm=((e.name||"").trim())||"Player";   // was "Hitter" — home team's own default names already say "Player N" (line ~406); jford: "those should both say player, not one player and one hitter"
         if(narrow) return `<div data-opprow data-i="${i}" style="display:flex;align-items:center;gap:9px;background:${T.surface2};border:2px solid ${T.line};border-radius:10px;padding:10px 9px">
           <span data-oppdrag style="cursor:grab;color:${T.sageDim};display:flex;align-items:center;padding:6px 2px;touch-action:none">${IC('<path d="M4 7h16M4 12h16M4 17h16"/>')}</span>
           <span style="font-family:${MONO};font-size:18px;font-weight:800;color:${T.lime};width:20px;text-align:center;flex:none">${i+1}</span>
@@ -4980,9 +4999,16 @@ function actionArea(){
       const numBadge=`<button data-act="luselect" data-arg="${slot}" title="${_sel?"Deselect":"Select to move"}" style="background:transparent;border:none;font-family:${MONO};font-size:18px;font-weight:800;color:${T.lime};width:20px;text-align:center;flex:none;padding:0;cursor:pointer">${slot+1}</button>`;
       // Bumped from 26x22 to 44x36 per slot (44px = the standard minimum comfortable touch target) —
       // jford, 2026-07-06: "I like the buttons but they are too small."
+      // Typed "jump to slot" box between the arrows — for a big single move (e.g. slot 9 → slot 2)
+      // without repeated up/down taps. onchange (not oninput) so it only fires once the scorer's
+      // done typing, same reasoning as luPNum/luPName above never calling render() mid-keystroke.
+      const jumpBox=`<input type="text" inputmode="numeric" value="${slot+1}" title="Type a batting-order slot and press enter/tap away to jump there"
+          onchange="if(window.moveLuToSlot)moveLuToSlot(${slot},(parseInt(this.value,10)||${slot+1})-1)"
+          style="width:44px;height:30px;text-align:center;font-family:${MONO};font-weight:800;font-size:15px;color:${T.ink};background:${T.surface};border:2px solid ${T.line};border-radius:6px;padding:0">`;
       const moveHandle=_sel
-        ? `<div style="display:flex;flex-direction:column;gap:3px;flex:none">
+        ? `<div style="display:flex;flex-direction:column;gap:3px;flex:none;align-items:center">
             <button data-act="lumove" data-arg="${slot}:up" ${slot===0?"disabled":""} style="width:44px;height:36px;border-radius:8px 8px 0 0;background:${T.lime};border:none;color:#fff;display:flex;align-items:center;justify-content:center;opacity:${slot===0?.35:1};cursor:${slot===0?"default":"pointer"}">${IC('<path d="M18 15 12 9 6 15"/>',22)}</button>
+            ${jumpBox}
             <button data-act="lumove" data-arg="${slot}:down" ${slot===_n-1?"disabled":""} style="width:44px;height:36px;border-radius:0 0 8px 8px;background:${T.lime};border:none;color:#fff;display:flex;align-items:center;justify-content:center;opacity:${slot===_n-1?.35:1};cursor:${slot===_n-1?"default":"pointer"}">${IC('<path d="M6 9l6 6 6-6"/>',22)}</button>
           </div>`
         : `<button data-act="luselect" data-arg="${slot}" title="Select to move" style="cursor:pointer;color:${T.sageDim};background:transparent;border:none;display:flex;align-items:center;justify-content:center;width:44px;height:44px;flex:none">${IC('<path d="M4 7h16M4 12h16M4 17h16"/>',22)}</button>`;
@@ -5875,7 +5901,7 @@ function render(){
         ${viewerRight==="field"?fieldBig+feedBlock(false):feedBlock(true)+fieldThumb}</div>`;
     body=monitorOn
       ? `<div style="flex:1;min-height:0;display:flex;flex-direction:row;gap:12px">
-          <div style="flex:0 0 55%;max-width:55%;min-width:0;min-height:0;display:flex;flex-direction:column">${monitorPane()}</div>
+          <div style="flex:0 0 55%;max-width:55%;min-width:0;min-height:0;display:flex;flex-direction:column">${monitorPane(viewerRight==="field")}</div>
           ${rightCol}
         </div>`
       : `<div style="flex:1;min-height:0;display:flex;flex-direction:row;gap:12px">
@@ -5885,7 +5911,7 @@ function render(){
   } else if(wide && monitorOn){
     body=`<div id="console-row" style="flex:1;min-height:0;display:flex;flex-direction:row;gap:12px">
         <div id="mon-col" style="flex:0 0 64%;max-width:64%;min-width:0;min-height:0;display:flex;flex-direction:column;gap:10px">
-          ${monitorPane()}
+          ${monitorPane(!(focusPlay||floatActive))}
         </div>
         <div style="flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;gap:8px">
           ${(focusPlay||floatActive)?"":scoreBar()}${fieldEl}${floatActive?"":batterCard()}${actionEl}
