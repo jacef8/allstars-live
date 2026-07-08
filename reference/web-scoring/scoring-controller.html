@@ -3699,6 +3699,27 @@ function setFollowKeys(a){var now=Date.now();try{localStorage.setItem("al-follow
 function isFollowingPlayer(tid,pid){return followKeys().indexOf(tid+":"+pid)>=0;}
 function toggleFollowPlayer(tid,pid){var k=tid+":"+pid,a=followKeys(),i=a.indexOf(k);if(i>=0)a.splice(i,1);else a.push(k);setFollowKeys(a);}
 function followedPlayers(){return followKeys().map(function(k){var i=k.indexOf(":"),t=teamById(k.slice(0,i));if(!t)return null;var p=(t.players||[]).find(function(x){return x.id===k.slice(i+1);});return p?{key:k,team:t,player:p}:null;}).filter(Boolean);}
+// Upcoming games/practices (next 24h) for anyone followed — jford: "if a player has an activity such
+// as practice, scrimmage, game... within 24hrs or that day... the app shows that upcoming info."
+// Excludes archived (season-ended) teams, same as the Home "ended-season teams drop off Home" rule —
+// a wrapped-up season has nothing upcoming to surface anyway. Dedupes by team+schedule-entry id so two
+// followed players on the SAME team don't produce two rows for the same game.
+function upcomingFollowedActivity(){
+  const fps=followedPlayers().filter(f=>!f.team.archived); if(!fps.length)return [];
+  const now=Date.now(), windowMs=24*3600*1000, byKey={}, out=[];
+  fps.forEach(function(f){
+    const t=f.team; if(!Array.isArray(t.schedule))return;
+    t.schedule.forEach(function(s){
+      let when; try{ when=new Date((s.date||"")+"T"+(s.time||"23:59")).getTime(); }catch(e){ when=NaN; }
+      if(!when||isNaN(when)||when<now||when-now>windowMs)return;
+      const key=t.id+":"+s.id;
+      if(byKey[key]){ if(byKey[key].players.indexOf(f.player)<0)byKey[key].players.push(f.player); return; }
+      const entry={team:t,sched:s,when,players:[f.player]}; byKey[key]=entry; out.push(entry);
+    });
+  });
+  out.sort((a,b)=>a.when-b.when);
+  return out;
+}
 const FOLLOW_COLORS=["#E11D2E","#2E6BE6","#F0B43E","#19A0E0","#7C5CFF","#2EC98A","#E0974F","#EC4899"];
 function playerHue(key){var i=followKeys().indexOf(key);return FOLLOW_COLORS[(i<0?0:i)%FOLLOW_COLORS.length];}
 function calendarHtml(t){
@@ -3828,7 +3849,10 @@ function actionArea(){
       ? drawer("toggleteams","My teams ("+ownedTeams.length+")",teamsOpen,`<div style="max-height:${_phTeamsMaxH}px;overflow-y:auto;-webkit-overflow-scrolling:touch;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;align-content:start;padding-right:2px">${ownedTeams.map(card).join("")}</div>`)
       : "";
     // "Following" = watch-only teams (e.g. the competition) + individual players you follow.
-    const _fps=followedPlayers();
+    // Season-ended teams already drop off "My teams" on Home (see _activeTeams below) — a followed
+    // player on one shouldn't linger here forever with a stale team name once their season's over.
+    // jford: "I'm good with the team name dropping from the player info on homescreen."
+    const _fps=followedPlayers().filter(f=>!f.team.archived);
     const followCard=f=>`<button data-act="openplayer" data-arg="${f.key}" style="display:flex;align-items:center;gap:${_w?14:11}px;width:100%;text-align:left;background:${T.surface};border:2px solid ${T.line};border-left:${_w?7:5}px solid ${playerHue(f.key)};border-radius:12px;padding:${_w?"15px 17px":"11px 13px"};cursor:pointer">
         <span style="width:${_w?44:34}px;height:${_w?44:34}px;flex:none;border-radius:9px;background:${f.team.color};color:#fff;display:flex;align-items:center;justify-content:center;font-family:${MONO};font-weight:800;font-size:${_w?20:15}px">${(f.player.num||"–")}</span>
         <div style="flex:1;min-width:0"><div style="font-weight:800;color:${T.ink};font-size:${_w?22:16}px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${(f.player.name||"Player").replace(/</g,"&lt;")}</div>
@@ -3885,6 +3909,23 @@ function actionArea(){
           <span style="display:flex;align-items:center;gap:10px;min-width:0"><span style="width:10px;height:10px;border-radius:50%;flex:none;background:#E11D2E;box-shadow:0 0 7px #E11D2E"></span><span style="min-width:0"><span style="font-size:18px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block">${_esc(s.a||"")} ${s.as|0}–${s.hs|0} ${_esc(s.h||"")}</span><span style="font-size:13.5px;color:${T.sage}">${sub}</span></span></span>
           <span style="font-family:${MONO};font-size:15px;font-weight:800;color:${T.lime};white-space:nowrap;flex:none">Watch &rsaquo;</span></button>
         ${takeoverPill}${endPill}</div>`; }).join("");
+    // Upcoming (next 24h) games/practices for anyone followed — an amber "heads up" banner, separate
+    // from the red LIVE rows above, tapping it opens that team (jford's "upcoming game notification").
+    // This is an IN-APP banner, not a phone push notification — real push delivery is a separate,
+    // already-tracked TODO (see allstars-notifications memory) that needs FCM + a Cloud Function; this
+    // is the "the app shows that upcoming info" half, deliverable without any new backend.
+    const upcomingRows = upcomingFollowedActivity().map(function(u){
+      const isG=u.sched.type!=="practice";
+      const names=u.players.map(function(p){return (p.name||"Player").replace(/</g,"&lt;");}).join(", ");
+      const when=(()=>{ try{ const d=new Date(u.when), isToday=d.toDateString()===new Date().toDateString();
+        const t=u.sched.time?d.toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"}):"";
+        return (isToday?"Today":"Tomorrow")+(t?" · "+t:""); }catch(e){ return u.sched.date||""; } })();
+      const what=isG?("Game"+(u.sched.opp?(" vs "+(u.sched.opp||"").replace(/</g,"&lt;")):"")):"Practice";
+      return `<button data-act="opent" data-arg="${u.team.id}" style="display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:${T.surface};border:2px solid ${T.amber};border-radius:13px;padding:13px 16px;cursor:pointer">
+          <span style="width:10px;height:10px;border-radius:50%;flex:none;background:${T.amber};box-shadow:0 0 7px ${T.amber}"></span>
+          <span style="flex:1;min-width:0"><span style="font-size:16px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block">${what} &middot; ${names}</span><span style="font-size:13px;color:${T.sage}">${when} &middot; ${(u.team.name||"").replace(/</g,"&lt;")}</span></span>
+          <span style="font-family:${MONO};font-size:15px;font-weight:800;color:${T.amber};white-space:nowrap;flex:none">Details &rsaquo;</span></button>`;
+    }).join("");
     const newGameBtn = `<button data-act="newgamestart" style="${bigBtn(T.lime,"font-size:21px;padding:17px;border:2px solid rgba(255,255,255,.92);box-shadow:0 8px 22px rgba(225,29,46,.34)")}">${IC(PLAY)} New Game</button>`;
     const manageBtn = DB.teams.length
       ? `<button data-act="gototeams" style="${ghost};width:100%;padding:17px;font-size:17px;border:2px solid rgba(255,255,255,.55);color:${T.ink};display:flex;align-items:center;justify-content:center;gap:9px">${IC('<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>')} Manage teams &amp; rosters</button>`
@@ -3999,9 +4040,9 @@ function actionArea(){
       const _mid=_twoCol
         ? `<div style="flex:1;min-height:0;display:flex;gap:18px;align-items:flex-start">
              <div style="flex:1;min-width:0;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch">${_teamsDrawer}</div>
-             <div style="flex:1;min-width:0;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;display:flex;flex-direction:column;gap:10px">${liveRows?`<div style="flex:none;display:flex;flex-direction:column;gap:8px">${liveRows}</div>`:""}${followingBlock}</div>
+             <div style="flex:1;min-width:0;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;display:flex;flex-direction:column;gap:10px">${liveRows?`<div style="flex:none;display:flex;flex-direction:column;gap:8px">${liveRows}</div>`:""}${upcomingRows?`<div style="flex:none;display:flex;flex-direction:column;gap:8px">${upcomingRows}</div>`:""}${followingBlock}</div>
            </div>`
-        : `${liveRows?`<div style="flex:none;display:flex;flex-direction:column;gap:8px">${liveRows}</div>`:""}${teamsArea}`;
+        : `${liveRows?`<div style="flex:none;display:flex;flex-direction:column;gap:8px">${liveRows}</div>`:""}${upcomingRows?`<div style="flex:none;display:flex;flex-direction:column;gap:8px;margin-bottom:10px">${upcomingRows}</div>`:""}${teamsArea}`;
       // Share moved to a small button in the empty top strip (mirrors the Settings gear on the right).
       const _shareSvg=`<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="19" r="2.6"/><path d="M8.3 10.8 15.7 6.4M8.3 13.2l7.4 4.4"/></svg>`;
       const _topIcoBtn=`background:var(--chip);border:2px solid ${T.line};color:${T.chalk};border-radius:11px;width:44px;height:44px;display:flex;align-items:center;justify-content:center;cursor:pointer`;
@@ -4020,7 +4061,7 @@ function actionArea(){
           </div>
         </div>`;
     }
-    return `<div style="position:relative;min-height:100%;display:flex;flex-direction:column;padding:6px 0">${topRowPhone}<div style="flex:1;min-height:0;display:flex;flex-direction:column;justify-content:safe center;gap:14px;margin-top:8px">${hero}${resumeBtn}${liveRows}${newGameBtn}${showTeams?`<div style="flex:none">${teamsBlock}</div>`:""}${followingBlock?`<div style="flex:none">${followingBlock}</div>`:""}${showTeams?`<div style="flex:none">${manageBtn}</div>`:""}<div style="flex:none;display:flex;gap:2px;background:${T.line};border:2px solid ${T.line};border-radius:11px;overflow:hidden">${shareBtnHome}${shareAppBtn}</div>${authBar}</div></div>`;
+    return `<div style="position:relative;min-height:100%;display:flex;flex-direction:column;padding:6px 0">${topRowPhone}<div style="flex:1;min-height:0;display:flex;flex-direction:column;justify-content:safe center;gap:14px;margin-top:8px">${hero}${resumeBtn}${liveRows}${upcomingRows?`<div style="flex:none;display:flex;flex-direction:column;gap:8px">${upcomingRows}</div>`:""}${newGameBtn}${showTeams?`<div style="flex:none">${teamsBlock}</div>`:""}${followingBlock?`<div style="flex:none">${followingBlock}</div>`:""}${showTeams?`<div style="flex:none">${manageBtn}</div>`:""}<div style="flex:none;display:flex;gap:2px;background:${T.line};border:2px solid ${T.line};border-radius:11px;overflow:hidden">${shareBtnHome}${shareAppBtn}</div>${authBar}</div></div>`;
   }
   if(mode==="teams"){
     const sorted=DB.teams.slice().sort((a,b)=>(b.fav?1:0)-(a.fav?1:0));
