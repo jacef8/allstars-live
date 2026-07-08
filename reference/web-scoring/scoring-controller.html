@@ -5505,7 +5505,27 @@ let _fieldJustDragged=0;
 function setupFieldDrag(){
   const wrap=document.getElementById("fieldmap"); const bench=document.getElementById("fieldbench");
   if(!wrap)return;
-  const target=(x,y)=>{ const el=document.elementFromPoint(x,y); if(!el)return null; return el.closest('[data-fieldspot]')||(bench&&bench.contains(el)?bench:null); };
+  // "Position-change UX + snap area" (backlog): the old version only used elementFromPoint, an
+  // exact-pixel hit test against the small position pill (as narrow as 40px on a phone) — a
+  // fingertip that's even slightly off the pill's own rendered area landed on the diamond SVG
+  // instead and the drop silently did nothing. Close-together spots (SS/2B, 1B/3B) made this worse.
+  // Now: an exact hit still wins first (so overlapping elements like bench chips stay precise), but
+  // a near-miss snaps to whichever spot's CENTER is within SNAP_R px, not just whatever's literally
+  // under the pointer. Shared by both the live drag-highlight (move) and the actual drop (up), so
+  // the amber outline shown while dragging always matches where letting go will actually land.
+  const SNAP_R=52;
+  const target=(x,y)=>{
+    const el=document.elementFromPoint(x,y);
+    if(el){ const hit=el.closest('[data-fieldspot]'); if(hit)return hit; if(bench&&bench.contains(el))return bench; }
+    let best=null,bestD=SNAP_R;
+    wrap.querySelectorAll('[data-fieldspot]').forEach(s=>{
+      const r=s.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2,d=Math.hypot(x-cx,y-cy);
+      if(d<bestD){ bestD=d; best=s; }
+    });
+    if(best)return best;
+    if(bench){ const r=bench.getBoundingClientRect(); if(x>=r.left-20&&x<=r.right+20&&y>=r.top-20&&y<=r.bottom+20)return bench; }
+    return null;
+  };
   const clear=()=>{ wrap.querySelectorAll('[data-fieldspot]').forEach(s=>{ s.style.outline=''; }); if(bench)bench.style.outline=''; };
   const bind=(el,ri)=>{
     el.addEventListener('pointerdown',e=>{
