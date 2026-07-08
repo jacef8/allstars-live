@@ -6001,12 +6001,19 @@ function render(){
           ${feedPanel()}
         </div>`;
   } else if(wide && monitorOn){
+    // This branch is only ever reached with focusPlay===false (the wide&&focusPlay branch above
+    // takes priority and drops the monitor entirely for a full-width field whenever a play is
+    // actually being recorded) — so the diamond here is purely passive between-plays decoration
+    // (base runners already show in scoreBar()'s own small diamond). jford: "the right side scoring
+    // windows are too small... maybe we can remove the field map from that screen" — dropped it, and
+    // narrowed the monitor column (64%->56%) to give the scoreboard/batter card/buttons real room
+    // instead of ceding most of the width to video while idle between pitches.
     body=`<div id="console-row" style="flex:1;min-height:0;display:flex;flex-direction:row;gap:12px">
-        <div id="mon-col" style="flex:0 0 64%;max-width:64%;min-width:0;min-height:0;display:flex;flex-direction:column;gap:10px">
+        <div id="mon-col" style="flex:0 0 56%;max-width:56%;min-width:0;min-height:0;display:flex;flex-direction:column;gap:10px">
           ${monitorPane(!(focusPlay||floatActive))}
         </div>
-        <div style="flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;gap:8px">
-          ${(focusPlay||floatActive)?"":scoreBar()}${fieldEl}${floatActive?"":batterCard()}${actionEl}
+        <div style="flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;gap:10px;justify-content:center">
+          ${(focusPlay||floatActive)?"":scoreBar()}${floatActive?"":batterCard()}${actionEl}
         </div>
       </div>`;
   } else if(wide){
@@ -6727,7 +6734,7 @@ function setupGcDrag(){
    to a fixed position, snapped to an 8px grid. Buttons with no saved position stay in the top-row flow.
    Reset returns them all to the row. Persists per device (al-bar-layout / al-bar-order). Scoreboard +
    feed are untouched. _barPieces holds the current button HTML so the float layer can render them. */
-const BAR_DEFAULT=["videotoggle","share","sound","live","swap","undo","redo","gamemenu","home"];
+const BAR_DEFAULT=["videotoggle","share","sound","live","swap","undo","redo","correct","gamemenu","home"];
 let _barPieces={};
 function barOrder(){ let s=[]; try{ s=JSON.parse(localStorage.getItem("al-bar-order")||"[]"); }catch(e){}
   if(!Array.isArray(s))s=[]; const known=s.filter(k=>BAR_DEFAULT.includes(k));
@@ -6834,7 +6841,14 @@ function renderToolbar(){
     home:{t:"Home",i:IC('home',19)},
     endgame:{t:"End",i:IC('<rect x="6" y="6" width="12" height="12" rx="1.5"/>',17),ex:`color:${T.out};border-color:${T.out}`},
     undo:{t:"Undo",i:IC('undo',18),ex:`border-color:${T.lime};font-weight:800`},
-    redo:{t:"Redo",i:IC('redo',18)}
+    redo:{t:"Redo",i:IC('redo',18)},
+    // Correct the count/outs/score/inning — used to live ONLY as a pencil chip overlaid on the field
+    // diamond (fieldOverlays()), which just vanished from the wide+video console when the diamond was
+    // dropped from that idle-between-plays view. jford: "the edit button on the field map could be
+    // moved to the top row on tablets and pc's." Same action (correctopen), same idle-only
+    // availability the diamond chip always had (fieldOverlays() was hidden during active-play modes
+    // too) — just a stable, always-visible home instead of one tied to whether the diamond renders.
+    correctopen:{t:"Correct",i:IC('<path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/>',18)}
   };
   // Compact game controls: ICON-ONLY (44px) so all of them + the meta buttons fit on ONE row without
   // running off the edge. Undo keeps its label (most-used). Tooltips/aria-labels carry the names.
@@ -6893,7 +6907,7 @@ function renderToolbar(){
   // borrowed watch session (unsubscribes, drops the game) regardless of viewMode, it just never had
   // a reachable button outside the scorer's row.
   const barPieces={ videotoggle:vidToggle, share:shareBtnTop, sound:soundBtn, live:(viewMode==="viewer")?liveDot:"", swap:vsw,
-    undo:inCtl?gcBtn("undo"):"", redo:inCtl?gcBtn("redo"):"", gamemenu:inCtl?gameMenuBtn:"",
+    undo:inCtl?gcBtn("undo"):"", redo:inCtl?gcBtn("redo"):"", correct:inCtl?gcBtn("correctopen"):"", gamemenu:inCtl?gameMenuBtn:"",
     home:(inCtl||viewMode==="viewer"||viewerLocked)?gcBtn("home"):"" };
   _barPieces=barPieces;   // the float layer renders the moved-out buttons from this
   const wrap=k=>{ const html=barPieces[k]; if(!html)return"";
