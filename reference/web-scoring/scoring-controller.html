@@ -3952,18 +3952,24 @@ function actionArea(){
       return out; })();
     const followCard=g=>{
       if(g.profile){ const f=g.primary;
-        const teamNames=g.profile.keys.map(k=>{const i=k.indexOf(":"),ot=teamById(k.slice(0,i));return ot?((ot.short||ot.name||"")+(ot.archived?" (ended)":"")):"";}).filter(Boolean);
+        // Same rule as the solo row below: an ended team contributes no name at all, not even
+        // tagged — only ACTIVE teams get named here. If every linked team has ended, fall back to
+        // "Season ended" instead of an empty subtitle.
+        const activeNames=g.profile.keys.map(k=>{const i=k.indexOf(":"),ot=teamById(k.slice(0,i));return (ot&&!ot.archived)?(ot.short||ot.name||""):"";}).filter(Boolean);
+        const teamLine=activeNames.length?("&#128279; "+activeNames.map(n=>n.replace(/</g,"&lt;")).join(" &middot; ")):"Season ended";
         return `<button data-act="openplayerprofile" data-arg="${g.profile.id}" style="display:flex;align-items:center;gap:${_w?14:11}px;width:100%;text-align:left;background:${T.surface};border:2px solid ${T.amber}88;border-left:${_w?7:5}px solid ${T.amber};border-radius:12px;padding:${_w?"15px 17px":"11px 13px"};cursor:pointer">
             <span style="width:${_w?44:34}px;height:${_w?44:34}px;flex:none;border-radius:9px;background:${f.team.color};color:#fff;display:flex;align-items:center;justify-content:center;font-family:${MONO};font-weight:800;font-size:${_w?20:15}px">${(f.player.num||"–")}</span>
             <div style="flex:1;min-width:0"><div style="font-weight:800;color:${T.ink};font-size:${_w?22:16}px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${(g.profile.name||"Player").replace(/</g,"&lt;")}</div>
-              <div style="font-size:${_w?14:12}px;color:${T.sage}">&#128279; ${teamNames.map(n=>n.replace(/</g,"&lt;")).join(" &middot; ")}</div></div>
+              <div style="font-size:${_w?14:12}px;color:${T.sage}">${teamLine}</div></div>
             <span style="color:${T.lime};font-weight:800;font-size:${_w?22:16}px">&rsaquo;</span></button>`;
       }
-      const f=g.single, endedTag=f.team.archived?`<span style="color:${T.sageDim};font-weight:700"> &middot; Season ended</span>`:"";
+      // jford: "it should not show a team name under the names if that season has ended" — no team
+      // name AT ALL once archived (not even alongside a tag), just the plain "Season ended" line.
+      const f=g.single, subLine=f.team.archived?"Season ended":(f.team.name||"").replace(/</g,"&lt;");
       return `<button data-act="openplayer" data-arg="${f.key}" style="display:flex;align-items:center;gap:${_w?14:11}px;width:100%;text-align:left;background:${T.surface};border:2px solid ${T.line};border-left:${_w?7:5}px solid ${playerHue(f.key)};border-radius:12px;padding:${_w?"15px 17px":"11px 13px"};cursor:pointer">
           <span style="width:${_w?44:34}px;height:${_w?44:34}px;flex:none;border-radius:9px;background:${f.team.color};color:#fff;display:flex;align-items:center;justify-content:center;font-family:${MONO};font-weight:800;font-size:${_w?20:15}px">${(f.player.num||"–")}</span>
           <div style="flex:1;min-width:0"><div style="font-weight:800;color:${T.ink};font-size:${_w?22:16}px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${(f.player.name||"Player").replace(/</g,"&lt;")}</div>
-            <div style="font-size:${_w?14:12}px;color:${T.sage}">${(f.team.name||"").replace(/</g,"&lt;")}${endedTag}</div></div>
+            <div style="font-size:${_w?14:12}px;color:${T.sage}">${subLine}</div></div>
           <span style="color:${T.lime};font-weight:800;font-size:${_w?22:16}px">&rsaquo;</span></button>`;
     };
     const _followCount=watchedTeams.length+_fpsGrouped.length;
@@ -7578,7 +7584,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v398";
+var APP_VERSION="v399";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
