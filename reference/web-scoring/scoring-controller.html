@@ -3935,8 +3935,13 @@ function actionArea(){
     // Season-ended teams already drop off "My teams" on Home (see _activeTeams below) — a followed
     // player on one shouldn't linger here forever with a stale team name once their season's over.
     // jford: "I'm good with the team name dropping from the player info on homescreen."
-    const _fpsAll=followedPlayers();   // unfiltered — used only to detect "everything followed is on an ended team" so the section/Players-calendar entry point never fully vanishes (see _followContent below)
-    const _fps=_fpsAll.filter(f=>!f.team.archived);
+    // jford: "i dont see a way to get to my followed players" / "it still doesnt show the players im
+    // following" — an earlier version hid ended-season followed players from this list entirely
+    // (matching "the team name dropping from the player info"), but that turned out to mean losing
+    // access to them altogether once a season ended — the exact opposite of what player profiles
+    // exist for (tracking someone ACROSS ended seasons). Show everyone followed, always; an ended
+    // team just gets a plain "Season ended" tag instead of pretending the roster's still current.
+    const _fps=followedPlayers();
     // Group followed entries that are linked into the same player profile — jford's "track the same
     // kid across teams/seasons" feature — so Home shows ONE row per real person, not one per team
     // they've ever been rostered on. An entry with no profile just renders as it always has.
@@ -3947,37 +3952,24 @@ function actionArea(){
       return out; })();
     const followCard=g=>{
       if(g.profile){ const f=g.primary;
-        const teamNames=g.profile.keys.map(k=>{const i=k.indexOf(":"),ot=teamById(k.slice(0,i));return ot?(ot.short||ot.name||""):"";}).filter(Boolean);
+        const teamNames=g.profile.keys.map(k=>{const i=k.indexOf(":"),ot=teamById(k.slice(0,i));return ot?((ot.short||ot.name||"")+(ot.archived?" (ended)":"")):"";}).filter(Boolean);
         return `<button data-act="openplayerprofile" data-arg="${g.profile.id}" style="display:flex;align-items:center;gap:${_w?14:11}px;width:100%;text-align:left;background:${T.surface};border:2px solid ${T.amber}88;border-left:${_w?7:5}px solid ${T.amber};border-radius:12px;padding:${_w?"15px 17px":"11px 13px"};cursor:pointer">
             <span style="width:${_w?44:34}px;height:${_w?44:34}px;flex:none;border-radius:9px;background:${f.team.color};color:#fff;display:flex;align-items:center;justify-content:center;font-family:${MONO};font-weight:800;font-size:${_w?20:15}px">${(f.player.num||"–")}</span>
             <div style="flex:1;min-width:0"><div style="font-weight:800;color:${T.ink};font-size:${_w?22:16}px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${(g.profile.name||"Player").replace(/</g,"&lt;")}</div>
               <div style="font-size:${_w?14:12}px;color:${T.sage}">&#128279; ${teamNames.map(n=>n.replace(/</g,"&lt;")).join(" &middot; ")}</div></div>
             <span style="color:${T.lime};font-weight:800;font-size:${_w?22:16}px">&rsaquo;</span></button>`;
       }
-      const f=g.single;
+      const f=g.single, endedTag=f.team.archived?`<span style="color:${T.sageDim};font-weight:700"> &middot; Season ended</span>`:"";
       return `<button data-act="openplayer" data-arg="${f.key}" style="display:flex;align-items:center;gap:${_w?14:11}px;width:100%;text-align:left;background:${T.surface};border:2px solid ${T.line};border-left:${_w?7:5}px solid ${playerHue(f.key)};border-radius:12px;padding:${_w?"15px 17px":"11px 13px"};cursor:pointer">
           <span style="width:${_w?44:34}px;height:${_w?44:34}px;flex:none;border-radius:9px;background:${f.team.color};color:#fff;display:flex;align-items:center;justify-content:center;font-family:${MONO};font-weight:800;font-size:${_w?20:15}px">${(f.player.num||"–")}</span>
           <div style="flex:1;min-width:0"><div style="font-weight:800;color:${T.ink};font-size:${_w?22:16}px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${(f.player.name||"Player").replace(/</g,"&lt;")}</div>
-            <div style="font-size:${_w?14:12}px;color:${T.sage}">${(f.team.name||"").replace(/</g,"&lt;")}</div></div>
+            <div style="font-size:${_w?14:12}px;color:${T.sage}">${(f.team.name||"").replace(/</g,"&lt;")}${endedTag}</div></div>
           <span style="color:${T.lime};font-weight:800;font-size:${_w?22:16}px">&rsaquo;</span></button>`;
     };
-    // jford: "i dont see a way to get to my followed players" — when EVERY followed player's team
-    // has ended, _fpsGrouped (active-only) goes to 0, which used to make the whole section — AND its
-    // "Players calendar" button, the one other way to reach them — vanish entirely. That's a dead
-    // end: the whole point of player profiles is tracking someone ACROSS ended seasons, so hiding the
-    // only door to them once every season's ended defeats it. Section now stays up whenever there's
-    // ANYONE followed at all (active or not); only the row list itself is season-filtered.
-    const _followCount=watchedTeams.length+(_fpsGrouped.length||_fpsAll.length);
+    const _followCount=watchedTeams.length+_fpsGrouped.length;
     const _twoCol = _w && _followCount>0;   // wide screens with something to follow → side-by-side teams|following
     const _subHd=`font-size:${_w?14:11}px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.sageDim};margin:0 2px ${_w?9:7}px`;
-    const _followPlayersBlock=_fpsGrouped.length
-      ? `<div style="${_subHd}">Players I'm following</div><div style="display:flex;flex-direction:column;gap:${_w?10:8}px">${_fpsGrouped.map(followCard).join("")}<button data-act="openfollowcal" style="${ghost};display:flex;align-items:center;justify-content:center;gap:9px;margin-top:2px;${_w?"font-size:15px;padding:13px":""}">${IC('calendar',_w?20:18)} Players calendar</button></div>`
-      : _fpsAll.length
-        ? `<div style="${_subHd}">Players I'm following</div><div style="display:flex;flex-direction:column;gap:8px">
-            <div style="font-size:13px;color:${T.sageDim};text-align:center;padding:12px;border:1px dashed ${T.line};border-radius:12px">Every team you're following a player on has an ended season — nothing current to show here.</div>
-            <button data-act="openfollowcal" style="${ghost};display:flex;align-items:center;justify-content:center;gap:9px;${_w?"font-size:15px;padding:13px":""}">${IC('calendar',_w?20:18)} Players calendar &middot; all ${_fpsAll.length}</button></div>`
-        : "";
-    const _followContent=`${watchedTeams.length?`<div style="${_subHd}">Teams I'm watching</div><div style="display:flex;flex-direction:column;gap:10px;margin-bottom:${_followPlayersBlock?12:0}px">${watchedTeams.map(t=>card(t,true)).join("")}</div>`:""}${_followPlayersBlock}`;
+    const _followContent=`${watchedTeams.length?`<div style="${_subHd}">Teams I'm watching</div><div style="display:flex;flex-direction:column;gap:10px;margin-bottom:${_fpsGrouped.length?12:0}px">${watchedTeams.map(t=>card(t,true)).join("")}</div>`:""}${_fpsGrouped.length?`<div style="${_subHd}">Players I'm following</div><div style="display:flex;flex-direction:column;gap:${_w?10:8}px">${_fpsGrouped.map(followCard).join("")}<button data-act="openfollowcal" style="${ghost};display:flex;align-items:center;justify-content:center;gap:9px;margin-top:2px;${_w?"font-size:15px;padding:13px":""}">${IC('calendar',_w?20:18)} Players calendar</button></div>`:""}`;
     // Phone: cap the open Following drawer so a long watched-teams + followed-players list scrolls INSIDE
     // it (jford's wasn't scrolling). JS px — vh/--avh resolve to 0 in the Android WebView. Wide keeps the
     // full list (it scrolls in its own right-hand column).
@@ -7586,7 +7578,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v397";
+var APP_VERSION="v398";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
