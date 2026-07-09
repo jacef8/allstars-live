@@ -3935,7 +3935,8 @@ function actionArea(){
     // Season-ended teams already drop off "My teams" on Home (see _activeTeams below) — a followed
     // player on one shouldn't linger here forever with a stale team name once their season's over.
     // jford: "I'm good with the team name dropping from the player info on homescreen."
-    const _fps=followedPlayers().filter(f=>!f.team.archived);
+    const _fpsAll=followedPlayers();   // unfiltered — used only to detect "everything followed is on an ended team" so the section/Players-calendar entry point never fully vanishes (see _followContent below)
+    const _fps=_fpsAll.filter(f=>!f.team.archived);
     // Group followed entries that are linked into the same player profile — jford's "track the same
     // kid across teams/seasons" feature — so Home shows ONE row per real person, not one per team
     // they've ever been rostered on. An entry with no profile just renders as it always has.
@@ -3960,10 +3961,23 @@ function actionArea(){
             <div style="font-size:${_w?14:12}px;color:${T.sage}">${(f.team.name||"").replace(/</g,"&lt;")}</div></div>
           <span style="color:${T.lime};font-weight:800;font-size:${_w?22:16}px">&rsaquo;</span></button>`;
     };
-    const _followCount=watchedTeams.length+_fpsGrouped.length;
+    // jford: "i dont see a way to get to my followed players" — when EVERY followed player's team
+    // has ended, _fpsGrouped (active-only) goes to 0, which used to make the whole section — AND its
+    // "Players calendar" button, the one other way to reach them — vanish entirely. That's a dead
+    // end: the whole point of player profiles is tracking someone ACROSS ended seasons, so hiding the
+    // only door to them once every season's ended defeats it. Section now stays up whenever there's
+    // ANYONE followed at all (active or not); only the row list itself is season-filtered.
+    const _followCount=watchedTeams.length+(_fpsGrouped.length||_fpsAll.length);
     const _twoCol = _w && _followCount>0;   // wide screens with something to follow → side-by-side teams|following
     const _subHd=`font-size:${_w?14:11}px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.sageDim};margin:0 2px ${_w?9:7}px`;
-    const _followContent=`${watchedTeams.length?`<div style="${_subHd}">Teams I'm watching</div><div style="display:flex;flex-direction:column;gap:10px;margin-bottom:${_fpsGrouped.length?12:0}px">${watchedTeams.map(t=>card(t,true)).join("")}</div>`:""}${_fpsGrouped.length?`<div style="${_subHd}">Players I'm following</div><div style="display:flex;flex-direction:column;gap:${_w?10:8}px">${_fpsGrouped.map(followCard).join("")}<button data-act="openfollowcal" style="${ghost};display:flex;align-items:center;justify-content:center;gap:9px;margin-top:2px;${_w?"font-size:15px;padding:13px":""}">${IC('calendar',_w?20:18)} Players calendar</button></div>`:""}`;
+    const _followPlayersBlock=_fpsGrouped.length
+      ? `<div style="${_subHd}">Players I'm following</div><div style="display:flex;flex-direction:column;gap:${_w?10:8}px">${_fpsGrouped.map(followCard).join("")}<button data-act="openfollowcal" style="${ghost};display:flex;align-items:center;justify-content:center;gap:9px;margin-top:2px;${_w?"font-size:15px;padding:13px":""}">${IC('calendar',_w?20:18)} Players calendar</button></div>`
+      : _fpsAll.length
+        ? `<div style="${_subHd}">Players I'm following</div><div style="display:flex;flex-direction:column;gap:8px">
+            <div style="font-size:13px;color:${T.sageDim};text-align:center;padding:12px;border:1px dashed ${T.line};border-radius:12px">Every team you're following a player on has an ended season — nothing current to show here.</div>
+            <button data-act="openfollowcal" style="${ghost};display:flex;align-items:center;justify-content:center;gap:9px;${_w?"font-size:15px;padding:13px":""}">${IC('calendar',_w?20:18)} Players calendar &middot; all ${_fpsAll.length}</button></div>`
+        : "";
+    const _followContent=`${watchedTeams.length?`<div style="${_subHd}">Teams I'm watching</div><div style="display:flex;flex-direction:column;gap:10px;margin-bottom:${_followPlayersBlock?12:0}px">${watchedTeams.map(t=>card(t,true)).join("")}</div>`:""}${_followPlayersBlock}`;
     // Phone: cap the open Following drawer so a long watched-teams + followed-players list scrolls INSIDE
     // it (jford's wasn't scrolling). JS px — vh/--avh resolve to 0 in the Android WebView. Wide keeps the
     // full list (it scrolls in its own right-hand column).
@@ -7572,7 +7586,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v396";
+var APP_VERSION="v397";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
