@@ -993,7 +993,12 @@ function resetOppLineup(){ const ot=oppTeamId&&teamById(oppTeamId);
 function resetOpponent(){ oppTeamId=null; OPP.name="Opponent"; OPP.short="OPP"; OPP.color="#E11D2E"; OPP.logo=null; G.oppLineup=[]; G.oppBench=[]; }
 function oppAtPos(P){ return oppList().findIndex(e=>e&&e.pos===P); }
 function oppPitcher(){ const i=oppAtPos("P"); return i>=0?oppList()[i]:null; }
-function oppAssignPos(i,P){ const L=oppList(); if(!L[i])return; const prev=L[i].pos||null; const other=oppAtPos(P); if(other>=0&&other!==i)L[other].pos=prev; L[i].pos=P; }
+// oppAssignPos was ALSO redeclared further down (near oppFieldMapHtml) — under JS hoisting the later
+// declaration silently wins, so this one was always dead code and every real call site was actually
+// running the other copy (which has a subtly different default: "" instead of null for an unset
+// position — harmless here since oppAtPos() does a strict === check, so neither ever matches a real
+// position string, but a landmine for a future edit that assumes only one definition exists). Removed
+// the duplicate; the surviving definition is the one near oppFieldMapHtml.
 function oppDefaultPositions(){ const L=oppList(); POSLIST.forEach((P,k)=>{ if(L[k]&&!L[k].pos)L[k].pos=P; }); }
 
 const battingKey=()=>G.half==="T"?"away":"home";
