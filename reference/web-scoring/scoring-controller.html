@@ -3646,7 +3646,7 @@ function syncNotifTopics(){ try{
 function _recentOppMap(){ try{ const m=JSON.parse(localStorage.getItem("al-recent-opps-v2")||"{}"); return (m&&typeof m==="object"&&!Array.isArray(m))?m:{}; }catch(e){ return {}; } }
 function getRecentOpps(teamId){ if(!teamId)return []; const m=_recentOppMap(); const r=m[teamId]; return Array.isArray(r)?r:[]; }
 /* Per-device "last seen this team's chat" stamps → home unread badge (t.lastMsgAt is cloud-set). */
-function getSeenChat(){ try{ return JSON.parse(localStorage.getItem("al-chat-seen")||"{}"); }catch(e){ return {}; } }
+function getSeenChat(){ if(_rcSeenChat)return _rcSeenChat; try{ return _rcSeenChat=JSON.parse(localStorage.getItem("al-chat-seen")||"{}"); }catch(e){ return _rcSeenChat={}; } }
 function markSeenChat(id){ if(!id)return; try{ const s=getSeenChat(); s[id]=Date.now(); localStorage.setItem("al-chat-seen",JSON.stringify(s)); }catch(e){} }
 function teamHasUnread(t){ try{ if(!t||!t.lastMsgAt)return false; return (getSeenChat()[t.id]||0) < (t.lastMsgAt-4000); }catch(e){ return false; } }  // 4s grace: never badge your own just-sent message (same-device clock skew)
 function recordRecentOpp(o,teamId){ if(!o||!o.name||o.name==="Opponent"||!teamId)return; try{ const m=_recentOppMap(); let r=(Array.isArray(m[teamId])?m[teamId]:[]).filter(x=>x.name!==o.name); r.unshift({name:o.name,short:o.short||"",color:o.color||"#E11D2E"}); m[teamId]=r.slice(0,12); localStorage.setItem("al-recent-opps-v2",JSON.stringify(m)); }catch(e){} }
@@ -3717,7 +3717,7 @@ let openProfileId=null;   // mode==="playerprofile": which linked-player-profile
 let teamsOpen=(()=>{try{return localStorage.getItem("al-teams-open")!=="0";}catch(e){return true;}})();
 let followOpen=(()=>{try{return localStorage.getItem("al-follow-open")!=="0";}catch(e){return true;}})();
 let followHidden=(()=>{try{return JSON.parse(localStorage.getItem("al-follow-hidden")||"{}");}catch(e){return {};}})();
-function followKeys(){try{return JSON.parse(localStorage.getItem("al-follow-players")||"[]");}catch(e){return [];}}
+function followKeys(){ if(_rcFollowKeys)return _rcFollowKeys; try{return _rcFollowKeys=JSON.parse(localStorage.getItem("al-follow-players")||"[]");}catch(e){return _rcFollowKeys=[];}}
 function setFollowKeys(a){var now=Date.now();try{localStorage.setItem("al-follow-players",JSON.stringify(a));localStorage.setItem("al-follow-at",String(now));}catch(e){} try{ if(window.cloudSavePrefs)window.cloudSavePrefs({followPlayers:a,followAt:now}); }catch(e){}}  // sync follows AND unfollows across your devices (last-write-wins by followAt; same account)
 function isFollowingPlayer(tid,pid){return followKeys().indexOf(tid+":"+pid)>=0;}
 function toggleFollowPlayer(tid,pid){var k=tid+":"+pid,a=followKeys(),i=a.indexOf(k);if(i>=0)a.splice(i,1);else a.push(k);setFollowKeys(a);}
@@ -5977,7 +5977,16 @@ function tvPane(){
       ${live?`<div style="position:absolute;top:16px;left:16px;z-index:5;display:flex;align-items:center;gap:8px;background:rgba(8,11,16,.6);border-radius:999px;padding:6px 14px"><span style="width:9px;height:9px;border-radius:50%;background:${T.live};box-shadow:0 0 8px ${T.live}"></span><span style="font-family:${MONO};font-weight:800;font-size:12px;letter-spacing:1.5px;color:#fff">LIVE${bugDelay?` &middot; +${bugDelay}s`:""}${viewer360?` &middot; 360°`:""}</span></div>`:""}
     </div>`;
 }
+// Per-render caches for a few localStorage-backed reads that were getting re-parsed from scratch
+// MANY times within a single render() pass — e.g. playerHue()/followKeys() once per followed
+// player in a .forEach, teamHasUnread()/getSeenChat() once per team card. Reset at the top of
+// every render() (not cached across renders — there's more than one writer for some of these,
+// e.g. al-follow-players is also written directly by a cloud-sync path, not just setFollowKeys()
+// — so "fresh every render, reused within it" is the safe boundary, not "cached until told
+// otherwise"). See barLayout()/followKeys()/getSeenChat() below.
+let _rcBarLayout=null, _rcFollowKeys=null, _rcSeenChat=null;
 function render(){
+  _rcBarLayout=null; _rcFollowKeys=null; _rcSeenChat=null;
   // Defensive cleanup: a field-map drag's floating "ghost" clone (position:fixed, appended straight to
   // document.body, z-index 9999) is only removed by its own pointerup/pointercancel handler. If a drag
   // is interrupted by NAVIGATING AWAY mid-gesture (switching lineup tabs, the OS backgrounding the app)
@@ -6109,7 +6118,12 @@ function render(){
   const controls=footer;   // undo + (idle: home/lineup/endgame); empty during transient picker steps
   // (No separate "Share with fans" button here — the top toolbar's "Share" is always present
   // in a live game, on every pane/width, so a second one in the video pane was a duplicate.)
-  const fieldEl=`<div style="${fieldStyle};display:flex;align-items:center;justify-content:center;position:relative">${diamondSVG()}${toastEl}</div>`;
+  // Lazy: diamondSVG() is nontrivial (lawn-stripe geometry, runner paths, zone overlays) and was
+  // running here UNCONDITIONALLY even though fieldEl is only ever actually used on narrow/phone
+  // layouts — every wide/tablet render built this, threw it away, then built ANOTHER diamondSVG()
+  // inline for whichever wide branch matched. Making it a thunk means it only actually runs where
+  // it's used, including the narrow branches' own ternaries that sometimes skip it too.
+  const fieldEl=()=>`<div style="${fieldStyle};display:flex;align-items:center;justify-content:center;position:relative">${diamondSVG()}${toastEl}</div>`;
   const actionEl=pickerModal?"":`<div id="action-area" style="display:flex;flex-direction:column;gap:8px;${actionStyle}">${actionArea()}</div>`;
   // Wide (tablet): a single compact row under a BIGGER monitor — instead of a full-width
   // Share button plus a separate controls row stacked beneath, which crowded the player.
@@ -6231,12 +6245,12 @@ function render(){
       ? `<div style="flex:1;min-height:0;display:flex;flex-direction:column;justify-content:center;gap:11px">${monitorPane()}</div>`
       : isView
         ? (function(){var vp=viewerPhone;var vseg=(id,l)=>`<button data-act="viewerphone" data-arg="${id}" style="flex:1;background:${vp===id?T.lime:T.surface2};color:${vp===id?"#fff":T.sage};border:none;border-radius:0;padding:9px;font-family:${MONO};font-weight:800;font-size:12.5px;letter-spacing:.4px;text-transform:uppercase">${l}</button>`;
-          return `<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px">${statusBar(true)}${batterCard()}<div style="display:flex;gap:2px;flex:none;background:${T.line};border:2px solid ${T.line};border-radius:9px;overflow:hidden">${vseg("both","Both")}${vseg("field","Field")}${vseg("feed","Feed")}</div>${vp==="feed"?"":fieldEl}${vp==="field"?"":feedPanel()}</div>`;})()
+          return `<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px">${statusBar(true)}${batterCard()}<div style="display:flex;gap:2px;flex:none;background:${T.line};border:2px solid ${T.line};border-radius:9px;overflow:hidden">${vseg("both","Both")}${vseg("field","Field")}${vseg("feed","Feed")}</div>${vp==="feed"?"":fieldEl()}${vp==="field"?"":feedPanel()}</div>`;})()
         // Phone scoreboard: team-name column widened (statusBar()'s min-width 128→168) so short names
         // like "LC AA" stop truncating; batterCard() below got a taller phone-only stacked layout so the
         // name is readable and the empty space under it gets used. (v323, jford: "cant even see the team
         // names... expand those windows to use some of the empty space")
-        : `<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px">${(focusPlay||floatActive)?"":statusBar(true)}${floatActive?"":batterCard()}${focusPlay?fieldEl:pcLine+'<div style="flex:1;min-height:0"></div>'}${actionEl}${controls}</div>`;
+        : `<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px">${(focusPlay||floatActive)?"":statusBar(true)}${floatActive?"":batterCard()}${focusPlay?fieldEl():pcLine+'<div style="flex:1;min-height:0"></div>'}${actionEl}${controls}</div>`;
     body=`<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:9px">
         ${focusPlay?"":`<div style="display:flex;gap:8px;flex:none">${tab("score",isView?ICN.inplay+" Field":ICN.dot+" Scoring")}${tab("video",ICN.play+" Video")}</div>`}
         ${pane}
@@ -6928,7 +6942,7 @@ let _barPieces={};
 function barOrder(){ let s=[]; try{ s=JSON.parse(localStorage.getItem("al-bar-order")||"[]"); }catch(e){}
   if(!Array.isArray(s))s=[]; const known=s.filter(k=>BAR_DEFAULT.includes(k));
   return known.concat(BAR_DEFAULT.filter(k=>!known.includes(k))); }
-function barLayout(){ try{ const o=JSON.parse(localStorage.getItem("al-bar-layout")||"{}"); return (o&&typeof o==="object")?o:{}; }catch(e){ return {}; } }
+function barLayout(){ if(_rcBarLayout)return _rcBarLayout; try{ const o=JSON.parse(localStorage.getItem("al-bar-layout")||"{}"); return _rcBarLayout=(o&&typeof o==="object")?o:{}; }catch(e){ return _rcBarLayout={}; } }
 function saveBarPos(k,x,y){ try{ const L=barLayout(); L[k]={x:Math.round(x),y:Math.round(y)}; localStorage.setItem("al-bar-layout",JSON.stringify(L)); }catch(e){} }
 function clearBarLayout(){ try{ localStorage.removeItem("al-bar-layout"); localStorage.removeItem("al-bar-order"); }catch(e){} }
 const _snap=v=>Math.round(v/8)*8;
@@ -7594,7 +7608,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v400";
+var APP_VERSION="v401";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
