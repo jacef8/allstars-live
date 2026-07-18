@@ -252,6 +252,25 @@ fun CompositorTestScreen(onUseCamera: () -> Unit = {}) {
  * Draws a broadcast-style scorebug onto a transparent, program-sized bitmap
  * (premultiplied alpha — what [VideoCompositor]/[GlScene] blend on top of the video).
  */
+// Called on every single score/count/out update during a live game (ScorerBridge.setScore()) --
+// was allocating a fresh 1280x720 ARGB_8888 bitmap (~3.7MB) every call, on a device that's
+// simultaneously decoding camera video and encoding to RTMP. Real GC-churn risk.
+//
+// Can't just reuse ONE shared bitmap across calls: VideoCompositor.setOverlay() hands the bitmap
+// to scene.updateOverlay() via handler.post {} -- the actual GL texture upload happens
+// ASYNCHRONOUSLY on the GL thread, not synchronously here. If this function's caller (main/JS-
+// bridge thread) repainted a shared bitmap for a NEW frame before the GL thread finished reading
+// the PREVIOUS frame's pixels off it, that's an unsynchronized read-while-write race -- visual
+// tearing at best, a crash at worst, in code that's live-streaming a real game.
+//
+// Small rotating pool instead (standard multi-buffering): at most 3 bitmaps ever allocated, total,
+// for the lifetime of the app, instead of one new 3.7MB bitmap per score update. By the time a
+// buffer comes back around (2 calls later), the GL handler has had two full call-cycles --
+// hundreds of milliseconds at minimum, since this only fires on human taps -- to finish with it.
+private const val OVERLAY_POOL_SIZE = 3
+private val overlayPool = arrayOfNulls<Bitmap>(OVERLAY_POOL_SIZE)
+private var overlayPoolIdx = 0
+
 fun buildScorebugOverlay(
     w: Int, h: Int,
     away: String, home: String,
@@ -260,7 +279,15 @@ fun buildScorebugOverlay(
     balls: Int, strikes: Int, outs: Int,
     awayLogo: Bitmap? = null, homeLogo: Bitmap? = null,
 ): Bitmap {
-    val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)   // transparent
+    val idx = overlayPoolIdx
+    overlayPoolIdx = (overlayPoolIdx + 1) % OVERLAY_POOL_SIZE
+    var bmp = overlayPool[idx]
+    if (bmp == null || bmp.isRecycled || bmp.width != w || bmp.height != h) {
+        bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)   // transparent
+        overlayPool[idx] = bmp
+    } else {
+        bmp.eraseColor(0)   // clear to transparent before repainting (cheap native fill, not an allocation)
+    }
     val c = Canvas(bmp)
     val pad = w * 0.022f
     val boxW = w * 0.47f
