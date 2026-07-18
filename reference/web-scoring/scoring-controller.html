@@ -295,6 +295,11 @@
 <script src="firebase-config.js"></script>
 <script src="auth.js"></script>
 <script src="cloud-data.js"></script>
+<!-- The ONE correct HTML-escaping function (see its own header for why this exists — an audit
+     found 9 different, inconsistently-complete ad hoc escapers scattered through the main
+     script, plus ~63 more inline call sites with no named helper at all). Must load before the
+     main script below, which uses it as a bare global (classic-script shared scope). -->
+<script src="html-safe.js"></script>
 <script>
 /* ----------------------------------------------------------------------
    Field-as-input baseball scoring controller — interaction prototype
@@ -482,7 +487,7 @@ function showPrintable(html){
  * record and a standard batting-order grid + substitutes + pitcher log. */
 function printLineupCard(t,ctx){
   if(!t)return; ctx=ctx||{};
-  const esc=s=>(s==null?"":String(s)).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+  const esc=escHtml; // was a local ad hoc escaper — see html-safe.js
   const R=teamRec(t), rec=`${R.w}-${R.l}${R.t?"-"+R.t:""}`;
   const today=ctx.date||new Date().toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric",year:"numeric"});
   const color=esc(t.color||"#2E6BE6");
@@ -534,7 +539,7 @@ window.exportGame=function(){ downloadJSON("game-"+((OUR.short||"home"))+"-vs-"+
 // Render the branded scorecard from a normalized model (used by both the LIVE game and a stored
 // past game). M = {A,H,maxI,date,winA,winH, line(side,inning), totals(side), bat(side), pitch(side)}.
 function openScorecard(M){
-  const esc=s=>(s==null?"":String(s)).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+  const esc=escHtml; // was a local ad hoc escaper — see html-safe.js
   const A=M.A, H=M.H, maxI=M.maxI;
   let lhead='<th class="tm"></th>'; for(let i=1;i<=maxI;i++)lhead+='<th>'+i+'</th>'; lhead+='<th class="rhe">R</th><th class="rhe">H</th><th class="rhe">E</th>';
   const lrow=(side,m)=>{ let c='<td class="tm">'+esc(m.short)+'</td>'; for(let i=1;i<=maxI;i++)c+='<td>'+(M.line(side,i)||0)+'</td>'; const t=M.totals(side)||{r:0,h:0,e:0}; c+='<td class="rhe b">'+t.r+'</td><td class="rhe">'+t.h+'</td><td class="rhe">'+t.e+'</td>'; return '<tr>'+c+'</tr>'; };
@@ -1080,7 +1085,7 @@ function fieldPlace(ri,pos){ ri=+ri;
    spot, pick another spot, or bench him) — so you control the whole chain, all visible on the field. */
 function fieldMapHtml(){
   const first=n=>(n||"").split(" ")[0];
-  const lastnm=n=>{const p=(n||"").trim().split(/\s+/);return (p.length>1?p[p.length-1]:(p[0]||"")).replace(/</g,"&lt;");};   // LAST name — the clearest ID (rosters are "M Ford")
+  const lastnm=n=>{const p=(n||"").trim().split(/\s+/);return (p.length>1?p[p.length-1]:(p[0]||"")).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");};   // LAST name — the clearest ID (rosters are "M Ford")
   const _cpFld=cpMode();   // coach pitch: FOUR outfielders (LF / LCF / RCF / RF), no lone CF
   const FXY=_cpFld
     ? {P:[50,63],C:[50,91],"1B":[79,60],"2B":[62,47],SS:[38,47],"3B":[21,60],LF:[14,30],LCF:[39,16],RCF:[61,16],RF:[86,30]}
@@ -1128,7 +1133,7 @@ function fieldMapHtml(){
   const benchRow=`<div style="flex:none">
       <div style="font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.sageDim};margin:2px 2px 5px">Bench / extra hitters${bench.length?" — drag up to a spot":""}</div>
       <div id="fieldbench" style="display:flex;flex-wrap:wrap;gap:7px;min-height:46px;border:2px dashed ${T.line};border-radius:10px;padding:8px;background:${T.surface2};align-content:flex-start">
-        ${bench.length?bench.map(ri=>{const pl=ROSTER[ri];return `<button data-fieldbench="${ri}" draggable="false" title="Drag up to a position" style="background:${T.surface};border:2px solid ${T.line};color:${T.chalk};border-radius:9px;padding:8px 12px;font-family:${MONO};font-size:14px;font-weight:800;white-space:nowrap;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-user-drag:none">${pl.num?"#"+pl.num+" ":""}${(pl.name||"").replace(/</g,"&lt;")}</button>`;}).join(""):`<span style="color:${T.sageDim};font-size:12px;align-self:center;padding:0 4px">Everyone's on the field. Drag a fielder here to bench him (still bats).</span>`}
+        ${bench.length?bench.map(ri=>{const pl=ROSTER[ri];return `<button data-fieldbench="${ri}" draggable="false" title="Drag up to a position" style="background:${T.surface};border:2px solid ${T.line};color:${T.chalk};border-radius:9px;padding:8px 12px;font-family:${MONO};font-size:14px;font-weight:800;white-space:nowrap;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-user-drag:none">${pl.num?"#"+pl.num+" ":""}${(pl.name||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;")}</button>`;}).join(""):`<span style="color:${T.sageDim};font-size:12px;align-self:center;padding:0 4px">Everyone's on the field. Drag a fielder here to bench him (still bats).</span>`}
       </div></div>`;
   return `<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px">
       <div style="position:relative;width:100%;max-width:400px;margin:0 auto;flex:none"><div id="fieldmap" style="position:relative;width:100%;height:0;padding-bottom:93.33%;border:2px solid ${T.line};border-radius:10px;overflow:hidden">${diamond}${FPOS.map(spot).join("")}</div></div>
@@ -1159,7 +1164,7 @@ function oppFieldMapHtml(){
     const nm=e?("#"+((e.num||"?").toString().replace(/</g,""))+" "+(first((e.name||"").trim())||"")):"—";
     return `<button data-act="oppfieldpos" data-arg="${P}" style="position:absolute;left:${xy[0]}%;top:${xy[1]}%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:1px;background:${sel?OPP.color:"var(--chip)"};border:2px solid ${bd};border-radius:9px;padding:5px 7px;min-width:46px;cursor:pointer;box-shadow:0 2px 9px rgba(0,0,0,.55);z-index:2">
         <span style="font-family:${MONO};font-size:14px;font-weight:800;color:${sel?"#fff":T.lime};line-height:1">${P}</span>
-        <span style="font-size:11px;font-weight:700;color:${sel?"#fff":(e?T.chalk:T.sageDim)};max-width:74px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.1">${nm.replace(/</g,"&lt;")}</span></button>`; };
+        <span style="font-size:11px;font-weight:700;color:${sel?"#fff":(e?T.chalk:T.sageDim)};max-width:74px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.1">${nm.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;")}</span></button>`; };
   const diamond=`<svg viewBox="0 0 300 280" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" style="display:block;position:absolute;inset:0">
       <path d="M150,250 L292,108 Q150,-12 8,108 Z" fill="${T.grass}"/>
       <path d="M150,250 L246,154 Q150,70 54,154 Z" fill="${T.grassLt}" opacity="0.45"/>
@@ -1168,7 +1173,7 @@ function oppFieldMapHtml(){
   let panel;
   if(oppFieldSel){
     const chips=L.map((e,i)=>{ const here=(oppAtPos(oppFieldSel)===i), atP=e.pos||"", nm=((e.name||"").trim())||("#"+(e.num||""));
-      return `<button data-act="oppfieldassign" data-arg="${i}" style="background:${here?OPP.color:T.surface2};border:2px solid ${here?OPP.color:T.line};color:${here?"#fff":T.chalk};border-radius:8px;padding:7px 10px;font-family:${MONO};font-size:13px;font-weight:700;white-space:nowrap">#${(e.num||"").toString().replace(/</g,"")} ${first(nm).replace(/</g,"&lt;")}${atP?` <span style="color:${here?"#fff":T.sageDim};font-size:11px">(${atP})</span>`:""}</button>`; }).join("");
+      return `<button data-act="oppfieldassign" data-arg="${i}" style="background:${here?OPP.color:T.surface2};border:2px solid ${here?OPP.color:T.line};color:${here?"#fff":T.chalk};border-radius:8px;padding:7px 10px;font-family:${MONO};font-size:13px;font-weight:700;white-space:nowrap">#${(e.num||"").toString().replace(/</g,"")} ${first(nm).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;")}${atP?` <span style="color:${here?"#fff":T.sageDim};font-size:11px">(${atP})</span>`:""}</button>`; }).join("");
     panel=`<div style="flex:none"><div style="font-size:13px;font-weight:800;color:${T.lime};margin:0 2px 6px">Who plays ${oppFieldSel}? — tap a hitter <span data-act="oppfieldcancel" style="color:${T.sageDim};font-weight:600;margin-left:6px;cursor:pointer">(cancel)</span></div>
         <div style="display:flex;flex-wrap:wrap;gap:6px;max-height:20vh;overflow-y:auto">${chips}</div></div>`;
   } else {
@@ -1642,7 +1647,7 @@ function baseRunModal(){
   const runnerRows=occ.map(b=>{ const r=G.bases[b];
     return `<div style="background:${T.surface2};border:2px solid ${T.line};border-radius:11px;padding:10px 11px;display:flex;flex-direction:column;gap:8px">
         <div style="display:flex;align-items:center;gap:9px"><span style="font-family:${MONO};font-size:15px;font-weight:800;color:${r.color||T.clay}">${b}B</span>
-          <span style="font-size:16px;font-weight:700;color:${T.chalk};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${((r.name||r.label||"Runner")+"").replace(/</g,"&lt;")}</span></div>
+          <span style="font-size:16px;font-weight:700;color:${T.chalk};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${((r.name||r.label||"Runner")+"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;")}</span></div>
         <div style="display:flex;flex-wrap:wrap;gap:2px;background:${T.line};border:2px solid ${T.line};border-radius:10px;overflow:hidden">
           ${chip("brsteal",b,"&#9650; Steal",T.safe,"#fff")}
           ${chip("bradv",b,"Adv +1",T.surface,T.chalk,T.line)}
@@ -1663,7 +1668,7 @@ function baseRunModal(){
         <div style="display:flex;flex-direction:column;gap:8px">${occ.length?occ.map(b=>{ const r=G.bases[b]; const dl=d=>d===b?"Hold":(d===4?"Score":d+"B"); const dests=[]; for(let d=b;d<=4;d++)dests.push(d);
           return `<div style="background:${T.surface2};border:2px solid ${T.line};border-radius:11px;padding:10px 11px;display:flex;flex-direction:column;gap:8px">
             <div style="display:flex;align-items:center;gap:9px"><span style="font-family:${MONO};font-size:15px;font-weight:800;color:${r.color||T.clay}">${b}B</span>
-              <span style="font-size:16px;font-weight:700;color:${T.chalk};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${((r.name||r.label||"Runner")+"").replace(/</g,"&lt;")}</span></div>
+              <span style="font-size:16px;font-weight:700;color:${T.chalk};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${((r.name||r.label||"Runner")+"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;")}</span></div>
             <div style="display:flex;gap:2px;background:${T.line};border:2px solid ${T.line};border-radius:9px;overflow:hidden">
               ${dests.map(d=>{const sel=(brWPSel[b]===d);return `<button data-act="brwpdest" data-arg="${b}:${d}" style="flex:1;background:${sel?T.safe:T.surface};border:none;color:${sel?"#fff":T.chalk};padding:11px 6px;font-family:${SANS};font-size:13px;font-weight:800">${dl(d)}</button>`;}).join("")}
             </div></div>`;}).join(""):`<div style="font-size:13px;color:${T.sageDim};text-align:center;padding:14px">No runners on base.</div>`}</div>
@@ -2766,14 +2771,14 @@ function batterCard(){
   const nameLine=b.ours?pBug(b):((b.name||"").trim());   // batter name, never the team name
   const abp=(G.ab&&G.ab.pitches)?G.ab.pitches.length:0;   // pitches to THIS batter this at-bat (resets each AB)
   const sub=b.ours
-    ? `${TEAMS[k].short}${b.pos?` · ${b.pos}`:""} &middot; ${ord} in order`
+    ? `${escHtml(TEAMS[k].short)}${b.pos?` · ${escHtml(b.pos)}`:""} &middot; ${ord} in order`
     : `${TEAMS[k].short||"OPP"} &middot; ${ord} batter`;   // include the team so it's unmistakable
   // A colored team badge next to AT BAT — the team short name was already in the `sub` text line,
   // but as small grey text it didn't read as a clear "which team is up" indicator at a glance
   // (jford, 2026-07-03: "need something in the current batter window indicating what team the
   // player is on or what team is batting"). Outlined in the team's own color so it's distinct from
   // the solid AT BAT pill next to it.
-  const teamBadge=`<div title="${(TEAMS[k].name||TEAMS[k].short||"").replace(/</g,"&lt;")} batting" style="display:inline-flex;align-items:center;background:${c}22;border:1.5px solid ${c};color:${c};border-radius:999px;padding:2px 9px;font-family:${MONO};font-size:10px;font-weight:800;letter-spacing:.6px;line-height:1;white-space:nowrap">${(TEAMS[k].short||"?").replace(/</g,"&lt;")}</div>`;
+  const teamBadge=`<div title="${(TEAMS[k].name||TEAMS[k].short||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;")} batting" style="display:inline-flex;align-items:center;background:${c}22;border:1.5px solid ${c};color:${c};border-radius:999px;padding:2px 9px;font-family:${MONO};font-size:10px;font-weight:800;letter-spacing:.6px;line-height:1;white-space:nowrap">${(TEAMS[k].short||"?").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;")}</div>`;
   if(!isWide()){
     // PHONE: the old single-row 4-column squeeze truncated the batter's name to fit alongside the
     // count/pitches/today stats. Stack instead — the name gets its OWN full-width row, using vertical
@@ -2830,7 +2835,7 @@ function batterStrip(){
   return `<div data-act="reviewbatter" data-arg="${batterKeyOf(b)}" class="frost-card" style="flex:1 1 auto;width:100%;display:flex;align-items:center;gap:14px;background:var(--chip);border:2px solid ${c}66;border-left:6px solid ${c};border-radius:10px;padding:8px 16px;cursor:pointer;max-width:100%;min-width:0">
     <span title="Lineup spot" style="font-family:${MONO};font-size:30px;font-weight:800;color:${c};line-height:1;flex:none">${ord}</span>
     <div style="flex:1;min-width:0;text-align:left;display:flex;flex-direction:column;gap:3px">
-      <div style="font-size:10px;letter-spacing:1.5px;font-weight:800;color:${T.sageDim};line-height:1">BATTING ${ordinal(ord)} &middot; <span style="color:${c}">${(TEAMS[k].short||"?").replace(/</g,"&lt;")}</span></div>
+      <div style="font-size:10px;letter-spacing:1.5px;font-weight:800;color:${T.sageDim};line-height:1">BATTING ${ordinal(ord)} &middot; <span style="color:${c}">${(TEAMS[k].short||"?").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;")}</span></div>
       <div style="font-family:${MONO};font-size:21px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;line-height:1;color:${T.chalk};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${nameLine}</div></div>
     <div style="flex:none;text-align:right;line-height:1.15">
       <div style="font-family:${MONO};font-size:19px;font-weight:800;color:${T.chalk}">${G.balls}-${G.strikes}</div>
@@ -3297,8 +3302,8 @@ function paRowHtml(pa,idx,total){
 function batterReviewModal(){
   const key=reviewBatter,list=(G.pa&&G.pa[key])||[],s=G.stats&&G.stats[key];
   let title="Batter";
-  if(key&&key[0]==="o"){ const ri=+key.slice(1),p=ROSTER[ri]; if(p)title=`#${p.num} ${p.name}`; }
-  else if(s&&s.name) title=`#${s.num} ${s.name}`;
+  if(key&&key[0]==="o"){ const ri=+key.slice(1),p=ROSTER[ri]; if(p)title=`#${escHtml(p.num)} ${escHtml(p.name)}`; }
+  else if(s&&s.name) title=`#${escHtml(s.num)} ${escHtml(s.name)}`;
   const gl=s?`${s.h}-${s.ab}${s.r?` · ${s.r} R`:""}${s.rbi?` · ${s.rbi} RBI`:""}${s.bb?` · ${s.bb} BB`:""}${s.k?` · ${s.k} K`:""}`:"0-0";
   const rows=list.length?list.map((pa,i)=>paRowHtml(pa,i,list.length)).reverse().join("")
     :`<div style="color:${T.sageDim};padding:18px;text-align:center">No at-bats yet — this is their first time up.</div>`;
@@ -3350,7 +3355,7 @@ function inningLogModal(){
         <span style="font-family:${MONO};font-size:13px;color:${T.sage}">${e.runs} R · ${e.hits} H · ${e.pitches} P${e.lob?` · ${e.lob} LOB`:""}<span style="color:${T.sageDim}"> · ${e.cumR} total</span></span></div>`).join("")
     :`<div style="color:${T.sageDim};padding:14px;text-align:center">No completed innings yet.</div>`;
   // C5: in-game lineup/position changes recorded for the historical record.
-  const esc=s=>(s==null?"":String(s)).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  const esc=escHtml; // was a local ad hoc escaper — see html-safe.js
   const ll=G.lineupLog||[];
   const luSec=ll.length?`
       <div style="margin-top:14px;font-family:${MONO};font-size:12px;font-weight:800;letter-spacing:.05em;color:${T.sage}">LINEUP CHANGES</div>
@@ -3555,15 +3560,15 @@ function themedSelect(id, options, cur, o){
   const curOpt=options.find(x=>!x.header && String(x.v)===cur);
   const label=curOpt?curOpt.label:(o.placeholder||"Select…");
   const css=o.css||`background:${T.surface2};border:2px solid ${T.line};color:${T.ink};border-radius:8px;padding:12px 12px;font-family:${MONO};font-size:16px;font-weight:800;outline:none;width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer;text-align:left`;
-  return `<input type="hidden" id="${id}" value="${cur.replace(/"/g,'&quot;')}"><button type="button" data-ddfor="${id}" data-ddopts="${enc}"${o.onpick?` data-ddonpick="${o.onpick}"`:""} onclick="window._ddSelect(this,'${id}')" style="${css}"><span data-ddlabel style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap${curOpt?"":`;color:${T.sageDim}`}">${(label||"").replace(/</g,"&lt;")}</span><span style="color:#E11D2E;font-weight:800;flex:none;font-size:13px">&#9662;</span></button>`;
+  return `<input type="hidden" id="${id}" value="${cur.replace(/"/g,'&quot;')}"><button type="button" data-ddfor="${id}" data-ddopts="${enc}"${o.onpick?` data-ddonpick="${o.onpick}"`:""} onclick="window._ddSelect(this,'${id}')" style="${css}"><span data-ddlabel style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap${curOpt?"":`;color:${T.sageDim}`}">${(label||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;")}</span><span style="color:#E11D2E;font-weight:800;flex:none;font-size:13px">&#9662;</span></button>`;
 }
 window._ddSelect=function(btn,id){
   let opts=[]; try{ opts=JSON.parse(decodeURIComponent(btn.getAttribute("data-ddopts")||"[]")); }catch(e){}
   const hid=document.getElementById(id), cur=hid?hid.value:"";
   const html=opts.map(o=>{
-    if(o.header) return `<div style="padding:9px 11px 4px;font-family:${MONO};font-size:11px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:${T.sageDim}">${(o.label||"").replace(/</g,"&lt;")}</div>`;
+    if(o.header) return `<div style="padding:9px 11px 4px;font-family:${MONO};font-size:11px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:${T.sageDim}">${(o.label||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;")}</div>`;
     const sel=String(o.v)===cur;
-    return `<div role="option" onmousedown="event.preventDefault()" onclick="window._ddPick('${id}','${encodeURIComponent(String(o.v))}')" style="padding:12px 13px;border-radius:8px;font-family:${SANS};font-weight:700;font-size:16px;color:${T.ink};cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:10px${sel?";background:rgba(225,29,46,.14)":""}"><span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${(o.label||"").replace(/</g,"&lt;")}</span>${sel?'<span style="color:#E11D2E;font-weight:800;flex:none">&#10003;</span>':""}</div>`;
+    return `<div role="option" onmousedown="event.preventDefault()" onclick="window._ddPick('${id}','${encodeURIComponent(String(o.v))}')" style="padding:12px 13px;border-radius:8px;font-family:${SANS};font-weight:700;font-size:16px;color:${T.ink};cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:10px${sel?";background:rgba(225,29,46,.14)":""}"><span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${(o.label||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;")}</span>${sel?'<span style="color:#E11D2E;font-weight:800;flex:none">&#10003;</span>':""}</div>`;
   }).join("");
   _ddOpenMenu(btn, html);
 };
@@ -3589,7 +3594,7 @@ window._acFilter=function(inp, listFnName){
   if(q){ const pre=items.filter(x=>String(x).toLowerCase().startsWith(q)); const sub=items.filter(x=>{const s=String(x).toLowerCase(); return !s.startsWith(q)&&s.indexOf(q)>=0;}); items=pre.concat(sub); }
   items=items.slice(0,8);
   if(!items.length){ _ddClose(); return; }
-  const esc=s=>String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;");
+  const esc=escHtml; // was a local ad hoc escaper — see html-safe.js
   const html=items.map(x=>{
     let disp=esc(x); if(q){ const s=String(x); const i=s.toLowerCase().indexOf(q); if(i>=0) disp=esc(s.slice(0,i))+`<b style="color:#E11D2E">`+esc(s.slice(i,i+q.length))+`</b>`+esc(s.slice(i+q.length)); }
     return `<div role="option" onmousedown="event.preventDefault()" onclick="window._acPick('${inp.id}','${encodeURIComponent(String(x))}')" style="padding:12px 13px;border-radius:8px;font-family:${SANS};font-weight:700;font-size:16px;color:${T.ink};cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${disp}</div>`;
@@ -3834,8 +3839,8 @@ function calendarHtml(t){
     const evRows=selEvs.map(s=>{const isG=s.type!=="practice";const tm=s.time?(()=>{try{return new Date("2000-01-01T"+s.time).toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"});}catch(e){return s.time;}})():"";
       return `<div style="display:flex;align-items:center;gap:8px;background:${T.surface2};border:2px solid ${T.line};border-left:5px solid ${isG?t.color:T.sage};border-radius:9px;padding:9px 11px">
           <div style="flex:1;min-width:0">
-            <div style="font-weight:800;color:${T.ink};font-size:16px">${isG?ICN.inplay+" "+(s.opp?("vs "+(s.opp||"").replace(/</g,"&lt;")):"Game"):ICN.ball+" Practice"}</div>
-            <div style="font-size:13px;color:${T.sage};margin-top:2px">${tm||"Time TBD"}${s.loc?(" · "+(s.loc||"").replace(/</g,"&lt;")):""}${s.notes?(" · "+(s.notes||"").replace(/</g,"&lt;")):""}</div></div>
+            <div style="font-weight:800;color:${T.ink};font-size:16px">${isG?ICN.inplay+" "+(s.opp?("vs "+(s.opp||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;")):"Game"):ICN.ball+" Practice"}</div>
+            <div style="font-size:13px;color:${T.sage};margin-top:2px">${tm||"Time TBD"}${s.loc?(" · "+(s.loc||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;")):""}${s.notes?(" · "+(s.notes||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;")):""}</div></div>
           <button data-act="schedrm" data-arg="${s.id}" style="background:none;border:2px solid ${T.line};color:${T.out};border-radius:7px;padding:7px 9px;font-weight:800">&times;</button></div>`;}).join("");
     detail=`<div style="margin-top:10px;border-top:1.5px solid ${T.line};padding-top:10px;display:flex;flex-direction:column;gap:7px">
         <div style="font-size:12px;font-weight:800;letter-spacing:.4px;color:${T.lime}">${dlabel}</div>
@@ -3876,8 +3881,8 @@ function multiCalendarHtml(fps){
     const evRows=selEvs.map(s=>{const isG=s.type!=="practice";const tm=s.time?(()=>{try{return new Date("2000-01-01T"+s.time).toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"});}catch(e){return s.time;}})():"";
       return `<div style="display:flex;align-items:center;gap:8px;background:${T.surface2};border:2px solid ${T.line};border-left:5px solid ${s.__col};border-radius:9px;padding:9px 11px">
           <div style="flex:1;min-width:0">
-            <div style="font-weight:800;color:${T.ink};font-size:15px">${(s.__who||"").replace(/</g,"&lt;")}</div>
-            <div style="font-size:12px;color:${T.sage};margin-top:2px">${isG?(s.opp?("vs "+(s.opp||"").replace(/</g,"&lt;")):"Game"):"Practice"}${tm?(" · "+tm):""}${s.loc?(" · "+(s.loc||"").replace(/</g,"&lt;")):""}</div></div></div>`;}).join("");
+            <div style="font-weight:800;color:${T.ink};font-size:15px">${(s.__who||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;")}</div>
+            <div style="font-size:12px;color:${T.sage};margin-top:2px">${isG?(s.opp?("vs "+(s.opp||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;")):"Game"):"Practice"}${tm?(" · "+tm):""}${s.loc?(" · "+(s.loc||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;")):""}</div></div></div>`;}).join("");
     detail=`<div style="margin-top:10px;border-top:1.5px solid ${T.line};padding-top:10px;display:flex;flex-direction:column;gap:7px">
         <div style="font-size:12px;font-weight:800;letter-spacing:.4px;color:${T.lime}">${dlabel}</div>
         ${selEvs.length?evRows:`<div style="font-size:12px;color:${T.sageDim}">Nothing scheduled for any followed player.</div>`}</div>`;
@@ -3912,7 +3917,7 @@ function actionArea(){
           <div style="display:flex;align-items:center;gap:9px;padding-right:${t.external?"30px":"2px"}">
             ${t.logo?`<img src="${t.logo}" alt="" style="width:36px;height:36px;flex:none;border-radius:8px;object-fit:contain;background:#fff;box-shadow:0 0 0 1px ${T.line}">`:""}
             ${unread?`<span title="New chat messages" style="flex:none;display:inline-flex;align-items:center;gap:4px;background:${T.amber};color:#10141A;border-radius:999px;padding:3px 9px;font-family:${MONO};font-weight:800;font-size:11px;letter-spacing:.4px">${IC('chat',12)} NEW</span>`:""}
-            <div style="font-family:${MONO};font-size:23px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1">${t.name}</div></div>
+            <div style="font-family:${MONO};font-size:23px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1">${escHtml(t.name)}</div></div>
           <div style="display:flex;align-items:baseline;gap:9px;margin-top:7px">
             <span style="font-family:${MONO};font-size:28px;font-weight:800;color:${t.color};line-height:1">${rec}</span><span style="font-size:13px;color:${T.sage}">${sub}</span></div>
           <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:14px;background:${t.color};color:#fff;border-radius:9px;padding:13px;font-family:${MONO};font-weight:800;font-size:16px;letter-spacing:.8px;pointer-events:none">${IC(GEAR)} ${t.external?"VIEW TEAM":"MANAGE TEAM"}</div></div>`;};
@@ -3961,19 +3966,19 @@ function actionArea(){
         // tagged — only ACTIVE teams get named here. If every linked team has ended, fall back to
         // "Season ended" instead of an empty subtitle.
         const activeNames=g.profile.keys.map(k=>{const i=k.indexOf(":"),ot=teamById(k.slice(0,i));return (ot&&!ot.archived)?(ot.short||ot.name||""):"";}).filter(Boolean);
-        const teamLine=activeNames.length?("&#128279; "+activeNames.map(n=>n.replace(/</g,"&lt;")).join(" &middot; ")):"Season ended";
+        const teamLine=activeNames.length?("&#128279; "+activeNames.map(n=>n.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;")).join(" &middot; ")):"Season ended";
         return `<button data-act="openplayerprofile" data-arg="${g.profile.id}" style="display:flex;align-items:center;gap:${_w?14:11}px;width:100%;text-align:left;background:${T.surface};border:2px solid ${T.amber}88;border-left:${_w?7:5}px solid ${T.amber};border-radius:12px;padding:${_w?"15px 17px":"11px 13px"};cursor:pointer">
             <span style="width:${_w?44:34}px;height:${_w?44:34}px;flex:none;border-radius:9px;background:${f.team.color};color:#fff;display:flex;align-items:center;justify-content:center;font-family:${MONO};font-weight:800;font-size:${_w?20:15}px">${(f.player.num||"–")}</span>
-            <div style="flex:1;min-width:0"><div style="font-weight:800;color:${T.ink};font-size:${_w?22:16}px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${(g.profile.name||"Player").replace(/</g,"&lt;")}</div>
+            <div style="flex:1;min-width:0"><div style="font-weight:800;color:${T.ink};font-size:${_w?22:16}px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${(g.profile.name||"Player").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;")}</div>
               <div style="font-size:${_w?14:12}px;color:${T.sage}">${teamLine}</div></div>
             <span style="color:${T.lime};font-weight:800;font-size:${_w?22:16}px">&rsaquo;</span></button>`;
       }
       // jford: "it should not show a team name under the names if that season has ended" — no team
       // name AT ALL once archived (not even alongside a tag), just the plain "Season ended" line.
-      const f=g.single, subLine=f.team.archived?"Season ended":(f.team.name||"").replace(/</g,"&lt;");
+      const f=g.single, subLine=f.team.archived?"Season ended":(f.team.name||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
       return `<button data-act="openplayer" data-arg="${f.key}" style="display:flex;align-items:center;gap:${_w?14:11}px;width:100%;text-align:left;background:${T.surface};border:2px solid ${T.line};border-left:${_w?7:5}px solid ${playerHue(f.key)};border-radius:12px;padding:${_w?"15px 17px":"11px 13px"};cursor:pointer">
           <span style="width:${_w?44:34}px;height:${_w?44:34}px;flex:none;border-radius:9px;background:${f.team.color};color:#fff;display:flex;align-items:center;justify-content:center;font-family:${MONO};font-weight:800;font-size:${_w?20:15}px">${(f.player.num||"–")}</span>
-          <div style="flex:1;min-width:0"><div style="font-weight:800;color:${T.ink};font-size:${_w?22:16}px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${(f.player.name||"Player").replace(/</g,"&lt;")}</div>
+          <div style="flex:1;min-width:0"><div style="font-weight:800;color:${T.ink};font-size:${_w?22:16}px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${(f.player.name||"Player").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;")}</div>
             <div style="font-size:${_w?14:12}px;color:${T.sage}">${subLine}</div></div>
           <span style="color:${T.lime};font-weight:800;font-size:${_w?22:16}px">&rsaquo;</span></button>`;
     };
@@ -4009,7 +4014,7 @@ function actionArea(){
         <span style="font-size:13px;font-weight:700;color:${T.navy}">${(OUR.short||"US").replace(/</g,"")} ${ourRuns()} &middot; ${(OPP.short||"OPP").replace(/</g,"")} ${oppRuns()} &nbsp;—&nbsp; ${G.half==="T"?"Top":"Bot"} ${ordinal(G.inning)}</span></button>
         <button data-act="discardgame" title="Discard this in-progress game" style="position:absolute;top:8px;right:8px;width:32px;height:32px;border-radius:8px;background:rgba(225,29,46,.16);border:1.5px solid ${T.out};color:${T.out};font-weight:800;font-size:16px;line-height:1;display:flex;align-items:center;justify-content:center;cursor:pointer">&times;</button></div>`:"";
     // Games live on ANOTHER device for a team I score → "in progress · take over" (cross-device handoff).
-    const _esc=x=>String(x==null?"":x).replace(/</g,"&lt;");
+    const _esc=x=>String(x==null?"":x).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
     const liveRows = otherLiveGames().map(function(o){ const s=o.live.summary||{}; const who=o.live.activeName?(" &middot; "+_esc(o.live.activeName)):"";
       // A scorer CAN take over, but tapping the card itself must never force that — a listed scorer
       // who just wants to watch shouldn't be dropped into scoring by mistake (jford, 2026-07-03: "i
@@ -4035,14 +4040,14 @@ function actionArea(){
     // is the "the app shows that upcoming info" half, deliverable without any new backend.
     const upcomingRows = upcomingFollowedActivity().map(function(u){
       const isG=u.sched.type!=="practice";
-      const names=u.players.map(function(p){return (p.name||"Player").replace(/</g,"&lt;");}).join(", ");
+      const names=u.players.map(function(p){return (p.name||"Player").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");}).join(", ");
       const when=(()=>{ try{ const d=new Date(u.when), isToday=d.toDateString()===new Date().toDateString();
         const t=u.sched.time?d.toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"}):"";
         return (isToday?"Today":"Tomorrow")+(t?" · "+t:""); }catch(e){ return u.sched.date||""; } })();
-      const what=isG?("Game"+(u.sched.opp?(" vs "+(u.sched.opp||"").replace(/</g,"&lt;")):"")):"Practice";
+      const what=isG?("Game"+(u.sched.opp?(" vs "+(u.sched.opp||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;")):"")):"Practice";
       return `<button data-act="opent" data-arg="${u.team.id}" style="display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:${T.surface};border:2px solid ${T.amber};border-radius:13px;padding:13px 16px;cursor:pointer">
           <span style="width:10px;height:10px;border-radius:50%;flex:none;background:${T.amber};box-shadow:0 0 7px ${T.amber}"></span>
-          <span style="flex:1;min-width:0"><span style="font-size:16px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block">${what} &middot; ${names}</span><span style="font-size:13px;color:${T.sage}">${when} &middot; ${(u.team.name||"").replace(/</g,"&lt;")}</span></span>
+          <span style="flex:1;min-width:0"><span style="font-size:16px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block">${what} &middot; ${names}</span><span style="font-size:13px;color:${T.sage}">${when} &middot; ${(u.team.name||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;")}</span></span>
           <span style="font-family:${MONO};font-size:15px;font-weight:800;color:${T.amber};white-space:nowrap;flex:none">Details &rsaquo;</span></button>`;
     }).join("");
     const newGameBtn = `<button data-act="newgamestart" style="${bigBtn(T.lime,"font-size:21px;padding:17px;border:2px solid rgba(255,255,255,.92);box-shadow:0 8px 22px rgba(225,29,46,.34)")}">${IC(PLAY)} New Game</button>`;
@@ -4085,7 +4090,7 @@ function actionArea(){
     // "create your first team" home (the #1 "shared link sends people to the wrong screen" complaint).
     // After sign-in, cloudClaimFollow/cloudClaimInvite completes + _joinTeamId opens the team.
     if(pendingJoin && C && C.enabled && !C.user){
-      const who=pendingJoinName?(`<b style="color:${T.chalk}">${pendingJoinName.replace(/</g,"&lt;")}</b>`):"this team";
+      const who=pendingJoinName?(`<b style="color:${T.chalk}">${pendingJoinName.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;")}</b>`):"this team";
       const isScorer=pendingJoin.type==="scorer";
       const headline=isScorer?("You've been invited to SCORE for "+who):("You've been invited to follow "+who);
       const blurb=isScorer
@@ -4194,7 +4199,7 @@ function actionArea(){
         ${(window.cloudIsScorer&&window.cloudIsScorer(t))?"":`<button data-act="favteam" data-arg="${t.id}" title="Follow this team" style="background:none;border:none;color:${t.fav?T.amber:T.sageDim};font-size:25px;line-height:1;padding:2px 4px;cursor:pointer">${t.fav?IC('starFill',23):IC('star',23)}</button>`}
         <button data-act="opent" data-arg="${t.id}" style="flex:1;min-width:0;display:flex;align-items:center;gap:10px;text-align:left;background:none;border:none;padding:6px 2px;cursor:pointer">
           <div style="flex:1;min-width:0">
-            <div style="font-family:${MONO};font-size:22px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.name}${ended?` <span style="font-family:${SANS};font-size:11px;font-weight:800;letter-spacing:.5px;color:${T.sageDim};background:${T.surface2};border:1px solid ${T.line};border-radius:6px;padding:2px 7px;vertical-align:middle">ENDED</span>`:""}</div>
+            <div style="font-family:${MONO};font-size:22px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(t.name)}${ended?` <span style="font-family:${SANS};font-size:11px;font-weight:800;letter-spacing:.5px;color:${T.sageDim};background:${T.surface2};border:1px solid ${T.line};border-radius:6px;padding:2px 7px;vertical-align:middle">ENDED</span>`:""}</div>
             <div style="display:flex;align-items:baseline;gap:9px;margin-top:5px"><span style="font-family:${MONO};font-size:26px;font-weight:800;color:${t.color};line-height:1">${rec}</span><span style="font-size:13px;color:${T.sage}">${sub}</span></div></div>
           <span style="color:${t.color};font-weight:800;font-size:15px;letter-spacing:.5px;white-space:nowrap">MANAGE &rsaquo;</span></button>
         ${liveBadge}</div>`;};
@@ -4254,7 +4259,7 @@ function actionArea(){
           return themedSelect("statsSeasonSel",opts,_sel,{onpick:"setStatsSeason",css:cell+";width:100%;flex:1;min-width:170px;font-family:"+MONO+";font-weight:800;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px;text-align:left"});})()}</div></div>`;
     const _vd="border-left:1px solid rgba(255,255,255,.14)";   // vertical column dividers for the stat table
     const sRows=t.players.map(p=>{const s=_statOf(p.id);const ab=s.ab||0,h=s.h||0;const avg=ab?(h/ab).toFixed(3).replace(/^0/,""):"—";
-      return `<tr style="border-top:1.5px solid ${T.line}"><td style="text-align:left;padding:10px 8px;font-weight:700;white-space:nowrap">#${p.num} ${p.name}</td><td style="padding:10px 6px;${_vd}">${ab}</td><td style="padding:10px 6px;${_vd}">${s.r||0}</td><td style="padding:10px 6px;${_vd}">${h}</td><td style="padding:10px 6px;${_vd}">${s.rbi||0}</td><td style="padding:10px 6px;${_vd}">${s.bb||0}</td><td style="padding:10px 6px;${_vd}">${s.k||0}</td><td style="padding:10px 6px;${_vd};font-weight:800">${avg}</td></tr>`;}).join("");
+      return `<tr style="border-top:1.5px solid ${T.line}"><td style="text-align:left;padding:10px 8px;font-weight:700;white-space:nowrap">#${escHtml(p.num)} ${escHtml(p.name)}</td><td style="padding:10px 6px;${_vd}">${ab}</td><td style="padding:10px 6px;${_vd}">${s.r||0}</td><td style="padding:10px 6px;${_vd}">${h}</td><td style="padding:10px 6px;${_vd}">${s.rbi||0}</td><td style="padding:10px 6px;${_vd}">${s.bb||0}</td><td style="padding:10px 6px;${_vd}">${s.k||0}</td><td style="padding:10px 6px;${_vd};font-weight:800">${avg}</td></tr>`;}).join("");
     const statTable=`<div class="frost-card" style="background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:14px 18px;overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-family:${MONO};font-size:18px;color:${T.chalk};text-align:center">
         <thead><tr style="color:${T.sageDim};font-size:14px;letter-spacing:.5px"><th style="text-align:left;padding:0 8px 10px">${_seasonLabel} · BATTING</th><th style="${_vd}">AB</th><th style="${_vd}">R</th><th style="${_vd}">H</th><th style="${_vd}">RBI</th><th style="${_vd}">BB</th><th style="${_vd}">K</th><th style="${_vd}">AVG</th></tr></thead>
         <tbody>${sRows}</tbody></table>
@@ -4265,7 +4270,7 @@ function actionArea(){
       const dt=(()=>{try{return new Date((g.date||"")+"T00:00").toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"});}catch(e){return g.date||"";}})();
       return `<button data-act="opengame" data-arg="${g.id}" style="display:flex;align-items:center;gap:12px;width:100%;text-align:left;padding:10px 2px;border:none;border-top:1.5px solid ${T.line};background:none;cursor:pointer">
           <span style="width:28px;height:28px;flex:none;display:flex;align-items:center;justify-content:center;border-radius:7px;background:${rc};color:#10141A;font-family:${MONO};font-weight:800;font-size:14px">${g.result||""}</span>
-          <div style="flex:1;min-width:0"><div style="font-weight:800;color:${T.ink};font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">vs ${(g.opp||"Opponent").replace(/</g,"&lt;")}</div><div style="font-size:12px;color:${T.sage};margin-top:1px">${dt}</div></div>
+          <div style="flex:1;min-width:0"><div style="font-weight:800;color:${T.ink};font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">vs ${(g.opp||"Opponent").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;")}</div><div style="font-size:12px;color:${T.sage};margin-top:1px">${dt}</div></div>
           <div style="font-family:${MONO};font-weight:800;font-size:19px;color:${T.chalk}">${g.us}&ndash;${g.them}</div>
           <span style="color:${T.lime};font-weight:800;font-size:16px">&rsaquo;</span></button>`;}).join("");
     const gamesBlock=`<div class="frost-card" style="background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:12px 16px">
@@ -4290,7 +4295,7 @@ function actionArea(){
     const schedWhen=(s)=>{ try{ const dt=new Date((s.date||"")+"T"+(s.time||"23:59")); return isNaN(dt.getTime())?0:dt.getTime(); }catch(e){ return 0; } };
     const schedRow=(s,past)=>{const isG=s.type!=="practice"; const wide=isWide();
       const title=isG?ICN.inplay+" "+(s.opp?("vs "+(s.opp||"").replace(/</g,"")):"Game"):ICN.ball+" Practice";
-      const sub=`${fmtSched(s)}${s.loc?` &middot; <span data-act="openmap" data-arg="${encodeURIComponent(s.loc)}" title="Open in Maps — get directions" style="color:${T.lime};cursor:pointer;text-decoration:underline;text-underline-offset:2px">${IC('<path d="M12 21s-6-5.7-6-10a6 6 0 1 1 12 0c0 4.3-6 10-6 10z"/><circle cx="12" cy="11" r="2.1"/>',15)} ${(s.loc||"").replace(/</g,"&lt;")}</span>`:""}${s.notes?(" &middot; "+(s.notes||"").replace(/</g,"&lt;")):""}`;
+      const sub=`${fmtSched(s)}${s.loc?` &middot; <span data-act="openmap" data-arg="${encodeURIComponent(s.loc)}" title="Open in Maps — get directions" style="color:${T.lime};cursor:pointer;text-decoration:underline;text-underline-offset:2px">${IC('<path d="M12 21s-6-5.7-6-10a6 6 0 1 1 12 0c0 4.3-6 10-6 10z"/><circle cx="12" cy="11" r="2.1"/>',15)} ${(s.loc||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;")}</span>`:""}${s.notes?(" &middot; "+(s.notes||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;")):""}`;
       const textBlock=`<div style="flex:1;min-width:0">
             <div style="font-weight:800;color:${T.ink};font-size:${wide?21:20}px;${wide?"white-space:nowrap;overflow:hidden;text-overflow:ellipsis":"line-height:1.25"}">${title}</div>
             <div style="font-size:${wide?17:16}px;color:${T.sage};margin-top:5px;${wide?"white-space:nowrap;overflow:hidden;text-overflow:ellipsis":"line-height:1.4"}">${sub}</div></div>`;
@@ -4349,9 +4354,9 @@ function actionArea(){
       const resWord=g.result==="W"?"WON":(g.result==="L"?"LOST":"TIE");
       return `<button data-act="opengame" data-arg="${g.id}" style="display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:${T.surface2};border:2px solid ${T.line};border-left:6px solid ${rc};border-radius:11px;padding:12px 14px;cursor:pointer">
           <span style="width:34px;height:34px;flex:none;display:flex;align-items:center;justify-content:center;border-radius:8px;background:${rc};color:#10141A;font-family:${MONO};font-weight:800;font-size:16px">${g.result||""}</span>
-          <div style="flex:1;min-width:0"><div style="font-weight:800;color:${T.ink};font-size:18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">vs ${(g.opp||"Opponent").replace(/</g,"&lt;")}</div><div style="font-size:14px;color:${T.sage};margin-top:2px">${gdt}</div></div>
+          <div style="flex:1;min-width:0"><div style="font-weight:800;color:${T.ink};font-size:18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">vs ${(g.opp||"Opponent").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;")}</div><div style="font-size:14px;color:${T.sage};margin-top:2px">${gdt}</div></div>
           <div style="text-align:right;flex:none;line-height:1.05"><div style="font-family:${MONO};font-size:9px;font-weight:800;letter-spacing:1.2px;color:${rc}">${resWord} &middot; FINAL</div>
-            <div style="font-family:${MONO};font-weight:800;font-size:21px;color:${T.chalk}"><span title="${(t.short||'Us')}">${g.us}</span>&ndash;<span title="${(g.oppShort||g.opp||'Opp')}">${g.them}</span></div>
+            <div style="font-family:${MONO};font-weight:800;font-size:21px;color:${T.chalk}"><span title="${escHtml(t.short||'Us')}">${g.us}</span>&ndash;<span title="${escHtml(g.oppShort||g.opp||'Opp')}">${g.them}</span></div>
             <div style="font-size:9px;color:${T.sageDim};letter-spacing:.3px">${(t.short||"US")} &ndash; ${(g.oppShort||(g.opp||"OPP").slice(0,3)).toUpperCase()}</div></div>
           <span style="color:${T.lime};font-weight:800;font-size:18px">&rsaquo;</span></button>`;}).join("");
     const pastGamesCard=`<div class="frost-card" style="background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:16px 18px;display:flex;flex-direction:column;gap:9px">
@@ -4426,7 +4431,7 @@ function actionArea(){
     // Owner-only: approve parents/players as MEMBERS (team chat + photos + full updates). Fans who follow
     // only see scores/stats/viewer. Pending requests come in here for Approve / Deny.
     const membersSection = (owner && C&&C.enabled) ? (function(){
-      const esc=s=>(s==null?"":String(s)).replace(/</g,"&lt;");
+      const esc=escHtml; // was a local ad hoc escaper — see html-safe.js
       const reqs=(t.memberRequests||[]), mems=(t.members||[]);
       const reqRows=reqs.map(em=>`<div style="display:flex;align-items:center;gap:8px;background:${T.surface2};border:2px solid ${T.amber};border-radius:10px;padding:9px 12px">
           <span style="flex:1;min-width:0;font-size:14.5px;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(em)}</span>
@@ -4451,7 +4456,7 @@ function actionArea(){
     const secWrap=(inner)=>`<div style="width:100%;max-width:880px;margin:0 auto;display:flex;flex-direction:column;gap:12px">${inner}</div>`;
     if(teamTab==="roster"){
       const canMng=!(C&&C.enabled)||(window.cloudIsScorer&&window.cloudIsScorer(t));
-      const esc=s=>(s==null?"":String(s)).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+      const esc=escHtml; // was a local ad hoc escaper — see html-safe.js
       // ---- saved lineups card ----
       const LUs=teamLineups(t), actId=t.activeLineupId||(LUs[0]&&LUs[0].id);
       // v327: the whole card is now ONE tap target (open the lineup) — jford: with Make default/Print/
@@ -4489,7 +4494,7 @@ function actionArea(){
     if(teamTab==="lineupedit"){
       const lu=lineupById(t,editLineupId);
       if(!lu){ teamTab="roster"; return actionArea(); }
-      const esc=s=>(s==null?"":String(s)).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+      const esc=escHtml; // was a local ad hoc escaper — see html-safe.js
       lu.order=(lu.order||[]).filter(id=>t.players.some(p=>p.id===id));   // drop any released players
       const n=lu.order.length;
       const back=`<div class="frost-card" style="display:flex;align-items:center;gap:12px;background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:12px 14px">
@@ -4575,7 +4580,7 @@ function actionArea(){
                <button data-act="endseason" data-arg="${t.id}" style="background:none;border:2px solid ${T.clay};color:${T.clay};border-radius:11px;padding:13px;font-family:${MONO};font-weight:800;font-size:15px;letter-spacing:.5px;display:flex;align-items:center;justify-content:center;gap:9px">${IC('flag',16)} End season</button>`}
         </div>`;
       // A live/in-progress game for THIS team → a "View current game" button right here (mirrors Home).
-      const _meH=String(""), _le=x=>String(x==null?"":x).replace(/</g,"&lt;");
+      const _meH=String(""), _le=x=>String(x==null?"":x).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
       const _myHere=gameActive&&curTeamId===t.id&&!(G&&G.final);
       const _liveT=_liveGames[t.id];
       const mgmtLiveBtn=_myHere
@@ -4602,7 +4607,7 @@ function actionArea(){
     if(teamTab==="schedule") return `<div style="width:100%;max-width:1080px;margin:0 auto;display:flex;flex-direction:column;gap:14px">${secHdr("Schedule")}${scheduleSection}</div>`;
     if(teamTab==="gameview"){
       const g=(t.games||[]).find(x=>x.id===viewGameId);
-      const esc=s=>(s==null?"":String(s)).replace(/</g,"&lt;");
+      const esc=escHtml; // was a local ad hoc escaper — see html-safe.js
       if(!g) return secWrap(`${secHdr("Game")}<div style="font-size:13px;color:${T.sage};padding:8px">Game not found.</div>`);
       const _canEdit = !(window.Cloud&&window.Cloud.enabled&&window.Cloud.user) || (window.cloudCanManage&&window.cloudCanManage(t));
       // ===== EDIT a finished game: fix the final score, opponent, date, and the per-batter box score.
@@ -4694,8 +4699,8 @@ function actionArea(){
       if(zp){ const canDelZ=(C.user&&zp.authorUid===C.user.uid)||(window.cloudCanManage&&window.cloudCanManage(t));
         zoomOv=`<div data-act="photoclose" style="position:fixed;inset:0;z-index:240;background:rgba(8,11,16,.93);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:13px;padding:18px">
             <img src="${zp.url||zp.img}" onclick="event.stopPropagation()" style="max-width:100%;max-height:74%;object-fit:contain;border-radius:10px;box-shadow:0 12px 40px rgba(0,0,0,.6)">
-            ${zp.caption?`<div style="color:${T.chalk};font-size:13px;max-width:90%;text-align:center">${(zp.caption||"").replace(/</g,"&lt;")}</div>`:""}
-            <div style="font-size:11px;color:${T.sageDim}">${(zp.authorName||"").replace(/</g,"&lt;")}</div>
+            ${zp.caption?`<div style="color:${T.chalk};font-size:13px;max-width:90%;text-align:center">${(zp.caption||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;")}</div>`:""}
+            <div style="font-size:11px;color:${T.sageDim}">${(zp.authorName||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;")}</div>
             <div style="display:flex;gap:10px">${canDelZ?`<button data-act="delphoto" data-arg="${zp.id}" style="background:none;border:2px solid ${T.out};color:${T.out};border-radius:8px;padding:10px 16px;font-weight:700">${IC('trash',15)} Delete</button>`:""}<button data-act="photoclose" style="background:${T.surface2};border:2px solid ${T.line};color:${T.chalk};border-radius:8px;padding:10px 18px;font-weight:700">Close</button></div></div>`;
       }
       return secWrap(`${secHdr("Photos")}${addBtn}${grid}`)+zoomOv;
@@ -4721,7 +4726,7 @@ function actionArea(){
           ${showManage?hb("manage",IC('gear',26),"Team management"):""}
           ${hbAct("shareteam",IC('share',26),"Share &amp; invite","grid-column:1/-1")}
         </div>`;})()}
-        <button data-act="startteam" style="${bigBtn(t.color)}">${IC('<path d="M8 5l11 7-11 7z" fill="currentColor" stroke="none"/>')} Start game with ${t.short}</button>
+        <button data-act="startteam" style="${bigBtn(t.color)}">${IC('<path d="M8 5l11 7-11 7z" fill="currentColor" stroke="none"/>')} Start game with ${escHtml(t.short)}</button>
         <button data-act="lineupcard" style="${ghost};display:flex;align-items:center;justify-content:center;gap:9px">${ICN.doc} Lineup card (PDF)</button>
         <div style="display:flex;justify-content:flex-end;margin-top:2px">
           <button data-act="deleteteam" style="background:${T.out};border:2px solid #fff;color:#fff;border-radius:9px;padding:11px 18px;font-family:${MONO};font-size:13px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;box-shadow:0 4px 14px rgba(0,0,0,.5)">${IC('trash',14)} Delete team</button></div>
@@ -4751,7 +4756,7 @@ function actionArea(){
     // ---- OUR-team picker: pick from your saved teams (or make one). ----
     const sortedTeams=DB.teams.slice().sort((a,b)=>((a.name||"").toLowerCase()<(b.name||"").toLowerCase()?-1:1));
     const cards=sortedTeams.map(t=>{const R=teamRec(t),rec=R.w+"-"+R.l+(R.t?"-"+R.t:"");return `<button data-act="setteam" data-arg="${t.id}" data-tname="${(t.name||'').toLowerCase().replace(/"/g,'&quot;')}" style="display:flex;align-items:center;gap:12px;background:${T.surface};border:2px solid ${T.line};border-left:5px solid ${t.color};border-radius:10px;padding:12px 14px;text-align:left;width:100%">
-        <div style="flex:1;min-width:0"><div style="font-family:${MONO};font-size:17px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.name}</div>
+        <div style="flex:1;min-width:0"><div style="font-family:${MONO};font-size:17px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(t.name)}</div>
           <div style="font-family:${MONO};font-size:15px;font-weight:800;color:${t.color};margin-top:3px">${rec}</div></div>
         <span style="color:${t.color};font-weight:800;font-size:12px">PICK &rsaquo;</span></button>`;}).join("")
       ||`<div style="color:${T.sage};font-size:13px;text-align:center;padding:16px 8px;border:1px dashed ${T.line};border-radius:10px">No saved teams yet — create one below.</div>`;
@@ -4936,7 +4941,7 @@ function actionArea(){
     const flips=(window._flipLog||[]);
     const flipBlock=`<div style="background:${T.surface};border:2px solid ${T.line};border-radius:11px;padding:13px 15px">
         <div style="font-size:13px;font-weight:800;color:${T.ink};margin-bottom:8px">Inning-flip trace <span style="font-weight:600;color:${T.sageDim};font-size:11px">(what triggered each half-inning change)</span></div>
-        ${flips.length?`<div style="font-family:${MONO};font-size:11px;color:${T.sage};line-height:1.7;max-height:210px;overflow:auto;white-space:pre-wrap">${flips.slice(-30).map(l=>l.replace(/</g,"&lt;")).join("\n")}</div>`:`<div style="font-size:12px;color:${T.sageDim}">No half-inning changes yet this session.</div>`}</div>`;
+        ${flips.length?`<div style="font-family:${MONO};font-size:11px;color:${T.sage};line-height:1.7;max-height:210px;overflow:auto;white-space:pre-wrap">${flips.slice(-30).map(l=>l.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;")).join("\n")}</div>`:`<div style="font-size:12px;color:${T.sageDim}">No half-inning changes yet this session.</div>`}</div>`;
     window.__diagText += "\n\nInning-flip trace:\n"+(flips.length?flips.join("\n"):"(none)");
     // Network/sync log — sign-in drops, live-publish blocks/failures/recoveries, team-sync failures,
     // scorer handoffs. PERSISTED (survives a reload/app update), unlike the flip trace above, since
@@ -4944,7 +4949,7 @@ function actionArea(){
     const netlog=(window._netLog||(function(){try{return JSON.parse(localStorage.getItem("al-netlog")||"[]");}catch(e){return [];}})());
     const netlogBlock=`<div style="background:${T.surface};border:2px solid ${T.line};border-radius:11px;padding:13px 15px">
         <div style="font-size:13px;font-weight:800;color:${T.ink};margin-bottom:8px">Network/sync log <span style="font-weight:600;color:${T.sageDim};font-size:11px">(sign-in drops, live-publish &amp; sync failures, scorer handoffs)</span></div>
-        ${netlog.length?`<div style="font-family:${MONO};font-size:11px;color:${T.sage};line-height:1.7;max-height:210px;overflow:auto;white-space:pre-wrap">${netlog.slice(-60).map(l=>l.replace(/</g,"&lt;")).join("\n")}</div>`:`<div style="font-size:12px;color:${T.sageDim}">No network/sync events logged yet.</div>`}</div>`;
+        ${netlog.length?`<div style="font-family:${MONO};font-size:11px;color:${T.sage};line-height:1.7;max-height:210px;overflow:auto;white-space:pre-wrap">${netlog.slice(-60).map(l=>l.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;")).join("\n")}</div>`:`<div style="font-size:12px;color:${T.sageDim}">No network/sync events logged yet.</div>`}</div>`;
     window.__diagText += "\n\nNetwork/sync log:\n"+(netlog.length?netlog.join("\n"):"(none)");
     return `<div style="display:flex;flex-direction:column;gap:12px">
         <div class="frost-card" style="display:flex;align-items:center;gap:10px;background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:12px 14px">
@@ -4971,8 +4976,8 @@ function actionArea(){
     const head=`<div class="frost-card" style="display:flex;align-items:center;gap:10px;background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:12px 14px">
         <button data-act="playerback" style="${ghost};padding:9px 13px;flex:none">&lsaquo; Back</button>
         <div style="flex:1;min-width:0;border-left:5px solid ${t.color};padding-left:10px">
-          <div style="font-family:${MONO};font-size:20px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">#${p.num||"–"} ${(p.name||"").replace(/</g,"&lt;")}</div>
-          <div style="font-size:12px;color:${T.sage}">${(t.name||"").replace(/</g,"&lt;")}</div></div>
+          <div style="font-family:${MONO};font-size:20px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">#${p.num||"–"} ${(p.name||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;")}</div>
+          <div style="font-size:12px;color:${T.sage}">${(t.name||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;")}</div></div>
         <button data-act="shareplayer" data-arg="${t.id}:${p.id}" title="Share this player" style="background:none;border:none;color:${T.sage};line-height:1;padding:4px;cursor:pointer">${IC('share',24)}</button>
         <button data-act="followplayer" data-arg="${t.id}:${p.id}" title="${following?"Following":"Follow this player"}" style="background:none;border:none;color:${following?T.amber:T.sageDim};line-height:1;padding:4px;cursor:pointer">${following?IC('starFill',26):IC('star',26)}</button></div>`;
     const tab=(id,lbl)=>`<button data-act="playertab" data-arg="${id}" style="flex:1;background:${playerTab===id?T.lime:T.surface2};color:${playerTab===id?"#fff":T.sage};border:2px solid ${playerTab===id?T.lime:T.line};border-radius:9px;padding:10px;font-family:${MONO};font-weight:800;font-size:14px;letter-spacing:.4px;text-transform:uppercase">${lbl}</button>`;
@@ -4988,7 +4993,7 @@ function actionArea(){
         const others=profile.keys.filter(k=>k!==key).map(k=>{ const i=k.indexOf(":"),ot=teamById(k.slice(0,i)); return ot?(ot.name||"a team"):"a team"; });
         return `<div class="frost-card" style="background:${T.surface};border:2px solid ${T.amber};border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:8px">
             <div style="font-size:13px;font-weight:800;color:${T.amber}">&#128279; Linked with ${others.length} other team entr${others.length===1?"y":"ies"}</div>
-            <div style="font-size:12.5px;color:${T.sage}">${others.map(n=>n.replace(/</g,"&lt;")).join(", ")}</div>
+            <div style="font-size:12.5px;color:${T.sage}">${others.map(n=>n.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;")).join(", ")}</div>
             <div style="display:flex;gap:8px">
               <button data-act="openplayerprofile" data-arg="${profile.id}" style="${ghost};flex:1;padding:9px;font-size:13px">View combined stats</button>
               <button data-act="unlinkplayerprofile" data-arg="${key}" style="background:none;border:2px solid ${T.out};color:${T.out};border-radius:9px;padding:9px 13px;font-weight:700;font-size:13px">Unlink</button>
@@ -4997,7 +5002,7 @@ function actionArea(){
       const others=followedPlayers().filter(f=>f.key!==key);
       if(!others.length)return "";
       const rows=others.map(f=>`<button data-act="linkplayerprofile" data-arg="${key}|${f.key}" style="display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:${T.surface2};border:2px solid ${T.line};border-radius:9px;padding:9px 12px">
-          <span style="flex:1;min-width:0"><span style="font-weight:700;color:${T.ink};font-size:13.5px">#${f.player.num||"–"} ${(f.player.name||"").replace(/</g,"&lt;")}</span><span style="display:block;font-size:11.5px;color:${T.sageDim}">${(f.team.name||"").replace(/</g,"&lt;")}</span></span>
+          <span style="flex:1;min-width:0"><span style="font-weight:700;color:${T.ink};font-size:13.5px">#${f.player.num||"–"} ${(f.player.name||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;")}</span><span style="display:block;font-size:11.5px;color:${T.sageDim}">${(f.team.name||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;")}</span></span>
           <span style="color:${T.lime};font-weight:700;font-size:12px">Link &rsaquo;</span></button>`).join("");
       return `<div class="frost-card" style="background:${T.surface};border:2px solid ${T.line};border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:8px">
           <div style="font-size:13px;font-weight:800;color:${T.lime}">Same kid as someone you already follow?</div>
@@ -5014,7 +5019,7 @@ function actionArea(){
           <div style="font-size:13.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin-bottom:10px">Season &middot; Batting</div>
           <div style="display:flex;flex-wrap:wrap;gap:8px">${stat("AVG",avg)}${stat("AB",ab)}${stat("H",h)}${stat("R",s.r||0)}${stat("RBI",s.rbi||0)}${stat("BB",s.bb||0)}${stat("K",s.k||0)}</div>
           ${pitchBlk}
-          <div style="font-size:12px;color:${T.sageDim};margin-top:12px">Season totals across ${(t.name||"the team").replace(/</g,"&lt;")}&#39;s scored games.</div></div>`;
+          <div style="font-size:12px;color:${T.sageDim};margin-top:12px">Season totals across ${(t.name||"the team").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;")}&#39;s scored games.</div></div>`;
     }
     return `<div style="display:flex;flex-direction:column;gap:12px">${head}${linkCard}${tabs}${body}</div>`;
   }
@@ -5028,7 +5033,7 @@ function actionArea(){
     const head=`<div class="frost-card" style="display:flex;align-items:center;gap:10px;background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:12px 14px">
         <button data-act="gohome" style="${ghost};padding:9px 13px;flex:none">&lsaquo; Home</button>
         <div style="flex:1;min-width:0">
-          <div style="font-family:${MONO};font-size:20px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${(profile.name||"Player").replace(/</g,"&lt;")}</div>
+          <div style="font-family:${MONO};font-size:20px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${(profile.name||"Player").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;")}</div>
           <div style="font-size:12px;color:${T.sage}">Career &middot; ${cs.rows.length} team${cs.rows.length===1?"":"s"}</div></div></div>`;
     const pitchBlk=(pt.outs||pt.k||pt.bb||pt.h||pt.r)?`<div style="font-size:13.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin:14px 0 10px">Career &middot; Pitching</div><div style="display:flex;flex-wrap:wrap;gap:8px">${stat("IP",ip)}${stat("K",pt.k)}${stat("BB",pt.bb)}${stat("H",pt.h)}${stat("R",pt.r)}</div>`:"";
     const totalsCard=`<div class="frost-card" style="background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:14px">
@@ -5040,7 +5045,7 @@ function actionArea(){
       const rb=r.bat, ravg=rb.ab?(rb.h/rb.ab).toFixed(3).replace(/^0/,""):"—";
       return `<button data-act="openplayer" data-arg="${r.team.id}:${r.player.id}" style="display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:${T.surface};border:2px solid ${r.team.color}66;border-left:5px solid ${r.team.color};border-radius:12px;padding:12px 14px">
           <div style="flex:1;min-width:0">
-            <div style="font-weight:800;color:${T.ink};font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${(r.team.name||"").replace(/</g,"&lt;")}</div>
+            <div style="font-weight:800;color:${T.ink};font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${(r.team.name||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;")}</div>
             <div style="font-size:12px;color:${T.sage}">${r.seasons} &middot; #${r.player.num||"–"} &middot; ${ravg} AVG, ${rb.h||0}H ${rb.rbi||0}RBI</div></div>
           <span style="color:${T.lime};font-weight:800;font-size:16px">&rsaquo;</span></button>`;
     }).join("");
@@ -5056,7 +5061,7 @@ function actionArea(){
         <div style="font-family:${MONO};font-size:20px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:${T.lime}">Players calendar</div></div>`;
     if(!fps.length) return `<div style="display:flex;flex-direction:column;gap:12px">${head}<div style="font-size:13px;color:${T.sage};text-align:center;padding:24px;border:1px dashed ${T.line};border-radius:12px">Follow a player first — open a team roster, tap a player (&rsaquo;), then the &#9733; star. Their games show up here on one calendar.</div></div>`;
     const chips=fps.map(f=>{const hid=followHidden[f.key],col=playerHue(f.key);
-      return `<button data-act="calfollowtog" data-arg="${f.key}" style="display:flex;align-items:center;gap:7px;background:${hid?T.surface2:col};border:2px solid ${hid?T.line:col};color:${hid?T.sage:"#fff"};border-radius:999px;padding:7px 12px;font-weight:800;font-size:12px"><span style="width:9px;height:9px;border-radius:50%;background:${hid?T.sageDim:"#fff"}"></span>#${f.player.num||"–"} ${(f.player.name||"").replace(/</g,"&lt;")}</button>`;}).join("");
+      return `<button data-act="calfollowtog" data-arg="${f.key}" style="display:flex;align-items:center;gap:7px;background:${hid?T.surface2:col};border:2px solid ${hid?T.line:col};color:${hid?T.sage:"#fff"};border-radius:999px;padding:7px 12px;font-weight:800;font-size:12px"><span style="width:9px;height:9px;border-radius:50%;background:${hid?T.sageDim:"#fff"}"></span>#${f.player.num||"–"} ${(f.player.name||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;")}</button>`;}).join("");
     return `<div style="display:flex;flex-direction:column;gap:12px">${head}
         <div style="font-size:12px;color:${T.sage};margin:0 2px">Tap a name to show/hide that player&#39;s games.</div>
         <div style="display:flex;flex-wrap:wrap;gap:7px">${chips}</div>
@@ -5069,8 +5074,8 @@ function actionArea(){
     const rowCard=`display:flex;align-items:center;justify-content:space-between;gap:12px;background:${T.surface};border:2px solid ${T.line};border-radius:12px;padding:18px 20px;box-shadow:0 2px 6px rgba(15,30,60,.07)`;
     const sideBtn=(s,lbl2)=>{const on=G.ourSide===s;return `<button data-act="ng-side" data-arg="${s}" style="flex:1;padding:18px;border:none;border-radius:0;font-family:${MONO};font-weight:800;font-size:19px;text-transform:uppercase;letter-spacing:.5px;background:${on?OUR.color:T.surface};color:${on?"#FFFFFF":T.ink}">${lbl2}</button>`;};
     const teamRow=(who,name,short,color,act)=>`<button data-act="${act}" class="frost-card" style="display:flex;align-items:center;gap:14px;background:var(--frost);border:2px solid ${color};border-left:11px solid ${color};border-radius:12px;padding:14px 16px;width:100%;text-align:left">
-        <span style="width:54px;height:54px;flex:none;border-radius:12px;background:${color};color:${idealText(color)};display:flex;align-items:center;justify-content:center;font-family:${MONO};font-weight:800;font-size:18px;letter-spacing:.5px;box-shadow:0 0 0 1px rgba(255,255,255,.2)">${((short||name||"?").slice(0,4)).toUpperCase()}</span>
-        <div style="flex:1;min-width:0"><div style="${lbl};margin:0 0 4px">${who}</div><div style="font-family:${MONO};font-size:23px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${name}</div></div>
+        <span style="width:54px;height:54px;flex:none;border-radius:12px;background:${color};color:${idealText(color)};display:flex;align-items:center;justify-content:center;font-family:${MONO};font-weight:800;font-size:18px;letter-spacing:.5px;box-shadow:0 0 0 1px rgba(255,255,255,.2)">${escHtml((short||name||"?").slice(0,4).toUpperCase())}</span>
+        <div style="flex:1;min-width:0"><div style="${lbl};margin:0 0 4px">${who}</div><div style="font-family:${MONO};font-size:23px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(name)}</div></div>
         <span style="color:${color};font-weight:800;font-size:14px;letter-spacing:.5px;flex:none">CHANGE &rsaquo;</span></button>`;
     // Opponent colour picker — so two same-ish team colours can be made distinct for the scoreboard.
     // Single "Opponent color" button → native colour picker (no swatch wall). Set it so a same-ish
@@ -5093,7 +5098,7 @@ function actionArea(){
           <button data-act="${setMode?"settingsdone":"gohome"}" style="${ghost};padding:9px 11px;flex:none">&lsaquo; ${setMode?"Done":"Home"}</button>
           <div style="flex:1;min-width:0;font-family:${MONO};font-size:23px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:${T.lime};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${setMode?"Game Settings":"New Game"}</div>${startTop}</div>`;
     const sideSel=`<div class="frost-card" style="background:${T.surface};border:2px solid ${T.line};border-radius:12px;padding:16px 20px;display:flex;flex-direction:column;gap:11px;box-shadow:0 2px 6px rgba(15,30,60,.07)">
-          <div style="font-weight:800;color:${T.ink};font-size:19px">Is ${OUR.name} home or away?</div>
+          <div style="font-weight:800;color:${T.ink};font-size:19px">Is ${escHtml(OUR.name)} home or away?</div>
           <div style="display:flex;gap:2px;background:${T.line};border:2px solid ${T.line};border-radius:11px;overflow:hidden">${sideBtn("home","Home")}${sideBtn("away","Away")}</div></div>`;
     const selStyle=`background:${T.surface2};border:2px solid ${T.line};color:${T.ink};border-radius:10px;padding:13px 12px;font-family:${MONO};font-size:16px;font-weight:800;outline:none;max-width:190px`;
     const curL=leagueById(G.league);
@@ -5156,7 +5161,7 @@ function actionArea(){
       return `<div style="min-height:100%;display:flex;flex-direction:column;gap:14px;justify-content:safe center">
           ${header}
           <div style="width:100%;max-width:1180px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start">
-            <div style="display:flex;flex-direction:column;gap:12px">${teamRow("Your team",OUR.name,OUR.short,OUR.color,"pickour")}${teamRow("Opponent",OPP.name,OPP.short,OPP.color,"pickopp")}${oppBrandRow}<button data-act="editopproster" style="${ghost};border-color:${OPP.color||T.lime};color:${T.ink};display:flex;align-items:center;justify-content:center;gap:8px;width:100%;flex:none;margin-top:-6px">${IC('users',16)} Add / edit ${(OPP.short||"opponent").replace(/</g,"&lt;")} lineup &rsaquo;</button>${sideSel}<div style="display:flex;gap:12px"><div style="flex:1;min-width:0">${runCapCard}</div><div style="flex:1;min-width:0">${hittersCard}</div></div>${startCard}</div>
+            <div style="display:flex;flex-direction:column;gap:12px">${teamRow("Your team",OUR.name,OUR.short,OUR.color,"pickour")}${teamRow("Opponent",OPP.name,OPP.short,OPP.color,"pickopp")}${oppBrandRow}<button data-act="editopproster" style="${ghost};border-color:${OPP.color||T.lime};color:${T.ink};display:flex;align-items:center;justify-content:center;gap:8px;width:100%;flex:none;margin-top:-6px">${IC('users',16)} Add / edit ${(OPP.short||"opponent").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;")} lineup &rsaquo;</button>${sideSel}<div style="display:flex;gap:12px"><div style="flex:1;min-width:0">${runCapCard}</div><div style="flex:1;min-width:0">${hittersCard}</div></div>${startCard}</div>
             <div style="display:flex;flex-direction:column;gap:12px">${leagueCard}${rulebookCard}${alertsCard}${pitchCatchCard}${pitchTypeCard}${detailedCard}</div>
           </div>
           <div style="width:100%;max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:10px">${lineupCardBtn}</div>
@@ -5168,7 +5173,7 @@ function actionArea(){
         ${teamRow("Your team",OUR.name,OUR.short,OUR.color,"pickour")}
         ${teamRow("Opponent",OPP.name,OPP.short,OPP.color,"pickopp")}
         ${oppBrandRow}
-        <button data-act="editopproster" style="${ghost};border-color:${OPP.color||T.lime};color:${T.ink};display:flex;align-items:center;justify-content:center;gap:8px;width:100%;flex:none;margin-top:-6px">${IC('users',16)} Add / edit ${(OPP.short||"opponent").replace(/</g,"&lt;")} lineup &rsaquo;</button>
+        <button data-act="editopproster" style="${ghost};border-color:${OPP.color||T.lime};color:${T.ink};display:flex;align-items:center;justify-content:center;gap:8px;width:100%;flex:none;margin-top:-6px">${IC('users',16)} Add / edit ${(OPP.short||"opponent").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;")} lineup &rsaquo;</button>
         ${sideSel}${ruleCards}${lineupCardBtn}
       </div>`;
   }
@@ -5185,7 +5190,7 @@ function actionArea(){
           <span data-oppdrag style="cursor:grab;color:${T.sageDim};display:flex;align-items:center;padding:6px 2px;touch-action:none">${IC('<path d="M4 7h16M4 12h16M4 17h16"/>')}</span>
           <span style="font-family:${MONO};font-size:18px;font-weight:800;color:${T.lime};width:20px;text-align:center;flex:none">${i+1}</span>
           <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:7px">
-            <button data-act="oppedit" data-arg="${i}" style="text-align:left;background:transparent;border:none;color:${T.chalk};font-size:20px;font-weight:700;display:flex;align-items:center;gap:9px;padding:0;min-width:0"><span style="font-family:${MONO};color:${OPP.color};flex:none">#${(e.num||"").toString().replace(/</g,"")}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${nm.replace(/</g,"&lt;")}</span></button>
+            <button data-act="oppedit" data-arg="${i}" style="text-align:left;background:transparent;border:none;color:${T.chalk};font-size:20px;font-weight:700;display:flex;align-items:center;gap:9px;padding:0;min-width:0"><span style="font-family:${MONO};color:${OPP.color};flex:none">#${(e.num||"").toString().replace(/</g,"")}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${nm.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;")}</span></button>
             <div style="display:flex;align-items:center;gap:9px">
               <button data-act="opppickpos" data-arg="${i}" style="background:${isP?OPP.color:T.surface2};border:2px solid ${isP?OPP.color:T.line};color:${isP?"#FFFFFF":T.chalk};border-radius:7px;padding:7px 14px;font-family:${MONO};font-size:16px;font-weight:800;min-width:54px;flex:none">${pos}</button>
               <span style="font-size:12px;color:${T.sageDim}">${isP?"Pitcher":(pos==="—"?"Tap to set position":"Fielding "+pos)}</span>
@@ -5193,20 +5198,20 @@ function actionArea(){
         return `<div data-opprow data-i="${i}" style="display:flex;align-items:center;gap:6px;background:${T.surface2};border:2px solid ${T.line};border-radius:9px;padding:8px 8px">
           <span data-oppdrag style="cursor:grab;color:${T.sageDim};display:flex;align-items:center;padding:4px 2px;touch-action:none">${IC('<path d="M4 7h16M4 12h16M4 17h16"/>')}</span>
           <span style="font-family:${MONO};font-size:17px;font-weight:800;color:${T.lime};width:18px;text-align:center">${i+1}</span>
-          <button data-act="oppedit" data-arg="${i}" style="flex:1;min-width:0;text-align:left;background:transparent;border:none;color:${T.chalk};font-size:18px;font-weight:700;display:flex;align-items:center;gap:8px;overflow:hidden"><span style="font-family:${MONO};color:${OPP.color};min-width:34px">#${(e.num||"").toString().replace(/</g,"")}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${nm.replace(/</g,"&lt;")}</span></button>
+          <button data-act="oppedit" data-arg="${i}" style="flex:1;min-width:0;text-align:left;background:transparent;border:none;color:${T.chalk};font-size:18px;font-weight:700;display:flex;align-items:center;gap:8px;overflow:hidden"><span style="font-family:${MONO};color:${OPP.color};min-width:34px">#${(e.num||"").toString().replace(/</g,"")}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${nm.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;")}</span></button>
           <button data-act="opppickpos" data-arg="${i}" style="background:${isP?OPP.color:T.surface2};border:2px solid ${isP?OPP.color:T.line};color:${isP?"#FFFFFF":T.chalk};border-radius:7px;padding:8px 12px;font-family:${MONO};font-size:16px;font-weight:800;min-width:50px">${pos}</button></div>`;}).join("");
-      const benchHtml=bench.length?bench.map((e,j)=>`<button data-act="oppbenchin" data-arg="${j}" title="Pinch in" style="font-family:${MONO};font-size:14px;color:${T.chalk};background:${T.surface};border:2px solid ${T.line};border-radius:6px;padding:6px 10px;white-space:nowrap">#${(e.num||"").toString().replace(/</g,"")} ${((e.name||"").trim()||"sub").replace(/</g,"&lt;")} <span style="color:${T.lime};font-weight:800">+</span></button>`).join(" "):`<span style="font-size:12px;color:${T.sageDim}">No bench players</span>`;
+      const benchHtml=bench.length?bench.map((e,j)=>`<button data-act="oppbenchin" data-arg="${j}" title="Pinch in" style="font-family:${MONO};font-size:14px;color:${T.chalk};background:${T.surface};border:2px solid ${T.line};border-radius:6px;padding:6px 10px;white-space:nowrap">#${(e.num||"").toString().replace(/</g,"")} ${((e.name||"").trim()||"sub").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;")} <span style="color:${T.lime};font-weight:800">+</span></button>`).join(" "):`<span style="font-size:12px;color:${T.sageDim}">No bench players</span>`;
       return `<div class="frost-card" style="flex-shrink:0;display:flex;align-items:center;gap:10px;background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:10px 12px">
           <button data-act="lineupback" style="${ghost};padding:9px 13px;flex:none">&lsaquo; Back</button>
           <div style="flex:1;min-width:0"><div style="font-family:${MONO};font-size:20px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:${T.lime}">Lineups</div>
-            <div style="font-size:11px;color:${T.sage};margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${OPP.name} &middot; batting ${n} &middot; drag to reorder</div></div></div>
+            <div style="font-size:11px;color:${T.sage};margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(OPP.name)} &middot; batting ${n} &middot; drag to reorder</div></div></div>
         ${luToggle}
         <div style="flex-shrink:0;display:flex;gap:2px;background:${T.line};border:2px solid ${T.line};border-radius:9px;overflow:hidden">
           <button data-act="luview" data-arg="list" style="flex:1;background:${lineupView==="list"?T.lime:T.surface2};color:${lineupView==="list"?"#fff":T.sage};border:none;border-radius:0;padding:9px;font-family:${MONO};font-weight:800;font-size:13px;letter-spacing:.4px">${IC('list',15)} Batting order</button>
           <button data-act="luview" data-arg="field" style="flex:1;background:${lineupView==="field"?T.lime:T.surface2};color:${lineupView==="field"?"#fff":T.sage};border:none;border-radius:0;padding:9px;font-family:${MONO};font-weight:800;font-size:13px;letter-spacing:.4px">&#9651; Field map</button></div>
         ${lineupView==="field" ? oppFieldMapHtml() : `<div style="flex-shrink:0;display:flex;align-items:center;justify-content:space-between;background:${T.surface2};border:2px solid ${T.line};border-radius:9px;padding:9px 12px">
           <span style="font-size:14px;color:${T.sage}">Pitcher</span>
-          <button data-act="opppickpitch" style="background:transparent;border:none;color:${T.chalk};font-size:18px;font-weight:700;display:flex;align-items:center;gap:8px">${pit?`<span style="font-family:${MONO};color:${OPP.color}">#${(pit.num||"").toString().replace(/</g,"")}</span>${((pit.name||"").trim()||"Pitcher").replace(/</g,"&lt;")}`:`<span style="color:${T.sageDim}">Set pitcher</span>`}<span style="font-size:12px;color:${OPP.color};font-weight:700;margin-left:4px">CHANGE</span></button></div>
+          <button data-act="opppickpitch" style="background:transparent;border:none;color:${T.chalk};font-size:18px;font-weight:700;display:flex;align-items:center;gap:8px">${pit?`<span style="font-family:${MONO};color:${OPP.color}">#${(pit.num||"").toString().replace(/</g,"")}</span>${((pit.name||"").trim()||"Pitcher").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;")}`:`<span style="color:${T.sageDim}">Set pitcher</span>`}<span style="font-size:12px;color:${OPP.color};font-weight:700;margin-left:4px">CHANGE</span></button></div>
         <div id="opp-list" style="flex:1 1 auto;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:6px">${orows}</div>
         <div style="flex-shrink:0;display:flex;gap:8px">
           <button data-act="oppadd" style="${ghost};flex:1" ${n>=12?"disabled":""}>+ Add hitter</button>
@@ -5267,7 +5272,7 @@ function actionArea(){
         ${moveHandle}
         ${numBadge}${_cur?curBadge:""}
         <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:7px">
-          <button data-act="editplayer" data-arg="${slot}" style="text-align:left;background:transparent;border:none;color:${T.chalk};font-size:20px;font-weight:700;display:flex;align-items:center;gap:9px;padding:0;min-width:0"><span style="font-family:${MONO};color:${OUR.color};flex:none">#${p.num}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.name}</span></button>
+          <button data-act="editplayer" data-arg="${slot}" style="text-align:left;background:transparent;border:none;color:${T.chalk};font-size:20px;font-weight:700;display:flex;align-items:center;gap:9px;padding:0;min-width:0"><span style="font-family:${MONO};color:${OUR.color};flex:none">#${escHtml(p.num)}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(p.name)}</span></button>
           <div style="display:flex;align-items:center;gap:9px">
             <button data-act="pickpos" data-arg="${slot}" style="background:${isP?OUR.color:T.surface2};border:2px solid ${isP?OUR.color:T.line};color:${isP?"#FFFFFF":T.chalk};border-radius:7px;padding:7px 14px;font-family:${MONO};font-size:16px;font-weight:800;min-width:54px;flex:none">${pos}</button>
             <span style="font-size:12px;color:${T.sageDim}">${isP?"Pitcher":(pos==="—"?"Tap to set position":"Fielding "+pos)}</span>
@@ -5275,7 +5280,7 @@ function actionArea(){
       return `<div data-row data-ri="${ri}" style="display:flex;align-items:center;gap:6px;background:${_rowBg};border:2px solid ${_sel?T.lime:_cur?T.lime:T.line};border-radius:9px;padding:8px 8px">
         ${moveHandle}
         ${numBadge}${_cur?curBadge:""}
-        <button data-act="editplayer" data-arg="${slot}" style="flex:1;min-width:0;text-align:left;background:transparent;border:none;color:${T.chalk};font-size:18px;font-weight:700;display:flex;align-items:center;gap:8px;overflow:hidden"><span style="font-family:${MONO};color:${OUR.color};min-width:34px">#${p.num}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.name}</span></button>
+        <button data-act="editplayer" data-arg="${slot}" style="flex:1;min-width:0;text-align:left;background:transparent;border:none;color:${T.chalk};font-size:18px;font-weight:700;display:flex;align-items:center;gap:8px;overflow:hidden"><span style="font-family:${MONO};color:${OUR.color};min-width:34px">#${escHtml(p.num)}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(p.name)}</span></button>
         <button data-act="pickpos" data-arg="${slot}" style="background:${isP?OUR.color:T.surface2};border:2px solid ${isP?OUR.color:T.line};color:${isP?"#FFFFFF":T.chalk};border-radius:7px;padding:8px 12px;font-family:${MONO};font-size:16px;font-weight:800;min-width:50px">${pos}</button></div>`;}).join("");
     const bench=benchIdx().map(ri=>`<span style="font-family:${MONO};font-size:14px;color:${T.sage};background:${T.surface};border:2px solid ${T.line};border-radius:6px;padding:5px 10px;white-space:nowrap">#${ROSTER[ri].num} ${ROSTER[ri].name}</span>`).join(" ");
     const pit=playerAtPos("P");
@@ -5283,7 +5288,7 @@ function actionArea(){
     return `<div class="frost-card" style="flex-shrink:0;display:flex;align-items:center;gap:10px;background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:10px 12px">
         <button data-act="lineupback" style="${ghost};padding:9px 13px;flex:none">&lsaquo; Back</button>
         <div style="flex:1;min-width:0"><div style="font-family:${MONO};font-size:20px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:${T.lime}">Lineups</div>
-          <div style="font-size:11px;color:${T.sage};margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${OUR.name} &middot; batting ${n}${n>9?" (continuous)":""} &middot; tap &#9776; to move</div></div></div>
+          <div style="font-size:11px;color:${T.sage};margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(OUR.name)} &middot; batting ${n}${n>9?" (continuous)":""} &middot; tap &#9776; to move</div></div></div>
       ${luToggle}
       <div style="flex-shrink:0;display:flex;gap:2px;background:${T.line};border:2px solid ${T.line};border-radius:9px;overflow:hidden">
         <button data-act="luview" data-arg="list" style="flex:1;background:${lineupView==="list"?T.lime:T.surface2};color:${lineupView==="list"?"#fff":T.sage};border:none;border-radius:0;padding:9px;font-family:${MONO};font-weight:800;font-size:13px;letter-spacing:.4px">${IC('list',15)} Batting order</button>
@@ -5309,7 +5314,7 @@ function actionArea(){
     const list=ROSTER.map((p,ri)=>{const inL=G.lineup.order.indexOf(ri),pos=posOfPlayer(ri),here=ri===cur;
       const tag=inL>=0?`bats ${inL+1}${pos?` · ${pos}`:""}`:"bench";
       return `<button data-act="setplayer" data-arg="${ri}" style="display:flex;justify-content:space-between;align-items:center;background:${here?T.surface2:T.surface};border:2px solid ${here?OUR.color:T.line};color:${T.chalk};border-radius:9px;padding:11px 13px;font-size:14px;font-weight:700">
-        <span style="display:flex;gap:9px;align-items:center"><span style="font-family:${MONO};color:${OUR.color};min-width:32px">#${p.num}</span>${p.name}</span>
+        <span style="display:flex;gap:9px;align-items:center"><span style="font-family:${MONO};color:${OUR.color};min-width:32px">#${escHtml(p.num)}</span>${escHtml(p.name)}</span>
         <span style="font-family:${MONO};font-size:11px;color:${T.sage}">${tag}</span></button>`;}).join("");
     return step(pitcherPick?"Pitching change":`Batting ${editSlot+1} — choose player`,
       pitcherPick?"Pick the new pitcher — a bench arm subs in for the current one.":"A bench player subs in; a starter swaps spots.",
@@ -5344,7 +5349,7 @@ function actionArea(){
   if(mode==="opppickpos"){
     const e=oppList()[editSlot]||{}, cur=e.pos||null;
     const cell=p=>{const oi=oppAtPos(p),who=oi>=0?oppList()[oi]:null,sel=p===cur;const wn=who?(((who.name||"").trim())||("#"+(who.num||""))):"—";
-      return `<button data-act="oppsetpos" data-arg="${p}" style="display:flex;flex-direction:column;gap:4px;align-items:center;background:${sel?OPP.color:T.surface};border:2px solid ${sel?OPP.color:T.line};color:${sel?"#08111f":T.chalk};border-radius:9px;padding:16px 6px;font-family:${MONO};font-weight:800;font-size:23px">${p}<span style="font-size:13px;font-weight:600;color:${sel?"#08111f":T.sage};max-width:96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${wn.replace(/</g,"&lt;")}</span></button>`;};
+      return `<button data-act="oppsetpos" data-arg="${p}" style="display:flex;flex-direction:column;gap:4px;align-items:center;background:${sel?OPP.color:T.surface};border:2px solid ${sel?OPP.color:T.line};color:${sel?"#08111f":T.chalk};border-radius:9px;padding:16px 6px;font-family:${MONO};font-weight:800;font-size:23px">${p}<span style="font-size:13px;font-weight:600;color:${sel?"#08111f":T.sage};max-width:96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${wn.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;")}</span></button>`;};
     const takenByOther=p=>{const oi=oppAtPos(p);return oi>=0&&oi!==editSlot;};
     const _posList=cpMode()?["P","C","1B","2B","3B","SS","LF","LCF","RCF","RF"]:POSLIST;   // coach pitch: 4 outfielders
     const open=_posList.filter(p=>!takenByOther(p)), used=_posList.filter(takenByOther);
@@ -5357,7 +5362,7 @@ function actionArea(){
     const L=oppList(),curP=oppAtPos("P");
     const list=L.map((e,i)=>{const here=i===curP,nm=(((e.name||"").trim())||("#"+(e.num||(i+1))));
       return `<button data-act="oppsetpitch" data-arg="${i}" style="display:flex;justify-content:space-between;align-items:center;background:${here?T.surface2:T.surface};border:2px solid ${here?OPP.color:T.line};color:${T.chalk};border-radius:9px;padding:11px 13px;font-size:14px;font-weight:700">
-        <span style="display:flex;gap:9px;align-items:center"><span style="font-family:${MONO};color:${OPP.color};min-width:32px">#${(e.num||"").toString().replace(/</g,"")}</span>${nm.replace(/</g,"&lt;")}</span>
+        <span style="display:flex;gap:9px;align-items:center"><span style="font-family:${MONO};color:${OPP.color};min-width:32px">#${(e.num||"").toString().replace(/</g,"")}</span>${nm.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;")}</span>
         <span style="font-family:${MONO};font-size:11px;color:${T.sage}">${here?"PITCHING":(e.pos||"")}</span></button>`;}).join("");
     return step("Who's pitching?","Pick the opponent's pitcher — they take the P spot.",
       `<div style="display:flex;flex-direction:column;gap:6px">${list}</div>`,"backlineup");
@@ -5383,7 +5388,7 @@ function actionArea(){
     const maxI=Math.max(1,G.inning);
     const _vL=`border-right:1.5px solid ${T.line}`, _totL=`border-left:2px solid ${T.line}`;
     const lineHead=`<th style="text-align:left;padding:4px 6px;${_vL}">Team</th>`+Array.from({length:maxI},(_,i)=>`<th style="padding:10px 7px;${_vL}">${i+1}</th>`).join("")+`<th style="padding:10px 7px;${_totL}">R</th><th style="padding:10px 7px">H</th><th style="padding:10px 7px">E</th>`;
-    const lineRow=side=>{let c=`<td style="text-align:left;padding:4px 6px;font-weight:800;${_vL}">${TEAMS[side].short}</td>`;for(let i=1;i<=maxI;i++)c+=`<td style="padding:10px 7px;${_vL}">${(G.line[side]&&G.line[side][i])||0}</td>`;c+=`<td style="padding:10px 7px;font-weight:800;color:${T.ink};${_totL}">${box.totals[side].r}</td><td style="padding:10px 7px">${box.totals[side].h}</td><td style="padding:10px 7px">${box.totals[side].e}</td>`;return `<tr style="border-top:1.5px solid ${T.line}">${c}</tr>`;};
+    const lineRow=side=>{let c=`<td style="text-align:left;padding:4px 6px;font-weight:800;${_vL}">${escHtml(TEAMS[side].short)}</td>`;for(let i=1;i<=maxI;i++)c+=`<td style="padding:10px 7px;${_vL}">${(G.line[side]&&G.line[side][i])||0}</td>`;c+=`<td style="padding:10px 7px;font-weight:800;color:${T.ink};${_totL}">${box.totals[side].r}</td><td style="padding:10px 7px">${box.totals[side].h}</td><td style="padding:10px 7px">${box.totals[side].e}</td>`;return `<tr style="border-top:1.5px solid ${T.line}">${c}</tr>`;};
     // ----- Box score for EITHER team (toggle). selSide = the chosen team's batting side. -----
     const oppSide=G.ourSide==="home"?"away":"home";
     const selSide=summaryTeam==="us"?G.ourSide:oppSide;
@@ -6782,7 +6787,7 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="toggleteams"){teamsOpen=!teamsOpen;try{localStorage.setItem("al-teams-open",teamsOpen?"1":"0");}catch(e){}render();}
   else if(act==="togglefollow"){followOpen=!followOpen;try{localStorage.setItem("al-follow-open",followOpen?"1":"0");}catch(e){}render();}
   else if(act==="openplayer"){const i=arg.indexOf(":");openPlayer={teamId:arg.slice(0,i),pid:arg.slice(i+1)};openPlayerFrom=(mode==="team"?"team":"home");playerTab="stats";mode="player";render();}
-  else if(act==="shareplayer"){ const i=arg.indexOf(":"); const tt=teamById(arg.slice(0,i)); const pp=tt&&(tt.players||[]).find(x=>x.id===arg.slice(i+1)); const nm=pp?(("#"+(pp.num||"")+" "+(pp.name||"Player")).trim()):"this player"; const pn=pp?(pp.name||"this player"):"this player"; const tnm=tt?(tt.name||"the team"):"the team"; openShareLink({ url:appBaseUrl()+"?player="+encodeURIComponent(arg), title:"SHARE "+nm.toUpperCase().replace(/</g,"&lt;"), shareTitle:nm, sub:"Opens "+nm.replace(/</g,"&lt;")+"&#39;s stats. The team must be Public (Team management &rarr; Discovery) for others to open it.", subject:pn+"'s stats on All-Stars Live", body:"See "+nm+" ("+tnm+") on All-Stars Live, a free youth-baseball app — batting & pitching stats, game log, and schedule. Tap to view:" }); }
+  else if(act==="shareplayer"){ const i=arg.indexOf(":"); const tt=teamById(arg.slice(0,i)); const pp=tt&&(tt.players||[]).find(x=>x.id===arg.slice(i+1)); const nm=pp?(("#"+(pp.num||"")+" "+(pp.name||"Player")).trim()):"this player"; const pn=pp?(pp.name||"this player"):"this player"; const tnm=tt?(tt.name||"the team"):"the team"; openShareLink({ url:appBaseUrl()+"?player="+encodeURIComponent(arg), title:"SHARE "+nm.toUpperCase().replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;"), shareTitle:nm, sub:"Opens "+nm.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;")+"&#39;s stats. The team must be Public (Team management &rarr; Discovery) for others to open it.", subject:pn+"'s stats on All-Stars Live", body:"See "+nm+" ("+tnm+") on All-Stars Live, a free youth-baseball app — batting & pitching stats, game log, and schedule. Tap to view:" }); }
   else if(act==="playerback"){mode=(openPlayerFrom==="team"?"team":"home");if(mode==="team")teamTab="roster";render();}
   else if(act==="playertab"){playerTab=(arg==="schedule"?"schedule":"stats");render();}
   else if(act==="followplayer"){const i=arg.indexOf(":");toggleFollowPlayer(arg.slice(0,i),arg.slice(i+1));render();}
@@ -6824,8 +6829,8 @@ document.getElementById("app").addEventListener("click",e=>{
       sub:'Send the app to a coach, parent, or scorekeeper &mdash; <b style="color:#E11D2E">scan</b> or send the link.',
       subject:"Check out All-Stars Live",
       body:"All-Stars Live is a free youth-baseball app — keep score, live-stream games to YouTube with a scorebug, and let parents follow the team & chat. Get it here:" }); return; }
-  else if(act==="shareteam"){ const t=teamById(openTeamId); if(!t)return; const url=appBaseUrl()+"?follow="+encodeURIComponent(openTeamId); const nm=(t.name||"our team"); const nmE=nm.replace(/</g,"&lt;");
-    openShareLink({ url:url, title:"SHARE "+nm.toUpperCase().replace(/</g,"&lt;"), shareTitle:nm,
+  else if(act==="shareteam"){ const t=teamById(openTeamId); if(!t)return; const url=appBaseUrl()+"?follow="+encodeURIComponent(openTeamId); const nm=(t.name||"our team"); const nmE=nm.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+    openShareLink({ url:url, title:"SHARE "+nm.toUpperCase().replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;"), shareTitle:nm,
       sub:`Parents &amp; fans can <b style="color:#E11D2E">follow ${nmE}</b> — watch live &amp; chat (no scoring).`,
       subject:"Follow "+nm+" on All-Stars Live",
       body:nm+" posts live games on All-Stars Live, a free youth-baseball scoreboard app. Follow the team to watch games live, see the schedule, and join the team chat:" }); }
@@ -7143,10 +7148,10 @@ function renderChatList(){
     const when=(()=>{try{return new Date(m.ts).toLocaleString(undefined,{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"});}catch(e){return "";}})();
     // Themed via CSS vars so bubbles flip in Day mode. Mine = blue-accented + right-aligned; theirs = neutral.
     return `<div style="align-self:${mine?"flex-end":"flex-start"};max-width:84%;background:var(--surface2);border:2px solid ${mine?"var(--safe)":"var(--line)"};border-radius:13px;padding:9px 12px">
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:3px"><span style="font-size:12px;color:${mine?"var(--safe)":"var(--textmid)"};font-family:'Barlow',sans-serif;font-weight:800;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${(m.authorName||"Someone").replace(/</g,"&lt;")}</span>${canDel?(chatDelArm===m.id
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:3px"><span style="font-size:12px;color:${mine?"var(--safe)":"var(--textmid)"};font-family:'Barlow',sans-serif;font-weight:800;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${(m.authorName||"Someone").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;")}</span>${canDel?(chatDelArm===m.id
           ? `<button data-act="delmsg" data-arg="${m.id}" title="Tap again to delete" style="background:#E11D2E;border:1px solid #E11D2E;color:#fff;font-size:11px;font-weight:800;cursor:pointer;border-radius:7px;padding:3px 9px;flex:none">Confirm delete?</button>`
           : `<button data-act="delmsg" data-arg="${m.id}" title="Delete this message" style="background:rgba(225,29,46,.16);border:1px solid #E11D2E66;color:#E11D2E;font-size:11px;font-weight:800;cursor:pointer;border-radius:7px;padding:3px 9px;flex:none">&#128465; Delete</button>`):""}</div>
-        <div style="font-size:15px;color:var(--ink);font-family:'Barlow',sans-serif;line-height:1.4;white-space:pre-wrap;word-break:break-word">${(m.text||"").replace(/</g,"&lt;")}</div>
+        <div style="font-size:15px;color:var(--ink);font-family:'Barlow',sans-serif;line-height:1.4;white-space:pre-wrap;word-break:break-word">${(m.text||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;")}</div>
         <div style="font-size:10.5px;color:var(--textmid);margin-top:3px">${when}</div></div>`;}).join("");
   box.scrollTop=box.scrollHeight;
 }
@@ -7183,7 +7188,7 @@ let _rulesParas=null, _rulesSrc=null;
 window.openRulebook=function(src,title){
   src=src||"rules-dyb-2026.txt"; title=title||"Rulebook";
   const m=document.getElementById("rulesmodal"); if(!m)return; m.style.display="flex";
-  const ttl=document.getElementById("rulesTitle"); if(ttl)ttl.innerHTML=IC('doc',16)+" "+title.replace(/</g,"&lt;");
+  const ttl=document.getElementById("rulesTitle"); if(ttl)ttl.innerHTML=IC('doc',16)+" "+title.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
   const body=document.getElementById("rulesBody"), si=document.getElementById("rulesSearch");
   if(_rulesParas&&_rulesSrc===src){ window.rulesSearch(si?si.value:""); try{si&&si.focus();}catch(e){} return; }
   _rulesParas=null; _rulesSrc=src; if(si)si.value="";
@@ -7199,7 +7204,7 @@ window.openRulebook=function(src,title){
 function closeRules(){ const m=document.getElementById("rulesmodal"); if(m)m.style.display="none"; }
 window.rulesSearch=function(q){
   const body=document.getElementById("rulesBody"), cnt=document.getElementById("rulesCount"); if(!body||!_rulesParas)return;
-  const esc=s=>s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  const esc=escHtml; // was a local ad hoc escaper — see html-safe.js
   q=(q||"").trim();
   if(!q){ body.innerHTML=_rulesParas.map(p=>`<p style="margin:0 0 12px">${esc(p)}</p>`).join(""); if(cnt)cnt.textContent=_rulesParas.length+" sections"; body.scrollTop=0; return; }
   const ql=q.toLowerCase(); const re=new RegExp("("+q.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+")","ig");
@@ -7589,7 +7594,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v399";
+var APP_VERSION="v400";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
