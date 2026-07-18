@@ -404,6 +404,16 @@ const curTeam=()=>DB.teams.find(t=>t.id===curTeamId)||null;
    new Date().toISOString() for this — that's UTC, so scoring in the evening (US zones) stamps
    tomorrow and the finished game stops matching its scheduled date (shows "not played yet"). */
 function todayLocal(){const n=new Date(),p=x=>String(x).padStart(2,"0");return n.getFullYear()+"-"+p(n.getMonth()+1)+"-"+p(n.getDate());}
+// Team-card subtitle ("Next · Jul 12" / "5 games" / "New season" / "Season ended") -- was
+// duplicated wholesale (not just the date math) between the Home team card and the Teams-list
+// card, with the Teams-list copy additionally checking `ended` first. One shared function instead.
+function teamCardSubtitle(t,games,ended){
+  if(ended)return "Season ended";
+  const today=todayLocal();
+  const up=(t.schedule||[]).filter(s=>s.date&&s.date>=today).sort((a,b)=>((a.date+(a.time||""))<(b.date+(b.time||""))?-1:1))[0];
+  if(up){ try{ return "Next · "+new Date(up.date+"T00:00").toLocaleDateString(undefined,{month:"short",day:"numeric"}); }catch(e){ return "Next game set"; } }
+  return games?(games+" game"+(games===1?"":"s")):"New season";
+}
 const teamById=id=>DB.teams.find(t=>t.id===id)||null;
 function nextId(p){return p+(DB.seq++);}
 function newTeam(name){name=(name||"").trim()||"New Team";
@@ -3681,7 +3691,7 @@ function fmtDateNice(ds){ if(!ds)return ""; try{ return new Date(ds+"T00:00").to
 // Full-width month grid; tapping a day selects it immediately (sets the hidden #schDate value).
 function schedCalGrid(val){
   let ym=ngDateYM; if(!ym){ const d=val?new Date(val+"T00:00"):new Date(); ym={y:d.getFullYear(),m:d.getMonth()}; ngDateYM=ym; }
-  const y=ym.y,m=ym.m,startDow=new Date(y,m,1).getDay(),daysIn=new Date(y,m+1,0).getDate(),today=(()=>{const n=new Date(),p=x=>String(x).padStart(2,"0");return n.getFullYear()+"-"+p(n.getMonth()+1)+"-"+p(n.getDate());})();
+  const y=ym.y,m=ym.m,startDow=new Date(y,m,1).getDay(),daysIn=new Date(y,m+1,0).getDate(),today=todayLocal();
   const monLabel=new Date(y,m,1).toLocaleDateString(undefined,{month:"long",year:"numeric"});
   const dow=["Su","Mo","Tu","We","Th","Fr","Sa"].map(d=>`<div style="text-align:center;font-size:11px;font-weight:800;color:${T.sageDim};padding-bottom:2px">${d}</div>`).join("");
   let cells=""; for(let i=0;i<startDow;i++)cells+="<div></div>";
@@ -3809,22 +3819,42 @@ function upcomingFollowedActivity(){
 }
 const FOLLOW_COLORS=["#E11D2E","#2E6BE6","#F0B43E","#19A0E0","#7C5CFF","#2EC98A","#E0974F","#EC4899"];
 function playerHue(key){var i=followKeys().indexOf(key);return FOLLOW_COLORS[(i<0?0:i)%FOLLOW_COLORS.length];}
-function calendarHtml(t){
+// Shared month-grid renderer for calendarHtml/multiCalendarHtml: computes the 7-wide cell
+// grid for calYM and paints each cell via caller-supplied dot/border/text coloring (the two
+// callers differ only in how they color cells and what goes in the detail strip below the grid).
+function monthGrid(byDate,opts){
   if(!calYM){ const d=new Date(); calYM={y:d.getFullYear(),m:d.getMonth()}; }
   const y=calYM.y, m=calYM.m, first=new Date(y,m,1), startDow=first.getDay(), daysIn=new Date(y,m+1,0).getDate();
   const monthName=first.toLocaleDateString(undefined,{month:"long",year:"numeric"});
-  const pad=n=>String(n).padStart(2,"0"), byDate={};
-  (t.schedule||[]).forEach(s=>{ if(s.date){(byDate[s.date]=byDate[s.date]||[]).push(s);} });
-  const todayStr=(()=>{const n=new Date();return `${n.getFullYear()}-${pad(n.getMonth()+1)}-${pad(n.getDate())}`;})();
+  const pad=n=>String(n).padStart(2,"0");
+  const todayStr=todayLocal();
   const total=Math.ceil((startDow+daysIn)/7)*7; let cells="";
   for(let i=0;i<total;i++){ const dn=i-startDow+1, inM=dn>=1&&dn<=daysIn, ds=inM?`${y}-${pad(m+1)}-${pad(dn)}`:""; const evs=ds?(byDate[ds]||[]):[];
     const sel=inM&&calSelDay===ds, isToday=inM&&ds===todayStr;
-    const dots=evs.length?`<div style="display:flex;gap:3px;flex-wrap:wrap;justify-content:center;max-width:100%">${evs.slice(0,4).map(s=>`<span style="width:8px;height:8px;border-radius:50%;background:${s.type==="practice"?T.sage:t.color}"></span>`).join("")}</div>`:`<div style="height:8px"></div>`;
+    const dots=evs.length?`<div style="display:flex;gap:3px;flex-wrap:wrap;justify-content:center;max-width:100%">${evs.slice(0,4).map(s=>`<span style="width:8px;height:8px;border-radius:50%;background:${opts.dotColor(s)}"></span>`).join("")}</div>`:`<div style="height:8px"></div>`;
+    const{border,text}=opts.selColor(sel,isToday);
     cells+=inM
-      ? `<button data-act="calday" data-arg="${ds}" style="min-height:62px;border:2px solid ${sel?t.color:(isToday?T.lime:T.line)};border-radius:9px;padding:5px 2px;background:${sel?T.surface:T.surface2};display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:5px;cursor:pointer">
-          <div style="font-family:${MONO};font-size:17px;font-weight:800;color:${sel?t.color:(isToday?T.lime:T.ink)}">${dn}</div>${dots}</button>`
+      ? `<button data-act="calday" data-arg="${ds}" style="min-height:62px;border:2px solid ${border};border-radius:9px;padding:5px 2px;background:${sel?T.surface:T.surface2};display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:5px;cursor:pointer">
+          <div style="font-family:${MONO};font-size:17px;font-weight:800;color:${text}">${dn}</div>${dots}</button>`
       : `<div style="min-height:62px;opacity:.18;border:2px solid ${T.line};border-radius:9px"></div>`; }
   const dow=["Su","Mo","Tu","We","Th","Fr","Sa"].map(d=>`<div style="text-align:center;font-family:${MONO};font-size:12px;font-weight:800;color:${T.sageDim};padding:2px 0">${d}</div>`).join("");
+  return{monthName,cells,dow};
+}
+function calendarShell(monthName,cells,dow,detail){
+  return `<div style="background:${T.surface};border:2px solid ${T.line};border-radius:10px;padding:10px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <button data-act="calprev" style="${ghost};padding:9px 15px;font-size:18px">&lsaquo;</button>
+        <div style="font-family:${MONO};font-size:17px;font-weight:800;color:${T.ink}">${monthName}</div>
+        <button data-act="calnext" style="${ghost};padding:9px 15px;font-size:18px">&rsaquo;</button></div>
+      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:5px">${dow}${cells}</div>${detail}</div>`;
+}
+function calendarHtml(t){
+  const byDate={};
+  (t.schedule||[]).forEach(s=>{ if(s.date){(byDate[s.date]=byDate[s.date]||[]).push(s);} });
+  const{monthName,cells,dow}=monthGrid(byDate,{
+    dotColor:s=>s.type==="practice"?T.sage:t.color,
+    selColor:(sel,isToday)=>({border:sel?t.color:(isToday?T.lime:T.line),text:sel?t.color:(isToday?T.lime:T.ink)})
+  });
   // Selected-day detail strip (tap a day to expand what's on it).
   const selEvs=calSelDay?(byDate[calSelDay]||[]):[];
   let detail="";
@@ -3840,34 +3870,20 @@ function calendarHtml(t){
         <div style="font-size:12px;font-weight:800;letter-spacing:.4px;color:${T.lime}">${dlabel}</div>
         ${selEvs.length?evRows:`<div style="font-size:12px;color:${T.sageDim}">Nothing scheduled. The date is filled into the editor below — add a game or practice.</div>`}</div>`;
   }
-  return `<div style="background:${T.surface};border:2px solid ${T.line};border-radius:10px;padding:10px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-        <button data-act="calprev" style="${ghost};padding:9px 15px;font-size:18px">&lsaquo;</button>
-        <div style="font-family:${MONO};font-size:17px;font-weight:800;color:${T.ink}">${monthName}</div>
-        <button data-act="calnext" style="${ghost};padding:9px 15px;font-size:18px">&rsaquo;</button></div>
-      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:5px">${dow}${cells}</div>${detail}</div>`;
+  return calendarShell(monthName,cells,dow,detail);
 }
 
 /* Combined month calendar across all (visible) followed players. Each player's team games are
    coloured by that player's hue; tap a day to see whose game it is. Shares calYM/calSelDay +
    calprev/calnext/calday with the single-team calendar. */
 function multiCalendarHtml(fps){
-  if(!calYM){ const d=new Date(); calYM={y:d.getFullYear(),m:d.getMonth()}; }
-  const y=calYM.y,m=calYM.m,first=new Date(y,m,1),startDow=first.getDay(),daysIn=new Date(y,m+1,0).getDate();
-  const monthName=first.toLocaleDateString(undefined,{month:"long",year:"numeric"});
-  const pad=n=>String(n).padStart(2,"0"),byDate={};
+  const byDate={};
   fps.forEach(f=>{ if(followHidden[f.key])return; const col=playerHue(f.key);
     (f.team.schedule||[]).forEach(s=>{ if(s.date){ (byDate[s.date]=byDate[s.date]||[]).push(Object.assign({},s,{__col:col,__who:"#"+(f.player.num||"–")+" "+(f.player.name||""),__tcolor:f.team.color})); } }); });
-  const todayStr=(()=>{const n=new Date();return `${n.getFullYear()}-${pad(n.getMonth()+1)}-${pad(n.getDate())}`;})();
-  const total=Math.ceil((startDow+daysIn)/7)*7; let cells="";
-  for(let i=0;i<total;i++){ const dn=i-startDow+1, inM=dn>=1&&dn<=daysIn, ds=inM?`${y}-${pad(m+1)}-${pad(dn)}`:""; const evs=ds?(byDate[ds]||[]):[];
-    const sel=inM&&calSelDay===ds, isToday=inM&&ds===todayStr;
-    const dots=evs.length?`<div style="display:flex;gap:3px;flex-wrap:wrap;justify-content:center;max-width:100%">${evs.slice(0,4).map(s=>`<span style="width:8px;height:8px;border-radius:50%;background:${s.__col}"></span>`).join("")}</div>`:`<div style="height:8px"></div>`;
-    cells+=inM
-      ? `<button data-act="calday" data-arg="${ds}" style="min-height:62px;border:2px solid ${sel?T.lime:(isToday?T.lime:T.line)};border-radius:9px;padding:5px 2px;background:${sel?T.surface:T.surface2};display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:5px;cursor:pointer">
-          <div style="font-family:${MONO};font-size:17px;font-weight:800;color:${sel||isToday?T.lime:T.ink}">${dn}</div>${dots}</button>`
-      : `<div style="min-height:62px;opacity:.18;border:2px solid ${T.line};border-radius:9px"></div>`; }
-  const dow=["Su","Mo","Tu","We","Th","Fr","Sa"].map(d=>`<div style="text-align:center;font-family:${MONO};font-size:12px;font-weight:800;color:${T.sageDim};padding:2px 0">${d}</div>`).join("");
+  const{monthName,cells,dow}=monthGrid(byDate,{
+    dotColor:s=>s.__col,
+    selColor:(sel,isToday)=>({border:sel?T.lime:(isToday?T.lime:T.line),text:sel||isToday?T.lime:T.ink})
+  });
   let detail="";
   if(calSelDay){
     const selEvs=byDate[calSelDay]||[];
@@ -3881,12 +3897,7 @@ function multiCalendarHtml(fps){
         <div style="font-size:12px;font-weight:800;letter-spacing:.4px;color:${T.lime}">${dlabel}</div>
         ${selEvs.length?evRows:`<div style="font-size:12px;color:${T.sageDim}">Nothing scheduled for any followed player.</div>`}</div>`;
   }
-  return `<div style="background:${T.surface};border:2px solid ${T.line};border-radius:10px;padding:10px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-        <button data-act="calprev" style="${ghost};padding:9px 15px;font-size:18px">&lsaquo;</button>
-        <div style="font-family:${MONO};font-size:17px;font-weight:800;color:${T.ink}">${monthName}</div>
-        <button data-act="calnext" style="${ghost};padding:9px 15px;font-size:18px">&rsaquo;</button></div>
-      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:5px">${dow}${cells}</div>${detail}</div>`;
+  return calendarShell(monthName,cells,dow,detail);
 }
 function actionArea(){
   if(mode==="home"){
@@ -3904,7 +3915,7 @@ function actionArea(){
     // favorite hid every other team while the header still said "My teams (N)".
     const list=DB.teams.slice().sort((a,b)=>(b.fav?1:0)-(a.fav?1:0));
     const card=(t,full)=>{const R=teamRec(t);const rec=`${R.w}-${R.l}${R.t?"-"+R.t:""}`;const games=R.w+R.l+R.t;
-      const sub=(()=>{const n=new Date(),today=n.getFullYear()+"-"+String(n.getMonth()+1).padStart(2,"0")+"-"+String(n.getDate()).padStart(2,"0");const up=(t.schedule||[]).filter(s=>s.date&&s.date>=today).sort((a,b)=>((a.date+(a.time||""))<(b.date+(b.time||""))?-1:1))[0];if(up){try{return "Next · "+new Date(up.date+"T00:00").toLocaleDateString(undefined,{month:"short",day:"numeric"});}catch(e){return "Next game set";}}return games?(games+" game"+(games===1?"":"s")):"New season";})();
+      const sub=teamCardSubtitle(t,games,false);
       const unread=teamHasUnread(t);
       return `<div data-act="opent" data-arg="${t.id}" style="position:relative;width:${full?"100%":"300px"};max-width:${full?"none":"100%"};background:${T.surface};border:2px solid ${t.color};border-left:7px solid ${t.color};border-radius:14px;padding:14px;box-shadow:0 0 0 1px rgba(0,0,0,.35), 0 8px 20px rgba(0,0,0,.4);cursor:pointer">
           ${t.external?`<button data-act="favteam" data-arg="${t.id}" title="Following — tap to remove" style="position:absolute;top:9px;right:11px;background:none;border:none;color:${t.fav?T.amber:T.sageDim};font-size:24px;line-height:1;padding:0;cursor:pointer">${t.fav?IC('starFill',23):IC('star',23)}</button>`:""}
@@ -4184,7 +4195,7 @@ function actionArea(){
   if(mode==="teams"){
     const sorted=DB.teams.slice().sort((a,b)=>(b.fav?1:0)-(a.fav?1:0));
     const mkCard=t=>{const R=teamRec(t);const rec=`${R.w}-${R.l}${R.t?"-"+R.t:""}`;const games=R.w+R.l+R.t;const ended=!!t.archived;
-      const sub=(()=>{ if(ended)return "Season ended"; const n=new Date(),today=n.getFullYear()+"-"+String(n.getMonth()+1).padStart(2,"0")+"-"+String(n.getDate()).padStart(2,"0");const up=(t.schedule||[]).filter(s=>s.date&&s.date>=today).sort((a,b)=>((a.date+(a.time||""))<(b.date+(b.time||""))?-1:1))[0];if(up){try{return "Next · "+new Date(up.date+"T00:00").toLocaleDateString(undefined,{month:"short",day:"numeric"});}catch(e){return "Next game set";}}return games?(games+" game"+(games===1?"":"s")):"New season";})();
+      const sub=teamCardSubtitle(t,games,ended);
       // LIVE badge → jump straight to watching, from the Teams list (not just Home) — jford,
       // 2026-07-03: "needs to be a way to see active game in other places, not just the homescreen."
       const liveT=_liveGames&&_liveGames[t.id];
@@ -7594,7 +7605,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v403";
+var APP_VERSION="v404";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
