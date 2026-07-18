@@ -970,7 +970,7 @@ const initGame=()=>({inning:1,half:"T",away:0,home:0,outs:0,balls:0,strikes:0,
   startedAt:null,  // wall-clock ms when the game ACTUALLY started (auto-set at first pitch / game start; editable in Game Setup) — drives the game timer
   lineup:{ order:[0,1,2,3,4,5,6,7,8],   // batting order: 9-12 entries (slots 10+ = extra hitters)
            pos:{P:0,C:1,"1B":2,"2B":3,"3B":4,SS:5,LF:6,CF:7,RF:8} }});
-let G=initGame(),hist=[],redoStack=[],mode="home",tap=null,contact=null,result=null,plan=null,toast=null,toastTimer=null,curResults=[],showAll=false,showZones=false,editSlot=null,confirmAct=null,gameActive=false,lineupTab="us",newgameFrom="home",brSheet=false,correctOpen=false,correctOpenAt=0,lineupView="list",fieldAssign=null,fieldHold=null,fieldDisplaced=null,lineEditSlot=null,luSelSlot=null,luBuilderSel=null,luFromSetup=false,koPick=null,oppFieldSel=null,gcArrange=false,bugPreview=false,barEdit=false,editAB=null,gameEdit=null,statsSeason="all",pgOpen=false,pgSide="home";
+let G=initGame(),hist=[],redoStack=[],mode="home",tap=null,contact=null,result=null,plan=null,toast=null,toastTimer=null,curResults=[],showAll=false,showZones=false,editSlot=null,confirmAct=null,gameActive=false,lineupTab="us",newgameFrom="home",brSheet=false,correctOpen=false,correctOpenAt=0,lineupView="list",fieldAssign=null,fieldHold=null,fieldDisplaced=null,lineEditSlot=null,luSelSlot=null,luBuilderSel=null,luFromSetup=false,koPick=null,oppFieldSel=null,bugPreview=false,barEdit=false,editAB=null,gameEdit=null,statsSeason="all",pgOpen=false,pgSide="home";
 // Resume the last in-progress game (saved by saveGame) across reloads/app updates, so the
 // lineup/score is never lost. Stays on the home screen → shows "Resume". Re-links ROSTER
 // to the saved team so the lineup's player indices resolve correctly.
@@ -2829,27 +2829,8 @@ function batterCard(){
   </div>`;
 }
 
-/* Compact one-line batter readout for the TOP BAR (wide scorer) — frees the right column
-   so the field grows into its wasted side margins. Tappable for the at-bat review. */
-function batterStrip(){
-  const b=batter(),k=battingKey(),c=TEAMS[k].color;
-  const ord=battingSlot()+1;                          // the batter's spot in the lineup (1-based)
-  // The batter's NAME — never the team name. For an opponent hitter with no name entered, fall
-  // back to their jersey number so it still identifies someone.
-  const nm=b.ours?pBug(b):(b.name||"").trim();
-  const nameLine=nm||(b.num?("#"+b.num):"—");
-  const abp=(G.ab&&G.ab.pitches)?G.ab.pitches.length:0;   // pitches to this batter this at-bat
-  return `<div data-act="reviewbatter" data-arg="${batterKeyOf(b)}" class="frost-card" style="flex:1 1 auto;width:100%;display:flex;align-items:center;gap:14px;background:var(--chip);border:2px solid ${c}66;border-left:6px solid ${c};border-radius:10px;padding:8px 16px;cursor:pointer;max-width:100%;min-width:0">
-    <span title="Lineup spot" style="font-family:${MONO};font-size:30px;font-weight:800;color:${c};line-height:1;flex:none">${ord}</span>
-    <div style="flex:1;min-width:0;text-align:left;display:flex;flex-direction:column;gap:3px">
-      <div style="font-size:10px;letter-spacing:1.5px;font-weight:800;color:${T.sageDim};line-height:1">BATTING ${ordinal(ord)} &middot; <span style="color:${c}">${(TEAMS[k].short||"?").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;")}</span></div>
-      <div style="font-family:${MONO};font-size:21px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;line-height:1;color:${T.chalk};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${nameLine}</div></div>
-    <div style="flex:none;text-align:right;line-height:1.15">
-      <div style="font-family:${MONO};font-size:19px;font-weight:800;color:${T.chalk}">${G.balls}-${G.strikes}</div>
-      <div style="font-size:9px;font-weight:800;letter-spacing:1px;color:${T.sageDim}">${abp} ${abp===1?"PITCH":"PITCHES"}</div></div>
-    <button data-act="quickeditbatter" data-arg="${batterKeyOf(b)}" title="Quick edit name/number" style="flex:none;background:${T.surface};border:2px solid ${T.line};color:${T.chalk};border-radius:9px;width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-size:15px">&#9998;</button>
-  </div>`;
-}
+// batterStrip() (a compact one-line batter readout, superseded by batterCard()) removed here —
+// dead code, zero call sites anywhere in the file or its sibling scripts.
 
 /* ───────── Free-layout windows (BETA prototype) ─────────
    A draggable + resizable floating "window" that survives the full re-render render() does on
@@ -3721,6 +3702,7 @@ let dirResults=null, viewTeam=null;
    detail screen, the Home "Following" drawer, and the combined multi-player calendar. ---- */
 let openPlayer=null, openPlayerFrom="home", playerTab="stats";
 let openProfileId=null;   // mode==="playerprofile": which linked-player-profile is open
+let profileRenaming=false;   // mode==="playerprofile": editing the profile's display name inline
 let teamsOpen=(()=>{try{return localStorage.getItem("al-teams-open")!=="0";}catch(e){return true;}})();
 let followOpen=(()=>{try{return localStorage.getItem("al-follow-open")!=="0";}catch(e){return true;}})();
 let followHidden=(()=>{try{return JSON.parse(localStorage.getItem("al-follow-hidden")||"{}");}catch(e){return {};}})();
@@ -3767,6 +3749,11 @@ function renameProfile(id,name){
   var profs=playerProfiles().map(function(pr){return pr.id===id?Object.assign({},pr,{name:(name||"").trim()||pr.name}):pr;});
   setPlayerProfiles(profs);
 }
+// Was unreachable — the linked-profile page had no UI calling this at all, so a profile's display
+// name could never be fixed after creation (e.g. picked up a nickname from whichever team's roster
+// happened to get linked first). Inline rename on the profile header, same "tap pencil → edit →
+// commit on blur/Enter" shape as the batting-order quick-edit elsewhere in this file.
+window.renameProfileAndClose=function(id,v){ renameProfile(id,v); profileRenaming=false; render(); };
 // Pitching mirror of seasonStatsFor (batting) — per-player pitching totals for a season filter
 // ("all" or a year key), computed from the game log. Pitch rows only carry a name (no jersey number),
 // so matching is name-only, same fallback matchRosterPlayer already uses when a number isn't there.
@@ -5037,10 +5024,19 @@ function actionArea(){
     const b=cs.bat, avg=b.ab?(b.h/b.ab).toFixed(3).replace(/^0/,""):"—";
     const pt=cs.pitch, ip=Math.floor(pt.outs/3)+"."+(pt.outs%3);
     const stat=(l,v)=>`<div style="flex:1;min-width:64px;background:${T.surface2};border:2px solid ${T.line};border-radius:10px;padding:10px 6px;text-align:center"><div style="font-family:${MONO};font-size:23px;font-weight:800;color:${T.ink}">${v}</div><div style="font-size:11px;font-weight:800;letter-spacing:.5px;color:${T.sageDim};margin-top:2px">${l}</div></div>`;
+    const nameRow=profileRenaming
+      ? `<input value="${escHtml(profile.name||"")}" placeholder="Player name" autofocus
+           onchange="window.renameProfileAndClose('${profile.id}',this.value)"
+           onkeydown="if(event.key==='Enter')this.blur()"
+           style="width:100%;background:${T.surface2};border:2px solid ${T.lime};color:${T.ink};border-radius:8px;padding:6px 9px;font-family:${MONO};font-size:19px;font-weight:800;outline:none">`
+      : `<div style="display:flex;align-items:center;gap:8px;min-width:0">
+           <div style="font-family:${MONO};font-size:20px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(profile.name||"Player")}</div>
+           <button data-act="renameprofile" title="Rename" style="flex:none;background:none;border:none;color:${T.sageDim};padding:2px;cursor:pointer;font-size:15px">&#9998;</button>
+         </div>`;
     const head=`<div class="frost-card" style="display:flex;align-items:center;gap:10px;background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:12px 14px">
         <button data-act="gohome" style="${ghost};padding:9px 13px;flex:none">&lsaquo; Home</button>
         <div style="flex:1;min-width:0">
-          <div style="font-family:${MONO};font-size:20px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${(profile.name||"Player").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;")}</div>
+          ${nameRow}
           <div style="font-size:12px;color:${T.sage}">Career &middot; ${cs.rows.length} team${cs.rows.length===1?"":"s"}</div></div></div>`;
     const pitchBlk=(pt.outs||pt.k||pt.bb||pt.h||pt.r)?`<div style="font-size:13.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin:14px 0 10px">Career &middot; Pitching</div><div style="display:flex;flex-wrap:wrap;gap:8px">${stat("IP",ip)}${stat("K",pt.k)}${stat("BB",pt.bb)}${stat("H",pt.h)}${stat("R",pt.r)}</div>`:"";
     const totalsCard=`<div class="frost-card" style="background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:14px">
@@ -6560,7 +6556,6 @@ document.getElementById("app").addEventListener("click",e=>{
   if(act==="swapviewer"){ viewerRight=viewerRight==="field"?"feed":"field"; try{localStorage.setItem("al-viewer-right",viewerRight);}catch(e){} render(); return; }
   if(act==="viewerphone"){ viewerPhone=(arg==="field"||arg==="feed")?arg:"both"; try{localStorage.setItem("al-viewer-phone",viewerPhone);}catch(e){} render(); return; }
   if(act==="soundtoggle"){ Snd.setOn(!Snd.isOn()); if(Snd.isOn())Snd.crack(); renderToolbar(); return; }
-  if(act==="gcarrange"){ gcArrange=!gcArrange; renderToolbar(); if(!gcArrange)flash("Toolbar order saved"); return; }
   if(act==="togglebaredit"){ barEdit=!barEdit; renderToolbar(); flash(barEdit?"Drag any button anywhere — tap Done to lock":"Toolbar layout saved"); return; }
   if(act==="barreset"){ clearBarLayout(); renderToolbar(); flash("Buttons reset to the top row"); return; }
   if(act==="bugpreview"){ bugPreview=true; render(); return; }
@@ -6826,7 +6821,8 @@ document.getElementById("app").addEventListener("click",e=>{
     render();
   }
   else if(act==="unlinkplayerprofile"){unlinkFromProfile(arg);flash("Unlinked");render();}
-  else if(act==="openplayerprofile"){openProfileId=arg;mode="playerprofile";render();}
+  else if(act==="openplayerprofile"){openProfileId=arg;profileRenaming=false;mode="playerprofile";render();}
+  else if(act==="renameprofile"){profileRenaming=true;render();}
   else if(act==="openfollowcal"){calYM=null;calSelDay=null;mode="followcal";render();}
   else if(act==="calfollowtog"){followHidden[arg]=!followHidden[arg];try{localStorage.setItem("al-follow-hidden",JSON.stringify(followHidden));}catch(e){}render();}
   else if(act==="refresh"){ try{ if(window.cloudSyncTeams)cloudSyncTeams(); }catch(e){} flash("Refreshed"); render(); }
@@ -6911,34 +6907,15 @@ document.getElementById("app").addEventListener("click",e=>{
 });
 
 /* ===== top toolbar: game info chip · Share/QR · relay connection dot ===== */
-/* Top-bar game controls: the operator can drag to reorder them (D), persisted so EVERY future game
-   uses the same arrangement. Order lives in localStorage (applies to all games on this device). */
-const GC_DEFAULT=["lineup","inninglog","ingamesettings","home","endgame","undo"];
-function gcOrder(){ let saved=[]; try{ saved=JSON.parse(localStorage.getItem("al-gc-order")||"[]"); }catch(e){}
-  if(!Array.isArray(saved))saved=[];
-  const known=saved.filter(k=>GC_DEFAULT.includes(k));
-  return known.concat(GC_DEFAULT.filter(k=>!known.includes(k))); }   // keep saved order, append any new controls
-function saveGcOrder(arr){ try{ localStorage.setItem("al-gc-order",JSON.stringify(arr)); }catch(e){} }
-function setupGcDrag(){
-  const row=document.getElementById("gc-row"); if(!row)return;
-  row.querySelectorAll('[data-gc]').forEach(chip=>{
-    chip.addEventListener('pointerdown',e=>{
-      e.preventDefault();
-      chip.style.opacity='0.6'; document.body.style.userSelect='none';
-      const move=ev=>{
-        const chips=[...row.querySelectorAll('[data-gc]')];
-        for(const c of chips){ if(c===chip)continue; const b=c.getBoundingClientRect();
-          if(ev.clientX < b.left + b.width/2){ row.insertBefore(chip,c); return; } }
-        const toggle=row.querySelector('[data-act="gcarrange"]');
-        if(toggle)row.insertBefore(chip,toggle); else row.appendChild(chip);   // never past the Done toggle
-      };
-      const up=()=>{ window.removeEventListener('pointermove',move); window.removeEventListener('pointerup',up);
-        document.body.style.userSelect=''; chip.style.opacity='';
-        saveGcOrder([...row.querySelectorAll('[data-gc]')].map(c=>c.getAttribute('data-gc'))); };
-      window.addEventListener('pointermove',move); window.addEventListener('pointerup',up);
-    });
-  });
-}
+// A whole "drag to reorder the compact toolbar controls, persisted per device" feature used to live
+// here: GC_DEFAULT/gcOrder() (computed an order from localStorage) plus saveGcOrder()/setupGcDrag()
+// (the drag itself) plus a gcArrange state var + "gcarrange" action handler (the entry point).
+// Confirmed fully dead, all of it: no button anywhere ever renders data-act="gcarrange", so arrange
+// mode could never be entered; even the row gcOrder() would have ordered (a "gc"/"gc-row" local var
+// built from it) was never actually interpolated into the toolbar's real innerHTML= template — it
+// was computed and discarded on every single renderToolbar() call. gcBtn()/gcDefs themselves are
+// NOT part of this removal — both are genuinely used elsewhere (the floating-button system and the
+// game-menu popover), just never by this specific dead row.
 /* Top-bar button layout (jford): the window button toggles "edit" mode. In edit mode ANY button can be
    dragged FREELY anywhere on screen (not just the top row, gaps allowed) — it lifts out of the toolbar
    to a fixed position, snapped to an 8px grid. Buttons with no saved position stay in the top-row flow.
@@ -7077,9 +7054,11 @@ function renderToolbar(){
     return `<div role="menuitem" onmousedown="event.preventDefault()" onclick="window._gameMenuPick('${k}')" style="padding:12px 13px;border-radius:8px;font-family:${SANS};font-weight:700;font-size:16px;color:${k==="endgame"?T.out:T.ink};cursor:pointer;display:flex;align-items:center;gap:10px">${d.i}<span>${d.t}</span></div>`;
   }).join("");
   const gameMenuBtn=`<button type="button" onclick="window._openGameMenu(this)" title="Game menu" aria-label="Game menu" style="display:inline-flex;align-items:center;justify-content:center;background:${T.surface2};border:2px solid ${T.line};border-radius:10px;height:40px;width:44px;flex:none;color:${T.chalk}">${IC('list',19)}</button>`;
-  const gc=(isWide()&&mode==="idle"&&viewMode==="scorer")
-    ? `<div id="gc-row" style="display:flex;gap:6px;flex:none;align-items:center;justify-content:flex-end;margin-left:auto">${gcOrder().map(gcBtn).join("")}</div>`
-    : "";
+  // A "gc" row was computed here (isWide/idle/scorer -> gcOrder().map(gcBtn)) but never actually
+  // interpolated into the toolbar's real innerHTML= template below (${chip}/${barHtml}/${bErr}/
+  // toggles only) -- confirmed dead, computed and discarded on every renderToolbar() call. gcBtn/
+  // gcDefs themselves stay: both are genuinely used by the floating-button system below (barPieces)
+  // and the game-menu popover, just never by this specific row.
   // Viewer (video on): the field/feed swap lives in the top bar, labeled with what you switch TO.
   const vsw=(isWide()&&viewMode==="viewer"&&monitorOn)
     ? tbBtn("swapviewer",`${ICN.swap} ${viewerRight==="field"?"Game feed":"Field view"}`)
@@ -7615,7 +7594,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v402";
+var APP_VERSION="v403";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
