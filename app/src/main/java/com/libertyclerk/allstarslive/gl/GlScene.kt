@@ -111,8 +111,6 @@ class GlScene {
     }
 
     companion object {
-        private val IDENTITY = FloatArray(16).also { android.opengl.Matrix.setIdentityM(it, 0) }
-
         // v -> 1 - v, so a normal top-down Bitmap isn't drawn upside-down.
         private val FLIP_V = FloatArray(16).also {
             android.opengl.Matrix.setIdentityM(it, 0)

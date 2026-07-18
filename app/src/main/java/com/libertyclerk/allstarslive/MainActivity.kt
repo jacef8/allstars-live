@@ -25,7 +25,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -39,13 +38,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material.icons.filled.Scoreboard
-import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -58,7 +52,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -79,17 +72,11 @@ import com.libertyclerk.allstarslive.stream.GoLiveDialog
 import com.libertyclerk.allstarslive.ui.theme.AllStarsLiveTheme
 import kotlinx.coroutines.delay
 
-/** Bottom-bar destinations. Game = scoring (next), Video = live ingest (working). */
-// Persistent app sections only. Lineup is per-game, so it lives inside the scorer
-// (Game tab -> New Game / Manage Teams), not as a global tab.
-private enum class Tab(val label: String, val icon: ImageVector) {
-    GAME("Game", Icons.Filled.Scoreboard),
-    VIDEO("Video", Icons.Filled.Videocam),
-}
-
-private val NavBarColor = Color(0xFF0E1626)   // slightly lifted navy for the tab bar
-private val NavHairline = Color(0xFF1E2A44)
-private val Sage = Color(0xFF8C97A8)
+// A native bottom-tab-bar navigation model (Tab enum, AllStarsBottomBar, TabsPeekButton,
+// ComingSoon, plus their NavBarColor/NavHairline/Sage color constants) used to live here --
+// removed as dead code, confirmed zero call sites anywhere in the module. The app IS the web
+// scorer, full-screen, no native tabs (matches the web/PWA) -- see the comment on the actual
+// root Composable below.
 
 // OAuth "Web client ID" (Firebase auto-created) — audience for the Google ID token we hand to
 // the web's Firebase. The app's signing SHA-1 must be registered in the Firebase project too.
@@ -258,13 +245,33 @@ class MainActivity : ComponentActivity() {
                     // Branded splash overlay — turf background, a near-full-screen A, wordmark at
                     // the bottom; fades out into the app.
                     AnimatedVisibility(visible = showSplash, exit = fadeOut(animationSpec = tween(450))) {
-                        // Solid navy (same as the OS splash #11203A) — NOT the old blue striped turf, which
-                        // read as a jarring second splash on launch. Just the logo + wordmark on navy.
+                        // jford, 2026-07-08: "all backgrounds should have the blue turf. should never
+                        // have a solid navy or the striped navy" — a prior fix (72f9389) deliberately
+                        // made this solid navy instead of turf, reasoning it avoided "a jarring second
+                        // splash" flickering between the navy OS splash and a turf screen. Overridden:
+                        // every background in the app is turf now, full stop, this one included. Navy
+                        // Box stays only as the base underneath (rare-aspect-ratio fallback — Crop
+                        // fills the frame in practice), same pattern as GameScorerScreen's backdrop.
                         Box(Modifier.fillMaxSize().background(Color(0xFF11203A))) {
                             Image(
-                                painter = painterResource(R.drawable.splash_logo),
+                                painter = painterResource(R.drawable.splash_turf),
+                                contentDescription = null,
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop,
+                            )
+                            Image(
+                                // splash_logo.png is a square APP-ICON asset — it has its own diagonal-
+                                // striped background baked in, not transparent, so it showed as a
+                                // mismatched striped patch behind the star here. splash_icon is the
+                                // actual transparent-background mark (same one the OS splash above
+                                // correctly uses via windowSplashScreenAnimatedIcon in themes.xml) —
+                                // but unlike splash_logo (star filled its square edge-to-edge),
+                                // splash_icon has generous transparent padding around the star (an
+                                // icon safe-zone), so the star itself renders noticeably smaller at
+                                // the same width fraction. Bumped 0.7 -> 0.92 to compensate.
+                                painter = painterResource(R.mipmap.splash_icon),
                                 contentDescription = "All-Stars Live",
-                                modifier = Modifier.fillMaxWidth(0.7f).align(Alignment.Center),
+                                modifier = Modifier.fillMaxWidth(0.92f).align(Alignment.Center),
                                 contentScale = ContentScale.Fit,
                             )
                             Row(
@@ -296,69 +303,6 @@ class MainActivity : ComponentActivity() {
         WindowInsetsControllerCompat(window, window.decorView).apply {
             hide(WindowInsetsCompat.Type.systemBars())
             systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-        }
-    }
-}
-
-/**
- * GroundLink-style bottom bar: expanded, bordered pill buttons. Each tab always
- * shows its icon AND label; the selected one fills lime (no disappearing icon /
- * indicator swap like the default Material nav).
- */
-@Composable
-private fun AllStarsBottomBar(tabs: List<Tab>, selected: Int, onSelect: (Int) -> Unit, onCollapse: (() -> Unit)? = null) {
-    val lime = MaterialTheme.colorScheme.primary
-    val field = Color(0xFF0B0E13)
-    val unselectedFill = Color(0xFF18223A)
-    val shape = RoundedCornerShape(12.dp)
-    Column(Modifier.background(NavBarColor).navigationBarsPadding()) {
-        // Hairline accent above the bar for the broadcast look.
-        Box(Modifier.fillMaxWidth().height(1.dp).background(NavHairline))
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 9.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            if (onCollapse != null) {
-                Box(
-                    Modifier
-                        .clip(shape)
-                        .background(unselectedFill)
-                        .border(2.dp, NavHairline, shape)
-                        .clickable(onClick = onCollapse)
-                        .padding(vertical = 12.dp, horizontal = 12.dp),
-                ) {
-                    Icon(Icons.Filled.KeyboardArrowDown, contentDescription = "Hide tabs", tint = Sage, modifier = Modifier.size(20.dp))
-                }
-            }
-            tabs.forEachIndexed { i, tab ->
-                val sel = i == selected
-                Row(
-                    Modifier
-                        .weight(1f)
-                        .clip(shape)
-                        .background(if (sel) lime else unselectedFill)
-                        .border(2.dp, if (sel) lime else NavHairline, shape)
-                        .clickable { onSelect(i) }
-                        .padding(vertical = 12.dp),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(
-                        tab.icon,
-                        contentDescription = tab.label,
-                        tint = if (sel) field else Sage,
-                        modifier = Modifier.size(20.dp),
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        tab.label,
-                        color = if (sel) field else Sage,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp,
-                    )
-                }
-            }
         }
     }
 }
@@ -398,23 +342,6 @@ private fun ConfirmDialog(
     }
 }
 
-/** Tiny floating handle shown during a game to reveal the hidden tab bar. Kept small
- *  and icon-only so it doesn't sit on top of the scorer's bottom panels. */
-@Composable
-private fun TabsPeekButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Box(
-        modifier
-            .clip(RoundedCornerShape(999.dp))
-            .background(NavBarColor.copy(alpha = 0.92f))
-            .border(1.dp, NavHairline, RoundedCornerShape(999.dp))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 9.dp, vertical = 4.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(Icons.Filled.KeyboardArrowUp, contentDescription = "Show tabs", tint = Sage, modifier = Modifier.size(18.dp))
-    }
-}
-
 /** Video tab: live camera, or a test pattern (for streaming/recording without the camera).
  *  The mode switch lives INSIDE each screen (a top Row toggle wouldn't render reliably
  *  above the SurfaceView), so each screen offers a button to jump to the other. */
@@ -424,45 +351,5 @@ private fun VideoTab() {
     Box(Modifier.fillMaxSize()) {
         if (mode == 0) SrtIngestScreen(onUseTestPattern = { mode = 1 })
         else CompositorTestScreen(onUseCamera = { mode = 0 })
-    }
-}
-
-@Composable
-private fun ComingSoon(icon: ImageVector, title: String, subtitle: String) {
-    Column(
-        Modifier.fillMaxSize().padding(32.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Icon(
-            icon,
-            contentDescription = null,
-            tint = Color(0xFF5B6880),
-            modifier = Modifier.size(56.dp),
-        )
-        Spacer(Modifier.height(16.dp))
-        Text(title, fontSize = 26.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
-        Spacer(Modifier.height(6.dp))
-        Text(
-            subtitle,
-            fontSize = 14.sp,
-            color = Sage,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.widthIn(max = 340.dp),
-        )
-        Spacer(Modifier.height(18.dp))
-        Box(
-            Modifier
-                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f), RoundedCornerShape(999.dp))
-                .padding(horizontal = 14.dp, vertical = 6.dp),
-        ) {
-            Text(
-                "COMING SOON",
-                color = MaterialTheme.colorScheme.primary,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 1.5.sp,
-            )
-        }
     }
 }

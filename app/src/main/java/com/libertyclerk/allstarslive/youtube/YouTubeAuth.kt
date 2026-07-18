@@ -5,7 +5,6 @@ import com.google.android.gms.auth.api.identity.AuthorizationRequest
 import com.google.android.gms.auth.api.identity.Identity
 import com.google.android.gms.common.api.Scope
 import org.json.JSONObject
-import java.net.HttpURLConnection
 import java.net.URL
 
 /**
