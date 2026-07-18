@@ -2263,15 +2263,22 @@ function broadcast(){
       window._lastLoggedSkip=window._livePublishSkip;
     }
   }catch(e){}
-  _seq++; const k=battingKey(),b=batter();
-  LINK.send({type:"state",seq:_seq,
-    away:G.away,home:G.home,inning:G.inning,half:G.half,balls:G.balls,strikes:G.strikes,outs:G.outs,
-    bases:{1:!!G.bases[1],2:!!G.bases[2],3:!!G.bases[3]},
-    teams:{away:{short:TEAMS.away.short,name:TEAMS.away.name,color:TEAMS.away.color,logo:TEAMS.away.logo||null},
-           home:{short:TEAMS.home.short,name:TEAMS.home.name,color:TEAMS.home.color,logo:TEAMS.home.logo||null}},
-    batter:{num:b.num,name:b.name,team:k}, event:_event, pitch:_pitch,
-    box:buildBox(), line:G.line, maxInning:G.inning, regInnings:(G.innings||6), final:G.final });
-  _event=null; _pitch=null;
+  // A second, "type":"state" LINK.send() used to fire here on every single broadcast() call
+  // (i.e. every pitch/tap) alongside the "full" send above -- but applyRemote(), the ONLY place
+  // that ever reads an incoming relay message, unconditionally requires msg.type==="full" and
+  // returns immediately for anything else (grep confirms zero consumers of type:"state" or its
+  // seq/event/pitch/box/line fields anywhere in this file, cloud-data.js, or auth.js). It was
+  // pure dead weight on the wire -- built and sent on every game action, received and parsed by
+  // every connected viewer, then thrown away unread, every time.
+  //
+  // Worse: since it was sent SECOND (right after the "full" message, same connection, so the
+  // relay receives them in that order), it was the one that ended up cached as server.js's
+  // `lastState` -- the value replayed to a NEWLY-JOINING viewer to catch them up. Since THAT
+  // client's own applyRemote() also rejects anything that isn't type:"full", a late joiner
+  // during a live game was actually seeing NOTHING until the next real game action produced a
+  // fresh "full" message -- the catch-up mechanism was silently defeated by this exact dead
+  // send. Removing it lets the relay's cached lastState correctly stay the "full" snapshot.
+  _seq++;
 }
 
 function pitch(type){
@@ -7608,7 +7615,7 @@ window.addEventListener("resize",function(){
 </script>
 <script>
 /* ---- App version badge (bump with each deploy; matches the SW cache version) ---- */
-var APP_VERSION="v401";
+var APP_VERSION="v402";
 try{
   var _vb=document.createElement("div");
   _vb.textContent=APP_VERSION;
