@@ -42,6 +42,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -182,9 +183,19 @@ fun SrtIngestScreen(onUseTestPattern: () -> Unit = {}) {
 
     DisposableEffect(Unit) { onDispose { source.stop() } }
 
-    val videoAspect = if (stats.widthPx > 0 && stats.heightPx > 0)
-        stats.widthPx.toFloat() / stats.heightPx else 16f / 9f
-    val playing = stats.state == IngestState.PLAYING
+    // derivedStateOf, not a plain val: stats.fps/framesRendered tick roughly once a second while
+    // playing, which changes the `stats` object on every read regardless of whether `state` (what
+    // `playing` actually depends on) changed. `playing` gates a top-level if/else branch below —
+    // without derivedStateOf, Compose can't tell the branch's OWN condition is unchanged, so it
+    // re-descends into whichever branch is active (AndroidView, GoLiveBar, setup sheets, ...) every
+    // single fps tick even though nothing in it actually needs to redraw. derivedStateOf only
+    // reports a change when the COMPUTED boolean/aspect-ratio actually flips, not on every read of
+    // the state it's derived from — this is the standard fix for a state read gating a branch
+    // condition. (Same reasoning applies to videoAspect, read by the video surface's layout.)
+    val videoAspect by remember { derivedStateOf {
+        if (stats.widthPx > 0 && stats.heightPx > 0) stats.widthPx.toFloat() / stats.heightPx else 16f / 9f
+    } }
+    val playing by remember { derivedStateOf { stats.state == IngestState.PLAYING } }
 
     Box(
         Modifier
@@ -573,8 +584,8 @@ private fun CameraSetupSheet(
                 TextButton(onClick = onOpenGuide) { Text("📋 Setup guide", color = Color(0xFFA3E635), fontSize = 13.sp, fontWeight = FontWeight.Bold) }
             }
             Text(
-                if (isDevice) "This tablet's own camera films AND streams — point it at the field and tap Go Live."
-                else "The camera streams to this tablet; we add the scorebug and send it to YouTube.",
+                if (isDevice) "This device's own camera films AND streams — point it at the field and tap Go Live."
+                else "The camera streams to this device; we add the scorebug and send it to YouTube.",
                 color = Color(0xFF9AA0A6), fontSize = 13.sp,
             )
 
@@ -688,7 +699,7 @@ private fun CameraSetupSheet(
                             color = Color(0xFFE8EAED), fontSize = 13.sp, fontWeight = FontWeight.Medium,
                         )
                         Text(
-                            "Fixes YouTube sign-in / Go Live failing on the camera's Wi-Fi",
+                            "Keeps this device's own internet connected the whole time",
                             color = Color(0xFF6B7585), fontSize = 11.sp,
                         )
                     }
@@ -701,20 +712,23 @@ private fun CameraSetupSheet(
                             .padding(12.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
-                        // Combined with the Opal/repeater toggle below: the camera is too far from the
-                        // tablet's own (weaker) hotspot radio to join it directly, so the repeater joins
-                        // the hotspot instead and re-broadcasts it with real range — same idea as the
-                        // existing Opal setup, just with the tablet's hotspot as the upstream source
-                        // instead of the camera's own Wi-Fi. (jford, 2026-07-06: "does this method
-                        // benefit from the travel router at all" — yes, for range.)
+                        // Combined with the range-extender toggle below: the camera is too far from
+                        // this device's own (weaker) hotspot radio to join it directly, so the
+                        // extender joins the hotspot instead and re-broadcasts it with real range —
+                        // same idea as the plain extender setup, just with this device's hotspot as
+                        // the upstream source instead of the camera's own Wi-Fi. (jford, 2026-07-06:
+                        // "does this method benefit from the travel router at all" — yes, for range.
+                        // jford, 2026-07-07: simplified for readers who aren't already using an Opal —
+                        // "tablet" assumed one device type, "Opal" named one specific product, and the
+                        // failure-first framing read as scarier than the setup actually is.)
                         (if (usingOpal) listOf(
-                            "On THIS tablet: Settings → Network & internet → Hotspot & tethering → turn on Mobile Hotspot.",
-                            "Connect your Wi-Fi repeater (Opal, etc.) to THIS TABLET's hotspot — use the name/password shown in the Hotspot settings above.",
-                            "In the camera's OWN app, choose \"Join a Network\" and connect it to the REPEATER's network (not the tablet's hotspot directly — the repeater is extending it).",
-                            "Type the repeater's WAN-side IP into the box below (see the Repeater section) — that's the address the camera actually pushes to.",
+                            "On this device: Settings → Network & internet → Hotspot & tethering → turn on Mobile Hotspot.",
+                            "Connect your Wi-Fi range extender to this device's hotspot — use the name/password shown in the Hotspot settings above.",
+                            "In the camera's OWN app, choose \"Join a Network\" and connect it to the EXTENDER's network (not this device's hotspot directly — the extender is passing it along).",
+                            "Type the extender's WAN-side IP into the box below (see the section under this one) — that's the address the camera actually pushes to.",
                         ) else listOf(
-                            "On THIS tablet: Settings → Network & internet → Hotspot & tethering → turn on Mobile Hotspot.",
-                            "In the camera's OWN app, choose \"Join a Network\" (not \"Create a Network\") and connect it to this tablet's hotspot — use the name/password shown in the Hotspot settings above.",
+                            "On this device: Settings → Network & internet → Hotspot & tethering → turn on Mobile Hotspot.",
+                            "In the camera's OWN app, choose \"Join a Network\" (not \"Create a Network\") and connect it to this device's hotspot — use the name/password shown in the Hotspot settings above.",
                             "Paste the address below into the camera's RTMP destination, same as always.",
                         )).forEachIndexed { i, step ->
                             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -723,14 +737,17 @@ private fun CameraSetupSheet(
                             }
                         }
                         Text(
-                            "Your tablet's own cellular data stays on the whole time — this just shares it with the camera over a local Wi-Fi bubble, so nothing else about signing in or streaming needs to change.",
+                            "This device's own cellular data stays on the whole time — this just shares it with the camera over a local Wi-Fi bubble, so nothing else about signing in or streaming needs to change.",
                             color = Color(0xFF6B7585), fontSize = 11.sp,
                         )
                     }
                 }
-                // ----- Repeater (e.g. GL.iNet Opal) toggle: the camera has to push to a different
-                // address when there's a Wi-Fi repeater between it and this tablet, since this
-                // tablet's own IP is then behind the repeater's NAT and unreachable to the camera. -----
+                // ----- Range-extender toggle: the camera has to push to a different address when
+                // there's a Wi-Fi range extender/repeater between it and this device, since this
+                // device's own IP is then behind the extender's NAT and unreachable to the camera.
+                // User-facing copy stays generic ("range extender") rather than naming a specific
+                // product (was "Opal, etc." everywhere) — most people setting this up won't recognize
+                // that name; it's just an example, not what the feature requires. -----
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -750,7 +767,7 @@ private fun CameraSetupSheet(
                         )
                     }
                     Text(
-                        if (usingHotspot) "Using a Wi-Fi repeater (Opal, etc.) to extend my hotspot's range" else "Using a Wi-Fi repeater (Opal, etc.) between the camera and this tablet",
+                        if (usingHotspot) "Using a Wi-Fi range extender to reach farther" else "Using a Wi-Fi range extender between the camera and this device",
                         color = Color(0xFFE8EAED), fontSize = 13.sp, fontWeight = FontWeight.Medium,
                         modifier = Modifier.weight(1f),
                     )
@@ -759,15 +776,15 @@ private fun CameraSetupSheet(
                     OutlinedTextField(
                         value = opalWanIp,
                         onValueChange = onOpalWanIp,
-                        label = { Text("Repeater's WAN IP (from its Internet/status page)") },
+                        label = { Text("Extender's WAN IP (from its Internet/status page)") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                     )
                     Text(
                         if (usingHotspot)
-                            "This is the repeater's own address on the CAMERA's side — after the repeater joins this tablet's hotspot, check the repeater's admin page for the address it hands the camera."
+                            "This is the extender's own address on the CAMERA's side — after it joins this device's hotspot, check its admin page for the address it hands the camera."
                         else
-                            "This is the repeater's own address on the camera's network — not this tablet's address. Check the repeater's admin page after it connects to the camera's Wi-Fi.",
+                            "This is the extender's own address on the camera's network — not this device's address. Check its admin page after it connects to the camera's Wi-Fi.",
                         color = Color(0xFF6B7585), fontSize = 12.sp,
                     )
                 }
