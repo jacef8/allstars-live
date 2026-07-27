@@ -13,8 +13,9 @@
  *
  * One function, escaping all 5 HTML-significant characters (&, <, >, ", '), used everywhere
  * instead. Loaded as a plain <script> before scoring-controller.html (classic-script shared
- * global scope, same pattern as cloud-data.js/auth.js) so existing `esc(...)` call sites keep
- * working — see scoring-controller.html's own `const esc=escHtml;` aliases.
+ * global scope, same pattern as game-logic.js/sync-logic.js/cloud-data.js/auth.js) so existing
+ * `esc(...)` call sites keep working — see scoring-controller.html's own `const esc=escHtml;`
+ * aliases. Unit-tested in test/html-safe.test.js.
  */
 (function (root) {
   function escHtml(s) {
