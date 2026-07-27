@@ -48,8 +48,8 @@ app/src/main/cpp/third_party/srt/
 # scratch screenshots
 _*.png
 
-# Generated: web scorer copied into the APK at build time (source is reference/web-scoring/)
-app/src/main/assets/scorer/
+# (The generated app/src/main/assets/scorer/ entry was removed along with the dead syncScorerAssets
+#  Gradle task — the app loads the live https scorer, not a bundled copy. See app/build.gradle.kts.)
 
 # scratch screenshots (agent session captures)
 al*.png

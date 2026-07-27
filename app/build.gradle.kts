@@ -110,13 +110,11 @@ dependencies {
     implementation("com.google.firebase:firebase-messaging-ktx")
 }
 
-// M4: bundle the web scorer into the app so the Game tab can show it offline.
-// Single source of truth stays reference/web-scoring/; this copies it into assets
-// at build time (the dest is git-ignored, never hand-edited).
-val syncScorerAssets by tasks.registering(Copy::class) {
-    from(rootProject.file("reference/web-scoring")) {
-        include("scoring-controller.html", "lib/**", "manifest.webmanifest", "sw.js", "icons/**", "firebase-config.js", "auth.js", "cloud-data.js")
-    }
-    into(layout.projectDirectory.dir("src/main/assets/scorer"))
-}
-tasks.named("preBuild") { dependsOn(syncScorerAssets) }
+// NOTE: the syncScorerAssets task that used to live here (copying reference/web-scoring/ into
+// src/main/assets/scorer/) was removed — it had been dead since 635e4b6 switched the WebView from
+// a file:// bundle to the live https app (APP_URL in GameScorerScreen.kt). Nothing referenced
+// file:///android_asset after that, so the copied files were never loaded, just shipped as dead
+// APK weight. The proof it was unused: its hand-maintained `include(...)` list never picked up
+// html-safe.js when v400 added it, and no one noticed for 9 days — a missing escaper would have
+// broken every render path instantly had those files actually been served. Offline support is the
+// PWA service worker's job now (sw.js), not a bundled copy.

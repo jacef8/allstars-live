@@ -5,14 +5,16 @@
  * network — only the static shell is cached here. Bump CACHE to ship an update. */
 // ⬆️ BUMP THIS STRING ON EVERY DEPLOY. Changing it is what makes the installed PWA
 // notice a new version, activate it, and auto-reload (see the SW-update code in the page).
-const CACHE = "allstars-v404";
+const CACHE = "allstars-v405";
 const SHELL = [
   "./",
   "./scoring-controller.html",
   "./firebase-config.js",
   "./auth.js",
+  "./sync-logic.js",
   "./cloud-data.js",
   "./html-safe.js",
+  "./game-logic.js",
   "./manifest.webmanifest",
   "./bg-turf.jpg",
   "./icons/logo-emblem.png",
