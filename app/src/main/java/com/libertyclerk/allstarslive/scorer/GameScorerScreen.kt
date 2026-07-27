@@ -279,7 +279,13 @@ fun GameScorerScreen(webView: WebView) {
 
     // Dark backdrop matching the scorer theme: the WebView is transparent, so this shows
     // everywhere except the monitor rect (where the camera TextureView sits).
-    Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color(0xFF1B3050))) {   // lighter navy base (was near-black) — brighter, easier in sunlight
+    // jford, 2026-07-08: "all backgrounds should have the blue turf. should never have a solid
+    // navy or the striped navy" — the turf image itself already matches the web app's own
+    // bg-turf.jpg exactly (same photo), so the "navy" look wasn't a different asset, it was THIS:
+    // alpha=0.78 blended the turf down into the solid navy base color below it, muting the actual
+    // vibrant blue into a muddier navy. Full opacity now — Crop fills the whole frame in practice,
+    // so the navy base box is just a rare-aspect-ratio fallback, never the dominant look.
+    Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color(0xFF1B3050))) {
         // Blue turf behind the transparent WebView so the native app matches the web look
         // (the web body is transparent in the app). Camera + web UI draw on top of this.
         Image(
@@ -287,7 +293,6 @@ fun GameScorerScreen(webView: WebView) {
             contentDescription = null,
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Crop,
-            alpha = 0.78f,   // let the lighter base show through so the dark turf reads brighter
         )
         // A SLIGHT light lift instead of the old heavy 60%-dark scrim (that's what made it hard to see
         // even at full brightness). The frosted cards in the web UI carry the contrast, not a dark wash.

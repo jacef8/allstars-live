@@ -1,7 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Window background shown only briefly while the WebView loads (the Android 12+ OS splash with the
-     star icon runs BEFORE this). Solid navy = the SAME colour as the OS splash background
-     (windowSplashScreenBackground #11203A), so the launch is one seamless navy field — no blue striped
-     turf flash between the star splash and the app. -->
-<color xmlns:android="http://schemas.android.com/apk/res/android"
-       android:color="#11203A" />
+<!-- Window background: the Android 12+ OS splash (navy, star icon) runs BEFORE this — that one
+     field (windowSplashScreenBackground in themes.xml) only accepts a solid color, a real platform
+     limitation with no workaround. Everything after it is turf, though: this drawable is what shows
+     right after that OS splash ends (while Compose/the WebView are still loading) and on pre-S
+     devices that skip the new SplashScreen API entirely, and android:windowBackground CAN be an
+     image. jford, 2026-07-08: "all backgrounds should have the blue turf... should never have a
+     solid navy." -->
+<bitmap xmlns:android="http://schemas.android.com/apk/res/android"
+        android:src="@drawable/splash_turf"
+        android:gravity="fill" />

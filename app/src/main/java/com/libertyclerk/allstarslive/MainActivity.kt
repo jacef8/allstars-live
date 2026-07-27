@@ -260,7 +260,8 @@ class MainActivity : ComponentActivity() {
                                 contentScale = ContentScale.Crop,
                             )
                             Image(
-                                // splash_logo.png is a square APP-ICON asset — it has its own diagonal-
+                                // splash_logo.png (since deleted — nothing referenced it after this
+                                // swap) was a square APP-ICON asset — it had its own diagonal-
                                 // striped background baked in, not transparent, so it showed as a
                                 // mismatched striped patch behind the star here. splash_icon is the
                                 // actual transparent-background mark (same one the OS splash above
