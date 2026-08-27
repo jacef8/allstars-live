@@ -143,17 +143,23 @@ body{
 @media(max-width:1099px){
   .app.scoring{
     grid-template-columns:minmax(0,40%) minmax(0,1fr);
-    grid-template-rows:auto minmax(0,1.25fr) minmax(0,.75fr) auto}
+    grid-template-rows:auto minmax(0,1.1fr) minmax(0,.9fr) auto}
   .app.scoring .bar {grid-column:1 / -1;grid-row:1}
   .app.scoring .anchor{grid-column:1;grid-row:2}
   .app.scoring .field {grid-column:2;grid-row:2}
   .app.scoring .side  {grid-column:1 / -1;grid-row:3}
   .app.scoring .dock  {grid-column:1 / -1;grid-row:4}
-  .app.scoring .side{flex-direction:row;gap:16px;align-items:stretch}
-  .app.scoring .grp{flex:1 1 0;min-width:0}
-  .app.scoring .grp.plays{flex:1.5 1 0}      /* play text was truncating to 'Singl...' */
-  .app.scoring .grp.pitch{flex:0 0 auto}          /* was flex-end: left a hole above it */
-  .app.scoring .grp + .grp{border-left:1px solid var(--rule);padding-left:17px}
+  /* TWO ROWS, not three squeezed columns. Three groups sharing one row leaves ~270px each,
+     which truncated runner names to "#12 J. R...". On base sits beside the compact pitch
+     count; the play list -- the longest text -- gets the full width beneath them. */
+  .app.scoring .side{display:grid;gap:13px 18px;
+    grid-template-columns:minmax(0,1fr) minmax(0,auto);
+    grid-template-rows:auto minmax(0,1fr)}
+  .app.scoring .grp{min-width:0}
+  .app.scoring .grp.pitch{grid-column:2;grid-row:1;
+    border-left:1px solid var(--rule);padding-left:18px}
+  .app.scoring .grp.plays{grid-column:1 / -1;grid-row:2;
+    border-top:1px solid var(--rule);padding-top:12px}
 }
 @media(max-width:620px){
   .bar{flex-wrap:wrap;gap:6px}
@@ -234,16 +240,18 @@ body{
 /* The directive wants one large circular anchor. In a dashboard that's a health
    gauge; here the honest anchor is the COUNT — the number a scorekeeper reads
    more than any other, and currently rendered as 13px dots. */
-.anchor{align-items:center;justify-content:center;gap:6px}
+.anchor{align-items:center;justify-content:flex-start;gap:9px}
+/* COUNT was the one section heading without the rule every other section got */
+.anchor > .lab{width:100%;padding-bottom:7px;border-bottom:1px solid var(--rule)}
 /* Count readout: big numerals + umpire-indicator lamp rows. No radial gauge -- see the
    markup comment on the count card for why that was the wrong instrument. */
-.countnum{font-family:"Archivo",sans-serif;font-weight:800;
+.countnum{margin:2px 0 2px;font-family:"Archivo",sans-serif;font-weight:800;
   font-size:clamp(52px,7.4vw,104px);line-height:.86;letter-spacing:-.05em;
   font-variant-numeric:tabular-nums;color:var(--ink);display:flex;align-items:baseline;
   justify-content:center}
 .countnum .sep{color:var(--ink-3);font-weight:600;margin:0 .06em}
 
-.lamps{width:100%;display:flex;flex-direction:column;gap:7px}
+.lamps{width:100%;flex:1;display:flex;flex-direction:column;justify-content:space-evenly;gap:7px}
 .lampRow{display:flex;align-items:center;gap:13px}
 .lampRow .lab{flex:0 0 62px}
 .lampWell{flex:1;display:flex;align-items:center;justify-content:space-around;gap:8px;
