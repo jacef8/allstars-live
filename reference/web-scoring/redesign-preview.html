@@ -1,0 +1,642 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>All-Stars Live — redesign comp</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=Inter+Tight:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700;800&display=swap" rel="stylesheet">
+<style>
+/* ============================================================================
+   All-Stars Live — redesign comp against the Visual Design Directive.
+
+   NOT the shipping app. A structural comp of the three highest-traffic screens
+   so the direction can be judged before 7,600 lines of live game-day code move.
+
+   Departures from the directive, both under §13 "when to be quiet":
+     - Full light ("day") palette, because this app is used outdoors in direct
+       sun. Glow is gated to dark only; it is invisible at 100k lux anyway.
+     - No rotating tick ring, no breathing gradient. Two hours of staring at a
+       live game is the textbook case for dropping ornament.
+   ============================================================================ */
+
+/* ---- tokens: LIGHT is the bare :root default, per directive §11 -------- */
+:root{
+  color-scheme:light dark;
+
+  /* elevation ladder — in light, closer = whiter + crisper shadow */
+  --e0:#DDE4EE;                 /* canvas behind the turf */
+  --e1:rgba(255,255,255,.94);   /* passive card */
+  --e1-hi:rgba(255,255,255,.98);
+  --e2:rgba(255,255,255,.99);   /* interactive widget, sits above its card */
+  --e2-hi:#FFFFFF;
+  --recess:#C3CCDA;             /* engraved well, cut below the card face */
+
+  --ink:#0C1420;
+  --ink-2:rgba(12,20,32,.74);
+  --ink-3:rgba(12,20,32,.66);
+
+  /* Accent rotation (§10): the app currently runs red + navy. Amber→gold is
+     maximally separated from both the blue turf and the red OUT state, and it
+     holds up in sunlight where cyan/mint wash out. */
+  --accent:#8A5200;             /* amber, darkened hard for 4.5:1 on white at small sizes */
+  --accent-2:#6B3F00;
+  --accent-ink:#FFFFFF;         /* text ON the accent fill. Day's amber is dark (for 4.5:1
+                                   on white), so its label must be white; dark mode's amber is
+                                   bright and flips this to near-black below. */
+  --ice:#0B5F86;
+
+  --safe:#1D63D6;
+  --bad:#C2172B;                /* OUT — status only, never decorative */
+  --good:#0F7A43;
+
+  --r:20px; --r-s:14px;
+  --glow:0;                     /* glow multiplier — 0 in day, 1 in dark */
+
+  --raise:
+    inset 0 1px 0 rgba(255,255,255,.9),
+    inset 0 -1px 0 rgba(12,20,32,.10),
+    0 1px 2px rgba(12,20,32,.14),
+    0 16px 30px -16px rgba(12,20,32,.38);
+
+  --well-sh:
+    inset 0 3px 7px rgba(12,20,32,.28),
+    inset 0 -1px 0 rgba(255,255,255,.75);
+
+  --turf-scrim:linear-gradient(rgba(255,255,255,.34),rgba(210,224,240,.58));
+}
+
+/* ---- dark, both by system preference and by explicit toggle ------------ */
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --e0:#0B0D13; --e1:rgba(22,25,34,.80); --e1-hi:rgba(30,34,46,.86);
+    --e2:rgba(32,37,51,.92); --e2-hi:rgba(44,50,68,.95); --recess:#07090D;
+    --ink:#FFFFFF; --ink-2:rgba(255,255,255,.74); --ink-3:rgba(255,255,255,.48);
+    --accent:#FFB020; --accent-2:#FFD84D; --accent-ink:#1A1000; --ice:#8FD8FF;
+    --safe:#5B9BFF; --bad:#FF4257; --good:#3BE85A;
+    --glow:1;
+    --raise:
+      inset 0 1px 0 rgba(255,255,255,.10),
+      inset 0 -1px 0 rgba(0,0,0,.55),
+      0 1px 2px rgba(0,0,0,.6),
+      0 18px 34px -14px rgba(0,0,0,.92);
+    --well-sh:
+      inset 0 3px 8px rgba(0,0,0,.9),
+      inset 0 -1px 0 rgba(255,255,255,.05);
+    --turf-scrim:linear-gradient(rgba(7,11,19,.30),rgba(7,11,19,.58));
+  }
+}
+:root[data-theme="dark"]{
+  --e0:#0B0D13; --e1:rgba(22,25,34,.80); --e1-hi:rgba(30,34,46,.86);
+  --e2:rgba(32,37,51,.92); --e2-hi:rgba(44,50,68,.95); --recess:#07090D;
+  --ink:#FFFFFF; --ink-2:rgba(255,255,255,.74); --ink-3:rgba(255,255,255,.48);
+  --accent:#FFB020; --accent-2:#FFD84D; --accent-ink:#1A1000; --ice:#8FD8FF;
+  --safe:#5B9BFF; --bad:#FF4257; --good:#3BE85A;
+  --glow:1;
+  --raise:
+    inset 0 1px 0 rgba(255,255,255,.10),
+    inset 0 -1px 0 rgba(0,0,0,.55),
+    0 1px 2px rgba(0,0,0,.6),
+    0 18px 34px -14px rgba(0,0,0,.92);
+  --well-sh:
+    inset 0 3px 8px rgba(0,0,0,.9),
+    inset 0 -1px 0 rgba(255,255,255,.05);
+  --turf-scrim:linear-gradient(rgba(7,11,19,.30),rgba(7,11,19,.58));
+}
+
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{
+  margin:0;background:var(--e0);color:var(--ink);
+  font-family:"Inter Tight",system-ui,-apple-system,sans-serif;
+  background-image:var(--turf-scrim),url("bg-turf.jpg");
+  background-size:cover;background-position:center;background-attachment:fixed;
+  overflow:hidden;
+}
+.mono{font-family:"JetBrains Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums}
+.disp{font-family:"Archivo","Inter Tight",system-ui,sans-serif}
+
+/* micro-labels — 9-10px, uppercase, wide tracking, mono (§6) */
+.lab{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:9.5px;font-weight:700;
+  text-transform:uppercase;letter-spacing:.19em;color:var(--ink-3)}
+
+/* ---- shell: fits one screen, no horizontal scroll ever (§7) ------------ */
+.app{height:100dvh;padding:clamp(10px,1.2vw,16px);display:grid;
+  gap:clamp(9px,1vw,14px);
+  grid-template-columns:minmax(0,1fr);
+  grid-template-rows:auto minmax(0,1fr) auto;overflow:hidden}
+@media(min-width:1080px){
+  .app.scoring{grid-template-columns:minmax(0,300px) minmax(0,1fr) minmax(0,300px)}
+  .app.scoring .bar,.app.scoring .dock{grid-column:1 / -1}
+}
+@media(max-width:1079px){
+  .app{height:auto;min-height:100dvh;overflow-y:auto;grid-template-rows:none}
+  body{overflow:auto}
+}
+
+/* ---- card: translucent raised housing (§2.4) --------------------------- */
+.card{
+  background:linear-gradient(158deg,var(--e1-hi),var(--e1) 70%);
+  backdrop-filter:blur(16px) saturate(150%);
+  -webkit-backdrop-filter:blur(16px) saturate(150%);
+  border:1px solid rgba(128,145,170,.22);
+  border-radius:var(--r);
+  box-shadow:var(--raise);
+  padding:14px;min-height:0;display:flex;flex-direction:column;
+  animation:rise .5s cubic-bezier(.2,.8,.2,1) both;
+}
+:root[data-theme="dark"] .card{border-color:rgba(255,255,255,.07)}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]) .card{border-color:rgba(255,255,255,.07)}
+}
+@keyframes rise{from{opacity:0;transform:translateY(14px)}}
+.card:nth-child(2){animation-delay:.06s}
+.card:nth-child(3){animation-delay:.12s}
+
+/* ---- raised widget inside a card (elevation +2, §2.7 recursion) -------- */
+.widget{
+  border-radius:var(--r-s);
+  background:linear-gradient(160deg,var(--e2-hi),var(--e2));
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.5),
+    inset 0 -1px 0 rgba(12,20,32,.12),
+    0 8px 18px -8px rgba(12,20,32,.4);
+  padding:10px 12px;
+}
+:root[data-theme="dark"] .widget{
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.13),
+    inset 0 -1px 0 rgba(0,0,0,.5),
+    0 10px 20px -8px rgba(0,0,0,.95);
+}
+
+/* ---- recessed well (§2.2) --------------------------------------------- */
+.well{border-radius:999px;background:var(--recess);box-shadow:var(--well-sh)}
+
+/* ---- segmented control: pills sunk into a well (§4) -------------------- */
+.pills{display:inline-flex;padding:3px;border-radius:999px;background:var(--recess);
+  box-shadow:var(--well-sh);gap:2px}
+.pills button{padding:6px 14px;border:none;border-radius:999px;background:transparent;
+  color:var(--ink-3);cursor:pointer;font-family:"JetBrains Mono",monospace;font-size:10px;
+  font-weight:700;letter-spacing:.14em;text-transform:uppercase;transition:.18s}
+.pills button[aria-pressed="true"]{
+  color:var(--accent-ink);
+  background:linear-gradient(150deg,var(--accent-2),var(--accent));
+  box-shadow:0 4px 12px rgba(178,106,0,calc(.45 * var(--glow) + .18)),
+             inset 0 1px 0 rgba(255,255,255,.6)}
+.pills button:focus-visible{outline:2px solid var(--ice);outline-offset:2px}
+
+/* ---- top bar ----------------------------------------------------------- */
+.bar{display:flex;align-items:center;gap:12px;padding:9px 14px;flex-wrap:wrap}
+.score-team{display:flex;align-items:center;gap:9px;min-width:0}
+.chip{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;
+  font-family:"Archivo",sans-serif;font-weight:800;font-size:12px;letter-spacing:.02em;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.45),0 4px 10px -4px rgba(0,0,0,.5);flex:none}
+.score-num{font-family:"Archivo",sans-serif;font-weight:800;font-size:30px;line-height:1;
+  letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+
+/* ---- THE ANCHOR: the count (§2.6) -------------------------------------- */
+/* The directive wants one large circular anchor. In a dashboard that's a health
+   gauge; here the honest anchor is the COUNT — the number a scorekeeper reads
+   more than any other, and currently rendered as 13px dots. */
+.anchor{align-items:center;justify-content:center;gap:6px}
+.gauge{position:relative;width:min(100%,286px);aspect-ratio:1}
+.gauge svg{width:100%;height:100%;display:block}
+.gcenter{position:absolute;inset:0;display:grid;place-content:center;text-align:center;
+  pointer-events:none}
+.gcount{font-family:"Archivo",sans-serif;font-weight:800;
+  font-size:clamp(54px,8.4vw,118px);line-height:.84;letter-spacing:-.055em;
+  font-variant-numeric:tabular-nums;color:var(--ink);
+  text-shadow:0 0 calc(40px * var(--glow)) rgba(255,176,32,.55)}
+.gcount .sep{color:var(--ink-3);font-weight:600}
+
+/* outs, as a recessed row of lamps under the gauge */
+.outs{display:flex;align-items:center;gap:8px;padding:7px 13px;border-radius:999px;
+  background:var(--recess);box-shadow:var(--well-sh)}
+.lamp{width:15px;height:15px;border-radius:50%;background:transparent;
+  border:1.75px solid var(--ink-3);transition:.2s}
+.lamp.on{background:var(--bad);border-color:var(--bad);
+  box-shadow:0 0 calc(10px * var(--glow)) var(--bad),inset 0 1px 0 rgba(255,255,255,.45)}
+
+/* ---- the diamond: still the input hero, now visibly a control ---------- */
+.field{align-items:center;justify-content:center;padding:8px}
+.field svg{width:100%;height:100%;max-height:100%;display:block}
+
+/* ---- rows / list ------------------------------------------------------- */
+.row{display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:12px;
+  transition:.16s;cursor:default}
+.row + .row{margin-top:6px}
+.row:hover{background:rgba(128,145,170,.13);transform:translateX(2px)}
+.row .nm{font-weight:600;font-size:13.5px;letter-spacing:-.01em;flex:1;min-width:0;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.num{font-family:"JetBrains Mono",monospace;font-weight:700;font-size:12px;
+  font-variant-numeric:tabular-nums;color:var(--ink-2)}
+
+/* base badge: a runner token, circular (§4) */
+.base{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;flex:none;
+  font-family:"JetBrains Mono",monospace;font-size:9.5px;font-weight:800;color:#fff;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.4),0 3px 8px -2px rgba(0,0,0,.6)}
+
+/* ---- sparkline / inline bar cue (§8: every number gets a visual cue) --- */
+.spark{height:5px;border-radius:999px;background:var(--recess);box-shadow:var(--well-sh);
+  overflow:hidden;flex:none;width:52px}
+.spark i{display:block;height:100%;border-radius:999px;
+  background:linear-gradient(90deg,var(--accent),var(--accent-2));
+  box-shadow:0 0 calc(9px * var(--glow)) rgba(255,176,32,.8)}
+
+/* ---- action dock: circular icon buttons (§4) --------------------------- */
+.dock{display:flex;align-items:center;justify-content:center;gap:10px;padding:10px;
+  flex-wrap:wrap}
+.ico{width:52px;height:52px;border-radius:50%;border:none;cursor:pointer;
+  background:linear-gradient(160deg,var(--e2-hi),var(--e2));
+  color:var(--ink);display:grid;place-items:center;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.45),inset 0 -1px 0 rgba(12,20,32,.14),
+             0 9px 18px -8px rgba(12,20,32,.5);
+  transition:transform .14s cubic-bezier(.2,.8,.2,1),box-shadow .18s}
+:root[data-theme="dark"] .ico{box-shadow:inset 0 1px 0 rgba(255,255,255,.13),
+  inset 0 -1px 0 rgba(0,0,0,.5),0 10px 20px -8px rgba(0,0,0,.95)}
+.ico:hover{transform:translateY(-2px)}
+.ico:focus-visible{outline:2px solid var(--ice);outline-offset:3px}
+.ico.primary{background:linear-gradient(150deg,var(--accent-2),var(--accent));
+  color:var(--accent-ink);width:64px;height:64px;
+  box-shadow:0 6px 20px rgba(178,106,0,calc(.5 * var(--glow) + .22)),
+             inset 0 1px 0 rgba(255,255,255,.6)}
+.ico b{font-family:"Archivo",sans-serif;font-size:11px;font-weight:800;letter-spacing:.04em}
+
+/* ---- screen switcher (comp scaffolding, not part of the design) -------- */
+.switch{position:fixed;z-index:60;left:50%;transform:translateX(-50%);bottom:10px;
+  display:flex;gap:6px;align-items:center}
+.hidden{display:none!important}
+
+@media (prefers-reduced-motion:reduce){
+  .card{animation:none}
+  .row:hover,.ico:hover{transform:none}
+}
+</style>
+</head>
+<body>
+
+<!-- ============================ SCORING ============================ -->
+<div class="app scoring" id="s-scoring">
+
+  <!-- top bar: the score, with the batting team lit -->
+  <div class="card bar">
+    <div class="score-team" style="flex:1">
+      <span class="chip" style="background:linear-gradient(150deg,#2E6BE6,#1D3A66);color:#fff">LC</span>
+      <div style="min-width:0">
+        <div class="disp" style="font-weight:700;font-size:14px;letter-spacing:-.01em">Liberty Clerks</div>
+        <div class="lab">away</div>
+      </div>
+      <span class="score-num" style="margin-left:auto;color:var(--accent)">7</span>
+    </div>
+
+    <div style="display:flex;flex-direction:column;align-items:center;gap:3px;padding:0 6px">
+      <div class="lab" style="color:var(--ink-2)">TOP 5<sup>TH</sup></div>
+      <div class="pills" role="group" aria-label="Mode">
+        <button aria-pressed="true">score</button>
+        <button aria-pressed="false">watch</button>
+      </div>
+    </div>
+
+    <div class="score-team" style="flex:1;justify-content:flex-end">
+      <span class="score-num" style="margin-right:auto">3</span>
+      <div style="min-width:0;text-align:right">
+        <div class="disp" style="font-weight:700;font-size:14px;letter-spacing:-.01em">Rivals</div>
+        <div class="lab">home · fielding</div>
+      </div>
+      <span class="chip" style="background:linear-gradient(150deg,#C2172B,#7A0E1B);color:#fff">RV</span>
+    </div>
+  </div>
+
+  <!-- LEFT: the anchor + who's up -->
+  <div class="card anchor">
+    <div class="lab" style="align-self:flex-start">count</div>
+    <div class="gauge">
+      <svg viewBox="0 0 340 340" role="img" aria-label="Count: 2 balls, 1 strike, 2 outs">
+        <defs>
+          <linearGradient id="ga" x1="0" y1="1" x2="1" y2="0">
+            <stop offset="0%" stop-color="var(--accent)"/>
+            <stop offset="100%" stop-color="var(--accent-2)"/>
+          </linearGradient>
+          <filter id="gl" x="-60%" y="-60%" width="220%" height="220%">
+            <feGaussianBlur stdDeviation="7" result="b"/>
+            <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+        </defs>
+
+        <!-- BALLS: outer ring, 4 recessed segments, 2 lit -->
+        <g id="balls"></g>
+        <!-- STRIKES: inner ring, 3 recessed segments, 1 lit -->
+        <g id="strikes"></g>
+      </svg>
+      <div class="gcenter">
+        <div class="gcount mono"><span id="cB">2</span><span class="sep">–</span><span id="cS">1</span></div>
+        <div class="lab" style="margin-top:9px">balls · strikes</div>
+      </div>
+    </div>
+
+    <div class="outs" role="img" aria-label="2 outs">
+      <span class="lab" style="color:var(--ink-2)">out</span>
+      <span class="lamp on"></span><span class="lamp on"></span><span class="lamp"></span>
+    </div>
+
+    <!-- recursion check: this card holds a widget at a different elevation -->
+    <div class="widget" style="width:100%;margin-top:auto;display:flex;align-items:center;gap:10px">
+      <span class="base" style="background:linear-gradient(150deg,#3BE85A,#0F7A43)">AB</span>
+      <div style="min-width:0;flex:1">
+        <div class="disp" style="font-weight:700;font-size:14.5px;letter-spacing:-.015em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">#4 M. Ford</div>
+        <div class="lab">2 for 3 · rbi 2</div>
+      </div>
+      <div class="mono" style="font-size:17px;font-weight:800;color:var(--accent)">.667</div>
+    </div>
+  </div>
+
+  <!-- CENTER: the diamond, unchanged in job, sharpened in form -->
+  <div class="card field">
+    <svg viewBox="0 0 300 300" role="img" aria-label="Diamond: runners on first and third">
+      <defs>
+        <radialGradient id="turf" cx="50%" cy="42%" r="62%">
+          <stop offset="0%" stop-color="#2C7D4E"/><stop offset="100%" stop-color="#17482F"/>
+        </radialGradient>
+        <filter id="bglow" x="-70%" y="-70%" width="240%" height="240%">
+          <feGaussianBlur stdDeviation="4.5" result="b"/>
+          <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+      </defs>
+
+      <!-- outfield arc, recessed into the card -->
+      <path d="M150 262 L36 148 A161 161 0 0 1 264 148 Z" fill="url(#turf)" opacity=".92"/>
+      <path d="M150 262 L36 148 A161 161 0 0 1 264 148 Z" fill="none"
+            stroke="rgba(0,0,0,.45)" stroke-width="3"/>
+
+      <!-- infield clay -->
+      <path d="M150 250 L214 186 L150 122 L86 186 Z" fill="#C9793A" opacity=".30"/>
+      <!-- basepaths, chalk -->
+      <path d="M150 250 L214 186 L150 122 L86 186 Z" fill="none"
+            stroke="#F4F8FC" stroke-width="2.6" stroke-linejoin="round" opacity=".85"/>
+
+      <!-- bases: 1B and 3B occupied, 2B empty. Occupied = filled + emissive. -->
+      <g>
+        <!-- 2B empty: recessed, dark -->
+        <rect x="141" y="113" width="18" height="18" rx="4" transform="rotate(45 150 122)"
+              fill="rgba(0,0,0,.34)" stroke="rgba(244,248,252,.6)" stroke-width="2"/>
+        <!-- 1B occupied -->
+        <rect x="205" y="177" width="18" height="18" rx="4" transform="rotate(45 214 186)"
+              fill="#38BDF8" stroke="#fff" stroke-width="2" filter="url(#bglow)"/>
+        <!-- 3B occupied -->
+        <rect x="77" y="177" width="18" height="18" rx="4" transform="rotate(45 86 186)"
+              fill="#F472B6" stroke="#fff" stroke-width="2" filter="url(#bglow)"/>
+        <!-- home -->
+        <path d="M150 244 l7 6 -7 7 -7 -7 Z" fill="#F4F8FC" stroke="rgba(0,0,0,.4)" stroke-width="1.2"/>
+      </g>
+
+      <!-- runner tokens sit ON the bases, circular, lit -->
+      <g font-family="JetBrains Mono, monospace" font-size="9" font-weight="800" fill="#04131C">
+        <circle cx="232" cy="168" r="13" fill="#38BDF8" stroke="#fff" stroke-width="1.6"/>
+        <text x="232" y="171.5" text-anchor="middle">12</text>
+        <circle cx="68" cy="168" r="13" fill="#F472B6" stroke="#fff" stroke-width="1.6"/>
+        <text x="68" y="171.5" text-anchor="middle">27</text>
+      </g>
+
+      <text x="150" y="288" text-anchor="middle" font-family="JetBrains Mono, monospace"
+            font-size="9.5" font-weight="700" letter-spacing="1.8" fill="var(--ink-3)">TAP A ZONE TO SCORE</text>
+    </svg>
+  </div>
+
+  <!-- RIGHT: base state + last plays -->
+  <div class="card" style="gap:11px">
+    <div class="lab">on base</div>
+    <div class="widget" style="display:flex;flex-direction:column;gap:7px">
+      <div class="row" style="padding:5px 2px">
+        <span class="base" style="background:linear-gradient(150deg,#38BDF8,#0B6E9B)">1B</span>
+        <span class="nm">#12 J. Reyes</span><span class="num">0-0</span>
+      </div>
+      <div class="row" style="padding:5px 2px">
+        <span class="base" style="background:linear-gradient(150deg,#F472B6,#9B2F6B)">3B</span>
+        <span class="nm">#27 B. Mayo</span><span class="num">1-1</span>
+      </div>
+    </div>
+
+    <div class="lab" style="margin-top:2px">this inning</div>
+    <div style="flex:1;min-height:0;overflow:auto">
+      <div class="row"><span class="nm">Single, left field</span><span class="num">#12</span></div>
+      <div class="row"><span class="nm">Fly out, center</span><span class="num">#8</span></div>
+      <div class="row"><span class="nm">Walk</span><span class="num">#27</span></div>
+      <div class="row"><span class="nm">Ground out, 6-3</span><span class="num">#3</span></div>
+    </div>
+
+    <div class="widget" style="display:flex;align-items:center;gap:9px">
+      <div style="flex:1;min-width:0">
+        <div class="lab">pitch count · #22</div>
+        <div class="mono" style="font-size:19px;font-weight:800;letter-spacing:-.02em">48<span style="color:var(--ink-3);font-size:12px"> / 75</span></div>
+      </div>
+      <div class="spark" style="width:64px"><i style="width:64%"></i></div>
+    </div>
+  </div>
+
+  <!-- DOCK -->
+  <div class="card dock">
+    <button class="ico" aria-label="Ball"><b>BALL</b></button>
+    <button class="ico" aria-label="Strike"><b>STRK</b></button>
+    <button class="ico primary" aria-label="Record the play"><b>PLAY</b></button>
+    <button class="ico" aria-label="Foul"><b>FOUL</b></button>
+    <button class="ico" aria-label="Undo"><b>UNDO</b></button>
+  </div>
+</div>
+
+<!-- ============================ HOME ============================ -->
+<div class="app hidden" id="s-home">
+  <div class="card bar">
+    <span class="chip" style="background:linear-gradient(150deg,var(--accent-2),var(--accent));color:var(--accent-ink)">AL</span>
+    <div style="flex:1">
+      <div class="disp" style="font-weight:800;font-size:16px;letter-spacing:-.02em">All-Stars Live</div>
+      <div class="lab">liberty clerks · 2026</div>
+    </div>
+    <div class="pills"><button aria-pressed="true">season</button><button aria-pressed="false">all time</button></div>
+  </div>
+
+  <div style="display:grid;gap:clamp(9px,1vw,14px);grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));min-height:0;overflow:auto">
+
+    <!-- the anchor on Home is the record -->
+    <div class="card anchor" style="justify-content:flex-start">
+      <div class="lab" style="align-self:flex-start">record</div>
+      <div class="gauge" style="width:min(100%,232px)">
+        <svg viewBox="0 0 340 340" role="img" aria-label="Record: 9 wins, 4 losses. 69 percent.">
+          <circle cx="170" cy="170" r="130" fill="none" stroke="var(--recess)" stroke-width="26"
+                  stroke-linecap="round" stroke-dasharray="613 817" transform="rotate(135 170 170)"/>
+          <circle cx="170" cy="170" r="130" fill="none" stroke="url(#ga2)" stroke-width="23"
+                  stroke-linecap="round" stroke-dasharray="423 817" transform="rotate(135 170 170)"
+                  filter="url(#gl2)"/>
+          <defs>
+            <linearGradient id="ga2" x1="0" y1="1" x2="1" y2="0">
+              <stop offset="0%" stop-color="var(--accent)"/><stop offset="100%" stop-color="var(--accent-2)"/>
+            </linearGradient>
+            <filter id="gl2" x="-60%" y="-60%" width="220%" height="220%">
+              <feGaussianBlur stdDeviation="7" result="b"/>
+              <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+            </filter>
+          </defs>
+        </svg>
+        <div class="gcenter">
+          <div class="gcount mono" style="font-size:clamp(44px,7vw,108px)">9<span class="sep">–</span>4</div>
+          <div class="lab" style="margin-top:8px">win rate 69%</div>
+        </div>
+      </div>
+      <button class="ico primary" style="width:auto;height:44px;border-radius:999px;padding:0 22px;margin-top:4px">
+        <b>START GAME</b>
+      </button>
+    </div>
+
+    <div class="card">
+      <div class="lab">next up</div>
+      <div class="widget" style="margin-top:9px">
+        <div class="disp" style="font-weight:700;font-size:15px;letter-spacing:-.015em">vs Rivals</div>
+        <div class="lab" style="margin-top:4px">sat aug 30 · 10:00 am · field 2</div>
+      </div>
+      <div class="lab" style="margin-top:13px">recent</div>
+      <div style="margin-top:7px;flex:1;min-height:0;overflow:auto">
+        <div class="row"><span class="base" style="background:linear-gradient(150deg,#3BE85A,#0F7A43)">W</span><span class="nm">vs Thunder</span><span class="num">7–3</span></div>
+        <div class="row"><span class="base" style="background:linear-gradient(150deg,#3BE85A,#0F7A43)">W</span><span class="nm">at Sharks</span><span class="num">5–2</span></div>
+        <div class="row"><span class="base" style="background:linear-gradient(150deg,#FF4257,#7A0E1B)">L</span><span class="nm">vs Rivals</span><span class="num">2–5</span></div>
+        <div class="row"><span class="base" style="background:linear-gradient(150deg,#3BE85A,#0F7A43)">W</span><span class="nm">at Comets</span><span class="num">9–1</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="lab">team leaders</div>
+      <div style="margin-top:9px;flex:1;min-height:0;overflow:auto">
+        <div class="row"><span class="nm">#4 M. Ford</span><span class="spark"><i style="width:86%"></i></span><span class="num" style="width:38px;text-align:right">.412</span></div>
+        <div class="row"><span class="nm">#12 J. Reyes</span><span class="spark"><i style="width:71%"></i></span><span class="num" style="width:38px;text-align:right">.340</span></div>
+        <div class="row"><span class="nm">#27 B. Mayo</span><span class="spark"><i style="width:64%"></i></span><span class="num" style="width:38px;text-align:right">.305</span></div>
+        <div class="row"><span class="nm">#8 T. Nguyen</span><span class="spark"><i style="width:52%"></i></span><span class="num" style="width:38px;text-align:right">.248</span></div>
+        <div class="row"><span class="nm">#3 R. Silva</span><span class="spark"><i style="width:44%"></i></span><span class="num" style="width:38px;text-align:right">.211</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card dock">
+    <button class="ico" aria-label="Teams"><b>TEAM</b></button>
+    <button class="ico" aria-label="Schedule"><b>SCHD</b></button>
+    <button class="ico" aria-label="Stats"><b>STAT</b></button>
+    <button class="ico" aria-label="Share"><b>SHRE</b></button>
+    <button class="ico" aria-label="Settings"><b>SET</b></button>
+  </div>
+</div>
+
+<!-- ============================ BOX ============================ -->
+<div class="app hidden" id="s-box">
+  <div class="card bar">
+    <div style="flex:1">
+      <div class="disp" style="font-weight:800;font-size:16px;letter-spacing:-.02em">Liberty Clerks 7 — Rivals 3</div>
+      <div class="lab">final · aug 24 2026</div>
+    </div>
+    <div class="pills"><button aria-pressed="true">batting</button><button aria-pressed="false">pitching</button></div>
+  </div>
+
+  <div class="card" style="min-height:0">
+    <div class="lab">batting — 4 of 9 shown</div>
+    <!-- Directive §7: tables become stacked rows. Numbers keep tabular alignment
+         via a grid, so nothing scrolls sideways at any width. -->
+    <div style="flex:1;min-height:0;overflow:auto;margin-top:10px">
+      <div class="widget" style="display:grid;grid-template-columns:1fr repeat(5,minmax(30px,42px));gap:4px;align-items:center;padding:8px 11px">
+        <span class="lab">batter</span>
+        <span class="lab" style="text-align:right">ab</span><span class="lab" style="text-align:right">r</span>
+        <span class="lab" style="text-align:right">h</span><span class="lab" style="text-align:right">rbi</span>
+        <span class="lab" style="text-align:right">avg</span>
+      </div>
+      <div class="row" style="display:grid;grid-template-columns:1fr repeat(5,minmax(30px,42px));gap:4px">
+        <span class="nm">#4 M. Ford</span>
+        <span class="num" style="text-align:right">3</span><span class="num" style="text-align:right">2</span>
+        <span class="num" style="text-align:right">2</span><span class="num" style="text-align:right">2</span>
+        <span class="num" style="text-align:right;color:var(--accent);font-weight:800">.667</span>
+      </div>
+      <div class="row" style="display:grid;grid-template-columns:1fr repeat(5,minmax(30px,42px));gap:4px">
+        <span class="nm">#12 J. Reyes</span>
+        <span class="num" style="text-align:right">4</span><span class="num" style="text-align:right">1</span>
+        <span class="num" style="text-align:right">2</span><span class="num" style="text-align:right">1</span>
+        <span class="num" style="text-align:right">.500</span>
+      </div>
+      <div class="row" style="display:grid;grid-template-columns:1fr repeat(5,minmax(30px,42px));gap:4px">
+        <span class="nm">#27 B. Mayo</span>
+        <span class="num" style="text-align:right">3</span><span class="num" style="text-align:right">2</span>
+        <span class="num" style="text-align:right">1</span><span class="num" style="text-align:right">3</span>
+        <span class="num" style="text-align:right">.333</span>
+      </div>
+      <div class="row" style="display:grid;grid-template-columns:1fr repeat(5,minmax(30px,42px));gap:4px">
+        <span class="nm">#8 T. Nguyen</span>
+        <span class="num" style="text-align:right">4</span><span class="num" style="text-align:right">2</span>
+        <span class="num" style="text-align:right">1</span><span class="num" style="text-align:right">1</span>
+        <span class="num" style="text-align:right">.250</span>
+      </div>
+      <div class="widget" style="display:grid;grid-template-columns:1fr repeat(5,minmax(30px,42px));gap:4px;margin-top:8px;padding:9px 11px">
+        <span class="disp" style="font-weight:800;font-size:12.5px">TOTALS</span>
+        <span class="num" style="text-align:right;font-weight:800">14</span>
+        <span class="num" style="text-align:right;font-weight:800;color:var(--accent)">7</span>
+        <span class="num" style="text-align:right;font-weight:800">6</span>
+        <span class="num" style="text-align:right;font-weight:800">7</span>
+        <span class="num" style="text-align:right;font-weight:800">.429</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card dock">
+    <button class="ico" aria-label="Back"><b>BACK</b></button>
+    <button class="ico primary" aria-label="Share box score"><b>SHRE</b></button>
+    <button class="ico" aria-label="Print"><b>PRNT</b></button>
+  </div>
+</div>
+
+<!-- comp scaffolding -->
+<div class="switch">
+  <div class="pills" id="nav">
+    <button aria-pressed="true" data-s="scoring">scoring</button>
+    <button aria-pressed="false" data-s="home">home</button>
+    <button aria-pressed="false" data-s="box">box</button>
+  </div>
+  <div class="pills" id="thm">
+    <button aria-pressed="true" data-t="dark">dark</button>
+    <button aria-pressed="false" data-t="light">day</button>
+  </div>
+</div>
+
+<script>
+/* ---- build the segmented count rings -------------------------------------
+   r=130 outer (balls), r=104 inner (strikes). 270° sweep starting at rotate(135)
+   so the gap sits at the bottom, per the directive's gauge spec. */
+function ring(el, r, n, lit, gap){
+  const C = 2 * Math.PI * r;               // full circumference
+  const sweep = C * 0.75;                  // 270°
+  const seg = (sweep - gap * (n - 1)) / n;  // one segment's arc length
+  const step = ((seg + gap) / C) * 360;     // degrees between segment starts
+  let out = "";
+  for (let i = 0; i < n; i++){
+    const on = i < lit;
+    out += `<circle cx="170" cy="170" r="${r}" fill="none"
+      stroke="${on ? 'url(#ga)' : 'var(--recess)'}"
+      stroke-width="${on ? 22 : 20}" stroke-linecap="round"
+      stroke-dasharray="${seg.toFixed(2)} ${C.toFixed(2)}"
+      transform="rotate(${(135 + i * step).toFixed(2)} 170 170)"
+      ${on ? 'filter="url(#gl)"' : 'opacity=".85"'} />`;
+  }
+  el.innerHTML = out;
+}
+ring(document.getElementById("balls"),   130, 4, 2, 11);
+ring(document.getElementById("strikes"), 100, 3, 1, 13);
+
+/* ---- comp scaffolding ---------------------------------------------------- */
+document.getElementById("nav").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  document.querySelectorAll("#nav button").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+  ["scoring","home","box"].forEach(s =>
+    document.getElementById("s-" + s).classList.toggle("hidden", s !== b.dataset.s));
+});
+document.getElementById("thm").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  document.querySelectorAll("#thm button").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+  document.documentElement.setAttribute("data-theme", b.dataset.t);
+});
+document.documentElement.setAttribute("data-theme", "dark");
+</script>
+</body>
+</html>
