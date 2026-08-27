@@ -55,11 +55,19 @@
 
   --s1:4px; --s2:7px; --s3:11px; --s4:15px; --s5:22px;
 
-  --t-lab:12px;
-  --t-body:clamp(14px, min(1.3vw, 2.1vh), 16.5px);
-  --t-num:clamp(13px, min(1.2vw, 1.9vh), 15px);
-  --t-score:clamp(24px, min(2.6vw, 4vh), 34px);
-  --t-count:clamp(30px, min(6vw, 8.6vh), 96px);
+  /* A modular scale off ONE fluid base, so the ratios between steps stay constant at
+     every viewport. The earlier version fixed --t-lab at 12px while the rest shrank
+     fluidly, which squeezed the bottom of the scale to a 1.17 ratio on a narrow pane
+     -- two steps the eye reads as one size. Multipliers: .86 / 1.21 / 1.64 / 2.71,
+     giving 1.41, 1.36 and 1.65 between steps no matter how big the screen is. */
+  --t-base:clamp(13px, min(1.4vw, 2.2vh), 14px);
+  --t-lab:calc(var(--t-base) * .86);                   /* micro-labels, chips, badges */
+  --t-body:calc(var(--t-base) * 1.21);                 /* names, figures, buttons     */
+  --t-val:calc(var(--t-base) * 1.64);                  /* readouts                    */
+  --t-score:calc(var(--t-base) * 2.71);                /* scoreboard                  */
+  /* The count is the one size driven by available HEIGHT rather than the scale — it
+     fills its card. Its floor is set so it always clears --t-score by at least 1.25. */
+  --t-count:clamp(46px, min(5.2vw, 6.4vh), 96px);
 
   --r:20px; --r-s:14px;
 
@@ -203,10 +211,10 @@ body{
 .team.right{justify-content:flex-end}
 .team.right .meta{text-align:right}
 .meta{min-width:0;flex:1}
-.meta .name{font-family:"Archivo",sans-serif;font-weight:700;font-size:var(--t-num);
+.meta .name{font-family:"Archivo",sans-serif;font-weight:700;font-size:var(--t-body);
   letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .chip{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;flex:none;
-  font-family:"Archivo",sans-serif;font-weight:800;font-size:12px;color:#fff;
+  font-family:"Archivo",sans-serif;font-weight:800;font-size:var(--t-lab);color:#fff;
   background:var(--c);box-shadow:var(--inset-hi),0 4px 10px -4px rgba(0,0,0,.5)}
 .score{font-family:"Archivo",sans-serif;font-weight:800;font-size:var(--t-score);
   line-height:1;letter-spacing:-.03em;font-variant-numeric:tabular-nums;flex:none}
@@ -238,7 +246,7 @@ body{
 
 .atbat{display:flex;align-items:center;gap:var(--s3);margin-top:auto;width:100%;
   padding:clamp(6px,1vh,11px) var(--s3)}
-.atbat .val{font-family:"JetBrains Mono",monospace;font-size:17px;font-weight:800;
+.atbat .val{font-family:"JetBrains Mono",monospace;font-size:var(--t-val);font-weight:800;
   color:var(--accent);font-variant-numeric:tabular-nums;flex:none}
 
 /* ---------- field -------------------------------------------------------- */
@@ -267,16 +275,16 @@ body{
 .row:hover{background:var(--hover)}
 .nm{font-weight:600;font-size:var(--t-body);flex:1;min-width:0;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.num{font-family:"JetBrains Mono",monospace;font-weight:700;font-size:var(--t-num);
+.num{font-family:"JetBrains Mono",monospace;font-weight:700;font-size:var(--t-body);
   font-variant-numeric:tabular-nums;color:var(--ink-2);flex:none}
 .num.hi{color:var(--accent);font-weight:800}
 .base{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;flex:none;
-  font-family:"JetBrains Mono",monospace;font-size:11px;font-weight:800;color:#fff;
+  font-family:"JetBrains Mono",monospace;font-size:var(--t-lab);font-weight:800;color:#fff;
   background:var(--c);box-shadow:var(--inset-hi),0 3px 8px -2px rgba(0,0,0,.6)}
 .pitchline{display:flex;align-items:center;gap:var(--s3)}
-.pitchline .val{font-family:"JetBrains Mono",monospace;font-size:19px;font-weight:800;
+.pitchline .val{font-family:"JetBrains Mono",monospace;font-size:var(--t-val);font-weight:800;
   letter-spacing:-.02em;flex:none;font-variant-numeric:tabular-nums}
-.pitchline .of{color:var(--ink-3);font-size:12px}
+.pitchline .of{color:var(--ink-3);font-size:var(--t-lab)}
 .spark{flex:1;height:6px;border-radius:999px;background:var(--recess);
   box-shadow:var(--well-sh);overflow:hidden}
 .spark i{display:block;height:100%;border-radius:999px;
@@ -287,7 +295,7 @@ body{
   background:var(--recess);box-shadow:var(--well-sh)}
 .pills button{padding:6px 14px;border:none;border-radius:999px;background:transparent;
   color:var(--ink-3);cursor:pointer;font-family:"JetBrains Mono",monospace;
-  font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;transition:.18s}
+  font-size:var(--t-lab);font-weight:700;letter-spacing:.14em;text-transform:uppercase;transition:.18s}
 .pills button[aria-pressed="true"]{color:var(--accent-ink);
   background:linear-gradient(150deg,var(--accent-2),var(--accent));
   box-shadow:inset 0 1px 0 rgba(255,255,255,.5)}
@@ -298,7 +306,7 @@ body{
   padding:var(--s2);flex-wrap:wrap}
 .ico{flex:1 1 0;max-width:190px;height:52px;padding:0 var(--s5);border:none;cursor:pointer;
   border-radius:999px;white-space:nowrap;color:var(--ink);
-  font-family:"Archivo",sans-serif;font-size:13px;font-weight:800;letter-spacing:.02em;
+  font-family:"Archivo",sans-serif;font-size:var(--t-body);font-weight:800;letter-spacing:.02em;
   background:linear-gradient(160deg,var(--e2-hi),var(--e2));
   box-shadow:var(--inset-hi),var(--inset-lo),var(--lift);
   transition:transform .14s cubic-bezier(.2,.8,.2,1)}
@@ -320,7 +328,7 @@ body{
   .lampRow{flex-direction:column;align-items:stretch;gap:var(--s1)}
   .lampRow > .lab{flex:none}
   .atbat{display:none}
-  .dock .ico{flex:1 1 auto;height:46px;padding:0 var(--s4);font-size:12px}
+  .dock .ico{flex:1 1 auto;height:46px;padding:0 var(--s4)}
   .dock .ico.primary{flex:1 1 100%;order:-1;height:50px}
   .bar{flex-wrap:wrap;gap:var(--s2)}
 }
