@@ -146,8 +146,10 @@ body{
   .app.scoring .field {grid-column:2;grid-row:2}
   .app.scoring .side  {grid-column:1 / -1;grid-row:3}
   .app.scoring .dock  {grid-column:1 / -1;grid-row:4}
-  .app.scoring .side{flex-direction:row;gap:14px;align-items:stretch}
-  .app.scoring .side > *{flex:1;min-width:0}
+  .app.scoring .side{flex-direction:row;gap:16px;align-items:stretch}
+  .app.scoring .grp{flex:1 1 0;min-width:0}
+  .app.scoring .grp.plays{flex:1.5 1 0}      /* play text was truncating to 'Singl...' */
+  .app.scoring .grp.pitch{flex:0 0 auto;justify-content:flex-end}
 }
 @media(max-width:620px){
   .bar{flex-wrap:wrap;gap:6px}
@@ -157,6 +159,10 @@ body{
 }
 
 /* ---- card: translucent raised housing (§2.4) --------------------------- */
+/* a group binds a label to its content so neither drifts into a column of its own */
+.grp{display:flex;flex-direction:column;gap:7px;min-height:0;min-width:0}
+.listwrap{flex:1 1 0;min-height:0;overflow:auto}
+.side{gap:12px}
 .card{
   background:linear-gradient(158deg,var(--e1-hi),var(--e1) 70%);
   backdrop-filter:blur(16px) saturate(150%);
@@ -224,23 +230,26 @@ body{
 .anchor{align-items:center;justify-content:center;gap:6px}
       /* at-bat also lives in the scorebar; drop the duplicate */
 }
-.gauge{position:relative;width:min(100%,286px);aspect-ratio:1}
-.gauge svg{width:100%;height:100%;display:block}
-.gcenter{position:absolute;inset:0;display:grid;place-content:center;text-align:center;
-  pointer-events:none}
-.gcount{font-family:"Archivo",sans-serif;font-weight:800;
-  font-size:clamp(54px,8.4vw,118px);line-height:.84;letter-spacing:-.055em;
-  font-variant-numeric:tabular-nums;color:var(--ink);
-  text-shadow:0 0 calc(40px * var(--glow)) rgba(255,176,32,.55)}
-.gcount .sep{color:var(--ink-3);font-weight:600}
+/* Count readout: big numerals + umpire-indicator lamp rows. No radial gauge -- see the
+   markup comment on the count card for why that was the wrong instrument. */
+.countnum{font-family:"Archivo",sans-serif;font-weight:800;
+  font-size:clamp(52px,7.4vw,104px);line-height:.86;letter-spacing:-.05em;
+  font-variant-numeric:tabular-nums;color:var(--ink);display:flex;align-items:baseline;
+  justify-content:center}
+.countnum .sep{color:var(--ink-3);font-weight:600;margin:0 .06em}
 
-/* outs, as a recessed row of lamps under the gauge */
+.lamps{width:100%;display:flex;flex-direction:column;gap:7px}
+.lampRow{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.lampWell{display:inline-flex;align-items:center;gap:7px;padding:6px 11px;border-radius:999px;
+  background:var(--recess);box-shadow:var(--well-sh)}
 .outs{display:flex;align-items:center;gap:8px;padding:7px 13px;border-radius:999px;
   background:var(--recess);box-shadow:var(--well-sh)}
-.lamp{width:15px;height:15px;border-radius:50%;background:transparent;
-  border:1.75px solid var(--ink-3);transition:.2s}
-.lamp.on{background:var(--bad);border-color:var(--bad);
-  box-shadow:0 0 calc(10px * var(--glow)) var(--bad),inset 0 1px 0 rgba(255,255,255,.45)}
+.lamp{width:14px;height:14px;border-radius:50%;background:transparent;
+  border:1.75px solid var(--ink-3);transition:.18s;flex:none}
+.lamp.on{box-shadow:inset 0 1px 0 rgba(255,255,255,.4)}
+.lamp.b.on{background:var(--ink);border-color:var(--ink)}
+.lamp.s.on{background:var(--accent);border-color:var(--accent)}
+.lamp.o.on{background:var(--bad);border-color:var(--bad)}
 
 /* ---- the diamond: still the input hero, now visibly a control ---------- */
 .field{align-items:center;justify-content:center;padding:8px}
@@ -306,14 +315,13 @@ body{
    The at-bat card is dropped rather than squeezed -- the batter is already
    named in the scorebar, so it was the one duplicated element in the stack. */
 @media(max-height:900px){
-  .gauge{width:min(100%,184px)}
-  .gcount{font-size:clamp(38px,6.4vw,78px)}
+  .countnum{font-size:clamp(40px,6.4vw,76px)}
   .anchor .widget{display:none}
 }
 @media(max-height:700px){
-  .gauge{width:min(100%,150px)}
-  .gcount{font-size:clamp(32px,5vw,58px)}
-  .outs{padding:5px 10px}
+  .countnum{font-size:clamp(34px,5vw,56px)}
+  .lampWell{padding:4px 9px}
+  .lamp{width:12px;height:12px}
 }
 
 /* Phone: five labelled buttons cannot sit on one 390px row, so the dock is the one
@@ -326,8 +334,10 @@ body{
   /* Home is a menu, not a live-game surface: let its cards grow to their content and let
      the container scroll, rather than clipping them into a fixed grid row. */
   #s-home .card{min-height:max-content}
-  #s-home .gauge{width:min(100%,132px)}
   #s-home .gcount{font-size:clamp(30px,9vw,46px)}
+  /* phone: the count column is ~145px, too narrow for label-beside-lamps */
+  .lampRow{flex-direction:column;align-items:flex-start;gap:3px}
+  .lampWell{padding:4px 8px}
 }
 </style>
 </head>
@@ -365,44 +375,45 @@ body{
     </div>
   </div>
 
-  <!-- LEFT: the anchor + who's up -->
+  <!-- LEFT: the count.
+       This was a 270-degree radial gauge. Wrong instrument: a radial arc encodes a continuous
+       0-100% value, and balls/strikes are two tiny discrete counters (0-3, 0-2). The ring carried
+       no information the numerals didn't already give, and read as a loading spinner. Replaced
+       with the readout baseball actually uses -- an umpire's indicator: discrete lamps in recessed
+       wells, plus the big numerals for the read-at-a-distance glance. -->
   <div class="card anchor">
     <div class="lab" style="align-self:flex-start">count</div>
-    <div class="gauge">
-      <svg viewBox="0 0 340 340" role="img" aria-label="Count: 2 balls, 1 strike, 2 outs">
-        <defs>
-          <linearGradient id="ga" x1="0" y1="1" x2="1" y2="0">
-            <stop offset="0%" stop-color="var(--accent)"/>
-            <stop offset="100%" stop-color="var(--accent-2)"/>
-          </linearGradient>
-          <filter id="gl" x="-60%" y="-60%" width="220%" height="220%">
-            <feGaussianBlur stdDeviation="7" result="b"/>
-            <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
-          </filter>
-        </defs>
 
-        <!-- BALLS: outer ring, 4 recessed segments, 2 lit -->
-        <g id="balls"></g>
-        <!-- STRIKES: inner ring, 3 recessed segments, 1 lit -->
-        <g id="strikes"></g>
-      </svg>
-      <div class="gcenter">
-        <div class="gcount mono"><span id="cB">2</span><span class="sep">–</span><span id="cS">1</span></div>
-        <div class="lab" style="margin-top:9px">balls · strikes</div>
+    <div class="countnum mono" aria-label="Count: 2 balls, 1 strike">
+      <span>2</span><span class="sep">&ndash;</span><span>1</span>
+    </div>
+
+    <div class="lamps">
+      <div class="lampRow">
+        <span class="lab">balls</span>
+        <span class="lampWell">
+          <i class="lamp b on"></i><i class="lamp b on"></i><i class="lamp b"></i><i class="lamp b"></i>
+        </span>
+      </div>
+      <div class="lampRow">
+        <span class="lab">strikes</span>
+        <span class="lampWell">
+          <i class="lamp s on"></i><i class="lamp s"></i><i class="lamp s"></i>
+        </span>
+      </div>
+      <div class="lampRow">
+        <span class="lab">outs</span>
+        <span class="lampWell">
+          <i class="lamp o on"></i><i class="lamp o on"></i><i class="lamp o"></i>
+        </span>
       </div>
     </div>
 
-    <div class="outs" role="img" aria-label="2 outs">
-      <span class="lab" style="color:var(--ink-2)">out</span>
-      <span class="lamp on"></span><span class="lamp on"></span><span class="lamp"></span>
-    </div>
-
-    <!-- recursion check: this card holds a widget at a different elevation -->
     <div class="widget" style="width:100%;margin-top:auto;display:flex;align-items:center;gap:10px">
       <span class="base" style="background:linear-gradient(150deg,#3BE85A,#0F7A43)">AB</span>
       <div style="min-width:0;flex:1">
         <div class="disp" style="font-weight:700;font-size:14.5px;letter-spacing:-.015em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">#4 M. Ford</div>
-        <div class="lab">2 for 3 · rbi 2</div>
+        <div class="lab">2 for 3 &middot; rbi 2</div>
       </div>
       <div class="mono" style="font-size:17px;font-weight:800;color:var(--accent)">.667</div>
     </div>
@@ -455,35 +466,42 @@ body{
     </svg>
   </div>
 
-  <!-- RIGHT: base state + last plays -->
-  <div class="card side" style="gap:11px">
-    <div class="lab">on base</div>
-    <div class="widget" style="display:flex;flex-direction:column;gap:7px">
-      <div class="row" style="padding:5px 2px">
-        <span class="base" style="background:linear-gradient(150deg,#38BDF8,#0B6E9B)">1B</span>
-        <span class="nm">#12 J. Reyes</span><span class="num">0-0</span>
+  <!-- RIGHT: base state + last plays.
+       Each label is grouped WITH the thing it labels. Previously the labels were siblings of the
+       content and, in the side-by-side layout, `.side > * {flex:1}` turned every one of them into
+       its own equal-width column -- which is the empty space jford circled. -->
+  <div class="card side">
+    <section class="grp">
+      <div class="lab">on base</div>
+      <div class="widget" style="display:flex;flex-direction:column;gap:6px">
+        <div class="row" style="padding:4px 2px">
+          <span class="base" style="background:linear-gradient(150deg,#38BDF8,#0B6E9B)">1B</span>
+          <span class="nm">#12 J. Reyes</span><span class="num">0-0</span>
+        </div>
+        <div class="row" style="padding:4px 2px">
+          <span class="base" style="background:linear-gradient(150deg,#F472B6,#9B2F6B)">3B</span>
+          <span class="nm">#27 B. Mayo</span><span class="num">1-1</span>
+        </div>
       </div>
-      <div class="row" style="padding:5px 2px">
-        <span class="base" style="background:linear-gradient(150deg,#F472B6,#9B2F6B)">3B</span>
-        <span class="nm">#27 B. Mayo</span><span class="num">1-1</span>
-      </div>
-    </div>
+    </section>
 
-    <div class="lab" style="margin-top:2px">this inning</div>
-    <div style="flex:1 1 0;min-height:0;overflow:auto">
-      <div class="row"><span class="nm">Single, left field</span><span class="num">#12</span></div>
-      <div class="row"><span class="nm">Fly out, center</span><span class="num">#8</span></div>
-      <div class="row"><span class="nm">Walk</span><span class="num">#27</span></div>
-      <div class="row"><span class="nm">Ground out, 6-3</span><span class="num">#3</span></div>
-    </div>
-
-    <div class="widget" style="display:flex;align-items:center;gap:9px">
-      <div style="flex:1;min-width:0">
-        <div class="lab">pitch count · #22</div>
-        <div class="mono" style="font-size:19px;font-weight:800;letter-spacing:-.02em">48<span style="color:var(--ink-3);font-size:12px"> / 75</span></div>
+    <section class="grp plays">
+      <div class="lab">this inning</div>
+      <div class="listwrap">
+        <div class="row"><span class="nm">Single, left field</span><span class="num">#12</span></div>
+        <div class="row"><span class="nm">Fly out, center</span><span class="num">#8</span></div>
+        <div class="row"><span class="nm">Walk</span><span class="num">#27</span></div>
+        <div class="row"><span class="nm">Ground out, 6-3</span><span class="num">#3</span></div>
       </div>
-      <div class="spark" style="width:64px"><i style="width:64%"></i></div>
-    </div>
+    </section>
+
+    <section class="grp pitch">
+      <div class="lab">pitch count &middot; #22</div>
+      <div class="widget" style="display:flex;align-items:center;gap:9px">
+        <div class="mono" style="font-size:19px;font-weight:800;letter-spacing:-.02em;flex:none">48<span style="color:var(--ink-3);font-size:12px"> / 75</span></div>
+        <span class="spark" style="flex:1;width:auto"><i style="width:64%"></i></span>
+      </div>
+    </section>
   </div>
 
   <!-- DOCK -->
@@ -652,28 +670,8 @@ body{
 </div>
 
 <script>
-/* ---- build the segmented count rings -------------------------------------
-   r=130 outer (balls), r=104 inner (strikes). 270° sweep starting at rotate(135)
-   so the gap sits at the bottom, per the directive's gauge spec. */
-function ring(el, r, n, lit, gap){
-  const C = 2 * Math.PI * r;               // full circumference
-  const sweep = C * 0.75;                  // 270°
-  const seg = (sweep - gap * (n - 1)) / n;  // one segment's arc length
-  const step = ((seg + gap) / C) * 360;     // degrees between segment starts
-  let out = "";
-  for (let i = 0; i < n; i++){
-    const on = i < lit;
-    out += `<circle cx="170" cy="170" r="${r}" fill="none"
-      stroke="${on ? 'url(#ga)' : 'var(--recess)'}"
-      stroke-width="${on ? 22 : 20}" stroke-linecap="round"
-      stroke-dasharray="${seg.toFixed(2)} ${C.toFixed(2)}"
-      transform="rotate(${(135 + i * step).toFixed(2)} 170 170)"
-      ${on ? 'filter="url(#gl)"' : 'opacity=".85"'} />`;
-  }
-  el.innerHTML = out;
-}
-ring(document.getElementById("balls"),   130, 4, 2, 11);
-ring(document.getElementById("strikes"), 100, 3, 1, 13);
+/* The count rings are gone -- see the markup comment on the count card. */
+
 
 /* ---- comp scaffolding ---------------------------------------------------- */
 document.getElementById("nav").addEventListener("click", e => {
