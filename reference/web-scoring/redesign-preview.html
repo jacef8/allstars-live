@@ -122,17 +122,38 @@ body{
   text-transform:uppercase;letter-spacing:.19em;color:var(--ink-3)}
 
 /* ---- shell: fits one screen, no horizontal scroll ever (§7) ------------ */
-.app{height:100dvh;padding:clamp(10px,1.2vw,16px);display:grid;
+/* The page NEVER scrolls, at any width. Only lists inside cards scroll. A scorekeeper
+   mid-at-bat should never have to hunt for a control that slid off screen.
+   padding-bottom clears the fixed screen-switcher so the dock can't collide with it. */
+.app{height:100dvh;padding:clamp(10px,1.2vw,16px);padding-bottom:58px;display:grid;
   gap:clamp(9px,1vw,14px);
   grid-template-columns:minmax(0,1fr);
   grid-template-rows:auto minmax(0,1fr) auto;overflow:hidden}
-@media(min-width:1080px){
-  .app.scoring{grid-template-columns:minmax(0,300px) minmax(0,1fr) minmax(0,300px)}
+
+/* Wide desktop: three zones flanking the diamond. */
+@media(min-width:1100px){
+  .app.scoring{grid-template-columns:minmax(0,290px) minmax(0,1fr) minmax(0,290px)}
   .app.scoring .bar,.app.scoring .dock{grid-column:1 / -1}
 }
-@media(max-width:1079px){
-  .app{height:auto;min-height:100dvh;overflow-y:auto;grid-template-rows:none}
-  body{overflow:auto}
+/* Tablet landscape, split panes, phones: count beside the diamond, base state as a
+   full-width strip under them. Still one screen, still no page scroll. */
+@media(max-width:1099px){
+  .app.scoring{
+    grid-template-columns:minmax(0,40%) minmax(0,1fr);
+    grid-template-rows:auto minmax(0,1.25fr) minmax(0,.75fr) auto}
+  .app.scoring .bar {grid-column:1 / -1;grid-row:1}
+  .app.scoring .anchor{grid-column:1;grid-row:2}
+  .app.scoring .field {grid-column:2;grid-row:2}
+  .app.scoring .side  {grid-column:1 / -1;grid-row:3}
+  .app.scoring .dock  {grid-column:1 / -1;grid-row:4}
+  .app.scoring .side{flex-direction:row;gap:14px;align-items:stretch}
+  .app.scoring .side > *{flex:1;min-width:0}
+}
+@media(max-width:620px){
+  .bar{flex-wrap:wrap;gap:6px}
+  .app.scoring .side{flex-direction:column}
+  .ico{height:44px;padding:0 14px}
+  .ico b{font-size:12px}
 }
 
 /* ---- card: translucent raised housing (§2.4) --------------------------- */
@@ -143,7 +164,7 @@ body{
   border:1px solid rgba(128,145,170,.22);
   border-radius:var(--r);
   box-shadow:var(--raise);
-  padding:14px;min-height:0;display:flex;flex-direction:column;
+  padding:14px;min-height:0;overflow:hidden;display:flex;flex-direction:column;
   animation:rise .5s cubic-bezier(.2,.8,.2,1) both;
 }
 :root[data-theme="dark"] .card{border-color:rgba(255,255,255,.07)}
@@ -201,6 +222,8 @@ body{
    gauge; here the honest anchor is the COUNT — the number a scorekeeper reads
    more than any other, and currently rendered as 13px dots. */
 .anchor{align-items:center;justify-content:center;gap:6px}
+      /* at-bat also lives in the scorebar; drop the duplicate */
+}
 .gauge{position:relative;width:min(100%,286px);aspect-ratio:1}
 .gauge svg{width:100%;height:100%;display:block}
 .gcenter{position:absolute;inset:0;display:grid;place-content:center;text-align:center;
@@ -272,6 +295,39 @@ body{
 @media (prefers-reduced-motion:reduce){
   .card{animation:none}
   .row:hover,.ico:hover{transform:none}
+}
+
+/* ---- short viewports ---------------------------------------------------
+   Placed at the END of the sheet on purpose: these override .gauge/.gcount,
+   which are defined above at the same specificity, so source order decides.
+   The constraint on a 1024x768 tablet in landscape is VERTICAL, so these key
+   off height, not width. Scale contrast drops under the directive's 8x here;
+   a clipped anchor is worse than a smaller one, and fitting the screen wins.
+   The at-bat card is dropped rather than squeezed -- the batter is already
+   named in the scorebar, so it was the one duplicated element in the stack. */
+@media(max-height:900px){
+  .gauge{width:min(100%,184px)}
+  .gcount{font-size:clamp(38px,6.4vw,78px)}
+  .anchor .widget{display:none}
+}
+@media(max-height:700px){
+  .gauge{width:min(100%,150px)}
+  .gcount{font-size:clamp(32px,5vw,58px)}
+  .outs{padding:5px 10px}
+}
+
+/* Phone: five labelled buttons cannot sit on one 390px row, so the dock is the one
+   place wrapping is allowed -- a second button row beats truncating the words back to
+   STRK. The Home record gauge also gives up size here rather than clipping. */
+@media(max-width:620px){
+  .dock{flex-wrap:wrap;gap:7px}
+  .ico{height:42px;padding:0 13px;flex:1 1 auto}
+  .ico.primary{height:46px;padding:0 18px;flex:1 1 100%;order:-1}
+  /* Home is a menu, not a live-game surface: let its cards grow to their content and let
+     the container scroll, rather than clipping them into a fixed grid row. */
+  #s-home .card{min-height:max-content}
+  #s-home .gauge{width:min(100%,132px)}
+  #s-home .gcount{font-size:clamp(30px,9vw,46px)}
 }
 </style>
 </head>
@@ -376,27 +432,22 @@ body{
       <path d="M150 250 L214 186 L150 122 L86 186 Z" fill="none"
             stroke="#F4F8FC" stroke-width="2.6" stroke-linejoin="round" opacity=".85"/>
 
-      <!-- bases: 1B and 3B occupied, 2B empty. Occupied = filled + emissive. -->
-      <g>
-        <!-- 2B empty: recessed, dark -->
-        <rect x="141" y="113" width="18" height="18" rx="4" transform="rotate(45 150 122)"
-              fill="rgba(0,0,0,.34)" stroke="rgba(244,248,252,.6)" stroke-width="2"/>
+      <!-- Bases. An occupied base IS the runner token: the jersey number sits ON it, so
+           there is one object per runner instead of a base plus a detached badge. -->
+      <g font-family="JetBrains Mono, monospace" font-weight="800" text-anchor="middle">
+        <!-- 2B empty: small, recessed, unlit -->
+        <rect x="139" y="111" width="22" height="22" rx="5" transform="rotate(45 150 122)"
+              fill="rgba(0,0,0,.38)" stroke="rgba(244,248,252,.55)" stroke-width="2"/>
         <!-- 1B occupied -->
-        <rect x="205" y="177" width="18" height="18" rx="4" transform="rotate(45 214 186)"
-              fill="#38BDF8" stroke="#fff" stroke-width="2" filter="url(#bglow)"/>
+        <rect x="199" y="171" width="30" height="30" rx="6" transform="rotate(45 214 186)"
+              fill="#38BDF8" stroke="#FFFFFF" stroke-width="2.5" filter="url(#bglow)"/>
+        <text x="214" y="191" font-size="14" fill="#04131C">12</text>
         <!-- 3B occupied -->
-        <rect x="77" y="177" width="18" height="18" rx="4" transform="rotate(45 86 186)"
-              fill="#F472B6" stroke="#fff" stroke-width="2" filter="url(#bglow)"/>
+        <rect x="71" y="171" width="30" height="30" rx="6" transform="rotate(45 86 186)"
+              fill="#F472B6" stroke="#FFFFFF" stroke-width="2.5" filter="url(#bglow)"/>
+        <text x="86" y="191" font-size="14" fill="#2A0716">27</text>
         <!-- home -->
-        <path d="M150 244 l7 6 -7 7 -7 -7 Z" fill="#F4F8FC" stroke="rgba(0,0,0,.4)" stroke-width="1.2"/>
-      </g>
-
-      <!-- runner tokens sit ON the bases, circular, lit -->
-      <g font-family="JetBrains Mono, monospace" font-size="9" font-weight="800" fill="#04131C">
-        <circle cx="232" cy="168" r="13" fill="#38BDF8" stroke="#fff" stroke-width="1.6"/>
-        <text x="232" y="171.5" text-anchor="middle">12</text>
-        <circle cx="68" cy="168" r="13" fill="#F472B6" stroke="#fff" stroke-width="1.6"/>
-        <text x="68" y="171.5" text-anchor="middle">27</text>
+        <path d="M150 243 l8 7 -8 8 -8 -8 Z" fill="#F4F8FC" stroke="rgba(0,0,0,.45)" stroke-width="1.2"/>
       </g>
 
       <text x="150" y="288" text-anchor="middle" font-family="JetBrains Mono, monospace"
@@ -405,7 +456,7 @@ body{
   </div>
 
   <!-- RIGHT: base state + last plays -->
-  <div class="card" style="gap:11px">
+  <div class="card side" style="gap:11px">
     <div class="lab">on base</div>
     <div class="widget" style="display:flex;flex-direction:column;gap:7px">
       <div class="row" style="padding:5px 2px">
@@ -419,7 +470,7 @@ body{
     </div>
 
     <div class="lab" style="margin-top:2px">this inning</div>
-    <div style="flex:1;min-height:0;overflow:auto">
+    <div style="flex:1 1 0;min-height:0;overflow:auto">
       <div class="row"><span class="nm">Single, left field</span><span class="num">#12</span></div>
       <div class="row"><span class="nm">Fly out, center</span><span class="num">#8</span></div>
       <div class="row"><span class="nm">Walk</span><span class="num">#27</span></div>
