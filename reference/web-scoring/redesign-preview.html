@@ -188,7 +188,7 @@ body{
 .pills button:focus-visible{outline:2px solid var(--ice);outline-offset:2px}
 
 /* ---- top bar ----------------------------------------------------------- */
-.bar{display:flex;align-items:center;gap:12px;padding:9px 14px;flex-wrap:wrap}
+.bar{display:flex;flex-direction:row;align-items:center;gap:12px;padding:9px 16px;flex-wrap:nowrap}
 .score-team{display:flex;align-items:center;gap:9px;min-width:0}
 .chip{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;
   font-family:"Archivo",sans-serif;font-weight:800;font-size:12px;letter-spacing:.02em;
@@ -221,7 +221,7 @@ body{
 
 /* ---- the diamond: still the input hero, now visibly a control ---------- */
 .field{align-items:center;justify-content:center;padding:8px}
-.field svg{width:100%;height:100%;max-height:100%;display:block}
+.field svg{height:100%;width:auto;max-width:100%;max-height:100%;display:block;margin:0 auto}
 
 /* ---- rows / list ------------------------------------------------------- */
 .row{display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:12px;
@@ -246,9 +246,9 @@ body{
   box-shadow:0 0 calc(9px * var(--glow)) rgba(255,176,32,.8)}
 
 /* ---- action dock: circular icon buttons (§4) --------------------------- */
-.dock{display:flex;align-items:center;justify-content:center;gap:10px;padding:10px;
-  flex-wrap:wrap}
-.ico{width:52px;height:52px;border-radius:50%;border:none;cursor:pointer;
+.dock{display:flex;flex-direction:row;align-items:center;justify-content:center;gap:9px;
+  padding:9px;flex-wrap:nowrap}
+.ico{height:50px;padding:0 20px;border-radius:999px;border:none;cursor:pointer;white-space:nowrap;
   background:linear-gradient(160deg,var(--e2-hi),var(--e2));
   color:var(--ink);display:grid;place-items:center;
   box-shadow:inset 0 1px 0 rgba(255,255,255,.45),inset 0 -1px 0 rgba(12,20,32,.14),
@@ -259,10 +259,10 @@ body{
 .ico:hover{transform:translateY(-2px)}
 .ico:focus-visible{outline:2px solid var(--ice);outline-offset:3px}
 .ico.primary{background:linear-gradient(150deg,var(--accent-2),var(--accent));
-  color:var(--accent-ink);width:64px;height:64px;
+  color:var(--accent-ink);height:56px;padding:0 30px;
   box-shadow:0 6px 20px rgba(178,106,0,calc(.5 * var(--glow) + .22)),
              inset 0 1px 0 rgba(255,255,255,.6)}
-.ico b{font-family:"Archivo",sans-serif;font-size:11px;font-weight:800;letter-spacing:.04em}
+.ico b{font-family:"Archivo",sans-serif;font-size:13px;font-weight:800;letter-spacing:.02em}
 
 /* ---- screen switcher (comp scaffolding, not part of the design) -------- */
 .switch{position:fixed;z-index:60;left:50%;transform:translateX(-50%);bottom:10px;
@@ -437,11 +437,11 @@ body{
 
   <!-- DOCK -->
   <div class="card dock">
-    <button class="ico" aria-label="Ball"><b>BALL</b></button>
-    <button class="ico" aria-label="Strike"><b>STRK</b></button>
-    <button class="ico primary" aria-label="Record the play"><b>PLAY</b></button>
-    <button class="ico" aria-label="Foul"><b>FOUL</b></button>
-    <button class="ico" aria-label="Undo"><b>UNDO</b></button>
+    <button class="ico" aria-label="Ball"><b>Ball</b></button>
+    <button class="ico" aria-label="Strike"><b>Strike</b></button>
+    <button class="ico primary" aria-label="Record the play"><b>Record play</b></button>
+    <button class="ico" aria-label="Foul"><b>Foul</b></button>
+    <button class="ico" aria-label="Undo"><b>Undo</b></button>
   </div>
 </div>
 
@@ -484,7 +484,7 @@ body{
         </div>
       </div>
       <button class="ico primary" style="width:auto;height:44px;border-radius:999px;padding:0 22px;margin-top:4px">
-        <b>START GAME</b>
+        <b>Start game</b>
       </button>
     </div>
 
@@ -516,11 +516,11 @@ body{
   </div>
 
   <div class="card dock">
-    <button class="ico" aria-label="Teams"><b>TEAM</b></button>
-    <button class="ico" aria-label="Schedule"><b>SCHD</b></button>
-    <button class="ico" aria-label="Stats"><b>STAT</b></button>
-    <button class="ico" aria-label="Share"><b>SHRE</b></button>
-    <button class="ico" aria-label="Settings"><b>SET</b></button>
+    <button class="ico" aria-label="Teams"><b>Teams</b></button>
+    <button class="ico" aria-label="Schedule"><b>Schedule</b></button>
+    <button class="ico" aria-label="Stats"><b>Stats</b></button>
+    <button class="ico" aria-label="Share"><b>Share</b></button>
+    <button class="ico" aria-label="Settings"><b>Settings</b></button>
   </div>
 </div>
 
@@ -581,9 +581,9 @@ body{
   </div>
 
   <div class="card dock">
-    <button class="ico" aria-label="Back"><b>BACK</b></button>
-    <button class="ico primary" aria-label="Share box score"><b>SHRE</b></button>
-    <button class="ico" aria-label="Print"><b>PRNT</b></button>
+    <button class="ico" aria-label="Back"><b>Back</b></button>
+    <button class="ico primary" aria-label="Share box score"><b>Share</b></button>
+    <button class="ico" aria-label="Print"><b>Print</b></button>
   </div>
 </div>
 
