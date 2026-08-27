@@ -51,6 +51,7 @@
   --bad:#C2172B;                /* OUT — status only, never decorative */
   --good:#0F7A43;
 
+  --rule:rgba(12,20,32,.16);      /* section-break hairline */
   --r:20px; --r-s:14px;
   --glow:0;                     /* glow multiplier — 0 in day, 1 in dark */
 
@@ -75,6 +76,7 @@
     --ink:#FFFFFF; --ink-2:rgba(255,255,255,.74); --ink-3:rgba(255,255,255,.48);
     --accent:#FFB020; --accent-2:#FFD84D; --accent-ink:#1A1000; --ice:#8FD8FF;
     --safe:#5B9BFF; --bad:#FF4257; --good:#3BE85A;
+    --rule:rgba(255,255,255,.13);
     --glow:1;
     --raise:
       inset 0 1px 0 rgba(255,255,255,.10),
@@ -93,6 +95,7 @@
   --ink:#FFFFFF; --ink-2:rgba(255,255,255,.74); --ink-3:rgba(255,255,255,.48);
   --accent:#FFB020; --accent-2:#FFD84D; --accent-ink:#1A1000; --ice:#8FD8FF;
   --safe:#5B9BFF; --bad:#FF4257; --good:#3BE85A;
+  --rule:rgba(255,255,255,.13);
   --glow:1;
   --raise:
     inset 0 1px 0 rgba(255,255,255,.10),
@@ -118,8 +121,8 @@ body{
 .disp{font-family:"Archivo","Manrope",system-ui,sans-serif}
 
 /* micro-labels — 9-10px, uppercase, wide tracking, mono (§6) */
-.lab{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:9.5px;font-weight:700;
-  text-transform:uppercase;letter-spacing:.19em;color:var(--ink-3)}
+.lab{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:12px;font-weight:700;
+  text-transform:uppercase;letter-spacing:.13em;color:var(--ink-2)}
 
 /* ---- shell: fits one screen, no horizontal scroll ever (§7) ------------ */
 /* The page NEVER scrolls, at any width. Only lists inside cards scroll. A scorekeeper
@@ -132,7 +135,7 @@ body{
 
 /* Wide desktop: three zones flanking the diamond. */
 @media(min-width:1100px){
-  .app.scoring{grid-template-columns:minmax(0,290px) minmax(0,1fr) minmax(0,290px)}
+  .app.scoring{grid-template-columns:minmax(0,350px) minmax(0,1fr) minmax(0,350px)}
   .app.scoring .bar,.app.scoring .dock{grid-column:1 / -1}
 }
 /* Tablet landscape, split panes, phones: count beside the diamond, base state as a
@@ -149,18 +152,22 @@ body{
   .app.scoring .side{flex-direction:row;gap:16px;align-items:stretch}
   .app.scoring .grp{flex:1 1 0;min-width:0}
   .app.scoring .grp.plays{flex:1.5 1 0}      /* play text was truncating to 'Singl...' */
-  .app.scoring .grp.pitch{flex:0 0 auto;justify-content:flex-end}
+  .app.scoring .grp.pitch{flex:0 0 auto}          /* was flex-end: left a hole above it */
+  .app.scoring .grp + .grp{border-left:1px solid var(--rule);padding-left:17px}
 }
 @media(max-width:620px){
   .bar{flex-wrap:wrap;gap:6px}
   .app.scoring .side{flex-direction:column}
+  .app.scoring .grp + .grp{border-top:1px solid var(--rule);padding-top:11px}
   .ico{height:44px;padding:0 14px}
   .ico b{font-size:12px}
 }
 
 /* ---- card: translucent raised housing (§2.4) --------------------------- */
 /* a group binds a label to its content so neither drifts into a column of its own */
-.grp{display:flex;flex-direction:column;gap:7px;min-height:0;min-width:0}
+.grp{display:flex;flex-direction:column;gap:8px;min-height:0;min-width:0}
+/* a heading owns a rule, so each section reads as its own block */
+.grp > .lab{padding-bottom:7px;border-bottom:1px solid var(--rule)}
 .listwrap{flex:1 1 0;min-height:0;overflow:auto}
 .side{gap:12px}
 .card{
@@ -228,8 +235,6 @@ body{
    gauge; here the honest anchor is the COUNT — the number a scorekeeper reads
    more than any other, and currently rendered as 13px dots. */
 .anchor{align-items:center;justify-content:center;gap:6px}
-      /* at-bat also lives in the scorebar; drop the duplicate */
-}
 /* Count readout: big numerals + umpire-indicator lamp rows. No radial gauge -- see the
    markup comment on the count card for why that was the wrong instrument. */
 .countnum{font-family:"Archivo",sans-serif;font-weight:800;
@@ -239,12 +244,14 @@ body{
 .countnum .sep{color:var(--ink-3);font-weight:600;margin:0 .06em}
 
 .lamps{width:100%;display:flex;flex-direction:column;gap:7px}
-.lampRow{display:flex;align-items:center;justify-content:space-between;gap:10px}
-.lampWell{display:inline-flex;align-items:center;gap:7px;padding:6px 11px;border-radius:999px;
+.lampRow{display:flex;align-items:center;gap:13px}
+.lampRow .lab{flex:0 0 62px}
+.lampWell{flex:1;display:flex;align-items:center;justify-content:space-around;gap:8px;
+  padding:8px 14px;border-radius:999px;
   background:var(--recess);box-shadow:var(--well-sh)}
 .outs{display:flex;align-items:center;gap:8px;padding:7px 13px;border-radius:999px;
   background:var(--recess);box-shadow:var(--well-sh)}
-.lamp{width:14px;height:14px;border-radius:50%;background:transparent;
+.lamp{width:18px;height:18px;border-radius:50%;background:transparent;
   border:1.75px solid var(--ink-3);transition:.18s;flex:none}
 .lamp.on{box-shadow:inset 0 1px 0 rgba(255,255,255,.4)}
 .lamp.b.on{background:var(--ink);border-color:var(--ink)}
@@ -252,7 +259,7 @@ body{
 .lamp.o.on{background:var(--bad);border-color:var(--bad)}
 
 /* ---- the diamond: still the input hero, now visibly a control ---------- */
-.field{align-items:center;justify-content:center;padding:8px}
+.field{align-items:center;justify-content:center;padding:5px}
 .field svg{height:100%;width:auto;max-width:100%;max-height:100%;display:block;margin:0 auto}
 
 /* ---- rows / list ------------------------------------------------------- */
@@ -260,14 +267,14 @@ body{
   transition:.16s;cursor:default}
 .row + .row{margin-top:6px}
 .row:hover{background:rgba(128,145,170,.13);transform:translateX(2px)}
-.row .nm{font-weight:600;font-size:13.5px;letter-spacing:-.01em;flex:1;min-width:0;
+.row .nm{font-weight:600;font-size:16.5px;letter-spacing:-.01em;flex:1;min-width:0;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.num{font-family:"JetBrains Mono",monospace;font-weight:700;font-size:12px;
+.num{font-family:"JetBrains Mono",monospace;font-weight:700;font-size:15px;
   font-variant-numeric:tabular-nums;color:var(--ink-2)}
 
 /* base badge: a runner token, circular (§4) */
-.base{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;flex:none;
-  font-family:"JetBrains Mono",monospace;font-size:9.5px;font-weight:800;color:#fff;
+.base{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;flex:none;
+  font-family:"JetBrains Mono",monospace;font-size:11px;font-weight:800;color:#fff;
   box-shadow:inset 0 1px 0 rgba(255,255,255,.4),0 3px 8px -2px rgba(0,0,0,.6)}
 
 /* ---- sparkline / inline bar cue (§8: every number gets a visual cue) --- */
@@ -279,7 +286,7 @@ body{
 /* ---- action dock: circular icon buttons (§4) --------------------------- */
 .dock{display:flex;flex-direction:row;align-items:center;justify-content:center;gap:9px;
   padding:9px;flex-wrap:nowrap}
-.ico{height:50px;padding:0 20px;border-radius:999px;border:none;cursor:pointer;white-space:nowrap;
+.ico{height:52px;padding:0 20px;flex:1 1 0;max-width:190px;border-radius:999px;border:none;cursor:pointer;white-space:nowrap;
   background:linear-gradient(160deg,var(--e2-hi),var(--e2));
   color:var(--ink);display:grid;place-items:center;
   box-shadow:inset 0 1px 0 rgba(255,255,255,.45),inset 0 -1px 0 rgba(12,20,32,.14),
@@ -290,7 +297,7 @@ body{
 .ico:hover{transform:translateY(-2px)}
 .ico:focus-visible{outline:2px solid var(--ice);outline-offset:3px}
 .ico.primary{background:linear-gradient(150deg,var(--accent-2),var(--accent));
-  color:var(--accent-ink);height:56px;padding:0 30px;
+  color:var(--accent-ink);height:58px;padding:0 30px;flex:1.25 1 0;max-width:250px;
   box-shadow:0 6px 20px rgba(178,106,0,calc(.5 * var(--glow) + .22)),
              inset 0 1px 0 rgba(255,255,255,.6)}
 .ico b{font-family:"Archivo",sans-serif;font-size:13px;font-weight:800;letter-spacing:.02em}
@@ -315,7 +322,7 @@ body{
    named in the scorebar, so it was the one duplicated element in the stack. */
 @media(max-height:900px){
   .countnum{font-size:clamp(40px,6.4vw,76px)}
-  .anchor .widget{display:none}
+  .anchor .widget{display:none!important}   /* inline display:flex on the element */
 }
 @media(max-height:700px){
   .countnum{font-size:clamp(34px,5vw,56px)}
@@ -335,8 +342,19 @@ body{
   #s-home .card{min-height:max-content}
   #s-home .gcount{font-size:clamp(30px,9vw,46px)}
   /* phone: the count column is ~145px, too narrow for label-beside-lamps */
-  .lampRow{flex-direction:column;align-items:flex-start;gap:3px}
-  .lampWell{padding:4px 8px}
+  .lampRow{flex-direction:column;align-items:flex-start;gap:4px}
+  .lampRow .lab{flex:none}
+  .lampWell{width:100%;padding:5px 10px;justify-content:space-between}
+  .lamp{width:15px;height:15px}
+  .lamps{gap:9px}
+  .countnum{font-size:clamp(38px,11vw,52px)}
+  .grp > .lab{padding-bottom:5px}
+  .row .nm{font-size:15px}
+  /* the at-bat card wraps to 132px in a ~145px column; the batter is already named in the
+     scorebar, so drop it here and let the lamps use the height instead of leaving a pocket */
+  .anchor .widget{display:none!important}   /* inline display:flex on the element */
+  .anchor{justify-content:flex-start}
+  .lamps{flex:1;justify-content:space-evenly}
 }
 </style>
 </head>
