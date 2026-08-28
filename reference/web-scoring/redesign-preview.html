@@ -354,36 +354,58 @@ body{
 
 /* Portrait phone: the count card is auto-height and was eating the column, leaving
    the history with no room at all. Guarantee the base/history strip a floor. */
-@media (max-width:699px){
-  /* Portrait phone genuinely cannot hold all five bands: bar + count + diamond +
-     strip + buttons exceeds the viewport, and the grid was crushing the count card
-     to 117px around 260px of content. The DIAMOND is what goes -- at phone width it
-     renders about 190px across, too small to tap a zone on with any accuracy, so it
-     is not a real input there. The count, the buttons and the history are. */
-  /* The count row needs an explicit floor. As a bare `auto` its card has
-     min-height:0, so grid was free to collapse it to 117px around 263px of
-     content while the 1fr strip below took 414px of the same 733. */
-  .app{grid-template-areas:"bar" "count" "side" "act";
-       grid-template-rows:auto minmax(266px,auto) minmax(140px,1fr) auto}
-  .field{display:none}
-  /* Three groups needed 148px of a 150px card, which collapsed the history to
-     exactly 0px. Pitch count is the one a phone glance can do without. */
-  .g-pitch{display:none}
-  /* both groups share the strip by fraction; the on-base widget scrolls rather
-     than claiming 143 of 200px as auto height and starving the history */
-  .side{grid-template-rows:minmax(0,1fr) minmax(0,1.3fr)}
-}
-
 @media (max-width:1179px){ .g-next{display:none} }
 
-/* ---------- phone: the one place that still needs a size override -------- */
-@media (max-width:620px){
-  .lampRow{flex-direction:column;align-items:stretch;gap:var(--s1)}
-  .lampRow > .lab{flex:none}
-  .atbat{display:none}
-  .dock .ico{flex:1 1 auto;height:46px;padding:0 var(--s4)}
-  .dock .ico.primary{flex:1 1 100%;order:-1;height:50px}
-  .bar{flex-wrap:wrap;gap:var(--s2)}
+/* ---------- PORTRAIT PHONE ----------------------------------------------
+   These were patches layered onto a layout built for landscape, and on a real
+   handset the result was broken: the scorebar overlapped itself, ON BASE showed
+   an empty sliver, the play log showed only its inning marker, and three of the
+   six buttons were cut off the bottom. One coherent block instead.
+
+   Four bands: scorebar, count, lists, buttons. The diamond is dropped -- about
+   190px across on a phone, too small to tap a zone on, so it is not an input here.  */
+@media (max-width:699px){
+  .app{
+    grid-template-areas:"bar" "count" "side" "act";
+    /* the count row needs a floor: as a bare `auto` the card's min-height:0 lets
+       grid collapse it to 109px around 200px of content */
+    grid-template-rows:auto minmax(202px,auto) minmax(120px,1fr) auto;
+    padding-bottom:50px;
+  }
+  .field,.g-next,.g-pitch,.atbat{display:none}
+
+  /* Scorebar on two rows. The single row was colliding: two team blocks plus the
+     mode pills cannot share 390px. Sub-labels (AWAY / HOME - FIELDING) go too;
+     the score's position already says which side is which. */
+  .bar{flex-wrap:wrap;justify-content:space-between;gap:var(--s2) var(--s3)}
+  .bar .team{flex:1 1 42%}
+  .bar .meta .lab{display:none}
+  .bar .inning{order:3;flex:1 1 100%;flex-direction:row;justify-content:center;gap:var(--s3)}
+
+  /* The count card is full width here, so the lamp rows go back to label-beside-
+     well. Stacking them was for the narrow landscape column and cost ~60px. */
+  .lampRow{flex-direction:row;align-items:center;gap:var(--s3)}
+  .lampRow > .lab{flex:0 0 58px}
+  .count{gap:var(--s2)}
+
+  /* On base sizes to its content and the play log takes the rest. Previously the
+     widget scrolled inside a collapsed row, which is why it showed one pink sliver. */
+  /* on a 360x740 handset on base ate the whole strip and left the log at zero;
+     the log keeps a floor so it always shows something */
+  .side{grid-template-rows:minmax(0,auto) minmax(76px,1fr)}
+  .g-base .widget{overflow:visible}
+  /* On a 360x740 handset the four bands genuinely do not all fit. On base is the
+     one that gives: it scrolls its two or three runners rather than being clipped. */
+  @media (max-width:400px){ .g-base .widget{overflow:auto} }
+
+  /* All six buttons visible: the four per-pitch ones across the top, then Record
+     play and Undo. Wrapping a flex row silently pushed half of them off screen. */
+  .act{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:var(--s2);
+    padding:var(--s2)}
+  .act .ico{flex:none;width:auto;max-width:none;height:46px;padding:0 var(--s1);
+    font-size:var(--t-lab)}
+  .act .ico.primary{grid-column:1 / 4;height:46px;font-size:var(--t-body)}
+  .act hr{display:none}
 }
 
 /* ---------- WIDE LANDSCAPE ---------------------------------------------
