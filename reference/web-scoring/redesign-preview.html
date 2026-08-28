@@ -163,13 +163,10 @@ body{
    dozens of times an inning, so they sit closest to the thumb; Record play and Undo
    sit below a divider. Moving the bar out of the bottom is also what gives the play
    history its height back. */
-@media (min-width:700px){
+@media (min-width:700px) and (max-width:899px){
   .app{
-    /* Same reasoning as the wide tier: size the field column from the row height so
-       the square diamond is not stranded in a wide card. The width that frees up
-       goes to the count column, where it widens the lamp wells -- bigger targets. */
-    grid-template-columns:minmax(0,1fr) clamp(240px, min(60vh, 32vw), 560px)
-                          minmax(0,clamp(116px,11vw,150px));
+    grid-template-columns:minmax(0,1fr) clamp(220px, min(52vh, 34vw), 460px)
+                          minmax(0,clamp(110px,12vw,140px));
     grid-template-areas:
       "bar   bar   act"
       "count field act"
@@ -269,7 +266,7 @@ body{
 /* Scoped to below 1100px on purpose: above that the three groups become grid items
    of .app itself (see the wide-landscape block), and these placements would override
    that one purely by sitting later in the sheet. */
-@media (min-width:700px) and (max-width:1279px){
+@media (min-width:700px) and (max-width:899px){
   .side{grid-template-columns:minmax(0,1fr) minmax(0,1.5fr);
     grid-template-rows:minmax(0,1fr) auto;gap:var(--s3) var(--s5);align-content:stretch}
   .g-base {grid-column:1;grid-row:1}
@@ -364,7 +361,7 @@ body{
   .side{grid-template-rows:minmax(0,1fr) minmax(0,1.3fr)}
 }
 
-@media (max-width:1279px){ .g-next{display:none} }
+@media (max-width:1179px){ .g-next{display:none} }
 
 /* ---------- phone: the one place that still needs a size override -------- */
 @media (max-width:620px){
@@ -387,18 +384,18 @@ body{
    that dead space: on base to the left of the diamond, this inning to the right,
    both running the full height of the row. .side stops being a box and lets its
    three groups become grid items in their own right. */
-@media (min-width:1280px){
+@media (min-width:900px){
   .app{
     /* The field column is sized from the row HEIGHT (and capped by width), so the
        card comes out near-square and the diamond fills it rather than sitting in a
        strip of dead space. Whatever width is left goes to the two list columns,
        which can actually use it. */
     grid-template-columns:
-      clamp(220px, 17vw, 300px)                    /* count  */
-      minmax(190px, 1fr)                           /* base   */
-      clamp(280px, min(70vh, 30vw), 720px)         /* field  */
-      minmax(220px, 1.15fr)                        /* plays  */
-      minmax(116px, 150px);                        /* rail   */
+      minmax(190px, .85fr)                         /* count  */
+      minmax(150px, .7fr)                          /* base   */
+      clamp(200px, min(64vh, 27vw), 700px)         /* field  */
+      minmax(180px, 1fr)                           /* plays  */
+      minmax(104px, 146px);                        /* rail   */
     grid-template-areas:
       "bar   bar   bar   bar   act"
       "count base  field plays act"
