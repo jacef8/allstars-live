@@ -165,7 +165,11 @@ body{
    history its height back. */
 @media (min-width:700px){
   .app{
-    grid-template-columns:minmax(0,36%) minmax(0,1fr) minmax(0,clamp(116px,11vw,150px));
+    /* Same reasoning as the wide tier: size the field column from the row height so
+       the square diamond is not stranded in a wide card. The width that frees up
+       goes to the count column, where it widens the lamp wells -- bigger targets. */
+    grid-template-columns:minmax(0,1fr) clamp(240px, min(60vh, 32vw), 560px)
+                          minmax(0,clamp(116px,11vw,150px));
     grid-template-areas:
       "bar   bar   act"
       "count field act"
@@ -255,8 +259,9 @@ body{
   color:var(--accent);font-variant-numeric:tabular-nums;flex:none}
 
 /* ---------- field -------------------------------------------------------- */
-.field{align-items:center;justify-content:center;padding:var(--s1)}
-.field svg{height:100%;width:auto;max-width:100%;max-height:100%;display:block;margin:0 auto}
+.field{align-items:stretch;justify-content:center;gap:var(--s3);padding:var(--s3)}
+.field svg{flex:1 1 auto;min-height:0}
+.field svg{height:auto;width:auto;max-width:100%;max-height:100%;display:block;margin:0 auto}
 
 /* ---------- side strip: two rows on tablet, a rail on desktop ------------ */
 .side{display:grid;gap:var(--s3);grid-template-columns:minmax(0,1fr);
@@ -264,7 +269,7 @@ body{
 /* Scoped to below 1100px on purpose: above that the three groups become grid items
    of .app itself (see the wide-landscape block), and these placements would override
    that one purely by sitting later in the sheet. */
-@media (min-width:700px) and (max-width:1099px){
+@media (min-width:700px) and (max-width:1279px){
   .side{grid-template-columns:minmax(0,1fr) minmax(0,1.5fr);
     grid-template-rows:minmax(0,1fr) auto;gap:var(--s3) var(--s5);align-content:stretch}
   .g-base {grid-column:1;grid-row:1}
@@ -359,6 +364,8 @@ body{
   .side{grid-template-rows:minmax(0,1fr) minmax(0,1.3fr)}
 }
 
+@media (max-width:1279px){ .g-next{display:none} }
+
 /* ---------- phone: the one place that still needs a size override -------- */
 @media (max-width:620px){
   .lampRow{flex-direction:column;align-items:stretch;gap:var(--s1)}
@@ -380,22 +387,32 @@ body{
    that dead space: on base to the left of the diamond, this inning to the right,
    both running the full height of the row. .side stops being a box and lets its
    three groups become grid items in their own right. */
-@media (min-width:1100px){
+@media (min-width:1280px){
   .app{
-    grid-template-columns:minmax(0,300px) minmax(0,265px) minmax(0,1fr)
-                          minmax(0,320px) minmax(116px,150px);
+    /* The field column is sized from the row HEIGHT (and capped by width), so the
+       card comes out near-square and the diamond fills it rather than sitting in a
+       strip of dead space. Whatever width is left goes to the two list columns,
+       which can actually use it. */
+    grid-template-columns:
+      clamp(220px, 17vw, 300px)                    /* count  */
+      minmax(190px, 1fr)                           /* base   */
+      clamp(280px, min(70vh, 30vw), 720px)         /* field  */
+      minmax(220px, 1.15fr)                        /* plays  */
+      minmax(116px, 150px);                        /* rail   */
     grid-template-areas:
       "bar   bar   bar   bar   act"
       "count base  field plays act"
+      "count next  field plays act"
       "count pitch field plays act";
-    grid-template-rows:auto minmax(0,1fr) auto;
+    grid-template-rows:auto auto minmax(0,1fr) auto;
   }
   .side{display:contents}
   .g-base {grid-area:base}
+  .g-next {grid-area:next}
   .g-pitch{grid-area:pitch}
   .g-plays{grid-area:plays}
   /* each group becomes its own card once it is a grid item */
-  .g-base,.g-pitch,.g-plays{
+  .g-base,.g-next,.g-pitch,.g-plays{
     background:linear-gradient(158deg,var(--e1-hi),var(--e1) 70%);
     backdrop-filter:blur(16px) saturate(150%);
     -webkit-backdrop-filter:blur(16px) saturate(150%);
@@ -473,14 +490,6 @@ body{
       </div>
     </div>
 
-    <div class="widget atbat">
-      <span class="base" style="--c:#0F7A43">AB</span>
-      <div class="meta">
-        <div class="name">#4 M. Ford</div>
-        <div class="lab">2 for 3 &middot; rbi 2</div>
-      </div>
-      <span class="val mono">.667</span>
-    </div>
   </div>
 
   <div class="card field">
@@ -512,6 +521,14 @@ body{
             font-size="10" font-weight="700" letter-spacing="1.6" fill="currentColor"
             opacity=".55">TAP A ZONE TO SCORE</text>
     </svg>
+    <div class="widget atbat">
+      <span class="base" style="--c:#0F7A43">AB</span>
+      <div class="meta">
+        <div class="name">#4 M. Ford</div>
+        <div class="lab">2 for 3 &middot; rbi 2</div>
+      </div>
+      <span class="val mono">.667</span>
+    </div>
   </div>
 
   <div class="card side">
@@ -526,6 +543,15 @@ body{
           <span class="base" style="--c:#F472B6">3B</span>
           <span class="nm">#27 B. Mayo</span><span class="num">1-1</span>
         </div>
+      </div>
+    </section>
+
+    <section class="grp g-next">
+      <div class="lab">up next</div>
+      <div class="listwrap">
+        <div class="row"><span class="num">on deck</span><span class="nm">#19 T. Nguyen</span><span class="num">.248</span></div>
+        <div class="row"><span class="num">in hole</span><span class="nm">#7 R. Silva</span><span class="num">.211</span></div>
+        <div class="row"><span class="num">then</span><span class="nm">#3 D. Okafor</span><span class="num">.302</span></div>
       </div>
     </section>
 
