@@ -147,27 +147,30 @@ body{
   height:100dvh;padding:var(--s3);padding-bottom:56px;overflow:hidden;
   display:grid;gap:var(--s3);
   grid-template-columns:minmax(0,1fr);
-  grid-template-areas:"bar" "count" "field" "side" "dock";
+  grid-template-areas:"bar" "count" "field" "side" "act";
   grid-template-rows:auto auto minmax(0,1.1fr) minmax(0,.9fr) auto;
 }
 .app > .bar  {grid-area:bar}
 .app > .count{grid-area:count}
 .app > .field{grid-area:field}
 .app > .side {grid-area:side}
-.app > .dock {grid-area:dock}
+.app > .act  {grid-area:act}
 
+/* Landscape devices — which is how this is actually scored: a tablet held in two
+   hands. The per-pitch buttons move to a full-height rail on the RIGHT EDGE, inside
+   the right thumb's arc, instead of a full-width bar along the bottom that has to be
+   reached across for every single pitch. Ball/Strike/Foul/Out are the ones pressed
+   dozens of times an inning, so they sit closest to the thumb; Record play and Undo
+   sit below a divider. Moving the bar out of the bottom is also what gives the play
+   history its height back. */
 @media (min-width:700px){
   .app{
-    grid-template-columns:minmax(0,38%) minmax(0,1fr);
-    grid-template-areas:"bar bar" "count field" "side side" "dock dock";
-    grid-template-rows:auto minmax(0,1.1fr) minmax(0,.9fr) auto;
-  }
-}
-@media (min-width:1100px){
-  .app{
-    grid-template-columns:minmax(0,350px) minmax(0,1fr) minmax(0,350px);
-    grid-template-areas:"bar bar bar" "count field side" "dock dock dock";
-    grid-template-rows:auto minmax(0,1fr) auto;
+    grid-template-columns:minmax(0,36%) minmax(0,1fr) minmax(0,clamp(116px,11vw,150px));
+    grid-template-areas:
+      "bar   bar   act"
+      "count field act"
+      "side  side  act";
+    grid-template-rows:auto minmax(0,1.05fr) minmax(0,.95fr);
   }
 }
 
@@ -254,18 +257,14 @@ body{
 .field svg{height:100%;width:auto;max-width:100%;max-height:100%;display:block;margin:0 auto}
 
 /* ---------- side strip: two rows on tablet, a rail on desktop ------------ */
-.side{display:grid;gap:var(--s3);grid-template-columns:minmax(0,1fr);align-content:start}
-@media (min-width:700px) and (max-width:1099px){
-  /* Two rows, not three squeezed columns — three across left each about 270px,
-     which truncated runner names to "#12 J. R...". */
-  .side{grid-template-columns:minmax(0,1fr) auto;grid-template-rows:auto minmax(0,1fr);
-    gap:var(--s3) var(--s5);align-content:stretch}
-  .g-pitch{grid-column:2;grid-row:1;border-left:1px solid var(--rule);padding-left:var(--s5)}
-  .g-plays{grid-column:1 / -1;grid-row:2;border-top:1px solid var(--rule);padding-top:var(--s3)}
-}
-@media (min-width:1100px){
-  .side{grid-template-rows:auto minmax(0,1fr) auto;align-content:stretch}
-  .g-plays,.g-pitch{border-top:1px solid var(--rule);padding-top:var(--s3)}
+.side{display:grid;gap:var(--s3);grid-template-columns:minmax(0,1fr);
+  grid-template-rows:auto minmax(0,1fr) auto;align-content:stretch}
+@media (min-width:700px){
+  .side{grid-template-columns:minmax(0,1fr) minmax(0,1.5fr);
+    grid-template-rows:minmax(0,1fr) auto;gap:var(--s3) var(--s5);align-content:stretch}
+  .g-base {grid-column:1;grid-row:1}
+  .g-plays{grid-column:2;grid-row:1;border-left:1px solid var(--rule);padding-left:var(--s5)}
+  .g-pitch{grid-column:1 / -1;grid-row:2;border-top:1px solid var(--rule);padding-top:var(--s3)}
 }
 
 /* ---------- rows --------------------------------------------------------- */
@@ -302,8 +301,18 @@ body{
 .pills button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
 /* ---------- dock --------------------------------------------------------- */
-.dock{flex-direction:row;align-items:center;justify-content:center;gap:var(--s3);
+.dock,.act{flex-direction:row;align-items:center;justify-content:center;gap:var(--s3);
   padding:var(--s2);flex-wrap:wrap}
+@media (min-width:700px){
+  .act{flex-direction:column;flex-wrap:nowrap;justify-content:stretch;gap:var(--s2);
+    padding:var(--s2)}
+  .act .ico{width:100%;max-width:none;flex:1 1 0;height:auto;min-height:46px;
+    padding:var(--s1) var(--s2);white-space:normal;line-height:1.15}
+  .act .ico.primary{flex:1.15 1 0}
+  .act hr{width:100%;border:0;border-top:1px solid var(--rule);margin:var(--s1) 0;flex:none}
+}
+.act hr{display:none}
+@media (min-width:700px){.act hr{display:block}}
 .ico{flex:1 1 0;max-width:190px;height:52px;padding:0 var(--s5);border:none;cursor:pointer;
   border-radius:999px;white-space:nowrap;color:var(--ink);
   font-family:"Archivo",sans-serif;font-size:var(--t-body);font-weight:800;letter-spacing:.02em;
@@ -322,6 +331,19 @@ body{
 .tbl > .lab{text-align:right}
 .tbl > .lab.first{text-align:left}
 .tbl > .num{text-align:right}
+
+/* Portrait phone: the count card is auto-height and was eating the column, leaving
+   the history with no room at all. Guarantee the base/history strip a floor. */
+@media (max-width:699px){
+  .app{grid-template-rows:auto auto minmax(0,.8fr) minmax(200px,1fr) auto}
+  /* Three groups needed 148px of a 150px card, which collapsed the history to
+     exactly 0px. Pitch count is the one a phone glance can do without. */
+  .g-pitch{display:none}
+  /* both groups share the strip by fraction; the on-base widget scrolls rather
+     than claiming 143 of 200px as auto height and starving the history */
+  .side{grid-template-rows:minmax(0,1fr) minmax(0,1.3fr)}
+  .g-base .widget{min-height:0;overflow:auto}
+}
 
 /* ---------- phone: the one place that still needs a size override -------- */
 @media (max-width:620px){
@@ -463,6 +485,9 @@ body{
         <div class="row"><span class="nm">Fly out, center</span><span class="num">#8</span></div>
         <div class="row"><span class="nm">Walk</span><span class="num">#27</span></div>
         <div class="row"><span class="nm">Ground out, 6-3</span><span class="num">#3</span></div>
+        <div class="row"><span class="nm">Double, right-center</span><span class="num">#4</span></div>
+        <div class="row"><span class="nm">Strikeout swinging</span><span class="num">#19</span></div>
+        <div class="row"><span class="nm">Hit by pitch</span><span class="num">#7</span></div>
       </div>
     </section>
 
@@ -475,11 +500,16 @@ body{
     </section>
   </div>
 
-  <div class="card dock">
+  <!-- Action rail. Order is by how often a thumb hits it, not by importance:
+       Ball/Strike/Foul/Out fire on every pitch, so they sit closest; the two
+       once-per-at-bat actions sit below the divider. -->
+  <div class="card act">
     <button class="ico">Ball</button>
     <button class="ico">Strike</button>
-    <button class="ico primary">Record play</button>
     <button class="ico">Foul</button>
+    <button class="ico">Out</button>
+    <hr>
+    <button class="ico primary">Record play</button>
     <button class="ico">Undo</button>
   </div>
 </div>
