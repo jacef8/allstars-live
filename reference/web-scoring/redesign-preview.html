@@ -261,7 +261,10 @@ body{
 /* ---------- side strip: two rows on tablet, a rail on desktop ------------ */
 .side{display:grid;gap:var(--s3);grid-template-columns:minmax(0,1fr);
   grid-template-rows:auto minmax(0,1fr) auto;align-content:stretch}
-@media (min-width:700px){
+/* Scoped to below 1100px on purpose: above that the three groups become grid items
+   of .app itself (see the wide-landscape block), and these placements would override
+   that one purely by sitting later in the sheet. */
+@media (min-width:700px) and (max-width:1099px){
   .side{grid-template-columns:minmax(0,1fr) minmax(0,1.5fr);
     grid-template-rows:minmax(0,1fr) auto;gap:var(--s3) var(--s5);align-content:stretch}
   .g-base {grid-column:1;grid-row:1}
@@ -365,6 +368,43 @@ body{
   .dock .ico.primary{flex:1 1 100%;order:-1;height:50px}
   .bar{flex-wrap:wrap;gap:var(--s2)}
 }
+
+/* ---------- WIDE LANDSCAPE ---------------------------------------------
+   At the END of the sheet on purpose. This overrides .side and the .g-* rules
+   defined above at equal specificity, so source order is what decides. Putting
+   it earlier meant .side{display:grid} won and every group landed in one cell.
+
+   The diamond is square and height-limited, so a wide centre column
+   left big dead zones either side of it while the lists were crammed into a short
+   strip underneath — one row deep, scroll for every entry. So the lists move INTO
+   that dead space: on base to the left of the diamond, this inning to the right,
+   both running the full height of the row. .side stops being a box and lets its
+   three groups become grid items in their own right. */
+@media (min-width:1100px){
+  .app{
+    grid-template-columns:minmax(0,300px) minmax(0,265px) minmax(0,1fr)
+                          minmax(0,320px) minmax(116px,150px);
+    grid-template-areas:
+      "bar   bar   bar   bar   act"
+      "count base  field plays act"
+      "count pitch field plays act";
+    grid-template-rows:auto minmax(0,1fr) auto;
+  }
+  .side{display:contents}
+  .g-base {grid-area:base}
+  .g-pitch{grid-area:pitch}
+  .g-plays{grid-area:plays}
+  /* each group becomes its own card once it is a grid item */
+  .g-base,.g-pitch,.g-plays{
+    background:linear-gradient(158deg,var(--e1-hi),var(--e1) 70%);
+    backdrop-filter:blur(16px) saturate(150%);
+    -webkit-backdrop-filter:blur(16px) saturate(150%);
+    border:1px solid var(--rule);border-radius:var(--r);
+    box-shadow:var(--raise);padding:var(--s4);
+  }
+  .g-base .widget{overflow:visible}      /* it has the height now; no need to scroll */
+}
+
 
 /* ---------- comp scaffolding (not part of the design) -------------------- */
 .switch{position:fixed;z-index:60;left:50%;transform:translateX(-50%);bottom:10px;
