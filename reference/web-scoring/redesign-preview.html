@@ -287,6 +287,19 @@ body{
 .base{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;flex:none;
   font-family:"JetBrains Mono",monospace;font-size:var(--t-lab);font-weight:800;color:#fff;
   background:var(--c);box-shadow:var(--inset-hi),0 3px 8px -2px rgba(0,0,0,.6)}
+/* inning markers inside the play log: a rule and a quieter weight, so the log reads
+   as grouped by inning rather than one flat run of plays */
+.row.inn{border-top:1px solid var(--rule);border-radius:0;margin-top:var(--s2);
+  padding-top:var(--s3)}
+.row.inn:first-child{border-top:0;margin-top:0;padding-top:var(--s2)}
+.row.inn .nm{font-family:"JetBrains Mono",monospace;font-size:var(--t-lab);
+  font-weight:700;text-transform:uppercase;letter-spacing:.13em;color:var(--ink-3)}
+.row.inn .num{color:var(--ink-3)}
+
+/* batting-order slots that are not on deck: same badge shape as a runner, muted,
+   so on base and up next read as one system instead of two */
+.base.slot{background:transparent;color:var(--ink-2);
+  border:1.5px solid var(--rule);box-shadow:none}
 .pitchline{display:flex;align-items:center;gap:var(--s3)}
 .pitchline .val{font-family:"JetBrains Mono",monospace;font-size:var(--t-val);font-weight:800;
   letter-spacing:-.02em;flex:none;font-variant-numeric:tabular-nums}
@@ -544,17 +557,21 @@ body{
     </section>
 
     <section class="grp g-next">
-      <div class="lab">up next</div>
+      <div class="lab">up next &middot; order</div>
       <div class="listwrap">
-        <div class="row"><span class="num">on deck</span><span class="nm">#19 T. Nguyen</span><span class="num">.248</span></div>
-        <div class="row"><span class="num">in hole</span><span class="nm">#7 R. Silva</span><span class="num">.211</span></div>
-        <div class="row"><span class="num">then</span><span class="nm">#3 D. Okafor</span><span class="num">.302</span></div>
+        <div class="row"><span class="base" style="--c:#0E7490">5</span><span class="nm">#19 T. Nguyen</span><span class="num">.248</span></div>
+        <div class="row"><span class="base slot">6</span><span class="nm">#7 R. Silva</span><span class="num">.211</span></div>
+        <div class="row"><span class="base slot">7</span><span class="nm">#3 D. Okafor</span><span class="num">.302</span></div>
+        <div class="row"><span class="base slot">8</span><span class="nm">#22 L. Chen</span><span class="num">.276</span></div>
+        <div class="row"><span class="base slot">9</span><span class="nm">#15 A. Boone</span><span class="num">.189</span></div>
+        <div class="row"><span class="base slot">1</span><span class="nm">#31 M. Diaz</span><span class="num">.334</span></div>
       </div>
     </section>
 
     <section class="grp g-plays">
-      <div class="lab">this inning</div>
+      <div class="lab">play by play</div>
       <div class="listwrap">
+        <div class="row inn"><span class="nm">Top 5th</span><span class="num">2 runs</span></div>
         <div class="row"><span class="nm">Single, left field</span><span class="num">#12</span></div>
         <div class="row"><span class="nm">Fly out, center</span><span class="num">#8</span></div>
         <div class="row"><span class="nm">Walk</span><span class="num">#27</span></div>
@@ -562,6 +579,16 @@ body{
         <div class="row"><span class="nm">Double, right-center</span><span class="num">#4</span></div>
         <div class="row"><span class="nm">Strikeout swinging</span><span class="num">#19</span></div>
         <div class="row"><span class="nm">Hit by pitch</span><span class="num">#7</span></div>
+        <div class="row inn"><span class="nm">Top 4th</span><span class="num">1 run</span></div>
+        <div class="row"><span class="nm">Home run, left</span><span class="num">#4</span></div>
+        <div class="row"><span class="nm">Pop out, short</span><span class="num">#22</span></div>
+        <div class="row"><span class="nm">Line out, second</span><span class="num">#15</span></div>
+        <div class="row"><span class="nm">Single, right field</span><span class="num">#31</span></div>
+        <div class="row"><span class="nm">Caught stealing, 2-6</span><span class="num">#31</span></div>
+        <div class="row inn"><span class="nm">Top 3rd</span><span class="num">0 runs</span></div>
+        <div class="row"><span class="nm">Ground out, 5-3</span><span class="num">#12</span></div>
+        <div class="row"><span class="nm">Strikeout looking</span><span class="num">#8</span></div>
+        <div class="row"><span class="nm">Fly out, right</span><span class="num">#27</span></div>
       </div>
     </section>
 
