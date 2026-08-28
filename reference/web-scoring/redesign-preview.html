@@ -197,6 +197,7 @@ body{
 }
 @keyframes rise{from{opacity:0;transform:translateY(14px)}}
 
+.g-base .widget{min-height:0;overflow:auto}
 .widget{
   border-radius:var(--r-s);padding:var(--s3);
   background:linear-gradient(160deg,var(--e2-hi),var(--e2));
@@ -204,7 +205,8 @@ body{
 }
 
 /* ---------- section groups + breaks -------------------------------------- */
-.grp{display:flex;flex-direction:column;gap:var(--s2);min-height:0;min-width:0}
+.grp{display:flex;flex-direction:column;gap:var(--s2);min-height:0;min-width:0;
+  overflow:hidden}
 .grp > .lab{padding-bottom:var(--s2);border-bottom:1px solid var(--rule)}
 .listwrap{flex:1 1 0;min-height:0;overflow:auto}
 
@@ -232,7 +234,7 @@ body{
   display:flex;align-items:baseline;justify-content:center}
 .countnum .sep{color:var(--ink-3);font-weight:600;margin:0 .05em}
 
-.lamps{width:100%;flex:1;display:flex;flex-direction:column;
+.lamps{width:100%;flex:1 1 0;min-height:0;display:flex;flex-direction:column;
   justify-content:space-evenly;gap:var(--s2)}
 .lampRow{display:flex;align-items:center;gap:var(--s3)}
 .lampRow > .lab{flex:0 0 62px}
@@ -247,7 +249,7 @@ body{
 .lamp.s.on{background:var(--accent);border-color:var(--accent)}
 .lamp.o.on{background:var(--bad);border-color:var(--bad)}
 
-.atbat{display:flex;align-items:center;gap:var(--s3);margin-top:auto;width:100%;
+.atbat{display:flex;flex:0 0 auto;align-items:center;gap:var(--s3);margin-top:auto;width:100%;
   padding:clamp(6px,1vh,11px) var(--s3)}
 .atbat .val{font-family:"JetBrains Mono",monospace;font-size:var(--t-val);font-weight:800;
   color:var(--accent);font-variant-numeric:tabular-nums;flex:none}
@@ -335,14 +337,23 @@ body{
 /* Portrait phone: the count card is auto-height and was eating the column, leaving
    the history with no room at all. Guarantee the base/history strip a floor. */
 @media (max-width:699px){
-  .app{grid-template-rows:auto auto minmax(0,.8fr) minmax(200px,1fr) auto}
+  /* Portrait phone genuinely cannot hold all five bands: bar + count + diamond +
+     strip + buttons exceeds the viewport, and the grid was crushing the count card
+     to 117px around 260px of content. The DIAMOND is what goes -- at phone width it
+     renders about 190px across, too small to tap a zone on with any accuracy, so it
+     is not a real input there. The count, the buttons and the history are. */
+  /* The count row needs an explicit floor. As a bare `auto` its card has
+     min-height:0, so grid was free to collapse it to 117px around 263px of
+     content while the 1fr strip below took 414px of the same 733. */
+  .app{grid-template-areas:"bar" "count" "side" "act";
+       grid-template-rows:auto minmax(266px,auto) minmax(140px,1fr) auto}
+  .field{display:none}
   /* Three groups needed 148px of a 150px card, which collapsed the history to
      exactly 0px. Pitch count is the one a phone glance can do without. */
   .g-pitch{display:none}
   /* both groups share the strip by fraction; the on-base widget scrolls rather
      than claiming 143 of 200px as auto height and starving the history */
   .side{grid-template-rows:minmax(0,1fr) minmax(0,1.3fr)}
-  .g-base .widget{min-height:0;overflow:auto}
 }
 
 /* ---------- phone: the one place that still needs a size override -------- */
