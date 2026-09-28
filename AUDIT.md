@@ -4,6 +4,8 @@
 **Scope:** native Android app (`app/`, ~6,600 lines Kotlin/C++) and the web scorer (`reference/web-scoring/`, ~9,000 lines JS/HTML) plus the relay, build, and deploy configuration.
 **Method:** every file cited below was read in full; every count was measured, not estimated. Nothing here is inferred from file names or comments alone.
 
+**Status (2026-09-27):** the seven fixes agreed after this audit are done — #1 the roster block is deleted, #2 the WebSocket relay is deleted (Firestore is the only live channel), #3 WebView debugging is gated to debug builds, #4 the camera service now starts only from the Video screen / Go Live, #5 the SRT stack is deleted, the `naluToAnnexB` bug is fixed, and `NetworkRouter` is deleted (Hotspot mode is the one supported topology). The rest of this document is the audit as written.
+
 Severity: 🔴 must fix · 🟠 should fix · 🟡 worth fixing · 🟢 tidy-up
 Effort: **S** under an hour · **M** a session · **L** multi-session
 
