@@ -4,18 +4,9 @@ import android.view.Surface
 import kotlinx.coroutines.flow.StateFlow
 
 /**
- * The boundary that keeps the M1 ingest spike honest about its one open decision.
- *
- * The Mevo feed can be pulled three ways (SRT / NDI|HX / RTMP), and the encoded
- * bytes can become on-screen pixels by very different routes:
- *   - FFmpeg AAR: receives `srt://`, demuxes the MPEG-TS, decodes, renders — all internal.
- *   - libsrt (NDK) + [MediaCodecVideoDecoder]: we demux TS and feed access units ourselves.
- *   - a maintained streaming-player lib: renders into the Surface for us.
- *
- * Every one of those can satisfy this contract: "given a Surface, render the live
- * feed into it and report what's happening." So the screen, lifecycle, and HUD are
- * built against this interface, and swapping the real transport in later touches
- * exactly one factory call — not the UI.
+ * "Given a Surface, render a live feed into it and report what's happening." Implemented by
+ * [RtmpVideoSource] (the real camera path, backed by [RtmpHub]) and [StubVideoSource] (the test
+ * pattern). [IngestState] / [VideoStats] are what the HUD and the web scorer's camera status read.
  */
 interface VideoSource {
 

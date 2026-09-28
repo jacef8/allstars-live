@@ -14,17 +14,6 @@ android {
         versionCode = 12
         versionName = "0.1.11-m0"
         vectorDrawables { useSupportLibrary = true }
-
-        // M1 SRT ingest (libsrt + NDK). arm64 only for the spike — add
-        // "armeabi-v7a" only if 32-bit tablets must be supported.
-        ndk { abiFilters += "arm64-v8a" }
-        externalNativeBuild {
-            cmake {
-                cppFlags += "-std=c++17"
-                // libsrt vendored under cpp/third_party/srt (arm64, encryption off).
-                arguments += "-DUSE_LIBSRT=ON"
-            }
-        }
     }
 
     buildTypes {
@@ -46,6 +35,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true   // BuildConfig.DEBUG gates WebView debugging (GameScorerScreen)
     }
     composeOptions {
         // Must match Kotlin 1.9.10.
@@ -54,16 +44,6 @@ android {
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
-        }
-    }
-
-    // Native SRT ingest. Requires "NDK (Side by side)" + "CMake" from the SDK
-    // Manager; install these versions (or update the pins) if Gradle complains.
-    ndkVersion = "25.1.8937393"
-    externalNativeBuild {
-        cmake {
-            path = file("src/main/cpp/CMakeLists.txt")
-            version = "3.22.1"
         }
     }
 }
@@ -81,10 +61,8 @@ dependencies {
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
-    // Bottom-nav tab icons (Scoreboard / Videocam / People / Settings).
+    // Videocam / ContentCopy on the camera screen (not in the core icon set).
     implementation("androidx.compose.material:material-icons-extended")
-    // (libVLC removed — its Android build has no SRT module. SRT ingest is the
-    //  native libsrt route under app/src/main/cpp.)
 
     // M3: RTMP push to YouTube Live (RootEncoder's RTMP client, fed by our encoder).
     // The "-1.8.22" build targets Kotlin 1.8.22 (our 1.9.10 compiler reads it) and
@@ -96,10 +74,6 @@ dependencies {
 
     // QR generation for "use a phone as the camera" (Larix Grove deep-link → QR in camera setup).
     implementation("com.google.zxing:core:3.5.3")
-
-    // Keystore-backed encryption for CameraSettings' stored Wi-Fi passphrase (was plaintext
-    // SharedPreferences — a security audit flagged it as the one real secret-at-rest in the app).
-    implementation("androidx.security:security-crypto:1.1.0-alpha06")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
 

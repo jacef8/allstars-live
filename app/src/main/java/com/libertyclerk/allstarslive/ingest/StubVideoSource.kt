@@ -11,13 +11,9 @@ import kotlin.concurrent.thread
 import kotlin.math.sin
 
 /**
- * A standing-in [VideoSource] so the spike screen, lifecycle, and HUD are real
- * and testable on the tablet *before* the SRT ingest library is chosen.
- *
- * It draws a moving SMPTE-ish test pattern + frame clock directly onto the
- * Surface at ~30fps and reports honest render stats. It pulls no network — when
- * the real transport lands, [SrtIngestScreen] swaps this for it at one call site
- * and nothing else changes.
+ * Test-pattern [VideoSource] for [CompositorTestScreen]: draws a moving SMPTE-ish pattern and a
+ * frame clock straight onto the Surface at ~30fps with honest render stats, so the composite /
+ * record / stream pipeline can be exercised with no camera attached.
  */
 class StubVideoSource : VideoSource {
 

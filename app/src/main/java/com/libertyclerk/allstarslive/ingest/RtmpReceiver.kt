@@ -260,18 +260,28 @@ class RtmpReceiver(
         }
         return if (sps != null && pps != null) sps!! to pps!! else null
     }
-    /** Length-prefixed (4-byte) NALUs → Annex-B (00 00 00 01 start codes). */
+    /** Length-prefixed (4-byte) NALUs → Annex-B (00 00 00 01 start codes).
+     *  Two passes over the NALU table (size, then copy), ONE allocation, arraycopy per NALU. The
+     *  previous version pushed every byte of every frame through an ArrayList<Byte> — a boxed
+     *  object per byte, ~300K allocations per keyframe at 30fps, on the thread feeding MediaCodec. */
     private fun naluToAnnexB(d: ByteArray, start: Int): ByteArray? {
-        var p = start
-        val out = ArrayList<Byte>(d.size + 16)
+        var p = start; var total = 0
         while (p + 4 <= d.size) {
             val len = be32(d, p); p += 4
             if (len <= 0 || p + len > d.size) break
-            out.add(0); out.add(0); out.add(0); out.add(1)
-            for (i in 0 until len) out.add(d[p + i])
-            p += len
+            total += 4 + len; p += len
         }
-        return if (out.isEmpty()) null else out.toByteArray()
+        if (total == 0) return null
+        val out = ByteArray(total)          // zero-filled: each start code only needs its final 0x01
+        p = start; var o = 0
+        while (p + 4 <= d.size) {
+            val len = be32(d, p); p += 4
+            if (len <= 0 || p + len > d.size) break
+            out[o + 3] = 1
+            System.arraycopy(d, p, out, o + 4, len)
+            o += 4 + len; p += len
+        }
+        return out
     }
     private fun annexB(d: ByteArray, off: Int, len: Int): ByteArray {
         val out = ByteArray(len + 4); out[3] = 1; System.arraycopy(d, off, out, 4, len); return out

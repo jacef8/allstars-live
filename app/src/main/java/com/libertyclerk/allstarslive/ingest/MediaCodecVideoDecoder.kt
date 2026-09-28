@@ -9,15 +9,12 @@ import java.nio.ByteBuffer
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * The real M1 "decode-to-surface" harness for the libsrt route.
+ * Decode-to-surface: consumes H.264 access units (Annex-B, SPS/PPS in-band on keyframes — see
+ * [RtmpHub.prepend]) and renders them to a [Surface], measuring rolling FPS and decode→render
+ * latency for the HUD. Transport-free: [RtmpReceiver] hands it frames via [submitAccessUnit].
  *
- * It is transport-free on purpose: it consumes already-demuxed H.264/H.265
- * access units (Annex-B, with in-band SPS/PPS or supplied as csd) and renders
- * them to a [Surface], measuring rolling FPS and decode→render latency for the
- * HUD. Whatever pulls SRT and demuxes the MPEG-TS just calls [submitAccessUnit].
- *
- * Uses the asynchronous MediaCodec callback API so there is no polling loop and
- * back-pressure is handled by the codec's own buffer availability.
+ * Uses the asynchronous MediaCodec callback API so there is no polling loop and back-pressure
+ * is handled by the codec's own buffer availability.
  */
 class MediaCodecVideoDecoder(
     private val mimeType: String = MediaFormat.MIMETYPE_VIDEO_AVC,

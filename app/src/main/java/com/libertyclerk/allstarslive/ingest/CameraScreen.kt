@@ -66,27 +66,23 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.libertyclerk.allstarslive.stream.Broadcast
 
 /**
- * Operator-facing camera screen. No backend on display: it **auto-connects** with
- * the saved camera settings and shows only a friendly status (or the live picture).
- * All the technical bits — Wi-Fi name/password, SRT URL, FPS/latency diagnostics —
- * live in a setup panel reached by **long-pressing** the screen (for whoever sets
- * up the hardware). The [VideoSource] is injected, so the transport can change
- * without touching this UI.
+ * Operator-facing camera screen. It **auto-connects** (the camera pushes RTMP to this device,
+ * or this device's own camera films in all-in-one mode) and shows only a friendly status or the
+ * live picture. The technical bits — the RTMP address, capture mode, FPS diagnostics — live in a
+ * setup panel reached by **long-pressing** the screen, or the gear once video is up.
  */
 @Composable
-fun SrtIngestScreen(onUseTestPattern: () -> Unit = {}) {
+fun CameraScreen(onUseTestPattern: () -> Unit = {}) {
     val ctx = LocalContext.current
-    // RTMP-push: the Mevo publishes to us (rtmp://<tablet-ip>:1935/live). SRT pull is
-    // retired for the Mevo — it only serves SRT while streaming to a network
-    // destination, and "Go Live" forces picking one. See RtmpVideoSource.
+    // The camera PUSHES RTMP to this device (rtmp://<tablet-ip>:1935/live); RtmpVideoSource is a
+    // thin adapter over the RtmpHub pipeline, which lives in a foreground service so it survives
+    // the operator switching to the camera's own app.
     val source = remember { RtmpVideoSource(ctx) }
     val stats by source.stats.collectAsStateWithLifecycle()
     // Shared YouTube broadcast state — same source of truth as the Game page.
     val bcast by Broadcast.state.collectAsStateWithLifecycle()
     // Local recording state (offline fallback).
     val rec by Broadcast.recState.collectAsStateWithLifecycle()
-    // True when the active network (e.g. the Mevo's Wi-Fi) has no internet → warn that YouTube needs it.
-    val noInternet by com.libertyclerk.allstarslive.net.NetworkRouter.noInternet.collectAsStateWithLifecycle()
     LaunchedEffect(rec.savedLocation) {
         if (rec.savedLocation.isNotEmpty()) Toast.makeText(ctx, "Recording saved to ${rec.savedLocation}", Toast.LENGTH_LONG).show()
     }
@@ -122,7 +118,7 @@ fun SrtIngestScreen(onUseTestPattern: () -> Unit = {}) {
     // CAMERA joins THIS TABLET's mobile hotspot instead — inverts which device is the access point.
     // The tablet's own default network route then never changes (stays cellular the whole time), so
     // YouTube sign-in, the RTMP push, and the live-score cloud sync all just work as plain
-    // single-network Android traffic — no NetworkRouter/bindProcessToNetwork juggling needed at all.
+    // single-network Android traffic — no dual-network juggling needed at all.
     // (jford, 2026-07-06, reviewing the dual-network sign-in dead end with another AI: "the Hotspot
     // Model is the only truly repeatable architecture" for non-technical users at scale.) The RTMP
     // address shown below already works unmodified — RtmpHub.localWifiIp() enumerates ANY up,
@@ -261,32 +257,6 @@ fun SrtIngestScreen(onUseTestPattern: () -> Unit = {}) {
             // (When YouTube isn't connected we show the first-run prompt below INSTEAD, so the two
             // never overlap.)
             CameraStatus(stats.state, stats.message, isDevice(), onSetup = { showSetup = true }, onUseTestPattern = onUseTestPattern)
-        }
-
-        // No-internet warning — the active network (often the Mevo's own Wi-Fi) can't reach the
-        // internet, so YouTube sign-in / Go Live will fail until cellular carries it. Tells the
-        // operator exactly what's wrong instead of a vague "sign in failed".
-        if (noInternet) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .statusBarsPadding()
-                    .padding(top = 12.dp, start = 80.dp, end = 80.dp)
-                    .widthIn(max = 560.dp)
-                    .background(Color(0xFF3A2A0A), RoundedCornerShape(10.dp))
-                    .border(1.dp, Color(0xFFF0A33C), RoundedCornerShape(10.dp))
-                    .padding(horizontal = 14.dp, vertical = 10.dp),
-            ) {
-                Text(
-                    "⚠ This Wi-Fi has no internet",
-                    color = Color(0xFFF0A33C), fontSize = 14.sp, fontWeight = FontWeight.Bold,
-                )
-                Text(
-                    "YouTube needs internet. The camera's Wi-Fi doesn't have it — turn on Mobile data so the app can go live over cellular while it receives the camera over Wi-Fi.",
-                    color = Color(0xFFE8EAED), fontSize = 12.sp, textAlign = TextAlign.Center,
-                )
-            }
         }
 
         // Go Live control — reflects the shared broadcast state (synced with the Game
@@ -991,7 +961,7 @@ private fun SetupGuideSheet(
                     "Camera setup → toggle BOTH Hotspot and Repeater ON",
                 ),
             )
-            GuideBullet("Fallback only, no cellular data at all: join the camera's own Wi-Fi directly, both toggles OFF. YouTube sign-in and live scoring may not work in this mode.")
+            GuideBullet("Fallback, no cellular data at all: join the camera's own Wi-Fi directly, both toggles OFF. That Wi-Fi has no internet, so YouTube and live score sync won't work — use Record instead and upload the video afterward.")
 
             // ----- Numbered sequence -----
             GuideSectionLabel("AT THE FIELD")
@@ -1008,8 +978,9 @@ private fun SetupGuideSheet(
             // ----- Troubleshooting -----
             GuideSectionLabel("IF SOMETHING'S WRONG")
             GuideTrouble("No camera picture", "Re-copy the RTMP address — a stale one silently fails. Confirm the camera and tablet are on the same network.")
-            GuideTrouble("\"This Wi-Fi has no internet\" banner", "Expected and harmless if Hotspot mode is on. If it's not on, turn it on.")
-            GuideTrouble("YouTube sign-in fails / \"Sign-in cancelled\"", "Only happens in the fallback setup (joining the camera's Wi-Fi directly) — that Wi-Fi has no internet, so sign-in can't finish. With Hotspot mode (recommended) this shouldn't happen at all; if it does, double-check the Hotspot toggle is actually ON in Camera setup.")
+            GuideTrouble("Camera says it can't connect", "This device only listens for the camera once Video has been opened (or Go Live tapped) since the app started. Open Video first, then start the camera's stream.")
+            GuideTrouble("Android says the Wi-Fi has no internet", "Expected in the fallback setup (joined to the camera's own Wi-Fi). Use Hotspot mode instead so this device stays on cellular.")
+            GuideTrouble("YouTube sign-in fails / \"Sign-in didn't finish\"", "Only happens in the fallback setup (joining the camera's Wi-Fi directly) — that Wi-Fi has no internet, so sign-in can't finish. With Hotspot mode (recommended) this shouldn't happen at all; if it does, double-check the Hotspot toggle is actually ON in Camera setup.")
             GuideTrouble("Live score not updating for viewers", "Settings → Diagnostics → check the Network/sync log.")
             GuideTrouble("A finished game is missing from the record", "Check the season filter on Stats & games first. If truly gone, use \"+ Add a past game\" to record the final score by hand.")
         }

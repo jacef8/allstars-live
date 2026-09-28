@@ -25,6 +25,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import com.libertyclerk.allstarslive.BuildConfig
 import com.libertyclerk.allstarslive.R
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.absoluteOffset
@@ -44,8 +45,9 @@ import com.libertyclerk.allstarslive.ingest.buildScorebugOverlay
 import com.libertyclerk.allstarslive.stream.Broadcast
 
 /**
- * M4: the Game tab hosts the existing web scorer (bundled into the APK assets at
- * build time from reference/web-scoring/). One codebase; works offline at the field.
+ * The app IS the web scorer: a full-screen WebView loading the live app from Railway ([APP_URL]
+ * below — web changes reach the tablets with no rebuild; the service worker caches the shell so
+ * it still opens offline at the field).
  *
  * The web ↔ app bridge ([ScorerBridge], exposed as `window.AllStars`) lets the Game-page
  * "Start game stream" button raise the native Go Live dialog. The WebView is rendered
@@ -63,7 +65,9 @@ private const val APP_URL = "https://web-production-77d34.up.railway.app/scoring
 
 @SuppressLint("SetJavaScriptEnabled")
 fun createScorerWebView(context: Context): WebView {
-    WebView.setWebContentsDebuggingEnabled(true)
+    // Debug builds only: with this on in release, anyone with USB access to a signed-in tablet can
+    // open chrome://inspect, read Firestore auth state, and run JavaScript as the user.
+    if (BuildConfig.DEBUG) WebView.setWebContentsDebuggingEnabled(true)
     return WebView(context).apply {
         settings.javaScriptEnabled = true
         settings.domStorageEnabled = true          // team DB / season stats / settings persist
@@ -262,16 +266,6 @@ fun GameScorerScreen(webView: WebView) {
     val camLive = stats.state == IngestState.PLAYING
     LaunchedEffect(camLive) {
         webView.evaluateJavascript("window.__cam && window.__cam(${if (camLive) "true" else "false"})", null)
-    }
-
-    // Surface NetworkRouter's cellular-fallback trail on the in-app Diagnostics page (window.netLog)
-    // — previously the ONLY way to see whether the cellular workaround engaged at all was adb
-    // logcat, which isn't available at the field. (jford, 2026-07-05: "once i connect to camera wifi
-    // i cant connect to cellular for streaming" — with zero visibility into where it broke down.)
-    val netRouterEvent by com.libertyclerk.allstarslive.net.NetworkRouter.events.collectAsStateWithLifecycle()
-    LaunchedEffect(netRouterEvent) {
-        val msg = netRouterEvent ?: return@LaunchedEffect
-        webView.evaluateJavascript("window.netLog && window.netLog(" + org.json.JSONObject.quote(msg) + ")", null)
     }
 
     // Where the web wants the live camera shown (its monitor region, in dp).

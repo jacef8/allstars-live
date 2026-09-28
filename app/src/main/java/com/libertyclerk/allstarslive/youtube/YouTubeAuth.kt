@@ -5,6 +5,7 @@ import com.google.android.gms.auth.api.identity.AuthorizationRequest
 import com.google.android.gms.auth.api.identity.Identity
 import com.google.android.gms.common.api.Scope
 import org.json.JSONObject
+import java.net.HttpURLConnection
 import java.net.URL
 
 /**
@@ -31,8 +32,7 @@ object YouTubeAuth {
      */
     fun fetchChannelTitle(accessToken: String): String {
         val url = URL("https://www.googleapis.com/youtube/v3/channels?part=snippet&mine=true")
-        // Route over cellular when the active (Mevo) Wi-Fi has no internet (else normal default).
-        val conn = com.libertyclerk.allstarslive.net.NetworkRouter.openConnection(url).apply {
+        val conn = (url.openConnection() as HttpURLConnection).apply {
             requestMethod = "GET"
             setRequestProperty("Authorization", "Bearer $accessToken")
             connectTimeout = 15000

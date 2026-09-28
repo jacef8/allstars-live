@@ -64,7 +64,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.libertyclerk.allstarslive.ingest.CompositorTestScreen
-import com.libertyclerk.allstarslive.ingest.SrtIngestScreen
+import com.libertyclerk.allstarslive.ingest.CameraScreen
 import com.libertyclerk.allstarslive.scorer.GameScorerScreen
 import com.libertyclerk.allstarslive.scorer.createScorerWebView
 import com.libertyclerk.allstarslive.stream.Broadcast
@@ -95,21 +95,15 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         // The scorer is handheld for a whole game on top of live video — keep the screen on.
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        // Multi-network: keep cellular available + route YouTube over it when the (Mevo) Wi-Fi has no
-        // internet, so you can receive the camera over Wi-Fi AND reach YouTube over cell at once.
-        com.libertyclerk.allstarslive.net.NetworkRouter.start(this)
         // Restore the chosen capture mode (external camera vs this device's own camera).
         val camPrefs = getSharedPreferences("allstars", android.content.Context.MODE_PRIVATE)
         com.libertyclerk.allstarslive.ingest.RtmpHub.captureMode =
             camPrefs.getString("capture_mode", com.libertyclerk.allstarslive.ingest.RtmpHub.MODE_EXTERNAL)
                 ?: com.libertyclerk.allstarslive.ingest.RtmpHub.MODE_EXTERNAL
         com.libertyclerk.allstarslive.ingest.RtmpHub.lensBack = camPrefs.getBoolean("lens_back", true)
-        // Bring the camera link up at launch so Go Live works from any tab (not just Video).
-        // Only the external-camera (RTMP receiver) path runs as a background service; the
-        // device-camera pipeline starts when the Video screen opens or on Go Live.
-        if (com.libertyclerk.allstarslive.ingest.RtmpHub.captureMode == com.libertyclerk.allstarslive.ingest.RtmpHub.MODE_EXTERNAL) {
-            com.libertyclerk.allstarslive.ingest.RtmpReceiverService.start(this, 1935)
-        }
+        // The camera link (receiver service / device camera) is NOT started here: it comes up when
+        // the Video screen opens or on Go Live / Record, so a scorer's phone that never touches
+        // video never gets a foreground service, an open port, a GL context or a decoder.
         // Mic for the broadcast's audio track (YouTube needs audio to go live). Silence
         // is the fallback if denied, but real game sound is better — ask once.
         val needAudio = checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) != android.content.pm.PackageManager.PERMISSION_GRANTED
@@ -350,7 +344,7 @@ private fun ConfirmDialog(
 private fun VideoTab() {
     var mode by rememberSaveable { mutableStateOf(0) }   // 0 = Camera, 1 = Test pattern
     Box(Modifier.fillMaxSize()) {
-        if (mode == 0) SrtIngestScreen(onUseTestPattern = { mode = 1 })
+        if (mode == 0) CameraScreen(onUseTestPattern = { mode = 1 })
         else CompositorTestScreen(onUseCamera = { mode = 0 })
     }
 }

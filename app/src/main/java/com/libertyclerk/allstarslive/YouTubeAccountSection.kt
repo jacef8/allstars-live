@@ -29,13 +29,18 @@ import androidx.compose.ui.unit.sp
 import com.libertyclerk.allstarslive.youtube.YouTubeAuth
 
 /**
- * YouTube account connection (M3 full). "Connect YouTube" runs Google authorization
- * for the YouTube scope and verifies by reading the signed-in channel — so the app can
- * create the broadcast and stream with no stream key to copy.
+ * YouTube account connection. "Connect YouTube" runs Google authorization for the YouTube scope
+ * and verifies by reading the signed-in channel — so the app can create the broadcast and stream
+ * with no stream key to copy.
  *
- * This used to be a standalone Settings tab; with only one option, it now embeds on the
- * Video tab's Camera setup panel (the admin/setup home) instead of taking its own tab.
+ * Lives on the camera setup panel (the admin/setup home) rather than a Settings tab of its own.
+ * Google's sign-in flow needs internet: in Hotspot mode (the recommended setup) this device keeps
+ * its own cellular connection the whole time, so it just works; on the camera's own Wi-Fi it won't.
  */
+private const val NO_INTERNET_HINT =
+    "Couldn't reach Google to sign in. Check this device has internet — if you're on the camera's " +
+        "Wi-Fi, use Mobile Hotspot mode (see Camera setup) or turn Wi-Fi off so cellular is used."
+
 @Composable
 fun YouTubeAccountSection(modifier: Modifier = Modifier) {
     val ctx = LocalContext.current
@@ -63,67 +68,32 @@ fun YouTubeAccountSection(modifier: Modifier = Modifier) {
     }
 
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { res ->
-        com.libertyclerk.allstarslive.net.NetworkRouter.unbindProcess()
         runCatching {
             val result = YouTubeAuth.client(ctx).getAuthorizationResultFromIntent(res.data)
             val token = result.accessToken
             if (token != null) verify(token) else { status = "No token returned"; working = false }
         }.onFailure {
-            // This ALSO used to be a blanket "Sign-in cancelled" no matter what actually happened —
-            // including when the picker activity itself couldn't reach Google to finish the exchange
-            // because the active network is the camera's Wi-Fi. A real user-tapped cancel and a
-            // silent network failure looked identical, so there was nothing to act on. (jford,
-            // 2026-07-06: "still getting the youtube sign in cancel error... after i am connected to
-            // the mevo wifi.")
-            status = if (com.libertyclerk.allstarslive.net.NetworkRouter.noInternet.value) {
-                "No internet reachable on this Wi-Fi — the sign-in screen couldn't finish. Sign in to " +
-                    "YouTube BEFORE connecting to the camera (or briefly turn Wi-Fi off so this device " +
-                    "uses cellular), then reconnect to the camera."
-            } else {
-                "Sign-in cancelled"
-            }
+            // A user-tapped cancel and a picker that couldn't reach Google look the same from here,
+            // so say what to check rather than a bare "cancelled".
+            status = "Sign-in didn't finish. $NO_INTERNET_HINT"
             working = false
         }
     }
 
     fun connect() {
         status = "Opening Google sign-in…"; working = true
-        // Google Play Services' Authorization API runs its own network call, most likely inside the
-        // separate com.google.android.gms process rather than this app's — so bindProcessToCellular
-        // (which only affects THIS process's own sockets) may not reach it at all. Applying it here
-        // anyway costs nothing if it doesn't help, and might if some part of this flow does run
-        // in-process. (jford, 2026-07-06: on the camera's Wi-Fi, "reconnect to youtube... sign in
-        // error immediately.")
-        com.libertyclerk.allstarslive.net.NetworkRouter.bindProcessToCellular()
         YouTubeAuth.client(ctx).authorize(YouTubeAuth.request())
             .addOnSuccessListener { result ->
                 val pi = result.pendingIntent
                 val token = result.accessToken
                 when {
-                    result.hasResolution() && pi != null -> {
-                        // Keep the cellular bind through the picker activity too, in case ITS network
-                        // exchange (not just this initial authorize() call) also runs in-process —
-                        // unbound in the launcher callback above once that activity returns.
-                        launcher.launch(IntentSenderRequest.Builder(pi.intentSender).build())
-                    }
-                    token != null -> { com.libertyclerk.allstarslive.net.NetworkRouter.unbindProcess(); verify(token) }
-                    else -> { com.libertyclerk.allstarslive.net.NetworkRouter.unbindProcess(); status = "No authorization result"; working = false }
+                    result.hasResolution() && pi != null -> launcher.launch(IntentSenderRequest.Builder(pi.intentSender).build())
+                    token != null -> verify(token)
+                    else -> { status = "No authorization result"; working = false }
                 }
             }
             .addOnFailureListener {
-                com.libertyclerk.allstarslive.net.NetworkRouter.unbindProcess()
-                // The generic "Failed: <exception message>" gave no clue this was almost always a
-                // network problem, not an account/credentials problem — Google's own sign-in flow
-                // needs to actually reach the internet, and it does NOT ride over this app's cellular
-                // fallback (that only covers the RTMP video upload). Telling the operator what to
-                // check saves a support round-trip.
-                status = if (com.libertyclerk.allstarslive.net.NetworkRouter.noInternet.value) {
-                    "No internet reachable on this Wi-Fi. Sign in to YouTube BEFORE connecting to the " +
-                        "camera (or briefly turn Wi-Fi off so this device uses cellular), then reconnect " +
-                        "to the camera — Go Live itself already works over cellular once signed in."
-                } else {
-                    "Failed: ${it.message}"
-                }
+                status = "Failed: ${it.message}. $NO_INTERNET_HINT"
                 working = false
             }
     }

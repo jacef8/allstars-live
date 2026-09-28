@@ -1,6 +1,7 @@
 package com.libertyclerk.allstarslive.youtube
 
 import org.json.JSONObject
+import java.net.HttpURLConnection
 import java.net.URL
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -80,7 +81,7 @@ object YouTubeLive {
         var lastErr: java.io.IOException? = null
         repeat(3) { attempt ->
             try {
-                val conn = com.libertyclerk.allstarslive.net.NetworkRouter.openConnection(URL("https://www.googleapis.com/youtube/v3/$path")).apply {
+                val conn = (URL("https://www.googleapis.com/youtube/v3/$path").openConnection() as HttpURLConnection).apply {
                     requestMethod = method
                     setRequestProperty("Authorization", "Bearer $token")
                     setRequestProperty("Connection", "close")   // don't reuse a stale pooled socket

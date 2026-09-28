@@ -139,9 +139,15 @@ object Broadcast {
             return
         }
         // Don't start a broadcast with no picture — that's what left dead "upcoming"
-        // broadcasts on YouTube. Require the camera to actually be delivering frames.
+        // broadcasts on YouTube. Require the camera to actually be delivering frames. The
+        // ensureStarted() above has already brought the link up, so in external mode the honest
+        // next step is on the camera side, not "open Video".
         if (!RtmpHub.hasVideo) {
-            _state.value = State(phase = Phase.ERROR, status = "No camera yet — connect the camera, then Go Live")
+            val hint = if (RtmpHub.captureMode == RtmpHub.MODE_DEVICE)
+                "No camera picture yet — open Video, wait for the picture, then Go Live"
+            else
+                "No camera yet — this device is listening now; start the camera's stream to it (the address is on the Video screen), then tap Go Live again"
+            _state.value = State(phase = Phase.ERROR, status = hint)
             return
         }
         _state.value = State(phase = Phase.STARTING, title = title, privacy = privacy, status = "Setting up your YouTube broadcast…")

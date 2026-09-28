@@ -13,14 +13,16 @@ import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import android.view.Surface
+import com.libertyclerk.allstarslive.R
 import com.libertyclerk.allstarslive.gl.VideoCompositor
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
 /**
- * The always-on camera pipeline: RTMP receiver → decoder → compositor, all living
- * here (not in any screen) so it keeps running while the operator is on the Game tab
- * scoring or away in the Mevo app. The on-screen preview is an *optional* attachment
+ * The camera pipeline: RTMP receiver → decoder → compositor, all living here (not in any
+ * screen) so it keeps running while the operator is on the Game tab scoring or away in the
+ * camera's own app. It starts on demand — the Video screen opening, or Go Live / Record via
+ * [ensureStarted] — never at app launch. The on-screen preview is an *optional* attachment
  * ([attachPreview]); the YouTube/record encoder attaches to [videoCompositor].
  *
  *   [RtmpReceiver] (FGS, :PORT)  →  H.264 Annex-B  →  [MediaCodecVideoDecoder]
@@ -281,8 +283,8 @@ class RtmpReceiverService : Service() {
         val pi = PendingIntent.getActivity(this, 0, launch, PendingIntent.FLAG_IMMUTABLE)
         return Notification.Builder(this, CHANNEL)
             .setContentTitle("All-Stars Live")
-            .setContentText("Camera link ready — waiting for the Mevo")
-            .setSmallIcon(android.R.drawable.ic_menu_camera)
+            .setContentText("Camera link is on — listening for your camera")
+            .setSmallIcon(R.drawable.ic_notif_camera)
             .setContentIntent(pi)
             .setOngoing(true)
             .build()
