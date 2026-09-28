@@ -1,11 +1,11 @@
 /* All-Stars Live — service worker.
  * App-shell caching so the PWA installs, opens instantly, and survives a flaky
- * connection at the field. The live game data (relay WebSocket, Firebase, the
- * YouTube player) is cross-origin / non-GET, so it always goes straight to the
+ * connection at the field. The live game data (Firebase, the YouTube player) is
+ * cross-origin / non-GET, so it always goes straight to the
  * network — only the static shell is cached here. Bump CACHE to ship an update. */
 // ⬆️ BUMP THIS STRING ON EVERY DEPLOY. Changing it is what makes the installed PWA
 // notice a new version, activate it, and auto-reload (see the SW-update code in the page).
-const CACHE = "allstars-v405";
+const CACHE = "allstars-v406";
 const SHELL = [
   "./",
   "./scoring-controller.html",
@@ -49,7 +49,7 @@ self.addEventListener("fetch", (e) => {
   const req = e.request;
   if (req.method !== "GET") return;                 // never cache score writes / API posts
   const url = new URL(req.url);
-  if (url.origin !== location.origin) return;        // relay / firebase / youtube → network
+  if (url.origin !== location.origin) return;        // firebase / youtube → network
 
   // The app page: stale-while-revalidate. Serve the cached shell INSTANTLY (so a weak/slow
   // signal at the field never blocks the load — it doesn't wait on the network), and fetch a

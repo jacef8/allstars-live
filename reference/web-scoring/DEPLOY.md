@@ -20,10 +20,10 @@ Two pieces get deployed:
   `scoring-controller.html`. Firestore holds teams/games/chat/schedule and powers
   cross-device sync + the live viewer (`onSnapshot` on a team's live-game doc). This is
   what `appBaseUrl()` in the app points at (`https://allstars-live.web.app/`).
-- **Railway** (`server.js`) — a WebSocket relay, still deployed and still used as a
-  live-sync channel (`new WebSocket(...)`, default `wss://web-production-77d34.up.railway.app`,
-  overridable with `?server=`/`?ws=`) alongside Firestore. Not required for the app to work
-  (Firestore sync covers cross-device/cross-network sync on its own) but still wired in.
+- **Railway** (`server.js`) — a plain static server for this same folder. The native Android
+  app's WebView loads `https://web-production-77d34.up.railway.app/scoring-controller.html`
+  (`APP_URL` in `GameScorerScreen.kt`), so a web change reaches the tablets on the next Railway
+  deploy. The old WebSocket relay is gone — Firestore is the only live-sync channel.
 
 **GitHub Pages is OFF.** It was accidentally enabled at one point, failed on most pushes,
 and was explicitly disabled (2026-07-03) — it has zero effect on the real deploy. Ignore
@@ -31,13 +31,13 @@ any old instructions that mention it.
 
 ---
 
-## A. Relay on Railway ✅ deployed
+## A. App server on Railway ✅ deployed
 
-- Config is pinned in `railway.json` (`node reference/web-scoring/server.js`,
-  healthcheck `/health`).
+- Config is pinned in this folder's `railway.json` (`node server.js`, with Railway's Root
+  Directory set to `reference/web-scoring`; healthcheck `/health`).
 - **Root Directory** = `reference/web-scoring`. **Do not set `PORT`** — Railway injects it.
-- The `wss://web-production-77d34.up.railway.app` URL is baked into the app as the
-  default relay (`?server=`/`?ws=` overrides it).
+- Railway auto-deploys on every push to `main`, so the tablets pick up a web change after
+  the push (bump `CACHE` in `sw.js` in the same change so the service worker refreshes).
 
 ## B. App on Firebase Hosting ✅ deployed
 
@@ -61,6 +61,6 @@ firebase deploy --only firestore:rules  # after editing firestore.rules
   not through this file.
 - Archived prototypes (the old separate viewer / gamecast / overlay / setup pages) live
   in `_archive/` and are not part of the deployed app.
-- Pushing to `origin/main` does **not** auto-deploy either piece — Firebase Hosting and
-  Firestore rules both need an explicit `firebase deploy`; Railway auto-deploys the relay
-  on push (per its GitHub integration) but the web app itself does not.
+- Pushing to `origin/main` does **not** deploy to Firebase — Hosting and Firestore rules
+  both need an explicit `firebase deploy`. Railway (what the native app loads) does
+  auto-deploy on push, per its GitHub integration.

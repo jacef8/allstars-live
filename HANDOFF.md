@@ -115,7 +115,7 @@ no‑app option — but the web can still score, it just can't stream.*
 | `reference/web-scoring/firebase-config.js` | Firebase web config (public key — safe to commit). |
 | `reference/web-scoring/firestore.rules` | Security rules — **must be published in the Firebase console by jford**. |
 | `reference/web-scoring/sw.js` | PWA service worker; bump `CACHE` every deploy. |
-| `reference/web-scoring/server.js` | Railway server: serves the app + the WebSocket **relay** (live viewer sync). |
+| `reference/web-scoring/server.js` | Railway static server for the app — what the native WebView loads. (No relay any more.) |
 | `app/src/main/java/.../MainActivity.kt` | Native shell: full‑screen WebView + splash + camera overlay (no tabs as of v48). |
 | `app/src/main/java/.../scorer/GameScorerScreen.kt` | The WebView + JS bridge (`AllStars`) + turf background + camera preview. |
 | `app/src/main/java/.../ingest/` | RTMP receiver, decoder, compositor, YouTube push. |
@@ -151,8 +151,8 @@ Only commit when asked / push when asked. The native files have at times been in
 - **Scoring/state:** all in `scoring-controller.html` — `G` (game state), `DB`/`teams`
   (localStorage `allstars-scorer-db`), `render()` rebuilds `#content` from a `mode` state machine,
   event delegation on `#app` via `data-act`. `IS_APP = window.AllStars?.isApp` distinguishes native.
-- **Live viewing:** `broadcast()` sends state over the WebSocket **relay** (server.js). A
-  `?view=viewer`/`?watch=` link hydrates via `applyRemote()`. The relay is real‑time only.
+- **Live viewing:** `broadcast()` publishes each play to the team's live game doc in Firestore
+  (`cloudPublishGame`); a `?watch=` link subscribes to it and hydrates via `applyRemote()`.
 - **Cloud (Firebase, web/https only):** Auth (Google + email‑link), Firestore `teams` (owner +
   `scorers[]` + `followers[]`), team **chat** (`teams/{id}/messages`), **persistent games**
   (`games/{id}`, public‑read for watch links). All **dormant until signed in AND rules published**.

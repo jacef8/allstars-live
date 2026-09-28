@@ -1,14 +1,10 @@
 {
-  "name": "liberty-league-relay",
+  "name": "allstars-live-web",
   "version": "1.0.0",
-  "description": "Live relay linking the scorekeeper controller to the broadcast overlay.",
+  "description": "All-Stars Live web app — static server (server.js) for the native app's WebView, plus the scoring/viewer UI.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "test": "node --test \"test/**/*.test.js\""
-  },
-  "dependencies": {
-    "ws": "^8.18.0",
-    "firebase-admin": "^12.7.0"
   }
 }

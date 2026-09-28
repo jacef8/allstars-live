@@ -1,58 +1,20 @@
-// All-Stars Live — single Railway service.
+// All-Stars Live — the Railway service: a plain static server for the web app in this folder.
 //
-// Serves BOTH:
-//   1. the PWA / web app (static files in this folder) over HTTPS, and
-//   2. the live relay (WebSocket) — passes the scorekeeper's game-state to every
-//      connected viewer/overlay, and catches late joiners up with the latest state.
-// One origin for everything, so the app connects to its own relay (no ?server needed).
+// The native Android app's WebView loads scoring-controller.html from here (APP_URL in
+// GameScorerScreen.kt), so a push to main reaches the tablets on Railway's auto-deploy. Fans'
+// share links point at Firebase Hosting, which serves this same folder (see DEPLOY.md).
 //
-// Optional crash recovery: if FIREBASE_SERVICE_ACCOUNT and FIREBASE_DB_URL are set,
-// the latest state is mirrored to Firebase Realtime DB at /games/current and reloaded
-// on startup. Unset → pure in-memory relay.
+// Live game sync is Firestore (cloud-data.js). The WebSocket relay that used to live here is
+// gone — it had no auth and no game scoping, and Firestore already carried every play.
 //
 // ── Railway env vars ─────────────────────────────────────────────────────────
-//   PORT                      set AUTOMATICALLY by Railway — do not set it
-//   FIREBASE_DB_URL           (optional) e.g. https://allstars-live-default-rtdb.firebaseio.com
-//   FIREBASE_SERVICE_ACCOUNT  (optional) the FULL service-account key JSON, one value
+//   PORT   set AUTOMATICALLY by Railway — do not set it
 
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
-const { WebSocketServer } = require("ws");
 
 const ROOT = __dirname; // static files live next to this server (reference/web-scoring)
-
-let lastState = null; // most recent state message (string) — replayed to late joiners
-let saveState = () => {}; // no-op unless Firebase is configured below
-
-/* ───────── optional Firebase Realtime Database persistence ───────── */
-let dbReady = Promise.resolve();
-if (process.env.FIREBASE_SERVICE_ACCOUNT && process.env.FIREBASE_DB_URL) {
-  try {
-    const admin = require("firebase-admin");
-    const creds = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-    admin.initializeApp({
-      credential: admin.credential.cert(creds),
-      databaseURL: process.env.FIREBASE_DB_URL,
-    });
-    const ref = admin.database().ref("/games/current");
-    saveState = (msg) => {
-      ref.set({ state: msg, updatedAt: Date.now() })
-        .catch((e) => console.error("Firebase write failed:", e.message));
-    };
-    dbReady = ref.once("value")
-      .then((snap) => {
-        const v = snap.val();
-        if (v && v.state) { lastState = v.state; console.log("Recovered last game state from Firebase."); }
-      })
-      .catch((e) => console.error("Firebase read failed:", e.message));
-    console.log("Firebase persistence enabled at /games/current.");
-  } catch (e) {
-    console.error("Firebase init failed — running as a pure relay:", e.message);
-  }
-} else {
-  console.log("Firebase not configured — running as a pure relay (no persistence).");
-}
 
 /* ───────── static file serving (the PWA) ───────── */
 const MIME = {
@@ -117,29 +79,6 @@ const server = http.createServer((req, res) => {
   serveStatic(req, res);
 });
 
-/* ───────── WebSocket relay (shares the same server/port) ───────── */
-const wss = new WebSocketServer({ server });
-
-wss.on("connection", (ws) => {
-  if (lastState) { try { ws.send(lastState); } catch (e) {} }   // catch the new client up
-  ws.on("message", (data) => {
-    const msg = data.toString();
-    lastState = msg;
-    saveState(msg);                                             // mirror to Firebase if enabled
-    for (const client of wss.clients) {
-      if (client.readyState === 1) { try { client.send(msg); } catch (e) {} }
-    }
-  });
-});
-
-// keep idle connections alive (Railway/proxies drop silent sockets)
-setInterval(() => {
-  for (const client of wss.clients) {
-    if (client.readyState === 1) { try { client.ping(); } catch (e) {} }
-  }
-}, 30000);
 
 const PORT = process.env.PORT || 8080;     // Railway injects PORT; 8080 for local dev
-dbReady.finally(() => {
-  server.listen(PORT, () => console.log("All-Stars Live (app + relay) on :" + PORT));
-});
+server.listen(PORT, () => console.log("All-Stars Live app server on :" + PORT));

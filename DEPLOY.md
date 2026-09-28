@@ -6,7 +6,7 @@ an existing setup, not standing one up from scratch.
 | Piece | What it is | Hosted on |
 |------|------------|-----------|
 | **Web app** (`reference/web-scoring/scoring-controller.html`) | The whole app — home, teams, live scoring, broadcast monitor, and the fan viewer — all one file, one route (`/`). Firestore powers cross-device sync + the live viewer. | **Firebase Hosting** |
-| **Relay** (`reference/web-scoring/server.js`) | A WebSocket relay used as an additional live-sync channel alongside Firestore. | **Railway** |
+| **App server** (`reference/web-scoring/server.js`) | A plain static server for the same web app — it is what the native Android app's WebView loads. | **Railway** |
 
 There is no separate setup/watch/viewer/overlay page anymore — that was an earlier
 prototype architecture, archived in `reference/web-scoring/_archive/`. Sharing (QR code,
@@ -25,7 +25,7 @@ pushes, and was disabled (2026-07-03). It has no bearing on the real deploy.
 - **Git** — check with `git --version`
 - **A Firebase project** (already set up: project id `allstars-live`) — https://console.firebase.google.com
 - **Firebase CLI** — `npm install -g firebase-tools`, then `firebase login`
-- **A Railway account**, for the relay — https://railway.app (only needed if redeploying the relay)
+- **A Railway account**, for the app server — https://railway.app (only needed if redeploying it)
 
 ---
 
@@ -56,7 +56,7 @@ explicitly after a web change.
 
 ---
 
-## 2. Deploy the relay to Railway
+## 2. Deploy the app server to Railway
 
 The repo already contains `railway.json`, a root `package.json`, and a `Procfile`.
 
@@ -66,25 +66,9 @@ The repo already contains `railway.json`, a root `package.json`, and a `Procfile
 3. Confirm it's healthy: `https://web-production-77d34.up.railway.app/health` → should
    print `ok`.
 
-The app's default relay URL (`wss://web-production-77d34.up.railway.app`) is already
-baked in; `?server=`/`?ws=` on the URL overrides it if you ever run a second relay.
-
-### 2a. (Optional) Firebase crash-recovery persistence for the relay
-
-Skip this to run as a pure in-memory relay (fine for most games). To survive a relay
-restart mid-game, set two variables in **Railway → Variables**:
-
-| Variable | Value |
-|----------|-------|
-| `FIREBASE_DB_URL` | Realtime Database URL, e.g. `https://allstars-live-default-rtdb.firebaseio.com` |
-| `FIREBASE_SERVICE_ACCOUNT` | The **entire** service-account key JSON, pasted as one value |
-
-Getting the service-account JSON: Firebase Console → ⚙ **Project settings → Service
-accounts → Generate new private key** — a `.json` downloads; paste its full contents as
-the `FIREBASE_SERVICE_ACCOUNT` value. Make sure Realtime Database is created first
-(Console → Build → Realtime Database → Create Database).
-
-⚠️ **Never commit the service-account file** — `.gitignore` already blocks it.
+The native Android app loads the web app from this Railway URL (`APP_URL` in
+`GameScorerScreen.kt`), so this deploy is what reaches the tablets. There is no relay and no
+Railway-side Firebase configuration any more — live sync is Firestore, deployed in step 1.
 
 ---
 
@@ -118,10 +102,10 @@ firebase deploy --only hosting
 # Redeploy Firestore rules after editing firestore.rules:
 firebase deploy --only firestore:rules
 
-# Redeploy the relay after a server.js change:
-git add -A && git commit -m "relay: <what changed>" && git push    # Railway auto-deploys on push
+# Redeploy the Railway app server (what the tablets load) after a web change:
+git add -A && git commit -m "web: <what changed>" && git push    # Railway auto-deploys on push
 
-# Tail relay logs:
+# Tail Railway logs:
 #   Railway dashboard → your service → Deployments → View Logs
 ```
 
@@ -132,5 +116,4 @@ git add -A && git commit -m "relay: <what changed>" && git push    # Railway aut
 | Web changes not showing up live | You need `firebase deploy --only hosting` — pushing to git alone doesn't deploy the web app. |
 | Firestore rule changes not taking effect | Same idea — `firebase deploy --only firestore:rules`, separate from `--only hosting`. |
 | A shared link opens to a blank/generic Home instead of the expected team/player/game | Check the query param is one the app actually reads: `view`, `feed`, `vid`, `yt`, `watch`, `tn`, `follow`, `player`, `overlay`. |
-| Relay logs `Firebase init failed` | `FIREBASE_SERVICE_ACCOUNT` isn't valid JSON, or Realtime Database wasn't created — re-paste the full key, create the DB. |
 | `firebase deploy` uploads `server.js`/`node_modules` | They're in `firebase.json`'s hosting `ignore` list — make sure it wasn't removed. |
