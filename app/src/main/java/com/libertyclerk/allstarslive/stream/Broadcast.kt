@@ -134,19 +134,18 @@ object Broadcast {
         // Mode-aware: device-camera (all-in-one) vs an external camera pushing RTMP to us.
         RtmpHub.ensureStarted(context)
         val comp = RtmpHub.videoCompositor
-        if (comp == null) {
-            _state.value = State(phase = Phase.ERROR, status = "Camera link not ready — try again")
-            return
-        }
         // Don't start a broadcast with no picture — that's what left dead "upcoming"
-        // broadcasts on YouTube. Require the camera to actually be delivering frames. The
-        // ensureStarted() above has already brought the link up, so in external mode the honest
-        // next step is on the camera side, not "open Video".
-        if (!RtmpHub.hasVideo) {
-            val hint = if (RtmpHub.captureMode == RtmpHub.MODE_DEVICE)
-                "No camera picture yet — open Video, wait for the picture, then Go Live"
-            else
-                "No camera yet — this device is listening now; start the camera's stream to it (the address is on the Video screen), then tap Go Live again"
+        // broadcasts on YouTube. Require the camera to actually be delivering frames. In external
+        // mode ensureStarted() has just brought the link up, so the honest next step is on the
+        // camera side; in device mode it stays down until the Video screen has run the camera
+        // permission flow, so "open Video" is the honest step there.
+        if (comp == null || !RtmpHub.hasVideo) {
+            val hint = when {
+                RtmpHub.captureMode == RtmpHub.MODE_DEVICE ->
+                    "No camera picture yet — open Video, allow camera access if asked, wait for the picture, then Go Live"
+                comp == null -> "Camera link not ready — try again"
+                else -> "No camera yet — this device is listening now; start the camera's stream to it (the address is on the Video screen), then tap Go Live again"
+            }
             _state.value = State(phase = Phase.ERROR, status = hint)
             return
         }

@@ -1832,6 +1832,9 @@ function applyRemote(raw){
     const _justEnded=(msg.G.final && !G.final && _remoteLive);
     if(_justEnded){ try{ flash("Game over — final score "+(msg.G.away|0)+"-"+(msg.G.home|0)); }catch(e){} }
     G=msg.G;
+    // The cloud copy carries anim path points as {x,y} (Firestore rejects nested arrays — see
+    // broadcast()); the animation reads [x,y] pairs, so put them back before triggerAnim() below.
+    try{ if(G.anim&&Array.isArray(G.anim.paths)) G.anim.paths.forEach(p=>{ if(Array.isArray(p.pts)) p.pts=p.pts.map(pt=>Array.isArray(pt)?pt:[+pt.x,+pt.y]); }); }catch(e){}
     if(Array.isArray(msg.ROSTER)) ROSTER=msg.ROSTER;
     if(msg.OUR) Object.assign(OUR,msg.OUR);
     if(msg.OPP) Object.assign(OPP,msg.OPP);
@@ -2158,7 +2161,8 @@ function broadcast(){
         // supported" — poisoning the live-game sync from that point on, while simple pitches
         // (ball/strike/foul, no G.anim.paths) kept working, which is exactly what jford saw: some
         // plays reached viewers, but sync then broke down and stayed broken. Only this Firestore-bound
-        // copy gets the [x,y] pairs reshaped to {x,y} objects; the local G keeps its arrays.
+        // copy gets the [x,y] pairs reshaped to {x,y} objects; the local G keeps its arrays, and
+        // applyRemote() turns them back into pairs on the viewer.
         const _fsG=(G.anim&&Array.isArray(G.anim.paths))
           ? Object.assign({},G,{anim:Object.assign({},G.anim,{paths:G.anim.paths.map(p=>Object.assign({},p,{pts:(p.pts||[]).map(pt=>({x:pt[0],y:pt[1]}))}))})})
           : G;
@@ -6897,10 +6901,9 @@ function renderToolbar(){
     : inGame
       ? `${OUR.short||"US"} <span style="color:${T.sageDim};font-weight:600">vs</span> ${OPP.short||"OPP"}`
       : `ALL-STARS <span style="color:${T.lime}">LIVE</span>`;
-  // Sync pill. Scorer: LIVE while this device's plays are reaching the cloud game doc (a Watch viewer
-  // sees them), LOCAL when they stay on this device (signed out, no team, another device is the
-  // active scorer). Viewer: LIVE once the cloud feed has delivered a snapshot. OFFLINE = no internet.
-  const conn = navigator.onLine && (viewMode==="viewer" ? _remoteLive : (gameActive && !window._livePublishSkip));
+  // Sync pill (a viewer-only toolbar piece — see the "live" piece below): LIVE once the cloud feed
+  // has delivered a snapshot, OFFLINE with no internet, LOCAL until the first snapshot arrives.
+  const conn = navigator.onLine && _remoteLive;
   const dot = !navigator.onLine ? {c:T.out,l:"OFFLINE"} : conn ? {c:T.live,l:"LIVE"} : {c:T.sageDim,l:"LOCAL"};
   // Wide-only: slide the video monitor in/out for distraction-free scoring.
   const playMode=!menuModes.includes(mode);

@@ -175,8 +175,15 @@ object RtmpHub {
     @Synchronized
     fun ensureStarted(context: Context) {
         if (compositor != null) return
-        if (captureMode == MODE_DEVICE) startDeviceCamera(context)
-        else { RtmpReceiverService.start(context, port); start(port) }
+        if (captureMode == MODE_DEVICE) {
+            // No CAMERA permission: a headless start would leave a dead pipeline behind (the camera
+            // fails, the compositor stays up, and [startDeviceCamera]'s guard then refuses the Video
+            // screen's own retry). Stay down instead; Go Live tells the operator to open Video,
+            // whose permission prompt starts the camera the normal way.
+            if (context.checkSelfPermission(android.Manifest.permission.CAMERA) !=
+                android.content.pm.PackageManager.PERMISSION_GRANTED) return
+            startDeviceCamera(context)
+        } else { RtmpReceiverService.start(context, port); start(port) }
     }
 
     private fun onVideo(au: ByteArray, ptsMs: Long, keyframe: Boolean) {

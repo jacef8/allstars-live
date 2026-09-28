@@ -58,10 +58,14 @@ explicitly after a web change.
 
 ## 2. Deploy the app server to Railway
 
-The repo already contains `railway.json`, a root `package.json`, and a `Procfile`.
+Railway runs `reference/web-scoring/server.js` whichever way the service is configured: with
+its Root Directory set to `reference/web-scoring` (what that folder's own `DEPLOY.md` documents)
+it uses the folder's `railway.json` + `package.json` (`node server.js`); with no Root Directory it
+uses the root `railway.json` / `Procfile` (`node reference/web-scoring/server.js`). Both sets are
+kept in sync.
 
-1. Railway → your `allstars-live` service → it auto-deploys `node reference/web-scoring/server.js`
-   on every push to `main` (GitHub integration). No manual step needed for routine changes.
+1. Railway → your `allstars-live` service → it auto-deploys the server on every push to `main`
+   (GitHub integration). No manual step needed for routine changes.
 2. **Do NOT set `PORT`** — Railway injects it; the server reads `process.env.PORT`.
 3. Confirm it's healthy: `https://web-production-77d34.up.railway.app/health` → should
    print `ok`.
