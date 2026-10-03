@@ -396,12 +396,56 @@ function saveDB(){
   // Skip entirely while APPLYING an inbound snapshot, or we'd bump the just-merged team and stop
   // receiving its future changes (the "edits never reach the other device" bug).
   if(!window._cloudApplying){ try{ if(window.cloudTouchChanged) window.cloudTouchChanged(); }catch(e){} }
-  try{localStorage.setItem(DB_KEY,JSON.stringify(DB));}catch(e){} try{ if(window.cloudPushSoon)window.cloudPushSoon(); }catch(e){}}
+  // The team DB (every saved game, roster and season record) always wins over the in-progress game's
+  // saved undo history (HIST_KEY, below): if storage is full, give the history's space back and write
+  // the DB again, the same rule saveGame() applies to the game record. Undo itself keeps working from
+  // memory; saveGame() re-saves the history at the next change if it fits.
+  const _db=JSON.stringify(DB);
+  try{localStorage.setItem(DB_KEY,_db);}catch(e){ try{ localStorage.removeItem(HIST_KEY); _histSavedSig=null; localStorage.setItem(DB_KEY,_db); }catch(_){} }
+  try{ if(window.cloudPushSoon)window.cloudPushSoon(); }catch(e){}}
 // Persist the in-progress game (lineup, positions, score, everything in G) so it survives
 // reloads and app updates — the operator never re-enters a lineup. Teams/roster persist in
 // DB above; this also stores the selected team so the lineup's roster re-links on restore.
 const GAME_KEY="al-game";
-function saveGame(){try{localStorage.setItem(GAME_KEY,JSON.stringify({G,curTeamId,oppTeamId,gameActive,OUR,OPP}));}catch(e){}}
+// The game feed and the undo history ride along too. Both used to live only in memory, so any
+// mid-game reload or app update left Undo greyed out, Rewind refusing every play, and an empty feed
+// with nothing to EDIT — and the scorer's next tap then published that empty feed to every parent
+// watching (per the 2026-09-27 scorer research). The feed (at most 220 short lines) goes in the game
+// record itself; eid is the last feed id handed out, so new lines keep numbering past the restored
+// ones (Undo/Rewind cut the feed by id). The history is bigger, so it has its own key (HIST_KEY),
+// is only rewritten when it actually changed, and is tied to this exact save by a token (histTok):
+// if that write ever fails, the token won't match and the restore simply skips the history rather
+// than pairing this game with a stale one. The gameFeed/eid reads sit in their own try because
+// those globals are declared further down this script.
+const HIST_KEY="al-game-hist";
+const HIST_BUDGET=800000;   // characters; past this only the recent taps are stored, which caps the history's size (a 15-inning test game came to ~320,000). If storage still fills up, saveGame() and saveDB() give the history's space back so the game record and team DB always save.
+let _histSavedSig=null;
+// A short fingerprint of the undo history as it stands (length, newest snapshot, its re-open stash):
+// the token saveGame() stores with the game, so a restore or a Take over can tell whether the
+// history in hand is the one that went with that exact save.
+function histSig(){
+  const top=hist[hist.length-1];
+  return hist.length+":"+(top&&top.n||0)+":"+(top&&top.play?(top.play.sig?2:1):0);
+}
+function saveHist(){
+  const sig=histSig();
+  if(sig===_histSavedSig) return sig;
+  const recentFrom=Math.max(0,hist.length-HIST_RECENT);
+  let s=JSON.stringify(Object.assign(histPack(hist,recentFrom),{tok:sig}));
+  if(s.length>HIST_BUDGET) s=JSON.stringify(Object.assign(histPack(hist.slice(recentFrom),0),{tok:sig}));
+  try{ localStorage.setItem(HIST_KEY,s); _histSavedSig=sig; return sig; }
+  catch(e){ try{ localStorage.removeItem(HIST_KEY); }catch(_){} _histSavedSig=null; return null; }
+}
+function saveGame(){try{
+  const o={G,curTeamId,oppTeamId,gameActive,OUR,OPP};
+  try{ o.gameFeed=Array.isArray(gameFeed)?gameFeed:[]; o.eid=_eventId; }catch(e){}
+  try{ o.histTok=saveHist(); }catch(e){}
+  const s=JSON.stringify(o);
+  // The game record always wins over the history: if storage is full, give the history's space back
+  // and save the game without it.
+  try{ localStorage.setItem(GAME_KEY,s); }
+  catch(e){ try{ localStorage.removeItem(HIST_KEY); }catch(_){} _histSavedSig=null; o.histTok=null; localStorage.setItem(GAME_KEY,JSON.stringify(o)); }
+  }catch(e){}}
 let DB=loadDB(), curTeamId=null, openTeamId=null, oppTeamId=null, pickFor="our", finderResults=null, openTeamFrom="teams";
 DB.teams.forEach(migrateTeam);   // split legacy single-name players into first/last
 const curTeam=()=>DB.teams.find(t=>t.id===curTeamId)||null;
@@ -919,7 +963,8 @@ const initGame=()=>({inning:1,half:"T",away:0,home:0,outs:0,balls:0,strikes:0,
 let G=initGame(),hist=[],redoStack=[],mode="home",tap=null,contact=null,result=null,plan=null,toast=null,toastTimer=null,curResults=[],showAll=false,showZones=false,editSlot=null,confirmAct=null,gameActive=false,lineupTab="us",newgameFrom="home",brSheet=false,correctOpen=false,correctOpenAt=0,lineupView="list",fieldAssign=null,fieldHold=null,fieldDisplaced=null,lineEditSlot=null,luSelSlot=null,luBuilderSel=null,luFromSetup=false,koPick=null,oppFieldSel=null,bugPreview=false,barEdit=false,editAB=null,gameEdit=null,statsSeason="all",pgOpen=false,pgSide="home",reopenPending=null;   // reopenPending: see adjustLastPlay()
 // Resume the last in-progress game (saved by saveGame) across reloads/app updates, so the
 // lineup/score is never lost. Stays on the home screen → shows "Resume". Re-links ROSTER
-// to the saved team so the lineup's player indices resolve correctly.
+// to the saved team so the lineup's player indices resolve correctly. The saved feed and undo
+// history are restored further down, right after gameFeed is declared (see there).
 (function(){try{const s=localStorage.getItem(GAME_KEY);if(!s)return;const o=JSON.parse(s);
   if(o&&o.G){G=o.G;curTeamId=o.curTeamId||null;oppTeamId=o.oppTeamId||null;gameActive=!!o.gameActive;
     if(o.OUR)Object.assign(OUR,o.OUR);if(o.OPP)Object.assign(OPP,o.OPP);
@@ -1178,7 +1223,20 @@ function removeBatter(){
 // play that no longer makes sense against the current state.
 // ev = the last feed-event id handed out when the snapshot was taken (see feedTrimTo()). Any new
 // action also ends a pending re-open (adjustLastPlay()): the scorer has moved on from it.
-function snapshot(){hist.push({g:JSON.parse(JSON.stringify(G)),fl:(Array.isArray(gameFeed)?gameFeed.length:0),ev:_eventId});if(hist.length>40)hist.shift();redoStack.length=0;reopenPending=null;}
+// The history used to be a flat 40 snapshots, about one inning of pitch-by-pitch scoring, so Rewind
+// refused most of a game (per the 2026-09-27 scorer research). Now the newest HIST_RECENT stay
+// tap-by-tap for Undo and older ones thin down to one checkpoint just before each play
+// (histCompact() in game-logic.js), which is what Rewind restores — the whole game fits. Whether the
+// previous snapshot was such a checkpoint is only known now, once its action has written (or not)
+// a play line to the feed. n numbers the snapshots so saveGame() can tell when the history changed.
+const HIST_RECENT=40, HIST_MAX=400;
+let histSeq=0;
+function snapshot(){
+  const t=hist[hist.length-1];
+  if(t&&typeof t.cp!=="boolean"&&typeof t.ev==="number") t.cp=Array.isArray(gameFeed)&&gameFeed.some(x=>isEditablePlay(x)&&typeof x.id==="number"&&x.id>t.ev);
+  hist.push({g:JSON.parse(JSON.stringify(G)),fl:(Array.isArray(gameFeed)?gameFeed.length:0),ev:_eventId,n:++histSeq});
+  histCompact(hist,HIST_RECENT,HIST_MAX);
+  redoStack.length=0;reopenPending=null;}
 function resetUI(){mode="idle";tap=null;contact=null;result=null;plan=null;showAll=false;reviewBatter=null;reviewInn=false;reopenPending=null;}
 // Cut gameFeed back to what it held when undo snapshot e was taken, and return the entries that
 // came off (in feed order) so Redo can put them back. By event id when the snapshot has one: the
@@ -1186,7 +1244,8 @@ function resetUI(){mode="idle";tap=null;contact=null;result=null;plan=null;showA
 // time points at the wrong line — undo/re-open/rewind left the undone play's own line in place and
 // the corrected play then showed up twice (per the 2026-09-27 scorer research). Ids only ever go
 // up, so "everything newer than ev" is exactly that play's lines, wherever the inning-end splice
-// put them. Snapshots without ev (none survive a reload, but be safe) keep the old length trim.
+// put them. Snapshots without ev (every snapshot has one now, restored ones too, but be safe) keep
+// the old length trim.
 function feedTrimTo(e){
   if(!Array.isArray(gameFeed))return [];
   if(e&&typeof e.ev==="number"){
@@ -1215,7 +1274,7 @@ function undo(){
 function redo(){
   if(!redoStack.length)return;
   const r=redoStack.pop();
-  const h={g:JSON.parse(JSON.stringify(G)),fl:(Array.isArray(gameFeed)?gameFeed.length:0)};
+  const h={g:JSON.parse(JSON.stringify(G)),fl:(Array.isArray(gameFeed)?gameFeed.length:0),n:++histSeq};
   if(typeof r.ev==="number")h.ev=r.ev;
   if(r.play)h.play=r.play;   // the restored state is the original commit's, so its stashed plan still fits
   hist.push(h);
@@ -1296,7 +1355,7 @@ function doFlip(){
       head:"End of "+(G.half==="T"?"Top":"Bottom")+" "+G.inning,
       sub:(_3?"3 outs":"run cap")+" · "+(_bt?(_bt.short||"")+" ":"")+_r+" run"+(_r===1?"":"s")+", "+_h+" hit"+(_h===1?"":"s"),
       away:G.away, home:G.home});
-    if(gameFeed.length>220)gameFeed.shift();
+    trimFeed(gameFeed,220);   // see feedPitch()
   }catch(e){}
   // The half-inning that just ended: if WE were on defense, our catcher caught it (feeds the pitch/catch rule alerts).
   try{ if(fielding()){ const ci=(G.lineup&&G.lineup.pos)?G.lineup.pos.C:null; if(ci!=null){ if(!G.caught)G.caught={}; const ck="o"+ci; G.caught[ck]=(G.caught[ck]||0)+1; } } }catch(e){}
@@ -1771,9 +1830,10 @@ function rewindToEvent(eid){
   const idx=gameFeed.findIndex(e=>e.id===eid); if(idx<0)return;
   // The most recent snapshot taken at/before this feed line existed = the state just before the play.
   // Matched by event id where the snapshot has one (see feedTrimTo(): a feed length stops lining up
-  // with feed positions once the 220-line cap starts shifting old lines off).
-  let found=-1; for(let i=hist.length-1;i>=0;i--){ const s=hist[i];
-    if((typeof s.ev==="number"&&typeof eid==="number")?(s.ev<eid):(s.fl<=idx)){ found=i; break; } }
+  // with feed positions once the 220-line cap starts shifting old lines off). rewindIndex() (in
+  // game-logic.js) also refuses when the older history was thinned right there, rather than
+  // restoring an earlier checkpoint and silently undoing the play before this one too.
+  const found=rewindIndex(hist,eid,idx);
   if(found<0){ editAB=null; flash("That play is too far back to rewind to."); render(); return; }
   const snap=hist[found];
   hist.length=found;                                              // drop this snapshot + everything after
@@ -1814,8 +1874,21 @@ function abEditSheet(){
         return `<button data-act="abreopen" style="background:${T.safe};color:#FFFFFF;border:none;border-radius:12px;padding:13px;font-family:${MONO};font-weight:800;font-size:14px;letter-spacing:.4px">&#8630; Re-open this play &middot; runners pre-filled</button>
       <div style="font-size:11px;color:${T.sageDim};margin-top:-4px">Puts you back on the runners screen with everything as you entered it — change the one runner (or Back to re-pick the result) and Confirm again. Cancel keeps the play as it was.</div>`;
       })()}
-      <button data-act="abrewind" data-arg="${e.id}" style="background:${T.amber};color:#1a1206;border:none;border-radius:12px;padding:13px;font-family:${MONO};font-weight:800;font-size:14px;letter-spacing:.4px">&#8624; Rewind to this play &amp; re-score it</button>
-      <div style="font-size:11px;color:${T.sageDim};margin-top:-4px">Use this when the fix affects runners, the score, or outs — it rolls the game back to just before this play so you can re-enter it correctly. Plays after it are cleared.</div>
+      ${(()=>{
+        // Say what Rewind will do BEFORE the tap: how many later plays it clears, or — when the
+        // history doesn't reach this far (a game resumed from before the history was saved, or a
+        // line whose checkpoint was thinned) — that it can't, and how far back it does go, instead
+        // of a "too far back" flash after the fact (per the 2026-09-27 scorer research).
+        const _ri=rewindIndex(hist,e.id,gameFeed.indexOf(e));
+        if(_ri<0){
+          const _first=gameFeed.find(x=>isEditablePlay(x)&&rewindIndex(hist,x.id,gameFeed.indexOf(x))>=0);
+          return `<button disabled style="background:${T.surface2};color:${T.sageDim};border:2px solid ${T.line};border-radius:12px;padding:13px;font-family:${MONO};font-weight:800;font-size:14px;letter-spacing:.4px">&#8624; Rewind can't reach this play</button>
+      <div style="font-size:11px;color:${T.sageDim};margin-top:-4px">${_first?`The saved history reaches back to ${_first.half==="T"?"Top":"Bottom"} ${_first.inn} (${escHtml(_first.head)}).`:`There's no saved history to rewind to yet.`}${s?" Change the call above still works for this play.":""}</div>`;
+        }
+        const _after=gameFeed.filter(x=>isEditablePlay(x)&&typeof x.id==="number"&&x.id>e.id).length;
+        return `<button data-act="abrewind" data-arg="${e.id}" style="background:${T.amber};color:#1a1206;border:none;border-radius:12px;padding:13px;font-family:${MONO};font-weight:800;font-size:14px;letter-spacing:.4px">&#8624; Rewind to this play &amp; re-score it</button>
+      <div style="font-size:11px;color:${T.sageDim};margin-top:-4px">Use this when the fix affects runners, the score, or outs — it rolls the game back to just before this play so you can re-enter it correctly. ${_after?`Clears this play and the ${_after} play${_after===1?"":"s"} after it.`:`This is the latest play, so only it (and any pitches since) is cleared.`}</div>`;
+      })()}
     </div></div>`;
 }
 // Clears BOTH this device's personal pasted link (viewerVid) AND the shared broadcast link
@@ -2024,7 +2097,7 @@ function setupLiveHomeWatch(){
       // "Resume game · Top 2nd" after the whole game was scored + finished on the tablet). Only touches
       // OUR local flag for the matching game, and only if we're not the one still actively scoring it.
       if(doc&&doc.final&&gameActive&&!G.final&&!amActiveScorer&&G.cloudId===(t.id+"-live")){
-        gameActive=false; G.final=true; try{localStorage.removeItem(GAME_KEY);}catch(e){}
+        gameActive=false; G.final=true; try{localStorage.removeItem(GAME_KEY);localStorage.removeItem(HIST_KEY);}catch(e){}
       }
       if(mode==="home")render();
     });
@@ -2127,6 +2200,27 @@ let _lastInteract=0;
 function uiBusy(){ try{ const ae=document.activeElement; if(ae&&/^(INPUT|SELECT|TEXTAREA)$/.test(ae.tagName)) return true; }catch(e){} return (Date.now()-_lastInteract)<1500; }
 let noFieldChip=false;  // when true, diamondSVG draws no in-field pitch chip (used for the tiny viewer thumbnail)
 let gameFeed=[];   // live feed (most recent last). Each entry is type "play" (an at-bat result) or "pitch".
+// Second half of the GAME_KEY resume (the first, near initGame(), restores G): bring back the feed
+// and the undo history saveGame() stored with it. It has to run here, after gameFeed/_eventId are
+// declared. Saves from before this existed have neither: the feed then stays empty until the
+// scorer taps Resume (adoptCloudFeedIfLost() fetches it back from the live game doc) and Rewind
+// says how far it reaches. The feed id counter resumes past every restored id so new lines never
+// collide with them (Undo/Rewind cut the feed by id).
+// _feedLost: this device's save had no feed at all (an older version's save), so an empty feed here
+// means "lost", not "no plays yet / all undone". Only then may broadcast() leave the feed out of the
+// publish and adoptCloudFeedIfLost() fetch it back; it clears once the device's own feed is published
+// or the cloud one is adopted. An empty feed the scorer got to by Undo/Rewind must still publish, or
+// viewers (and a later adopt) would keep the undone lines.
+let _feedLost=false;
+(function(){try{const s=localStorage.getItem(GAME_KEY);if(!s)return;const o=JSON.parse(s);if(!o||!o.G)return;
+  if(Array.isArray(o.gameFeed))gameFeed=o.gameFeed; else _feedLost=true;
+  let mx=(typeof o.eid==="number")?o.eid:0;
+  gameFeed.forEach(x=>{ if(x&&typeof x.id==="number"&&x.id>mx)mx=x.id; });
+  if(o.histTok){ const hs=localStorage.getItem(HIST_KEY); const h=hs?JSON.parse(hs):null;
+    if(h&&h.tok===o.histTok){ hist=histUnpack(h); _histSavedSig=o.histTok;
+      hist.forEach(x=>{ if(typeof x.n==="number"&&x.n>histSeq)histSeq=x.n; if(typeof x.ev==="number"&&x.ev>mx)mx=x.ev; }); } }
+  if(mx>_eventId)_eventId=mx;
+}catch(e){}})();
 // Feed view: "play" = one line per at-bat (default); "pitch" = every pitch + the result. Per-device.
 let feedView=(()=>{try{return localStorage.getItem("al-feed-view")||"play";}catch(e){return "play";}})();
 // Log one pitch (ball/strike/foul) to the feed — only surfaced in "pitch" view.
@@ -2146,7 +2240,7 @@ function feedPitch(label,detail,inn,half){
   // goes after the divider, not in front of it.
   const tail=gameFeed[gameFeed.length-1];
   if(tail&&tail.kind==="inningend"&&tail.inn===entry.inn&&tail.half===entry.half) gameFeed.splice(gameFeed.length-1,0,entry); else gameFeed.push(entry);
-  if(gameFeed.length>220)gameFeed.shift();
+  trimFeed(gameFeed,220);   // sheds old pitch lines before plays (game-logic.js), so every at-bat stays editable all game
 }
 // Advanced pitch tracking: when on, the scorer arms a pitch type that's recorded with
 // each pitch. reviewBatter / reviewInn drive the tap-to-review modals (read-only).
@@ -2195,7 +2289,7 @@ function bcastEvent(kind,sub,team,bk,inn,half){
   // re-open-last-play work from the 2026-09-27 scorer research).
   const tail=gameFeed[gameFeed.length-1];
   if(tail&&tail.kind==="inningend"&&tail.inn===entry.inn&&tail.half===entry.half) gameFeed.splice(gameFeed.length-1,0,entry); else gameFeed.push(entry);
-  if(gameFeed.length>220)gameFeed.shift();
+  trimFeed(gameFeed,220);   // see feedPitch()
 }
 /* Assemble the live box score (per-batter rows + R/H/E totals), mapped to away/home. */
 function buildBox(){
@@ -2222,11 +2316,49 @@ function liveGameBox(){
     bat:{away:box.away,home:box.home}, pitch:{away:pitchersForSide("away"),home:pitchersForSide("home")},
     lineupLog:(G.lineupLog||[]).slice() };
 }
+// Has anything happened in this game yet? (Any pitch, out, run, finished at-bat or later inning.)
+function gameProgressed(){ try{ return !!(G.away||G.home||G.outs||G.balls||G.strikes||G.inning>1||G.half==="B"||
+  (G.pa&&Object.keys(G.pa).length)||(G.ab&&Array.isArray(G.ab.pitches)&&G.ab.pitches.length)); }catch(e){ return false; } }
+// Resuming a game whose feed didn't come back from this device's own save (saved by a version that
+// didn't store it): fetch it once from the live game doc, which the guard in broadcast() keeps from
+// being overwritten in the meantime. Only adopted when it is plainly the same game AT THE SAME POINT:
+// the same inning, half, score, outs, count and batting-order spots (a doc that another device has
+// scored further would hand this device a feed ahead of its own scorebug and stats), plus the same
+// start time; and only while ours is still empty and was actually lost (_feedLost), never after the
+// scorer emptied it with Undo/Rewind.
+function adoptCloudFeedIfLost(){
+  if(!_feedLost||(Array.isArray(gameFeed)&&gameFeed.length)||!gameProgressed()||!curTeamId) return;
+  if(!(window.cloudSubscribeGameDoc&&window.Cloud&&window.Cloud.db)) return;
+  const cid=G.cloudId||(curTeamId+"-live");
+  let got=false,unsub=null;
+  const u=window.cloudSubscribeGameDoc(cid,function(doc){
+    if(got)return; got=true; try{ if(unsub)unsub(); }catch(e){}
+    try{ const st=doc&&doc.state, f=st&&st.gameFeed, sg=st&&st.G;
+      if(!_feedLost||!Array.isArray(f)||!f.length||!sg||(Array.isArray(gameFeed)&&gameFeed.length)||viewMode==="viewer") return;
+      const same=(sg.startedAt||null)===(G.startedAt||null)&&
+        ["inning","half","away","home","outs","balls","strikes","awayPtr","homePtr"].every(k=>sg[k]===G[k]);
+      if(!same) return;
+      gameFeed=f.slice(); _feedLost=false;
+      gameFeed.forEach(x=>{ if(x&&typeof x.id==="number"&&x.id>_eventId)_eventId=x.id; });
+      saveGame(); flash("Game feed restored"); render();
+    }catch(e){} });
+  if(got){ try{ if(u)u(); }catch(e){} } else unsub=u;
+}
 function broadcast(){
   if(viewMode==="viewer") return;   // viewers are read-only — they receive state, never send it
   try{ saveGame(); }catch(e){}   // persist the in-progress game on every change (resume after reload/update)
   // Full snapshot for remote viewers (watch link): lets any device render the game identically.
   const _full={type:"full",G:G,ROSTER:ROSTER,OUR:OUR,OPP:OPP,curTeamId:curTeamId,oppTeamId:oppTeamId,gameFeed:gameFeed};
+  // An EMPTY feed on a game that is clearly under way, on a device whose save had no feed at all
+  // (_feedLost: a save from before the feed was stored), means this device lost it, not that the
+  // game has no plays — publishing it would wipe the play-by-play off every parent's screen (per the
+  // 2026-09-27 scorer research). Leave it out: the cloud write merges, so the doc keeps its feed,
+  // and viewers only replace theirs when one arrives. Once this device has a feed of its own (or the
+  // game hasn't started) the flag is done with; from then on an empty feed is a real one (everything
+  // undone) and publishes like any other, so viewers drop the undone lines.
+  const _hasFeed=Array.isArray(gameFeed)&&gameFeed.length>0, _prog=gameProgressed();
+  if(_hasFeed||!_prog) _feedLost=false;
+  if(_feedLost&&!_hasFeed&&_prog) delete _full.gameFeed;
   // Publish it to the cloud game doc — the ONE live channel: Watch viewers subscribe to it, co-scorers
   // share it, and it survives a dead phone (owner/scorer only).
   // Track WHY a publish attempt was skipped (not just whether it succeeded) — see the "Live publish"
@@ -2432,8 +2564,9 @@ function commit(r,movers){
   // only {g, fl}, so before this a wrong runner default noticed one tap too late (Confirm) cost the
   // whole re-entry: undo, In Play, field, contact, result, the one corrected cell, Confirm again
   // (per the 2026-09-27 scorer research). adjustLastPlay() reads this back and re-opens the
-  // runners screen pre-filled instead. Lives on hist (in-memory), never on G — so saved/cloud games
-  // are unchanged and older snapshots without it simply aren't re-openable. The lineup fingerprint
+  // runners screen pre-filled instead. Lives on hist, never on G — so the cloud game is unchanged;
+  // saveGame() keeps it with the locally saved history (for the recent snapshots only), and older
+  // snapshots without it simply aren't re-openable. The lineup fingerprint
   // (sig) is taken at the very end, after render()/broadcast(), so it describes G as the next
   // render will see it.
   let _play=null;
@@ -3403,7 +3536,10 @@ function feedPanel(){
   const fzKey=(()=>{try{return localStorage.getItem("al-feed-size")||"m";}catch(e){return "m";}})();
   const fz=fzKey==="s"?0.86:fzKey==="l"?1.2:1, fpx=n=>Math.round(n*fz);
   const _editable=(typeof viewMode==="undefined"||viewMode==="scorer")&&!G.final;   // only the scorer edits; never a finished game
-  const rows=items.slice(-70).reverse().map(e=>{
+  // At-bat view shows every play of a full game (~60-100 lines plus dividers), so the first inning's
+  // EDIT / Rewind stay reachable now that the history covers the whole game; the pitch view stays
+  // at the last 70 lines.
+  const rows=items.slice(feedView==="pitch"?-70:-160).reverse().map(e=>{
     // End-of-inning marker: a centered divider line so it visibly breaks the feed between innings.
     if(e.kind==="inningend"){
       return `<div style="display:flex;align-items:center;gap:10px;padding:8px 15px;background:rgba(225,29,46,.07)">
@@ -6799,7 +6935,7 @@ document.getElementById("app").addEventListener("click",e=>{
       if(bugDelay>0) setTimeout(apply, bugDelay*1000); else apply();
     });
     mode="idle"; render(); return; }
-  else if(act==="resume"){ amActiveScorer=true; _myClaimAt=Date.now(); _claimStamped=false; _haveConfirmedOwnClaim=false; mode="idle"; render(); broadcast(); }
+  else if(act==="resume"){ amActiveScorer=true; _myClaimAt=Date.now(); _claimStamped=false; _haveConfirmedOwnClaim=false; mode="idle"; render(); broadcast(); adoptCloudFeedIfLost(); }
   else if(act==="takeoverlive"){ const teamId=arg;
     if(!(window.cloudSubscribeGameDoc&&window.Cloud&&window.Cloud.user)){ flash("Sign in to take over scoring"); return; }
     flash("Loading game…");
@@ -6808,8 +6944,25 @@ document.getElementById("app").addEventListener("click",e=>{
       if(got)return; got=true; try{ if(unsub)unsub(); }catch(e){}
       if(!doc||!doc.state||doc.final){ flash("No live game to take over"); return; }
       try{ const s=doc.state;
+        // This device's own undo history still fits if the doc is the very game it last scored and
+        // nobody has scored anything since: same game, same start time, same last feed line, same
+        // inning/count/score. Then Undo/Rewind carry over. Otherwise the history belongs to states
+        // this game has moved past, so it's dropped below. (The history isn't in the cloud doc: a
+        // whole game's worth would weigh down every fan's live updates.)
+        // Compared against what THIS device last scored, i.e. its own save (GAME_KEY: saveGame()
+        // never runs while watching), and only when the history in hand is the one stored with that
+        // save (histTok). Not against the live G/gameFeed: while this device was watching (after
+        // being taken over, or via Watch) those mirror the doc, so they'd always "match" and an old
+        // history would ride along, one Undo away from wiping the other scorer's innings.
+        let _keepHist=false;
+        try{ const _o=JSON.parse(localStorage.getItem(GAME_KEY)||"null"), _og=_o&&_o.G;
+          const _sf=Array.isArray(s.gameFeed)?s.gameFeed:null, _of=_o&&Array.isArray(_o.gameFeed)?_o.gameFeed:null, _sg=s.G||{};
+          _keepHist=!!(hist.length&&_og&&_o.histTok&&_o.histTok===histSig()&&(_og.cloudId||(_o.curTeamId+"-live"))===(teamId+"-live")&&
+            _sf&&_of&&_of.length&&_sf.length===_of.length&&_sf[_sf.length-1]&&_sf[_sf.length-1].id===_of[_of.length-1].id&&
+            _og.startedAt&&_sg.startedAt===_og.startedAt&&["inning","half","outs","balls","strikes","away","home","awayPtr","homePtr"].every(k=>_sg[k]===_og[k]));
+        }catch(e){ _keepHist=false; }
         G=s.G; if(Array.isArray(s.ROSTER))ROSTER=s.ROSTER; if(s.OUR)Object.assign(OUR,s.OUR); if(s.OPP)Object.assign(OPP,s.OPP);
-        if(Array.isArray(s.gameFeed))gameFeed=s.gameFeed; if(s.curTeamId)curTeamId=s.curTeamId; if(s.oppTeamId!=null)oppTeamId=s.oppTeamId;
+        if(Array.isArray(s.gameFeed)){ gameFeed=s.gameFeed; _feedLost=false; } if(s.curTeamId)curTeamId=s.curTeamId; if(s.oppTeamId!=null)oppTeamId=s.oppTeamId;
         // Keep feed ids increasing across the hand-off: the adopted lines were numbered by the other
         // device, and Undo / re-open / Rewind cut the feed by id (feedTrimTo()), so a new line must
         // never get an id at or below one already in the feed.
@@ -6817,7 +6970,7 @@ document.getElementById("app").addEventListener("click",e=>{
         gameActive=true; G.cloudId=teamId+"-live"; amActiveScorer=true; _myClaimAt=Date.now(); _claimStamped=false; _haveConfirmedOwnClaim=false; viewMode="scorer"; viewerLocked=false; _remoteLive=false;
         try{ if(window.cloudClaimScoring)window.cloudClaimScoring(teamId+"-live", myCloudName()); }catch(e){}
         try{ watchLiveTakeover(teamId); }catch(e){}
-        hist=[];redoStack=[]; resetUI(); mode="idle"; flash("You're now scoring this game"); render(); broadcast();
+        if(!_keepHist)hist=[]; redoStack=[]; resetUI(); mode="idle"; flash("You're now scoring this game"); render(); broadcast();
       }catch(e){ flash("Couldn't load that game"); }
     });
   }
@@ -6831,7 +6984,7 @@ document.getElementById("app").addEventListener("click",e=>{
     const _cid=G.cloudId||(curTeamId?curTeamId+"-live":null);
     try{ if(_cid&&window.cloudEndGame)window.cloudEndGame(_cid); }catch(e){}
     if(curTeamId)delete _liveGames[curTeamId];
-    gameActive=false; G=initGame(); curTeamId=null; oppTeamId=null; try{localStorage.removeItem(GAME_KEY);}catch(e){} resetUI(); mode="home"; render(); broadcast(); }}; render(); return; }   // clear a lingering/abandoned Resume ghost
+    gameActive=false; G=initGame(); curTeamId=null; oppTeamId=null; hist=[];redoStack=[];gameFeed=[]; try{localStorage.removeItem(GAME_KEY);localStorage.removeItem(HIST_KEY);}catch(e){} resetUI(); mode="home"; render(); broadcast(); }}; render(); return; }   // clear a lingering/abandoned Resume ghost (its saved feed + undo history go with it)
   // Force-end a game that's stuck live in the CLOUD as seen from a device that never scored it (no
   // local ghost/gameActive to "discardgame" here) — jford, 2026-07-03: kept seeing a stuck "Franklin
   // County" game as still in-progress from the PC, which never had a Resume ghost for it (that only

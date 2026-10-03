@@ -127,3 +127,87 @@ test("constants: RUNCOLORS has no yellow (must stay distinguishable on the orang
   assert.equal(RUNCOLORS.some(c => /^#F{0,1}FF00$/i.test(c)), false);
   assert.ok(BATTER_GREEN.startsWith("#"));
 });
+
+/* ---- undo history + feed housekeeping ---- */
+const { histCompact, rewindIndex, trimFeed, histPack, histUnpack, isEditablePlay } = require("../game-logic.js");
+
+// A pitch-by-pitch game: each at-bat is two pitch snapshots then the play's snapshot (cp true).
+// Feed ids: the snapshot's ev is the last id handed out before it; its action then adds one line.
+function fakeGame(atBats) {
+  const hist = [], feed = []; let id = 0;
+  for (let a = 0; a < atBats; a++) {
+    for (let p = 0; p < 2; p++) { hist.push({ g: { a, p }, ev: id, cp: false }); feed.push({ id: ++id, type: "pitch", away: 0, home: 0 }); }
+    hist.push({ g: { a, p: "play" }, ev: id, cp: true }); feed.push({ id: ++id, type: "play", kind: "single", away: 0, home: 0 });
+  }
+  return { hist, feed };
+}
+
+test("histCompact: keeps the recent taps whole and one checkpoint per older play, so Rewind reaches the first at-bat", () => {
+  const { hist, feed } = fakeGame(30);   // 90 snapshots: well past the old flat cap of 40
+  histCompact(hist, 12, 500);
+  assert.equal(hist.length, 12 + 26, "12 recent + the 26 older at-bats' play checkpoints");
+  const firstPlay = feed.find(isEditablePlay);
+  const i = rewindIndex(hist, firstPlay.id);
+  assert.ok(i >= 0, "the very first play is still rewindable");
+  assert.deepEqual(hist[i].g, { a: 0, p: "play" }, "and it restores the state just before that play");
+  for (const line of feed.filter(isEditablePlay)) assert.ok(rewindIndex(hist, line.id) >= 0, "every play line stays rewindable");
+});
+
+test("rewindIndex: refuses (instead of over-rewinding) when the snapshots just before a line were thinned away", () => {
+  const { hist, feed } = fakeGame(10);
+  histCompact(hist, 3, 500);
+  const oldPitch = feed[3];   // a pitch of at-bat 2, whose own snapshot was dropped
+  assert.equal(rewindIndex(hist, oldPitch.id), -1, "restoring the previous checkpoint would also undo the play before it");
+  assert.equal(rewindIndex([], 5), -1);
+});
+
+test("rewindIndex: snapshots with no ev fall back to the feed position", () => {
+  assert.equal(rewindIndex([{ fl: 0 }, { fl: 3 }], "x", 2), 0);
+});
+
+test("histCompact: hard ceiling drops the oldest entries", () => {
+  const { hist } = fakeGame(40);
+  histCompact(hist, 10, 30);
+  assert.equal(hist.length, 30);
+});
+
+test("trimFeed: sheds old non-scoring pitch lines before any play line", () => {
+  const feed = [];
+  for (let i = 1; i <= 10; i++) feed.push({ id: i, type: i % 2 ? "pitch" : "play", kind: "single", away: 0, home: i >= 6 ? 1 : 0 });
+  trimFeed(feed, 7);
+  assert.equal(feed.length, 7);
+  assert.deepEqual(feed.filter(x => x.type === "play").map(x => x.id), [2, 4, 6, 8, 10], "no play line was dropped");
+  assert.ok(feed.some(x => x.id === 1), "the first line has nothing before it to compare scores with, so it stays while other pitches can go");
+  const only = [{ id: 1, type: "play", away: 0, home: 0 }, { id: 2, type: "play", away: 0, home: 0 }];
+  trimFeed(only, 1);
+  assert.deepEqual(only.map(x => x.id), [2], "falls back to dropping the oldest line");
+});
+
+test("trimFeed: never drops the current at-bat's pitches, even once plays alone fill the cap", () => {
+  const feed = [];
+  for (let i = 1; i <= 220; i++) feed.push({ id: i, type: "play", kind: "single", away: 0, home: 0 });
+  feed.push({ id: 221, type: "pitch", away: 0, home: 0 });
+  trimFeed(feed, 220);
+  assert.equal(feed.length, 220);
+  assert.equal(feed[feed.length - 1].id, 221, "the pitch just added is still there");
+  assert.equal(feed[0].id, 2, "the oldest line went instead");
+  // A finished at-bat's pitch (before the last play) is still shed ahead of any play line.
+  const f2 = [{ id: 1, type: "play", away: 0, home: 0 }, { id: 2, type: "pitch", away: 0, home: 0 }, { id: 3, type: "play", away: 0, home: 0 }, { id: 4, type: "pitch", away: 0, home: 0 }];
+  trimFeed(f2, 3);
+  assert.deepEqual(f2.map(x => x.id), [1, 3, 4]);
+});
+
+test("histPack/histUnpack: round-trips the history, shares repeated values, and gives every entry its own objects", () => {
+  const G1 = { inning: 1, bases: { 1: null, 2: { label: "#4" }, 3: null }, stats: { o1: { ab: 1 }, o2: { ab: 0 } }, innLog: [], name: undefined };
+  const G2 = JSON.parse(JSON.stringify(G1)); G2.stats.o2.ab = 1;
+  const hist = [{ g: G1, ev: 4, fl: 4, n: 1, cp: true, dz: 6 }, { g: G2, ev: 7, fl: 7, n: 2, cp: false, play: { eid: 8 } }];
+  const packed = JSON.parse(JSON.stringify(histPack(hist, 1)));
+  assert.ok(packed.pool.length < 10, "identical field values are stored once");
+  const back = histUnpack(packed);
+  assert.deepEqual(back.map(h => h.g), [JSON.parse(JSON.stringify(G1)), G2]);
+  assert.deepEqual(back.map(h => [h.ev, h.fl, h.n, h.cp, h.dz]), [[4, 4, 1, true, 6], [7, 7, 2, false, undefined]]);
+  assert.deepEqual(back[1].play, { eid: 8 });
+  back[0].g.stats.o1.ab = 99;
+  assert.equal(back[1].g.stats.o1.ab, 1, "changing one restored snapshot (Undo makes it the live G) never leaks into another");
+  assert.deepEqual(histUnpack({ v: 2 }), [], "an unknown format restores nothing rather than garbage");
+});

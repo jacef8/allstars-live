@@ -138,9 +138,137 @@
     } catch (e) { return "#fff"; }
   }
 
+  /* ---- undo history + game feed housekeeping (used by snapshot()/saveGame()/rewindToEvent()) ----
+   * Each undo snapshot is {g: a deep copy of G, ev: the last feed-event id when it was taken,
+   * fl: the feed length then (legacy), cp: true when a play line (an at-bat result or a runner
+   * event, i.e. a line the feed's EDIT button opens) came right after it, dz: see histCompact(),
+   * n: a sequence number, play: the re-open stash commit() leaves on it}.
+   * The history used to be a flat 40 entries in memory only: about one inning of pitch-by-pitch
+   * scoring, and nothing at all after a reload, so Rewind refused most of the game (per the
+   * 2026-09-27 scorer research). Now the newest `keepRecent` snapshots stay tap-by-tap for Undo, and
+   * older ones are thinned to the checkpoints that sit just before each play, which is exactly what
+   * "Rewind to this play" restores. A full game is roughly 100 checkpoints. */
+
+  // A feed line the scorer can open with EDIT (feedPanel()): a "play" line that isn't a divider.
+  const isEditablePlay = x => !!x && x.type === "play" && x.kind !== "inningend" && x.kind !== "gameend";
+
+  // Thin `list` in place: keep the newest keepRecent entries, and older ones only when they are a
+  // checkpoint (cp true, or not yet known). A dropped run is remembered on the kept entry before it
+  // as dz = the lowest ev that was dropped, so rewindIndex() can tell when that kept entry is no
+  // longer the state just before a given play. Past maxTotal the oldest entries go entirely.
+  function histCompact(list, keepRecent, maxTotal) {
+    if (!Array.isArray(list)) return list;
+    const cut = list.length - keepRecent;
+    if (cut > 0) {
+      const out = []; let last = null;
+      for (let i = 0; i < list.length; i++) {
+        const h = list[i];
+        if (i >= cut || !h || h.cp !== false) { out.push(h); last = h; continue; }
+        if (last && typeof h.ev === "number") last.dz = (typeof last.dz === "number") ? Math.min(last.dz, h.ev) : h.ev;
+      }
+      if (out.length !== list.length) { list.length = 0; for (const h of out) list.push(h); }
+    }
+    while (maxTotal > 0 && list.length > maxTotal) list.shift();
+    return list;
+  }
+
+  // Which snapshot "Rewind to this play" restores for feed line eid (idx = its position in the feed,
+  // only for old snapshots with no ev): the newest one taken before that line existed. -1 when
+  // there is none, or when the snapshots that sat between it and the play were thinned away (dz),
+  // because restoring it would also undo the play(s) before the one the scorer picked.
+  function rewindIndex(hist, eid, idx) {
+    if (!Array.isArray(hist)) return -1;
+    for (let i = hist.length - 1; i >= 0; i--) {
+      const s = hist[i]; if (!s) continue;
+      if (typeof s.ev === "number" && typeof eid === "number") {
+        if (s.ev < eid) return (typeof s.dz === "number" && s.dz < eid) ? -1 : i;
+      } else if (typeof s.fl === "number" && typeof idx === "number" && s.fl <= idx) return i;
+    }
+    return -1;
+  }
+
+  // Keep the live feed at `cap` lines. Drops the oldest PITCH line first (only one that didn't move
+  // the score, so the "score changed" tag on the following line stays right) and only falls back to
+  // the very oldest line when no such pitch is left. The plays themselves, which are what the scorer
+  // edits and rewinds to, then last the whole game instead of scrolling off after ~220 pitches.
+  // Only pitches of FINISHED at-bats (ones before the last non-pitch line) are candidates: in a long
+  // game whose plays alone fill the cap, the current at-bat's pitches (including the one just added)
+  // must not be the first thing to go; the oldest line goes instead, as before this existed.
+  function trimFeed(feed, cap) {
+    if (!Array.isArray(feed)) return feed;
+    while (feed.length > cap) {
+      let k = -1, lastPlay = -1;
+      for (let i = feed.length - 1; i >= 0; i--) { if (feed[i] && feed[i].type !== "pitch") { lastPlay = i; break; } }
+      for (let i = 1; i < lastPlay; i++) {
+        const x = feed[i], p = feed[i - 1];
+        if (x && x.type === "pitch" && p && p.away === x.away && p.home === x.home) { k = i; break; }
+      }
+      feed.splice(k < 0 ? 0 : k, 1);
+    }
+    return feed;
+  }
+
+  // Undo history <-> a compact storable object. Consecutive snapshots are nearly identical, so G is
+  // split into its top-level fields (and one level below for objects such as stats/pa/pstats/bases)
+  // and every distinct JSON value is stored once in a pool. That keeps a whole game's history to a
+  // few hundred KB of localStorage instead of megabytes. The per-entry JSON is cached on the entry
+  // as _pk (snapshots are never changed once taken), so a save only re-serializes new entries.
+  // playFrom: entries from this index on keep their .play re-open stash (older ones can't use it).
+  function packG(g) {
+    const out = {};
+    for (const k of Object.keys(g || {})) {
+      const v = g[k]; if (v === undefined) continue;
+      if (v && typeof v === "object" && !Array.isArray(v)) {
+        const o = {}; for (const sk of Object.keys(v)) { if (v[sk] !== undefined) o[sk] = JSON.stringify(v[sk]); }
+        out[k] = o;
+      } else out[k] = JSON.stringify(v);
+    }
+    return out;
+  }
+  function histPack(list, playFrom) {
+    const pool = [], at = new Map();
+    const ref = s => { let i = at.get(s); if (i === undefined) { i = pool.length; pool.push(s); at.set(s, i); } return i; };
+    const s = (list || []).map((h, idx) => {
+      if (!h._pk) h._pk = packG(h.g);
+      const g = {};
+      for (const k in h._pk) {
+        const v = h._pk[k];
+        if (typeof v === "string") g[k] = ref(v);
+        else { const o = {}; for (const sk in v) o[sk] = ref(v[sk]); g[k] = { o: o }; }
+      }
+      const e = { g: g, ev: h.ev, fl: h.fl };
+      if (typeof h.n === "number") e.n = h.n;
+      if (typeof h.cp === "boolean") e.cp = h.cp;
+      if (typeof h.dz === "number") e.dz = h.dz;
+      if (h.play && idx >= (playFrom || 0)) e.play = h.play;
+      return e;
+    });
+    return { v: 1, pool: pool, s: s };
+  }
+  // Every entry gets its own fresh objects (Undo makes one of them the live G, which then changes).
+  function histUnpack(o) {
+    if (!o || o.v !== 1 || !Array.isArray(o.pool) || !Array.isArray(o.s)) return [];
+    const pool = o.pool;
+    return o.s.map(e => {
+      const g = {}, pk = {};
+      for (const k in e.g) {
+        const v = e.g[k];
+        if (typeof v === "number") { pk[k] = pool[v]; g[k] = JSON.parse(pool[v]); }
+        else { const sub = {}, spk = {}; for (const sk in v.o) { spk[sk] = pool[v.o[sk]]; sub[sk] = JSON.parse(pool[v.o[sk]]); } g[k] = sub; pk[k] = spk; }
+      }
+      const h = { g: g, ev: e.ev, fl: e.fl, _pk: pk };
+      if (typeof e.n === "number") h.n = e.n;
+      if (typeof e.cp === "boolean") h.cp = e.cp;
+      if (typeof e.dz === "number") h.dz = e.dz;
+      if (e.play) h.play = e.play;
+      return h;
+    });
+  }
+
   const api = {
     BATTER_GREEN, RUNCOLORS, OUT_MARKER_COLOR: OUT_MARKER_FALLBACK,
     buildPlan, playSummary, outsFromKind, rbiEligible, teamRec, teamRecForSeason, gameSeason, idealText,
+    isEditablePlay, histCompact, rewindIndex, trimFeed, histPack, histUnpack,
   };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else Object.assign(root, api);   // classic-script global scope, same pattern as the rest of this app
