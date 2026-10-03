@@ -336,8 +336,15 @@ function teamData(side){return side===G.ourSide?OUR:OPP;}
 const TEAMS={get away(){return teamData("away");},get home(){return teamData("home");}};
 
 /* ===== active roster (index = player id within the current team / quick game) ===== */
-function genericRoster(){return Array.from({length:12},(_,i)=>({id:"g"+i,num:String(i+1),name:"Player "+(i+1),first:"Player "+(i+1),last:""}));}
+function genericRoster(n){return Array.from({length:Math.max(12,n|0)},(_,i)=>({id:"g"+i,num:String(i+1),name:"Player "+(i+1),first:"Player "+(i+1),last:""}));}
 let ROSTER=genericRoster();
+// A no-team game keeps no roster of its own in the save, only player indexes in G.lineup. A setup link
+// with batters=13..20 builds a longer generic roster, so on reload / import the stand-in roster must
+// reach the highest index the order (or a fielding spot) uses; a 12-player default left batter()
+// reading ROSTER[12] as undefined and throwing. Never shorter than the old 12, so older saves match.
+function genericRosterFor(g){ const L=(g&&g.lineup)||{}, ids=[].concat(Array.isArray(L.order)?L.order:[], Object.values(L.pos||{}))
+    .map(Number).filter(n=>Number.isInteger(n)&&n>=0);
+  return genericRoster(ids.length?Math.max(...ids)+1:0); }
 
 /* ===== player names: separate first/last; `name` stays the full name for display/back-compat.
    Scorebug/batter readout uses pBug() = "F. Last" (the number is shown separately). ===== */
@@ -488,9 +495,9 @@ function lineupToIdx(t,lu){ if(!t||!lu||!t.players)return null; const ids=t.play
   const order=(lu.order||[]).map(id=>ids.indexOf(id)).filter(i=>i>=0);
   const pos={}; Object.keys(lu.pos||{}).forEach(P=>{ const i=ids.indexOf(lu.pos[P]); if(i>=0)pos[P]=i; });
   return order.length?{order:order,pos:pos}:null; }
-/* Create a fresh lineup from the current roster: everyone bats (cap 12), first 9 take the field. */
+/* Create a fresh lineup from the current roster: everyone bats (up to maxBatters()), first 9 take the field. */
 function makeLineup(t,name){ const L=teamLineups(t);
-  const order=t.players.slice(0,Math.min(12,Math.max(9,t.players.length))).map(p=>p.id);
+  const order=t.players.slice(0,Math.min(maxBatters(),Math.max(9,t.players.length))).map(p=>p.id);
   const pos={}; POSLIST.forEach((P,i)=>{ if(t.players[i])pos[P]=t.players[i].id; });
   const lu={id:nextId("lu"),name:name||("Lineup "+(L.length+1)),order:order,pos:pos};
   L.push(lu); if(!t.activeLineupId)t.activeLineupId=lu.id; saveDB(); return lu; }
@@ -659,7 +666,7 @@ function printStoredGameCard(g,t){
   openScorecard({A:A,H:H,maxI:g.maxI||((g.line&&g.line.away&&g.line.away.length)||1),winA:A.runs>H.runs,winH:H.runs>A.runs,date:dt,
     line:(s,i)=>((g.line&&g.line[s])?g.line[s][i-1]:0)||0, totals:s=>(g.totals&&g.totals[s])||{r:0,h:0,e:0}, bat:s=>(g.bat&&g.bat[s])||[], pitch:s=>(g.pitch&&g.pitch[s])||[]});
 }
-window.importGame=function(){ pickJSON(function(o){ if(!o||!o.G){try{alert("That's not a game file.");}catch(e){} return;} G=o.G; if(o.OUR)Object.assign(OUR,o.OUR); if(o.OPP)Object.assign(OPP,o.OPP); curTeamId=o.curTeamId||null; oppTeamId=o.oppTeamId||null; const t=curTeamId&&teamById(curTeamId); if(t)ROSTER=t.players; gameActive=true; resetUI(); render(); try{broadcast();}catch(e){} }); };
+window.importGame=function(){ pickJSON(function(o){ if(!o||!o.G){try{alert("That's not a game file.");}catch(e){} return;} G=o.G; if(o.OUR)Object.assign(OUR,o.OUR); if(o.OPP)Object.assign(OPP,o.OPP); curTeamId=o.curTeamId||null; oppTeamId=o.oppTeamId||null; const t=curTeamId&&teamById(curTeamId); if(t)ROSTER=t.players; else ROSTER=genericRosterFor(G); gameActive=true; resetUI(); render(); try{broadcast();}catch(e){} }); };
 /* Season accumulation row, keyed by player id (full box). */
 function seasonRow(t,pid){if(!t.season[pid])t.season[pid]={bat:{ab:0,r:0,h:0,rbi:0,bb:0,k:0,sb:0,cs:0},pitch:{ip:0,k:0,bb:0,h:0,r:0},field:{po:0,a:0,e:0}};return t.season[pid];}
 const ourRuns=()=>G.ourSide==="home"?G.home:G.away, oppRuns=()=>G.ourSide==="home"?G.away:G.home;
@@ -945,7 +952,7 @@ const initGame=()=>({inning:1,half:"T",away:0,home:0,outs:0,balls:0,strikes:0,
   alerts:{on:true,runRule:true,runCap:true,pitch:true,inning:true,pcRules:pcRulesPref()}, // rule-reminder popups (pcRules = tournament pitch/catch limits)
   caught:{},       // innings caught per OUR catcher this game, keyed "o"+rosterIdx (feeds the pitch/catch rule alerts)
   halfRuns:0,      // runs scored so far in the current half-inning
-  oppBatters:12,   // opponent's batting-order size (continuous order support) — default 12 (full roster bats)
+  oppBatters:12,   // opponent's batting-order size (continuous order support) — default 12; kept equal to oppLineup.length, up to maxBatters()
   stats:{},        // per-batter box-score stats, keyed "o"+rosterIdx (ours) / "p"+spot (opp)
   pitches:{},      // pitch count per pitcher, keyed "o"+rosterIdx (our P) / "oppP" (their P)
   pstats:{},       // per-pitcher line, same keys: {k,bb,h,r,outs} (outs/3 = IP)
@@ -959,7 +966,7 @@ const initGame=()=>({inning:1,half:"T",away:0,home:0,outs:0,balls:0,strikes:0,
   errors:{away:0,home:0},   // team errors (E column)
   final:false,     // set true by "End Game" so the viewer shows the Final summary
   startedAt:null,  // wall-clock ms when the game ACTUALLY started (auto-set at first pitch / game start; editable in Game Setup) — drives the game timer
-  lineup:{ order:[0,1,2,3,4,5,6,7,8],   // batting order: 9-12 entries (slots 10+ = extra hitters)
+  lineup:{ order:[0,1,2,3,4,5,6,7,8],   // batting order: 9 to maxBatters() entries (slots 10+ = extra hitters)
            pos:{P:0,C:1,"1B":2,"2B":3,"3B":4,SS:5,LF:6,CF:7,RF:8} }});
 let G=initGame(),hist=[],redoStack=[],mode="home",tap=null,contact=null,result=null,plan=null,toast=null,toastTimer=null,curResults=[],showAll=false,showZones=false,editSlot=null,confirmAct=null,gameActive=false,lineupTab="us",newgameFrom="home",brSheet=false,correctOpen=false,correctOpenAt=0,lineupView="list",fieldAssign=null,fieldHold=null,fieldDisplaced=null,lineEditSlot=null,luSelSlot=null,luBuilderSel=null,luFromSetup=false,koPick=null,oppFieldSel=null,bugPreview=false,barEdit=false,editAB=null,gameEdit=null,statsSeason="all",pgOpen=false,pgSide="home",reopenPending=null;   // reopenPending: see adjustLastPlay()
 // Resume the last in-progress game (saved by saveGame) across reloads/app updates, so the
@@ -969,7 +976,7 @@ let G=initGame(),hist=[],redoStack=[],mode="home",tap=null,contact=null,result=n
 (function(){try{const s=localStorage.getItem(GAME_KEY);if(!s)return;const o=JSON.parse(s);
   if(o&&o.G){G=o.G;curTeamId=o.curTeamId||null;oppTeamId=o.oppTeamId||null;gameActive=!!o.gameActive;
     if(o.OUR)Object.assign(OUR,o.OUR);if(o.OPP)Object.assign(OPP,o.OPP);
-    const t=curTeamId&&teamById(curTeamId);if(t)ROSTER=t.players;}
+    const t=curTeamId&&teamById(curTeamId);if(t)ROSTER=t.players;else ROSTER=genericRosterFor(G);}
 }catch(e){}})();
 window.oppPNum=function(i,v){if(G.oppLineup&&G.oppLineup[i])G.oppLineup[i].num=v;};
 window.oppPName=function(i,v){if(G.oppLineup&&G.oppLineup[i])G.oppLineup[i].name=v;};
@@ -985,7 +992,9 @@ function oppBenchList(){ if(!Array.isArray(G.oppBench))G.oppBench=[]; return G.o
 // opponent's lineup. (jford bug: new game's opp lineup was the previous opponent's.)
 function resetOppLineup(){ const ot=oppTeamId&&teamById(oppTeamId);
   const all = ot ? ot.players.map(p=>({num:p.num,name:p.name})) : Array.from({length:Math.max(1,G.oppBatters||12)},(_,i)=>({num:String(i+1),name:""}));
-  G.oppLineup = all.slice(0,12); G.oppBench = all.slice(12); if(ot)G.oppBatters=G.oppLineup.length; try{ oppDefaultPositions(); }catch(e){} }
+  // oppBatters always follows the order it built (it was only synced for a saved team, so a generic
+  // opponent could carry a count the order didn't have).
+  const mb=maxBatters(); G.oppLineup = all.slice(0,mb); G.oppBench = all.slice(mb); G.oppBatters=G.oppLineup.length; try{ oppDefaultPositions(); }catch(e){} }
 // Clear the opponent entirely (start a new game with a blank opponent so nothing carries over).
 function resetOpponent(){ oppTeamId=null; OPP.name="Opponent"; OPP.short="OPP"; OPP.color="#E11D2E"; OPP.logo=null; G.oppLineup=[]; G.oppBench=[]; }
 function oppAtPos(P){ return oppList().findIndex(e=>e&&e.pos===P); }
@@ -1008,8 +1017,17 @@ const playerAtPos=pos=>{const ri=G.lineup.pos[pos];return ri!=null?ROSTER[ri]:nu
 const fielding=()=>G.ourSide!==battingKey();           // our team is on defense when the opponent bats
 function fielderName(pos){ if(!fielding())return ""; const p=playerAtPos(pos); return p?p.name:""; }
 function ordinal(n){const s=["th","st","nd","rd"],v=n%100;return n+(s[(v-20)%10]||s[v]||s[0]);}
-const ourOrderLen=()=>Math.max(1,G.lineup.order.length);          // 9-12 (continuous lineup)
-const battingSlot=()=>ptr()%(battingKey()===G.ourSide?ourOrderLen():Math.max(1,G.oppBatters));
+// Longest batting order either side may have. Was a literal 12 in ~10 places, which benched a 13-kid
+// team's 13th player: DYB rosters go to 13 uniformed players and a continuous order lists every one
+// of them (rules-dyb-2026 14.22 / 3.03(e), per the 2026-09-27 scorer research). Defaults to 20, the
+// same cap teamAddPlayer() puts on a roster, so "everyone bats" is never cut short. A league preset
+// can set maxBat (e.g. a 12-man tournament order); none of the shipped presets do.
+function maxBatters(){ try{ const n=parseInt(leagueById(G.league).maxBat,10); if(n>=9&&n<=20) return n; }catch(e){} return 20; }
+const ourOrderLen=()=>Math.max(1,G.lineup.order.length);          // 9 to maxBatters() (continuous lineup)
+// The opponent's spot comes from the actual order length, like batter() below. G.oppBatters alone could
+// disagree with it (a generic 14-hitter opponent got a 12-man order but kept oppBatters=14), so the
+// "At-bat spot" readout said "13th" while the scored batter was spot 1 again.
+const battingSlot=()=>ptr()%(battingKey()===G.ourSide?ourOrderLen():Math.max(1,(G.oppLineup&&G.oppLineup.length)||G.oppBatters));
 function batter(){
   const k=battingKey();
   if(k===G.ourSide){ const ri=G.lineup.order[ptr()%ourOrderLen()],p=ROSTER[ri];
@@ -1094,7 +1112,7 @@ function assignSlot(slot,ri){
 // already worked this way; our in-game bench strip was display-only (per the 2026-09-27 scorer research).
 function benchIn(ri){ ri=+ri;
   if(!ROSTER[ri]||G.lineup.order.indexOf(ri)>=0) return false;
-  if(G.lineup.order.length>=12){ flash("Max 12 batters"); return false; }
+  if(G.lineup.order.length>=maxBatters()){ flash("Max "+maxBatters()+" batters"); return false; }
   lineupStep();
   // Our batting pointer is a running count of plate appearances; batter() takes it modulo the order
   // length. Make the order longer without re-basing it and, once we've been through the order, the
@@ -1272,12 +1290,12 @@ function moveLuBuilder(i,dir){
   const tmp=ord[i]; ord[i]=ord[j]; ord[j]=tmp;
   luBuilderSel=j; saveDB(); render();
 }
-/* ---- continuous batting order: 9 fielders + extra hitters (bat only), up to 12 ---- */
+/* ---- continuous batting order: 9 fielders + extra hitters (bat only), up to maxBatters() ---- */
 // Used to push benchIdx()[0] — whoever had the lowest roster index, not necessarily the kid the coach
 // meant (per the 2026-09-27 scorer research). One bench kid: no choice to make, add him. More than one:
 // open the player picker in "append" mode (editSlot = the next free slot), bench kids only.
 function addBatter(){const b=benchIdx();if(!b.length){flash("No bench players to add");return;}
-  if(G.lineup.order.length>=12){flash("Max 12 batters");return;}
+  if(G.lineup.order.length>=maxBatters()){flash("Max "+maxBatters()+" batters");return;}
   if(b.length===1){benchIn(b[0]);return;}
   lineEditSlot=null; luSelSlot=null; editSlot=G.lineup.order.length; mode="pickplayer";}
 function removeBatter(){
@@ -1499,7 +1517,7 @@ function startNewGame(){
   if(keep.oppLineup && keep.oppLineup.length){ G.oppLineup=keep.oppLineup; G.oppBench=keep.oppBench||[]; G.oppBatters=G.oppLineup.length; if(!G.oppLineup.some(e=>e&&e.pos))oppDefaultPositions(); }
   else { const ot=oppTeamId&&teamById(oppTeamId);
     const _allOpp = ot ? ot.players.map(p=>({num:p.num,name:p.name})) : Array.from({length:Math.max(1,G.oppBatters)},(_,i)=>({num:String(i+1),name:""}));
-    G.oppLineup = _allOpp.slice(0,12); G.oppBench = _allOpp.slice(12); if(ot) G.oppBatters=G.oppLineup.length; oppDefaultPositions(); }
+    const mb=maxBatters(); G.oppLineup = _allOpp.slice(0,mb); G.oppBench = _allOpp.slice(mb); G.oppBatters=G.oppLineup.length; oppDefaultPositions(); }   // synced for a generic opponent too (see resetOppLineup)
   settingsMode=false; resetAlerts();
   amActiveScorer=true; _myClaimAt=Date.now(); _claimStamped=false; _haveConfirmedOwnClaim=false;   // starting a fresh game → I'm the active scorer
   lineupTab="us"; hist=[];redoStack=[]; gameFeed=[]; resetUI(); mode="lineup"; render(); broadcast();
@@ -1516,7 +1534,16 @@ window.luPFirst=function(slot,v){const ri=G.lineup.order[+slot]; if(ROSTER[ri]){
 window.luPLast=function(slot,v){const ri=G.lineup.order[+slot]; if(ROSTER[ri]){ROSTER[ri].last=v; ensureName(ROSTER[ri]); saveDB();}};
 window.ngOppName=function(v){const s=(v||"").trim(); OPP.name=s||"Opponent"; OPP.short=(s||"OPP").slice(0,3).toUpperCase();};
 window.ngRunCap=function(v){const n=parseInt(v,10); G.runCap=(isNaN(n)||n<0)?0:Math.min(n,30);};        // 0 = no cap
-window.ngOppBatters=function(v){const n=parseInt(v,10); G.oppBatters=(isNaN(n)||n<1)?12:Math.min(n,15);};
+// Clamped to the same cap the order uses (the input took 15 while the order stopped at 12). On the New
+// Game screen, a blank no-roster opponent's order (built when it was picked) is rebuilt to the new size
+// so the count typed here is the order the game starts with; one the scorer has filled in is left alone.
+// Guarded on settingsMode (mid-game Game Settings), not gameActive: New Game opened while an earlier game
+// is still unfinished has gameActive=true, and the typed count was lost there.
+window.ngOppBatters=function(v){const n=parseInt(v,10); G.oppBatters=(isNaN(n)||n<1)?12:Math.min(n,maxBatters());
+  const L=G.oppLineup;
+  if(!settingsMode&&!oppTeamId&&Array.isArray(L)&&L.length&&L.length!==G.oppBatters&&!oppBenchList().length
+     &&L.every((e,i)=>e&&!(e.name||"").trim()&&String(e.num)===String(i+1)&&(!e.pos||e.pos===POSLIST[i]))){
+    G.oppLineup=Array.from({length:G.oppBatters},(_,i)=>({num:String(i+1),name:""})); oppDefaultPositions(); }};
 
 /* ===== League presets (Diamond Youth Baseball 2026 + custom) — set default rules & alerts ===== */
 const LEAGUES=[
@@ -4937,7 +4964,8 @@ function actionArea(){
           ${themedSelect("lupos_"+id,posOpts(),cur,{onpick:"_luPosPick",css:`background:${T.surface2};border:2px solid ${T.line};color:${T.chalk};border-radius:7px;padding:7px 8px;min-width:66px;font-family:${MONO};font-weight:800;font-size:14px;display:flex;align-items:center;justify-content:space-between;gap:5px;cursor:pointer;text-align:left`})}
           <button data-act="luremove" data-arg="${id}" ${n<=9?"disabled":""} title="Move to bench" style="background:none;border:2px solid ${T.line};color:${n<=9?T.sageDim:T.out};border-radius:7px;padding:7px 9px;font-weight:800">&times;</button></div>`; }).join("");
       const benchIds=t.players.filter(p=>lu.order.indexOf(p.id)<0);
-      const bench=benchIds.length?benchIds.map(p=>`<button data-act="luadd" data-arg="${p.id}" ${n>=12?"disabled":""} style="display:inline-flex;align-items:center;gap:6px;background:${T.surface};border:2px solid ${T.line};color:${n>=12?T.sageDim:T.chalk};border-radius:8px;padding:7px 11px;font-size:14px;font-weight:700"><span style="font-family:${MONO};color:${t.color}">#${esc(p.num)}</span>${esc(p.name)} <span style="color:${T.lime};font-weight:800">+</span></button>`).join(" "):`<span style="font-size:13.5px;color:${T.sageDim}">Everyone is in the order</span>`;
+      const mb=maxBatters();
+      const bench=benchIds.length?benchIds.map(p=>`<button data-act="luadd" data-arg="${p.id}" ${n>=mb?"disabled":""} style="display:inline-flex;align-items:center;gap:6px;background:${T.surface};border:2px solid ${T.line};color:${n>=mb?T.sageDim:T.chalk};border-radius:8px;padding:7px 11px;font-size:14px;font-weight:700"><span style="font-family:${MONO};color:${t.color}">#${esc(p.num)}</span>${esc(p.name)} <span style="color:${T.lime};font-weight:800">+</span></button>`).join(" "):`<span style="font-size:13.5px;color:${T.sageDim}">Everyone is in the order</span>`;
       return secWrap(`${back}${nameCard}
           <div class="frost-card" style="background:${T.surface};border:2px solid ${T.line};border-radius:12px;padding:11px 12px;display:flex;flex-direction:column;gap:6px">
             <div style="display:flex;align-items:center;justify-content:space-between;margin:0 2px 2px">
@@ -4946,7 +4974,7 @@ function actionArea(){
               <button data-act="luauto" style="background:${T.surface2};border:2px solid ${T.line};color:${T.sage};border-radius:7px;padding:7px 11px;font-size:13px;font-weight:700">Auto-fill positions</button></div>
             <div id="lu-list" style="display:flex;flex-direction:column;gap:6px">${rows}</div></div>
           <div class="frost-card" style="background:${T.surface};border:2px solid ${T.line};border-radius:12px;padding:11px 12px">
-            <div style="font-size:12.5px;color:${T.sageDim};letter-spacing:.6px;margin:0 2px 7px">BENCH &middot; ${n>=12?"max 12 batters":"tap to add to the order"}</div>
+            <div style="font-size:12.5px;color:${T.sageDim};letter-spacing:.6px;margin:0 2px 7px">BENCH &middot; ${n>=mb?"max "+mb+" batters":"tap to add to the order"}</div>
             <div style="display:flex;flex-wrap:wrap;gap:6px">${bench}</div></div>
           <div style="display:flex;gap:8px">
             <button data-act="luprintcard" data-arg="${lu.id}" style="${ghost};flex:1;display:flex;align-items:center;justify-content:center;gap:8px">${ICN.doc} Print card</button>
@@ -5536,7 +5564,7 @@ function actionArea(){
     const hittersCard=`<div style="${rowCard}">
           <div><div style="font-weight:800;color:${T.ink};font-size:19px">Number of hitters</div>
             <div style="color:${T.sage};font-size:14px;margin-top:3px">In the opponent's lineup</div></div>
-          <input type="number" inputmode="numeric" min="1" max="15" value="${G.oppBatters}" oninput="ngOppBatters(this.value)" style="${inpSm}"></div>`;
+          <input type="number" inputmode="numeric" min="1" max="${maxBatters()}" value="${G.oppBatters}" oninput="ngOppBatters(this.value)" style="${inpSm}"></div>`;
     const startVal=G.startedAt?(()=>{const d=new Date(G.startedAt),p=n=>String(n).padStart(2,"0");return p(d.getHours())+":"+p(d.getMinutes());})():"";
     const startCard=`<div style="${rowCard}">
           <div><div style="font-weight:800;color:${T.ink};font-size:19px">Actual start time</div>
@@ -5619,7 +5647,7 @@ function actionArea(){
           <button data-act="opppickpitch" style="background:transparent;border:none;color:${T.chalk};font-size:18px;font-weight:700;display:flex;align-items:center;gap:8px">${pit?`<span style="font-family:${MONO};color:${OPP.color}">#${(pit.num||"").toString().replace(/</g,"")}</span>${((pit.name||"").trim()||"Pitcher").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;")}`:`<span style="color:${T.sageDim}">Set pitcher</span>`}<span style="font-size:12px;color:${OPP.color};font-weight:700;margin-left:4px">CHANGE</span></button></div>
         <div id="opp-list" style="flex:1 1 auto;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:6px">${orows}</div>
         <div style="flex-shrink:0;display:flex;gap:8px">
-          <button data-act="oppadd" style="${ghost};flex:1" ${n>=12?"disabled":""}>+ Add hitter</button>
+          <button data-act="oppadd" style="${ghost};flex:1" ${n>=maxBatters()?"disabled":""}>+ Add hitter</button>
           <button data-act="oppbenchadd" style="${ghost};flex:1">+ Add bench</button></div>
         <div style="flex-shrink:0"><div style="font-size:10px;color:${T.sageDim};letter-spacing:.6px;margin:0 2px 5px">BENCH &middot; tap to pinch into the order</div>
           <div style="display:flex;flex-wrap:wrap;gap:5px">${benchHtml}</div></div>`}
@@ -5703,7 +5731,8 @@ function actionArea(){
     // (same as the opponent tab's "tap to pinch into the order" chips). To put him in a SPECIFIC spot,
     // use that row's Sub. Shown under the field map too, since the field map's own bench box only
     // holds kids who already bat. These used to be inert spans (per the 2026-09-27 scorer research).
-    const bench=benchIdx().map(ri=>`<button data-act="benchin" data-arg="${ri}" ${n>=12?"disabled":""} title="Add to the batting order" style="display:inline-flex;align-items:center;gap:6px;font-family:${MONO};font-size:14px;font-weight:700;color:${n>=12?T.sageDim:T.chalk};background:${T.surface};border:2px solid ${T.line};border-radius:7px;padding:7px 11px;white-space:nowrap"><span style="color:${OUR.color}">#${escHtml(ROSTER[ri].num)}</span>${escHtml(ROSTER[ri].name)}${n>=12?"":` <span style="color:${T.lime};font-weight:800">+</span>`}</button>`).join(" ");
+    const full=n>=maxBatters();   // order is at the batter cap (was a literal 12; see maxBatters())
+    const bench=benchIdx().map(ri=>`<button data-act="benchin" data-arg="${ri}" ${full?"disabled":""} title="Add to the batting order" style="display:inline-flex;align-items:center;gap:6px;font-family:${MONO};font-size:14px;font-weight:700;color:${full?T.sageDim:T.chalk};background:${T.surface};border:2px solid ${T.line};border-radius:7px;padding:7px 11px;white-space:nowrap"><span style="color:${OUR.color}">#${escHtml(ROSTER[ri].num)}</span>${escHtml(ROSTER[ri].name)}${full?"":` <span style="color:${T.lime};font-weight:800">+</span>`}</button>`).join(" ");
     return `<div class="frost-card" style="flex-shrink:0;display:flex;align-items:center;gap:10px;background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:10px 12px">
         <button data-act="lineupback" style="${ghost};padding:9px 13px;flex:none">&lsaquo; Back</button>
         <div style="flex:1;min-width:0"><div style="font-family:${MONO};font-size:20px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:${T.lime}">Lineups</div>
@@ -5718,9 +5747,9 @@ function actionArea(){
         <button data-act="pickpitch" style="background:transparent;border:none;color:${T.chalk};font-size:18px;font-weight:700;display:flex;align-items:center;gap:8px">${pit?`<span style="font-family:${MONO};color:${OUR.color}">#${pit.num}</span>${pit.name}<span style="font-size:12px;color:${OUR.color};font-weight:700;margin-left:4px">CHANGE</span>`:`<span style="color:${T.sageDim}">— Tap to set pitcher</span>`}</button></div>
       <div id="lineup-list" style="flex:1 1 auto;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:6px">${rows}</div>
       <div style="flex-shrink:0;display:flex;gap:8px">
-        <button data-act="addbatter" style="${ghost};flex:1" ${n>=12?"disabled":""}>+ Add batter (EH)</button>
+        <button data-act="addbatter" style="${ghost};flex:1" ${full?"disabled":""}>+ Add batter (EH)</button>
         <button data-act="rembatter" style="${ghost};flex:1" ${n<=9?"disabled":""}>&minus; Remove last</button></div>`}
-      <div style="flex-shrink:0"><div style="font-size:10px;color:${T.sageDim};letter-spacing:.6px;margin:0 2px 5px">BENCH${bench?(n>=12?" &middot; max 12 batters"+(lineupView==="field"?"":" &middot; use a row's Sub to swap one in"):" &middot; not batting &middot; tap to add to the order"+(lineupView==="field"?"":", or use a row's Sub")):""}</div>
+      <div style="flex-shrink:0"><div style="font-size:10px;color:${T.sageDim};letter-spacing:.6px;margin:0 2px 5px">BENCH${bench?(full?" &middot; max "+maxBatters()+" batters"+(lineupView==="field"?"":" &middot; use a row's Sub to swap one in"):" &middot; not batting &middot; tap to add to the order"+(lineupView==="field"?"":", or use a row's Sub")):""}</div>
         <div style="display:flex;flex-wrap:wrap;gap:5px">${bench||`<span style="font-size:12px;color:${T.sageDim}">No bench players</span>`}</div></div>
       ${(function(){ const ct=curTeam(); if(!ct)return ""; const sl=teamLineups(ct);
         return `<div style="flex-shrink:0;display:flex;gap:8px;align-items:center">
@@ -6972,7 +7001,7 @@ document.getElementById("app").addEventListener("click",e=>{
     openShareLink({ url:url, title:"SHARE THE GAME", shareTitle:nm+opp, sub:'Opens the live scoreboard &amp; play-by-play — no login. Shows a "waiting" screen until you start, then goes live.',
       subject:"Watch "+nm+opp+" live", body:"Watch "+nm+opp+" live on All-Stars Live — no app or login needed, just tap the link:" }); return; }
   if(act==="schedstart"){ const t=teamById(openTeamId); if(!t)return; const s=(t.schedule||[]).find(x=>x.id===arg);
-    newgameFrom="team"; selectTeam(t.id); G=initGame(); clearStaleStreamLink(); applyTeamDefaultRules(); loadTeamLineup(teamById(curTeamId)); hist=[];redoStack=[]; resetUI(); resetOpponent();
+    newgameFrom="team"; settingsMode=false; selectTeam(t.id); G=initGame(); clearStaleStreamLink(); applyTeamDefaultRules(); loadTeamLineup(teamById(curTeamId)); hist=[];redoStack=[]; resetUI(); resetOpponent();
     if(s){ G.schedId=s.id; G.schedDate=s.date||null; }   // remember WHICH scheduled game this is, so end-game marks it played for sure
     if(s&&s.opp){ const m=(DB.teams||[]).find(x=>x.id!==t.id && (x.name||"").toLowerCase()===(s.opp||"").toLowerCase());
       if(m){ oppTeamId=m.id; OPP.name=m.name; OPP.short=m.short; OPP.color=m.color; OPP.logo=m.logo||null; }
@@ -7208,7 +7237,7 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="fielddispswap"){ if(fieldDisplaced){ if(fieldDisplaced.openPos)G.lineup.pos[fieldDisplaced.openPos]=fieldDisplaced.ri; fieldDisplaced=null; render(); broadcast(); } }   // bumped player takes the now-open spot
   else if(act==="fielddisppick"){ if(fieldDisplaced){ fieldHold=fieldDisplaced.ri; fieldDisplaced=null; render(); } }   // I'll place the bumped player myself
   else if(act==="fielddispbench"){ if(fieldDisplaced){ fieldDisplaced=null; render(); broadcast(); } }   // bumped player stays in the order but with no fielding position
-  else if(act==="oppadd"){const L=oppList();if(L.length<12){lineupStep();L.push({num:String(L.length+1),name:""});G.oppBatters=L.length;}render();}
+  else if(act==="oppadd"){const L=oppList();if(L.length<maxBatters()){lineupStep();L.push({num:String(L.length+1),name:""});G.oppBatters=L.length;}render();}
   else if(act==="opprem"){if(oppList().length>1){lineupStep();oppList().splice(+arg,1);G.oppBatters=oppList().length;render();broadcast();}}
   // ---- opponent lineup editor (full mirror): positions, pitcher, bench/pinch, edit ----
   else if(act==="oppedit"){editSlot=+arg;mode="oppeditplayer";render();}
@@ -7217,7 +7246,7 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="opppickpitch"){mode="opppickpitch";render();}
   else if(act==="oppsetpitch"){oppAssignPos(+arg,"P");mode="lineup";render();broadcast();}
   else if(act==="oppbenchadd"){oppBenchList().push({num:"",name:""});render();}
-  else if(act==="oppbenchin"){const b=oppBenchList();if(b[+arg]&&oppList().length<12){lineupStep();const e=oppBenchList().splice(+arg,1)[0];oppList().push(e);G.oppBatters=oppList().length;}render();broadcast();}   // the step is taken before the splice, so Undo puts him back on the bench; a full order leaves him there (it used to drop him)
+  else if(act==="oppbenchin"){const b=oppBenchList();if(b[+arg]&&oppList().length<maxBatters()){lineupStep();const e=oppBenchList().splice(+arg,1)[0];oppList().push(e);G.oppBatters=oppList().length;}render();broadcast();}   // the step is taken before the splice, so Undo puts him back on the bench; a full order leaves him there (it used to drop him)
   else if(act==="oppbenchout"){const i=editSlot;if(oppList()[i])lineupStep();const e=oppList().splice(i,1)[0];if(e){delete e.pos;oppBenchList().push(e);}G.oppBatters=oppList().length;mode="lineup";render();broadcast();}
   else if(act==="home"){ if(_watchLiveUnsub){ try{_watchLiveUnsub();}catch(e){} _watchLiveUnsub=null; _watchGen++; gameActive=false; _remoteLive=false; G=initGame(); }   // leaving a watch session → drop the borrowed game + cancel any delayed updates
     // viewerLocked was never cleared here — a viewer stuck on the "waiting for the game to start"
@@ -7404,7 +7433,7 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="apprefresh"){ flash("Refreshing…"); try{ if(navigator.serviceWorker&&navigator.serviceWorker.getRegistrations) navigator.serviceWorker.getRegistrations().then(function(rs){rs.forEach(function(r){try{r.update();}catch(e){}});}); }catch(e){} try{ if(window.cloudSyncTeams)cloudSyncTeams(); }catch(e){} setTimeout(function(){ try{ location.reload(); }catch(e){} }, 500); }
   else if(act==="settings"){mode="settings";render();}
   else if(act==="opencamera"){ try{ if(window.AllStars&&window.AllStars.openVideo)AllStars.openVideo(); }catch(e){} }
-  else if(act==="newgamestart"){newgameFrom="home";resetOpponent();if(!gameActive)applyTeamDefaultRules();mode="newgame";render();}
+  else if(act==="newgamestart"){newgameFrom="home";settingsMode=false;resetOpponent();if(!gameActive)applyTeamDefaultRules();mode="newgame";render();}
   else if(act==="gototeams"){mode="teams";render();}
   else if(act==="opent"){openTeamId=arg;teamTab="hub";openTeamFrom=(mode==="home"?"home":"teams");mode="team";render();}
   else if(act==="teamtab"){teamTab=arg;render();}
@@ -7438,14 +7467,14 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="ludel"){ const t=teamById(openTeamId); const lu=t&&lineupById(t,arg); if(lu){ const lid=arg; confirmAct={title:'Delete lineup "'+lu.name+'"?',msg:"This removes the saved lineup. It won't affect any game already played.",yes:"Delete",danger:true,run:function(){ t.lineups=teamLineups(t).filter(l=>l.id!==lid); if(t.activeLineupId===lid)t.activeLineupId=(t.lineups[0]&&t.lineups[0].id)||null; saveDB(); render(); }}; render(); } }
   else if(act==="luprintcard"){ const t=teamById(openTeamId); const lu=t&&lineupById(t,arg); if(t&&lu){ printLineupCard(t,{lineup:lineupToIdx(t,lu)}); } }
   else if(act==="luremove"){ const t=teamById(openTeamId); const lu=t&&lineupById(t,editLineupId); if(lu&&lu.order.length>9){ lu.order=lu.order.filter(id=>id!==arg); Object.keys(lu.pos||{}).forEach(P=>{if(lu.pos[P]===arg)delete lu.pos[P];}); saveDB(); render(); } }
-  else if(act==="luadd"){ const t=teamById(openTeamId); const lu=t&&lineupById(t,editLineupId); if(lu&&lu.order.length<12&&lu.order.indexOf(arg)<0){ lu.order.push(arg); saveDB(); render(); } }
+  else if(act==="luadd"){ const t=teamById(openTeamId); const lu=t&&lineupById(t,editLineupId); if(lu&&lu.order.length<maxBatters()&&lu.order.indexOf(arg)<0){ lu.order.push(arg); saveDB(); render(); } }
   else if(act==="luauto"){ const t=teamById(openTeamId); const lu=t&&lineupById(t,editLineupId); if(lu){ lu.pos={}; let f=0; lu.order.forEach(id=>{ if(f<POSLIST.length){lu.pos[POSLIST[f]]=id;f++;} }); saveDB(); render(); } }
   else if(act==="savecurlineup"){ const t=curTeam(); if(t){ let nm=""; try{nm=prompt("Name this lineup:","Lineup "+(teamLineups(t).length+1));}catch(e){} if(nm!=null){ const ids=t.players.map(p=>p.id); const order=G.lineup.order.map(ri=>ids[ri]).filter(Boolean); const pos={}; Object.keys(G.lineup.pos||{}).forEach(P=>{const ri=G.lineup.pos[P]; if(ids[ri]!=null)pos[P]=ids[ri];}); const lu={id:nextId("lu"),name:(nm||"").trim()||("Lineup "+(teamLineups(t).length+1)),order:order,pos:pos}; teamLineups(t).push(lu); t.activeLineupId=lu.id; saveDB(); try{flash("Lineup saved");}catch(e){} render(); } } }
   // ---- roster tools ----
   else if(act==="sortnum"){ const t=teamById(openTeamId); if(t){ t.players.sort((a,b)=>(parseInt(a.num,10)||999)-(parseInt(b.num,10)||999)); saveDB(); render(); } }
   else if(act==="sortname"){ const t=teamById(openTeamId); if(t){ t.players.sort((a,b)=>((a.last||a.name||"")+a.first).localeCompare((b.last||b.name||"")+b.first)); saveDB(); render(); } }
   else if(act==="pasteplayers"){ const t=teamById(openTeamId); if(t){ let txt=""; try{txt=prompt("Paste players — one per line. Each line: number then name, e.g.\n12 John Smith\n7 Maria Diaz");}catch(e){} if(txt){ let added=0; txt.split(/\r?\n/).forEach(line=>{ line=line.trim(); if(!line)return; if(t.players.length>=20)return; const m=line.match(/^(\d{1,3})\s+(.*)$/); let num="",nm=line; if(m){num=m[1];nm=m[2].trim();} const parts=nm.split(/\s+/).filter(Boolean); const first=parts.length>1?parts.slice(0,-1).join(" "):(parts[0]||""); const last=parts.length>1?parts[parts.length-1]:""; const p={id:nextId("p"),num:num,first:first,last:last,name:""}; ensureName(p); t.players.push(p); added++; }); if(added){saveDB();render();} else {try{alert("No players found — check the format.");}catch(e){}} } } }
-  else if(act==="startteam"){newgameFrom="team";selectTeam(openTeamId);G=initGame();clearStaleStreamLink();applyTeamDefaultRules();loadTeamLineup(teamById(curTeamId));hist=[];redoStack=[];resetUI();resetOpponent();mode="newgame";render();broadcast();}
+  else if(act==="startteam"){newgameFrom="team";settingsMode=false;selectTeam(openTeamId);G=initGame();clearStaleStreamLink();applyTeamDefaultRules();loadTeamLineup(teamById(curTeamId));hist=[];redoStack=[];resetUI();resetOpponent();mode="newgame";render();broadcast();}
   else if(act==="pickour"){pickFor="our";mode="pickteam";render();}
   else if(act==="pickopp"){pickFor="opp";finderResults=null;window._finderQ="";
     // Seed the recent-opponent quick-picks from the team's SCHEDULE (which syncs across devices), so a
@@ -8060,8 +8089,8 @@ function applySetupParams(){
   const our=q.get("our")==="away"?"away":"home";
   if(our==="home"){ OUR.name=homeName;OUR.short=homeShort; OPP.name=awayName;OPP.short=awayShort; }
   else            { OUR.name=awayName;OUR.short=awayShort; OPP.name=homeName;OPP.short=homeShort; }
-  const batters=clampInt(q.get("batters"),9,12,9);
-  ROSTER=genericRoster();
+  const batters=clampInt(q.get("batters"),9,maxBatters(),9);
+  ROSTER=genericRoster(batters);   // a roster at least as long as the order, so slots 13+ have a player
   G=initGame(); clearStaleStreamLink();
   G.ourSide=our;
   G.runCap=clampInt(q.get("runcap"),0,30,0);   // default NO cap unless the link/league sets one
