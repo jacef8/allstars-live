@@ -1049,9 +1049,37 @@ const _pname=ri=>{const p=ROSTER[ri];return p?("#"+(p.num||"?")+" "+(p.name||"")
 function logLineup(text,extra){ try{ if(gameActive&&G&&text){ if(!G.lineupLog)G.lineupLog=[]; G.lineupLog.push(Object.assign({inn:G.inning,half:G.half,t:text},extra||{})); } }catch(e){} }
 function assignSlot(slot,ri){
   const old=G.lineup.order[slot],at=G.lineup.order.indexOf(ri);
-  if(at>=0){G.lineup.order[at]=old;G.lineup.order[slot]=ri;}          // swap two batters (each keeps his glove)
-  else{G.lineup.order[slot]=ri;const p=posOfPlayer(old);if(p)G.lineup.pos[p]=ri;}  // sub in for 'old', take his position
-  logLineup(_pname(ri)+" → batting "+(slot+1));
+  if(at===slot) return;   // picked the kid already batting here: nothing changes, so nothing to log
+  if(at>=0){G.lineup.order[at]=old;G.lineup.order[slot]=ri;logLineup(_pname(ri)+" → batting "+(slot+1));}          // swap two batters (each keeps his glove)
+  else{G.lineup.order[slot]=ri;const p=posOfPlayer(old);if(p)G.lineup.pos[p]=ri;  // sub in for 'old', take his position
+    // A kid who leaves while he's on base is replaced there by his sub. Otherwise the runner stays
+    // keyed to the player who left, and if he scores, the run goes on the box score of a kid who is
+    // out of the game. Same swap brCourtesy() does: keep the runner's colour, change who he is.
+    let onB=0;
+    if(gameActive&&G.bases&&ROSTER[ri]){ for(let b=1;b<=3;b++){ const r=G.bases[b]; if(!r||r.key!=="o"+old)continue;
+      // A bench kid who never batted has no box-score row yet; statFor() would file it under the
+      // opponent with no name (the same reason brCourtesy() names the row first).
+      if(!G.stats["o"+ri]){ const s=statFor("o"+ri); s.num=ROSTER[ri].num; s.name=ROSTER[ri].name||("Batter "+ROSTER[ri].num); s.team="our"; s.slot=slot; }
+      G.bases[b]=Object.assign({},r,{label:"#"+ROSTER[ri].num,name:ROSTER[ri].name,key:"o"+ri}); onB=b; } }
+    // Name who came OUT too: "#7 → batting 4" alone doesn't tell the record whose spot that was.
+    logLineup(_pname(ri)+" subs for "+_pname(old)+", batting "+(slot+1)+(p?" · "+p:"")+(onB?" · runs for him on "+ordinal(onB):""),{kind:"sub",out:"o"+old,in:"o"+ri,slot:slot});}
+}
+// Put a true bench kid (not in the batting order) at the bottom of the order as an extra hitter (bats,
+// no glove). Mirrors the opponent tab's oppbenchin chips and the saved-lineup builder's luadd, which
+// already worked this way; our in-game bench strip was display-only (per the 2026-09-27 scorer research).
+function benchIn(ri){ ri=+ri;
+  if(!ROSTER[ri]||G.lineup.order.indexOf(ri)>=0) return false;
+  if(G.lineup.order.length>=12){ flash("Max 12 batters"); return false; }
+  // Our batting pointer is a running count of plate appearances; batter() takes it modulo the order
+  // length. Make the order longer without re-basing it and, once we've been through the order, the
+  // same count lands on a different slot: the kid due up changes silently (e.g. 11 % 9 is slot 3,
+  // 11 % 10 is slot 2). Fold it back to the slot it points at now; the new kid's slot sits past every
+  // existing one, so the batter due up and everyone after him are unchanged, and the new kid bats
+  // after the old last spot. Runs whichever half is batting: it also fixes who leads off next time.
+  if(gameActive){ const k=G.ourSide==="away"?"awayPtr":"homePtr"; G[k]=(G[k]||0)%Math.max(1,G.lineup.order.length); }
+  G.lineup.order.push(ri);
+  logLineup(_pname(ri)+" added to the order, batting "+G.lineup.order.length);
+  return true;
 }
 function assignPos(ri,pos){
   const cur=posOfPlayer(ri),occ=G.lineup.pos[pos];
@@ -1213,12 +1241,22 @@ function moveLuBuilder(i,dir){
   luBuilderSel=j; saveDB(); render();
 }
 /* ---- continuous batting order: 9 fielders + extra hitters (bat only), up to 12 ---- */
+// Used to push benchIdx()[0] — whoever had the lowest roster index, not necessarily the kid the coach
+// meant (per the 2026-09-27 scorer research). One bench kid: no choice to make, add him. More than one:
+// open the player picker in "append" mode (editSlot = the next free slot), bench kids only.
 function addBatter(){const b=benchIdx();if(!b.length){flash("No bench players to add");return;}
-  if(G.lineup.order.length>=12){flash("Max 12 batters");return;} G.lineup.order.push(b[0]);}
+  if(G.lineup.order.length>=12){flash("Max 12 batters");return;}
+  if(b.length===1){benchIn(b[0]);return;}
+  lineEditSlot=null; luSelSlot=null; editSlot=G.lineup.order.length; mode="pickplayer";}
 function removeBatter(){
   if(G.lineup.order.length<=9){flash("Minimum 9 batters");return;}
   const ri=G.lineup.order[G.lineup.order.length-1];
   if(posOfPlayer(ri)){flash("That batter is fielding — change their position first");return;}
+  // Mirror of benchIn(): re-base our running batting pointer onto its slot before the order gets
+  // shorter, so the kid due up doesn't change. If the kid due up is the one being removed, the
+  // order wraps to the leadoff spot.
+  if(gameActive){ const k=G.ourSide==="away"?"awayPtr":"homePtr", n=G.lineup.order.length;
+    G[k]=(G[k]||0)%Math.max(1,n); if(G[k]>=n-1)G[k]=0; }
   G.lineup.order.pop();
 }
 // A brand-new action makes the old "future" (whatever Undo used to lead back to) meaningless — same
@@ -5491,14 +5529,22 @@ function actionArea(){
     const curBadge = `<span style="font-family:${MONO};font-size:9px;font-weight:800;letter-spacing:.5px;color:#fff;background:${T.lime};border-radius:4px;padding:2px 5px;flex:none">AT BAT</span>`;
     const eCell=`background:${T.surface};border:2px solid ${T.line};color:${T.ink};border-radius:8px;padding:10px 11px;font-size:16px;font-weight:700;outline:none`;
     const rows=G.lineup.order.map((ri,slot)=>{const p=ROSTER[ri];ensureName(p);const pos=posOfPlayer(ri)||"—",isP=pos==="P";const _cur=(slot===ourSlot);
+      // "Sub" on every row: put a specific bench kid into THIS batting spot (he takes the glove of the
+      // kid coming out), or swap two batters. The picker and assignSlot() existed but nothing opened
+      // them, so the only ways to sub were append-then-arrow or retyping the name, and retyping
+      // renames the rostered kid and corrupts his season stats (per the 2026-09-27 scorer research).
+      const subBtn=`<button data-act="pickplayer" data-arg="${slot}" title="Put a bench player in this batting spot" style="background:transparent;border:2px solid ${T.line};color:${T.chalk};border-radius:7px;padding:7px 10px;min-height:38px;font-family:${MONO};font-size:13px;font-weight:800;letter-spacing:.3px;display:flex;align-items:center;gap:5px;flex:none">${IC('users',14)}Sub</button>`;
       // In-line edit (C1): the row itself becomes number/first/last fields — no second window, same
       // boxes as the team roster. Tap the name to open; tap Done (or another name) to close.
+      // These boxes rename the ROSTERED kid (luPName → _setFullName), so the row says so and offers
+      // Sub right there for the "it's a different kid now" case.
       if(lineEditSlot===slot) return `<div data-row data-ri="${ri}" style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;background:rgba(225,29,46,.10);border:2px solid ${T.lime};border-radius:10px;padding:9px 9px">
         <span style="font-family:${MONO};font-size:17px;font-weight:800;color:${T.lime};width:18px;text-align:center;flex:none">${slot+1}</span>
         <input value="${(p.num||"").replace(/"/g,"&quot;")}" oninput="luPNum(${slot},this.value)" inputmode="numeric" maxlength="3" style="${eCell};width:52px;text-align:center;font-family:${MONO};font-weight:800;flex:none">
         <input value="${(p.name||"").replace(/"/g,"&quot;")}" oninput="luPName(${slot},this.value)" placeholder="Player name" style="${eCell};flex:1 1 150px;min-width:0">
         <button data-act="pickpos" data-arg="${slot}" style="background:${isP?OUR.color:T.surface2};border:2px solid ${isP?OUR.color:T.line};color:${isP?"#FFFFFF":T.chalk};border-radius:7px;padding:8px 12px;font-family:${MONO};font-size:15px;font-weight:800;flex:none">${pos}</button>
-        <button data-act="editplayer" data-arg="${slot}" style="background:${T.lime};border:2px solid ${T.lime};color:#fff;border-radius:8px;padding:9px 15px;font-family:${SANS};font-size:14px;font-weight:800;flex:none">Done</button></div>`;
+        <button data-act="editplayer" data-arg="${slot}" style="background:${T.lime};border:2px solid ${T.lime};color:#fff;border-radius:8px;padding:9px 15px;font-family:${SANS};font-size:14px;font-weight:800;flex:none">Done</button>
+        <div style="flex:1 1 100%;display:flex;align-items:center;gap:8px"><span style="flex:1;min-width:0;font-size:12px;color:${T.sageDim}">This fixes this player's roster name &amp; number. A different kid batting here? Use Sub.</span>${subBtn}</div></div>`;
       // Tap-to-select + up/down arrows (replaces drag entirely) — jford, 2026-07-06: "battig order
       // adjustments still arent working... just change it so that i touch to select a batter then
       // click an up or down arrow to move them." Drag depended on a held gesture surviving for its
@@ -5540,16 +5586,22 @@ function actionArea(){
           <button data-act="editplayer" data-arg="${slot}" style="text-align:left;background:transparent;border:none;color:${T.chalk};font-size:20px;font-weight:700;display:flex;align-items:center;gap:9px;padding:0;min-width:0"><span style="font-family:${MONO};color:${OUR.color};flex:none">#${escHtml(p.num)}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(p.name)}</span></button>
           <div style="display:flex;align-items:center;gap:9px">
             <button data-act="pickpos" data-arg="${slot}" style="background:${isP?OUR.color:T.surface2};border:2px solid ${isP?OUR.color:T.line};color:${isP?"#FFFFFF":T.chalk};border-radius:7px;padding:7px 14px;font-family:${MONO};font-size:16px;font-weight:800;min-width:54px;flex:none">${pos}</button>
-            <span style="font-size:12px;color:${T.sageDim}">${isP?"Pitcher":(pos==="—"?"Tap to set position":"Fielding "+pos)}</span>
+            <span style="flex:1;min-width:0;font-size:12px;color:${T.sageDim}">${isP?"Pitcher":(pos==="—"?"Tap to set position":"Fielding "+pos)}</span>
+            ${subBtn}
           </div></div></div>`;
       return `<div data-row data-ri="${ri}" style="display:flex;align-items:center;gap:6px;background:${_rowBg};border:2px solid ${_sel?T.lime:_cur?T.lime:T.line};border-radius:9px;padding:8px 8px">
         ${moveHandle}
         ${numBadge}${_cur?curBadge:""}
         <button data-act="editplayer" data-arg="${slot}" style="flex:1;min-width:0;text-align:left;background:transparent;border:none;color:${T.chalk};font-size:18px;font-weight:700;display:flex;align-items:center;gap:8px;overflow:hidden"><span style="font-family:${MONO};color:${OUR.color};min-width:34px">#${escHtml(p.num)}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(p.name)}</span></button>
+        ${subBtn}
         <button data-act="pickpos" data-arg="${slot}" style="background:${isP?OUR.color:T.surface2};border:2px solid ${isP?OUR.color:T.line};color:${isP?"#FFFFFF":T.chalk};border-radius:7px;padding:8px 12px;font-family:${MONO};font-size:16px;font-weight:800;min-width:50px">${pos}</button></div>`;}).join("");
-    const bench=benchIdx().map(ri=>`<span style="font-family:${MONO};font-size:14px;color:${T.sage};background:${T.surface};border:2px solid ${T.line};border-radius:6px;padding:5px 10px;white-space:nowrap">#${ROSTER[ri].num} ${ROSTER[ri].name}</span>`).join(" ");
     const pit=playerAtPos("P");
     const n=G.lineup.order.length;
+    // True bench (on the roster, not in the batting order). Tap = add him to the bottom of the order
+    // (same as the opponent tab's "tap to pinch into the order" chips). To put him in a SPECIFIC spot,
+    // use that row's Sub. Shown under the field map too, since the field map's own bench box only
+    // holds kids who already bat. These used to be inert spans (per the 2026-09-27 scorer research).
+    const bench=benchIdx().map(ri=>`<button data-act="benchin" data-arg="${ri}" ${n>=12?"disabled":""} title="Add to the batting order" style="display:inline-flex;align-items:center;gap:6px;font-family:${MONO};font-size:14px;font-weight:700;color:${n>=12?T.sageDim:T.chalk};background:${T.surface};border:2px solid ${T.line};border-radius:7px;padding:7px 11px;white-space:nowrap"><span style="color:${OUR.color}">#${escHtml(ROSTER[ri].num)}</span>${escHtml(ROSTER[ri].name)}${n>=12?"":` <span style="color:${T.lime};font-weight:800">+</span>`}</button>`).join(" ");
     return `<div class="frost-card" style="flex-shrink:0;display:flex;align-items:center;gap:10px;background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:10px 12px">
         <button data-act="lineupback" style="${ghost};padding:9px 13px;flex:none">&lsaquo; Back</button>
         <div style="flex:1;min-width:0"><div style="font-family:${MONO};font-size:20px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:${T.lime}">Lineups</div>
@@ -5566,7 +5618,7 @@ function actionArea(){
       <div style="flex-shrink:0;display:flex;gap:8px">
         <button data-act="addbatter" style="${ghost};flex:1" ${n>=12?"disabled":""}>+ Add batter (EH)</button>
         <button data-act="rembatter" style="${ghost};flex:1" ${n<=9?"disabled":""}>&minus; Remove last</button></div>`}
-      <div style="flex-shrink:0"><div style="font-size:10px;color:${T.sageDim};letter-spacing:.6px;margin:0 2px 5px">BENCH</div>
+      <div style="flex-shrink:0"><div style="font-size:10px;color:${T.sageDim};letter-spacing:.6px;margin:0 2px 5px">BENCH${bench?(n>=12?" &middot; max 12 batters"+(lineupView==="field"?"":" &middot; use a row's Sub to swap one in"):" &middot; not batting &middot; tap to add to the order"+(lineupView==="field"?"":", or use a row's Sub")):""}</div>
         <div style="display:flex;flex-wrap:wrap;gap:5px">${bench||`<span style="font-size:12px;color:${T.sageDim}">No bench players</span>`}</div></div>
       ${(function(){ const ct=curTeam(); if(!ct)return ""; const sl=teamLineups(ct);
         return `<div style="flex-shrink:0;display:flex;gap:8px;align-items:center">
@@ -5575,15 +5627,28 @@ function actionArea(){
       <button data-act="lineupdone" style="${bigBtn(T.lime,"")}flex-shrink:0">Done</button>`;
   }
   if(mode==="pickplayer"){
-    const pitcherPick=editSlot===-1, cur=pitcherPick?G.lineup.pos.P:G.lineup.order[editSlot];
-    const list=ROSTER.map((p,ri)=>{const inL=G.lineup.order.indexOf(ri),pos=posOfPlayer(ri),here=ri===cur;
-      const tag=inL>=0?`bats ${inL+1}${pos?` · ${pos}`:""}`:"bench";
+    // Three uses: the pitcher (editSlot -1), a batting slot's "Sub" (editSlot = that slot), and
+    // "+ Add batter" (editSlot = one past the last slot: append a bench kid).
+    const pitcherPick=editSlot===-1, appendPick=!pitcherPick&&editSlot>=G.lineup.order.length, cur=pitcherPick?G.lineup.pos.P:G.lineup.order[editSlot];
+    const btn=ri=>{const p=ROSTER[ri],inL=G.lineup.order.indexOf(ri),pos=posOfPlayer(ri),here=ri===cur;
+      const tag=(here&&!pitcherPick)?"batting here":(inL>=0?`bats ${inL+1}${pos?` · ${pos}`:""}`:"bench");
       return `<button data-act="setplayer" data-arg="${ri}" style="display:flex;justify-content:space-between;align-items:center;background:${here?T.surface2:T.surface};border:2px solid ${here?OUR.color:T.line};color:${T.chalk};border-radius:9px;padding:11px 13px;font-size:14px;font-weight:700">
         <span style="display:flex;gap:9px;align-items:center"><span style="font-family:${MONO};color:${OUR.color};min-width:32px">#${escHtml(p.num)}</span>${escHtml(p.name)}</span>
-        <span style="font-family:${MONO};font-size:11px;color:${T.sage}">${tag}</span></button>`;}).join("");
-    return step(pitcherPick?"Pitching change":`Batting ${editSlot+1} — choose player`,
-      pitcherPick?"Pick the new pitcher — a bench arm subs in for the current one.":"A bench player subs in; a starter swaps spots.",
-      `<div style="display:flex;flex-direction:column;gap:6px">${list}</div>`,"backlineup");
+        <span style="font-family:${MONO};font-size:11px;color:${T.sage}">${tag}</span></button>`;};
+    const all=ROSTER.map((_,ri)=>ri);
+    if(pitcherPick) return step("Pitching change","Pick the new pitcher — a bench arm subs in for the current one.",
+      `<div style="display:flex;flex-direction:column;gap:6px">${all.map(btn).join("")}</div>`,"backlineup");
+    // Batting slot: bench kids first (the usual reason to open this is an injury or late-arrival sub),
+    // then the rest of the order for a straight swap of two batters.
+    const grp=(lbl,arr)=>arr.length?`<div style="font-size:11px;font-weight:800;letter-spacing:.6px;color:${T.sageDim};margin:6px 2px 0">${lbl}</div>${arr.map(btn).join("")}`:"";
+    const benchL=all.filter(ri=>G.lineup.order.indexOf(ri)<0);
+    if(appendPick) return step(`Batting ${editSlot+1} — add a player`,"Adds an extra hitter at the bottom of the order (bats, no glove until you give him a position).",
+      `<div style="display:flex;flex-direction:column;gap:6px">${grp("BENCH",benchL)||`<div style="font-size:13px;color:${T.sageDim};text-align:center;padding:14px">No bench players to add.</div>`}</div>`,"backlineup");
+    const outP=ROSTER[cur], outPos=posOfPlayer(cur);
+    const orderL=G.lineup.order.slice();   // batting-order sequence, so "bats 3" reads in order
+    return step(`Batting ${editSlot+1} — choose player`,
+      `${outP?`Now: #${escHtml(outP.num)} ${escHtml(outP.name)}${outPos?` (${outPos})`:""}. `:""}A bench player subs in${outPos?" and takes the "+outPos+" spot":""}; a batter from the order swaps spots.`,
+      `<div style="display:flex;flex-direction:column;gap:6px">${grp("BENCH — SUBS IN",benchL)}${grp("BATTING ORDER — SWAPS SPOTS",orderL)}</div>`,"backlineup");
   }
   if(mode==="pickpos"){
     const ri=G.lineup.order[editSlot],cur=posOfPlayer(ri);
@@ -7104,11 +7169,12 @@ document.getElementById("app").addEventListener("click",e=>{
     try{ if(window.cloudEndGame)window.cloudEndGame(_tid+"-live"); }catch(e){}
     delete _liveGames[_tid]; render(); }}; render(); return; }
   else if(act==="summary-done"){gameActive=false;mode="teams";render();broadcast();}
-  else if(act==="pickplayer"){editSlot=+arg;mode="pickplayer";render();}
+  else if(act==="pickplayer"){editSlot=+arg;lineEditSlot=null;luSelSlot=null;mode="pickplayer";render();}   // the row's "Sub" button
   else if(act==="pickpos"){editSlot=+arg;mode="pickpos";render();}
   else if(act==="editplayer"){ lineEditSlot=(lineEditSlot===+arg?null:+arg); render(); }   // C1: toggle in-row edit (no second window)
   else if(act==="pickpitch"){editSlot=-1;mode="pickplayer";render();}
-  else if(act==="setplayer"){const ri=+arg;if(editSlot===-1)makePitcher(ri);else assignSlot(editSlot,ri);mode="lineup";render();broadcast();}
+  else if(act==="setplayer"){const ri=+arg;if(editSlot===-1)makePitcher(ri);else if(editSlot>=G.lineup.order.length)benchIn(ri);else assignSlot(editSlot,ri);mode="lineup";render();broadcast();}   // editSlot past the end = "+ Add batter" picking who to append
+  else if(act==="benchin"){ if(benchIn(+arg)){ render(); broadcast(); } }   // BENCH strip chip: straight to the bottom of the order
   else if(act==="setpos"){assignPos(G.lineup.order[editSlot],arg);mode="lineup";render();broadcast();}
   else if(act==="backlineup"){mode="lineup";render();}
   else if(act==="endinning"){ confirmAct={title:"End "+(G.half==="T"?"Top":"Bottom")+" "+G.inning+"?",msg:"Closes out the half-inning early, at "+G.outs+" out"+(G.outs===1?"":"s")+". Use this for a walk-off or a missed 3rd out — otherwise just keep playing, it'll flip on its own. Undoable.",yes:"End inning",run:endInning}; render(); }
@@ -7237,8 +7303,8 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="ng-side"){G.ourSide=arg;render();broadcast();}
   else if(act==="ng-start")startNewGame();
   else if(act==="nglineupcard"){ const tt=curTeam()||{name:OUR.name,short:OUR.short,color:OUR.color,players:ROSTER,record:{w:0,l:0,t:0},games:[]}; const opp=(OPP.name&&OPP.name!=="Opponent")?OPP.name:""; let tm=""; if(G&&G.startedAt){ try{ tm=new Date(G.startedAt).toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"}); }catch(e){} } printLineupCard(tt,{opp:opp,time:tm}); }
-  else if(act==="addbatter"){addBatter();render();}
-  else if(act==="rembatter"){removeBatter();render();}
+  else if(act==="addbatter"){const n0=G.lineup.order.length;addBatter();render();if(G.lineup.order.length!==n0)broadcast();}   // appended directly (one bench kid) → publish; otherwise the picker is open (or nothing changed)
+  else if(act==="rembatter"){const n0=G.lineup.order.length;removeBatter();render();if(G.lineup.order.length!==n0)broadcast();}   // save the shorter order (and re-based pointer) like addbatter does
   else if(act==="share"){ shareCtx=null; openShare(); }   // game share (reset any stale invite/link context)
   else if(act==="undo")undo();
   else if(act==="redo")redo();
