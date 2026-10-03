@@ -857,7 +857,7 @@ function buildResults(pos,contact,bases){
     R.push(h("error",`Reached on error (${pos})`,`E${n}`)); return R;
   }
   if(contact==="Grounder"){
-    R.push(h("out1",`Out at first (${n}-3)`,pos==="1B"?"3U":`${n}-3`));
+    R.push(h("out1",`Out at first (${pos==="1B"?"3U":`${n}-3`})`,pos==="1B"?"3U":`${n}-3`));   // label carries the same note (3U for the 1B unassisted, not 3-3)
     if(bases[1])R.push(h("dp","Double play",`${n}-4-3`));
     if(runnerOn)R.push(h("fc","Fielder's choice","FC"));
     R.push(h("single","Infield single","1B"),h("error",`Reached on error (${pos})`,`E${n}`));
@@ -916,7 +916,7 @@ const initGame=()=>({inning:1,half:"T",away:0,home:0,outs:0,balls:0,strikes:0,
   startedAt:null,  // wall-clock ms when the game ACTUALLY started (auto-set at first pitch / game start; editable in Game Setup) — drives the game timer
   lineup:{ order:[0,1,2,3,4,5,6,7,8],   // batting order: 9-12 entries (slots 10+ = extra hitters)
            pos:{P:0,C:1,"1B":2,"2B":3,"3B":4,SS:5,LF:6,CF:7,RF:8} }});
-let G=initGame(),hist=[],redoStack=[],mode="home",tap=null,contact=null,result=null,plan=null,toast=null,toastTimer=null,curResults=[],showAll=false,showZones=false,editSlot=null,confirmAct=null,gameActive=false,lineupTab="us",newgameFrom="home",brSheet=false,correctOpen=false,correctOpenAt=0,lineupView="list",fieldAssign=null,fieldHold=null,fieldDisplaced=null,lineEditSlot=null,luSelSlot=null,luBuilderSel=null,luFromSetup=false,koPick=null,oppFieldSel=null,bugPreview=false,barEdit=false,editAB=null,gameEdit=null,statsSeason="all",pgOpen=false,pgSide="home";
+let G=initGame(),hist=[],redoStack=[],mode="home",tap=null,contact=null,result=null,plan=null,toast=null,toastTimer=null,curResults=[],showAll=false,showZones=false,editSlot=null,confirmAct=null,gameActive=false,lineupTab="us",newgameFrom="home",brSheet=false,correctOpen=false,correctOpenAt=0,lineupView="list",fieldAssign=null,fieldHold=null,fieldDisplaced=null,lineEditSlot=null,luSelSlot=null,luBuilderSel=null,luFromSetup=false,koPick=null,oppFieldSel=null,bugPreview=false,barEdit=false,editAB=null,gameEdit=null,statsSeason="all",pgOpen=false,pgSide="home",reopenPending=null;   // reopenPending: see adjustLastPlay()
 // Resume the last in-progress game (saved by saveGame) across reloads/app updates, so the
 // lineup/score is never lost. Stays on the home screen → shows "Resume". Re-links ROSTER
 // to the saved team so the lineup's player indices resolve correctly.
@@ -1176,29 +1176,104 @@ function removeBatter(){
 // A brand-new action makes the old "future" (whatever Undo used to lead back to) meaningless — same
 // rule as any standard undo/redo stack (a text editor, etc.). Otherwise a stale Redo could resurrect a
 // play that no longer makes sense against the current state.
-function snapshot(){hist.push({g:JSON.parse(JSON.stringify(G)),fl:(Array.isArray(gameFeed)?gameFeed.length:0)});if(hist.length>40)hist.shift();redoStack.length=0;}
-function resetUI(){mode="idle";tap=null;contact=null;result=null;plan=null;showAll=false;reviewBatter=null;reviewInn=false;}
-// Undo truncates gameFeed down to the pre-play length — those trailing entries (the play's own feed
+// ev = the last feed-event id handed out when the snapshot was taken (see feedTrimTo()). Any new
+// action also ends a pending re-open (adjustLastPlay()): the scorer has moved on from it.
+function snapshot(){hist.push({g:JSON.parse(JSON.stringify(G)),fl:(Array.isArray(gameFeed)?gameFeed.length:0),ev:_eventId});if(hist.length>40)hist.shift();redoStack.length=0;reopenPending=null;}
+function resetUI(){mode="idle";tap=null;contact=null;result=null;plan=null;showAll=false;reviewBatter=null;reviewInn=false;reopenPending=null;}
+// Cut gameFeed back to what it held when undo snapshot e was taken, and return the entries that
+// came off (in feed order) so Redo can put them back. By event id when the snapshot has one: the
+// feed is capped at 220 lines with shift(), so once a game is that long a length taken at snapshot
+// time points at the wrong line — undo/re-open/rewind left the undone play's own line in place and
+// the corrected play then showed up twice (per the 2026-09-27 scorer research). Ids only ever go
+// up, so "everything newer than ev" is exactly that play's lines, wherever the inning-end splice
+// put them. Snapshots without ev (none survive a reload, but be safe) keep the old length trim.
+function feedTrimTo(e){
+  if(!Array.isArray(gameFeed))return [];
+  if(e&&typeof e.ev==="number"){
+    const newer=x=>!!x&&typeof x.id==="number"&&x.id>e.ev;
+    const tail=gameFeed.filter(newer);
+    if(tail.length){ const keep=gameFeed.filter(x=>!newer(x)); gameFeed.length=0; gameFeed.push(...keep); }
+    return tail;
+  }
+  const fl=(e&&typeof e.fl==="number")?e.fl:gameFeed.length;
+  const tail=gameFeed.slice(fl); gameFeed.length=Math.min(gameFeed.length,fl); return tail;
+}
+// Undo cuts gameFeed back to the pre-play state — those trailing entries (the play's own feed
 // line, an "end of inning" divider, etc.) are spliced off and saved on the redo entry so Redo can put
 // them right back, rather than just re-deriving state and losing that part of the feed. (jford,
-// 2026-07-05: "i guess i need a redo button next to the undo button.")
+// 2026-07-05: "i guess i need a redo button next to the undo button.") The redo entry also keeps
+// the snapshot's ev and, for a ball in play, its re-open state (.play — see commit()), so after
+// Undo → Redo the play is still re-openable and a second Undo still trims by id.
 function undo(){
   if(!hist.length)return;
   const e=hist.pop();
-  const fl=(e&&typeof e.fl==="number")?e.fl:(Array.isArray(gameFeed)?gameFeed.length:0);
-  const removedFeed=Array.isArray(gameFeed)?gameFeed.slice(fl):[];
-  redoStack.push({g:G,feedTail:removedFeed});
+  const removedFeed=feedTrimTo(e);
+  redoStack.push({g:G,feedTail:removedFeed,ev:e&&e.ev,play:e&&e.play});
   G=(e&&e.g)?e.g:e;
-  if(Array.isArray(gameFeed))gameFeed.length=Math.min(gameFeed.length,fl);
   resetUI();render();broadcast();
 }
 function redo(){
   if(!redoStack.length)return;
-  hist.push({g:JSON.parse(JSON.stringify(G)),fl:(Array.isArray(gameFeed)?gameFeed.length:0)});
   const r=redoStack.pop();
+  const h={g:JSON.parse(JSON.stringify(G)),fl:(Array.isArray(gameFeed)?gameFeed.length:0)};
+  if(typeof r.ev==="number")h.ev=r.ev;
+  if(r.play)h.play=r.play;   // the restored state is the original commit's, so its stashed plan still fits
+  hist.push(h);
   G=r.g;
   if(Array.isArray(gameFeed)&&Array.isArray(r.feedTail)&&r.feedTail.length)gameFeed.push(...r.feedTail);
   resetUI();render();broadcast();
+}
+// The most recent ball in play is re-openable only while the top of hist is still the snapshot
+// commit() took for it (it stashes the play's UI state there as .play — see commit()). Any later
+// action — a pitch, a walk, a base-running event, a correction — pushes its own snapshot on top,
+// and then the honest answer is undo/rewind, not a pre-filled re-entry. Returns that saved state
+// or null.
+// Lineup, position, pitcher and opponent-lineup edits (and in-game rule settings) change G WITHOUT
+// a snapshot, so they don't retire the play on their own — but re-opening pops back to the pre-play
+// G and would silently throw them away (and a corrected play must stay charged to the pitcher who
+// threw it, so they can't be carried over either). commit() fingerprints those parts as .play.sig;
+// once the current G no longer matches, the re-open is withdrawn and Undo/Rewind (which say what
+// they do) are the way back.
+function reopenSig(){
+  try{ return JSON.stringify([G.lineup||null,G.oppLineup||[],G.oppBench||[],G.oppBatters,(G.lineupLog||[]).length,
+    G.ourSide,G.innings,G.runCap,G.mercy||null,G.pitchMax,G.league,G.rulebookId||null,G.alerts||null]); }catch(e){ return ""; }
+}
+function lastPlayReopenable(){
+  const t=hist[hist.length-1];
+  if(!(t&&t.play&&t.play.result&&Array.isArray(t.play.plan)))return null;
+  if(typeof t.play.sig==="string"&&t.play.sig!==reopenSig())return null;
+  return t.play;
+}
+// Re-open the last play with the runners pre-filled. The common runner slips (wrong runner marked
+// out, out at the wrong base, the runner from 2nd left at the default 3rd on a single) plus one
+// premature Confirm used to cost six or seven taps including re-tapping the field — and on the
+// phone layout, where "Base run" is wide-only, undo + full re-entry was the ONLY recovery (per the
+// 2026-09-27 scorer research). This pops the snapshot exactly as undo() does, then restores
+// result/plan/tap/contact and lands on the runners screen: change the one wrong cell — or Back to
+// re-pick the result with the field tap kept — and Confirm again. commit() then snapshots afresh.
+// Until that Confirm the original play is only PARKED, not removed: it sits on the redo stack
+// (reopenPending points at that entry), nothing is saved or published here, so the saved game, a
+// reload and the fans' scoreboard all still have it — and backing out (Cancel, Back off the result
+// sheet, OS Back) puts it back exactly as entered via leavePlayEntry(), instead of silently
+// deleting the at-bat.
+function adjustLastPlay(){
+  const p=lastPlayReopenable(); if(!p)return;
+  const e=hist.pop();
+  const parked={g:G,feedTail:feedTrimTo(e),ev:e.ev,play:p};
+  redoStack.push(parked);
+  G=e.g;
+  resetUI(); editAB=null; koPick=null;
+  reopenPending=parked;
+  tap=p.tap?Object.assign({},p.tap):null; contact=p.contact||null;
+  result=Object.assign({},p.result); plan=JSON.parse(JSON.stringify(p.plan)); showAll=!!p.showAll;
+  mode="runners"; flash("Re-opened · Cancel keeps original"); render();
+}
+// Every way OUT of a ball-in-play entry (locate / result sheet / runners) without confirming. A
+// normal play just goes back to idle; a re-opened one gets its original play back (redo() restores
+// the post-play G and feed lines and re-publishes) rather than leaving the game rolled back.
+function leavePlayEntry(){
+  if(reopenPending&&redoStack[redoStack.length-1]===reopenPending){ flash("Play kept as entered"); redo(); return; }
+  resetUI(); render();
 }
 
 function nextBatter(){const k=G.half==="T"?"awayPtr":"homePtr";G[k]++;G.balls=0;G.strikes=0;G.abPitches=0;}
@@ -1695,12 +1770,15 @@ function adjustABRbi(eid,d){
 function rewindToEvent(eid){
   const idx=gameFeed.findIndex(e=>e.id===eid); if(idx<0)return;
   // The most recent snapshot taken at/before this feed line existed = the state just before the play.
-  let found=-1; for(let i=hist.length-1;i>=0;i--){ if(hist[i].fl<=idx){ found=i; break; } }
+  // Matched by event id where the snapshot has one (see feedTrimTo(): a feed length stops lining up
+  // with feed positions once the 220-line cap starts shifting old lines off).
+  let found=-1; for(let i=hist.length-1;i>=0;i--){ const s=hist[i];
+    if((typeof s.ev==="number"&&typeof eid==="number")?(s.ev<eid):(s.fl<=idx)){ found=i; break; } }
   if(found<0){ editAB=null; flash("That play is too far back to rewind to."); render(); return; }
   const snap=hist[found];
   hist.length=found;                                              // drop this snapshot + everything after
   G=snap.g;                                                       // restore (snapshot() stored a deep copy)
-  if(Array.isArray(gameFeed))gameFeed.length=Math.min(gameFeed.length,snap.fl);
+  feedTrimTo(snap);
   editAB=null; resetUI(); render(); broadcast(); flash("Rewound to that play — re-enter it.");
 }
 function abEditSheet(){
@@ -1727,6 +1805,15 @@ function abEditSheet(){
           <span style="font-family:${MONO};font-size:24px;font-weight:800;min-width:30px;text-align:center">${s.rbi||0}</span>
           <button data-act="abrbi" data-arg="${e.id}:1" style="${sBtn}">+</button></div></div>`:`<div style="font-size:12px;color:${T.sageDim}">This feed line isn't tied to a batter's stat line, so only Rewind is available.</div>`}
       <div style="font-size:10px;font-weight:800;letter-spacing:1px;color:${T.sageDim};margin:4px 2px -3px">RUNNERS / SCORE / OUTS CHANGED?</div>
+      ${(()=>{
+        // Only the most recent ball in play, and only while nothing has happened since (see
+        // lastPlayReopenable()): re-open it with every runner already filled in, so the fix is one
+        // cell + Confirm instead of the full Rewind re-entry below. Matched by the feed line's id so
+        // an older at-bat in the same sheet never offers it.
+        const lp=lastPlayReopenable(); if(!lp||lp.eid!==e.id)return "";
+        return `<button data-act="abreopen" style="background:${T.safe};color:#FFFFFF;border:none;border-radius:12px;padding:13px;font-family:${MONO};font-weight:800;font-size:14px;letter-spacing:.4px">&#8630; Re-open this play &middot; runners pre-filled</button>
+      <div style="font-size:11px;color:${T.sageDim};margin-top:-4px">Puts you back on the runners screen with everything as you entered it — change the one runner (or Back to re-pick the result) and Confirm again. Cancel keeps the play as it was.</div>`;
+      })()}
       <button data-act="abrewind" data-arg="${e.id}" style="background:${T.amber};color:#1a1206;border:none;border-radius:12px;padding:13px;font-family:${MONO};font-weight:800;font-size:14px;letter-spacing:.4px">&#8624; Rewind to this play &amp; re-score it</button>
       <div style="font-size:11px;color:${T.sageDim};margin-top:-4px">Use this when the fix affects runners, the score, or outs — it rolls the game back to just before this play so you can re-enter it correctly. Plays after it are cleared.</div>
     </div></div>`;
@@ -2055,8 +2142,10 @@ function feedPitch(label,detail,inn,half){
   // the end of gameFeed by now — appending after it would put the divider BEFORE the very pitch that
   // ended the inning once the feed displays most-recent-first. (jford, 2026-07-06, from a screenshot:
   // "shows the inning end indicator in the middle of an at-bat.") Insert just before it instead.
+  // Same same-half guard as bcastEvent() (see the comment there): a pitch of the NEXT half-inning
+  // goes after the divider, not in front of it.
   const tail=gameFeed[gameFeed.length-1];
-  if(tail&&tail.kind==="inningend") gameFeed.splice(gameFeed.length-1,0,entry); else gameFeed.push(entry);
+  if(tail&&tail.kind==="inningend"&&tail.inn===entry.inn&&tail.half===entry.half) gameFeed.splice(gameFeed.length-1,0,entry); else gameFeed.push(entry);
   if(gameFeed.length>220)gameFeed.shift();
 }
 // Advanced pitch tracking: when on, the scorer arms a pitch type that's recorded with
@@ -2098,8 +2187,14 @@ function bcastEvent(kind,sub,team,bk,inn,half){
   // put the divider BEFORE the very play that caused it once the feed shows most-recent-first — reads
   // as the inning ending mid-play. (jford, 2026-07-06, from a screenshot: "shows the inning end
   // indicator in the middle of an at-bat.") Insert just before it instead when present.
+  // Only for the play that actually ended that half, though (stamped with the same pre-flip
+  // inn/half the divider carries): the divider used to stay the last feed item for the rest of the
+  // game, so EVERY later entry was spliced in front of it — "End of Top 2" floated above all of
+  // Bottom 2, and undo()/rewindToEvent()/adjustLastPlay(), which then trimmed the feed by length, cut the
+  // divider off the end and left the undone play's line in place (found while verifying the
+  // re-open-last-play work from the 2026-09-27 scorer research).
   const tail=gameFeed[gameFeed.length-1];
-  if(tail&&tail.kind==="inningend") gameFeed.splice(gameFeed.length-1,0,entry); else gameFeed.push(entry);
+  if(tail&&tail.kind==="inningend"&&tail.inn===entry.inn&&tail.half===entry.half) gameFeed.splice(gameFeed.length-1,0,entry); else gameFeed.push(entry);
   if(gameFeed.length>220)gameFeed.shift();
 }
 /* Assemble the live box score (per-batter rows + R/H/E totals), mapped to away/home. */
@@ -2214,36 +2309,61 @@ function pitch(type){
 }
 function manual(kind,label){snapshot();const k0=battingKey(),bn=batter().name,bk0=batterKeyOf(batter()),inn0=G.inning,half0=G.half;if(kind==="hbp")recordPitch("hbp");applyPlanInline(kind);bcastEvent(kind,bn,k0,bk0,inn0,half0);flash(label);render();broadcast();}
 function startInPlay(){mode="locate";tap=null;render();}
-function onFieldTap(x,y){const z=zoneFromPoint(x,y);tap={x,y,pos:z.pos,zone:z.zone};contact=defaultContact(z.pos);mode="contact";render();}
-function chooseContact(c){contact=c;showAll=false;mode="result";render();}
+// A field tap lands straight on the result sheet with the contact type already defaulted (Fly for
+// the outfield, Grounder for the infield). It used to stop on a separate "what kind of contact?"
+// screen first, whose only way forward was tapping the type the app had already highlighted — one
+// pure confirmation tap on every ball in play, 25-40 times a game (per the 2026-09-27 scorer
+// research). The five contact chips now live at the top of the result sheet instead, so the type is
+// still one tap away when the default is wrong, and still recorded per AB for stats + the hit animation.
+function onFieldTap(x,y){const z=zoneFromPoint(x,y);tap={x,y,pos:z.pos,zone:z.zone};contact=defaultContact(z.pos);showAll=false;mode="result";render();}
+// Swapping the contact type re-sorts the suggested outcomes in place (the result render rebuilds
+// curResults from contact on every pass) — no screen change.
+function chooseContact(c){contact=c;mode="result";render();}
+// Fielder-dependent kinds whose fielder defaults to where the ball was tapped; the runners screen
+// offers an optional "change fielder" chip for these instead of a mandatory pick screen.
+const FIELDER_KINDS=["error","out1","flyout","lineout","popout","sacfly"];
 function chooseResult(r){
-  if(r.kind==="error"){result=Object.assign({},r);mode="errpos";render();return;}
-  if(r.kind==="dp"){
+  // Every ball-in-play result defaults to the fielder the ball was tapped to (buildResults /
+  // fullCatalog already stamp fielder:n and the matching E6 / F7 / 6-3 note). Reached-on-error,
+  // fielder's choice and double play each used to insert a pick screen here (which fielder booted
+  // it / which runner was thrown out) before the runners screen — a mandatory tap to confirm a
+  // default that was right most of the time, on exactly the plays where the scorer is busiest
+  // watching runners scramble. Per the 2026-09-27 scorer research those detours are gone: fc/dp
+  // build the plan with the lead runner out and the runners screen's own OUT cells reassign it
+  // (setFcOut/setDpOut); error and the catalog's outs keep the tapped fielder, with a "change
+  // fielder" chip on the runners screen (errpos/outpos) for the rare play that belongs elsewhere.
+  if(r.kind==="dp"||r.kind==="fc"||r.kind==="error"){
     result=Object.assign({},r);
-    const onBase=[G.bases[1],G.bases[2],G.bases[3]].filter(Boolean).length;
-    if(onBase>1){mode="dppick";render();return;}
-    plan=buildPlan("dp",G.bases,batterLabel(),batter().name,null,batterKeyOf(batter()));mode="runners";render();return;
+    plan=buildPlan(r.kind,G.bases,batterLabel(),batter().name,null,batterKeyOf(batter()));mode="runners";render();return;
   }
-  if(r.kind==="fc"){
-    result=Object.assign({},r);
-    const onBase=[G.bases[1],G.bases[2],G.bases[3]].filter(Boolean).length;
-    if(onBase>1){mode="fcpick";render();return;}   // more than one runner → who the defense chose is a real decision
-    plan=buildPlan("fc",G.bases,batterLabel(),batter().name,null,batterKeyOf(batter()));mode="runners";render();return;
-  }
-  // From the full catalog ("something else"), let the user pick the actual fielder for fielder-dependent outs.
-  if(showAll&&["out1","flyout","lineout","popout","sacfly"].includes(r.kind)){result=Object.assign({},r);mode="outpos";render();return;}
-  result=r;const movers=buildPlan(r.kind,G.bases,batterLabel(),batter().name,null,batterKeyOf(batter()));plan=movers;
+  result=Object.assign({},r);const movers=buildPlan(r.kind,G.bases,batterLabel(),batter().name,null,batterKeyOf(batter()));plan=movers;
   const noRunners=!G.bases[1]&&!G.bases[2]&&!G.bases[3];
-  const auto=r.kind==="hr"||(["out1","flyout","popout","lineout"].includes(r.kind)&&noRunners);
-  if(auto){commit(r,movers);}else{mode="runners";render();}
+  // Suggested-list outs with nobody on auto-commit (zero extra taps; the fielder is the tapped one).
+  // The same outs picked from the full catalog stop on the runners screen instead: the scorer went
+  // to "more outcomes" on purpose, and that screen is where the optional "change fielder" chip
+  // lives — auto-committing would make it unreachable there.
+  const auto=r.kind==="hr"||(!showAll&&["out1","flyout","popout","lineout"].includes(r.kind)&&noRunners);
+  if(auto){commit(result,movers);}else{mode="runners";render();}
 }
+// Open the optional fielder picker from the runners screen (the "E6 · change fielder" chip).
+function openFielderPick(){
+  if(!result||!FIELDER_KINDS.includes(result.kind))return;
+  mode=result.kind==="error"?"errpos":"outpos";render();
+}
+// Both setters are reached ONLY from the runners screen now, so they keep the plan the scorer has
+// already been editing (runner destinations, extra outs) instead of rebuilding it, and always return
+// to runners — the play is confirmed there, never auto-committed from here.
 function setOutFielder(pos){
   const n=POSNUM[pos];
   const note={out1:(pos==="1B"?"3U":n+"-3"),flyout:"F"+n,lineout:"L"+n,popout:"P"+n,sacfly:"SF"+n}[result.kind]||result.note;
-  result=Object.assign({},result,{note,fielder:n});
-  const movers=buildPlan(result.kind,G.bases,batterLabel(),batter().name,null,batterKeyOf(batter()));plan=movers;
-  const noRunners=!G.bases[1]&&!G.bases[2]&&!G.bases[3];
-  if(noRunners&&["out1","flyout","popout","lineout"].includes(result.kind))commit(result,movers); else {mode="runners";render();}
+  // The label is rebuilt with the note (the outpos hint reads result.label back), so a changed
+  // fielder doesn't leave "Flyout to CF" sitting next to an F9 note.
+  const label={out1:`Out at first (${note})`,flyout:`Flyout to ${pos}`,lineout:`Lineout to ${pos}`,popout:`Popout to ${pos}`,sacfly:"Sac fly"}[result.kind]||result.label;
+  // fielderPos keeps the position STRING for the picker highlight: POSNUM maps both RCF and RF to
+  // 9 in coach-pitch, so a number-only compare lit two cells. result is transient (never saved).
+  result=Object.assign({},result,{label,note,fielder:n,fielderPos:pos});
+  if(!plan)plan=buildPlan(result.kind,G.bases,batterLabel(),batter().name,null,batterKeyOf(batter()));
+  mode="runners";render();
 }
 function setDpOut(base){
   plan=buildPlan("dp",G.bases,batterLabel(),batter().name,{dpOut:+base},batterKeyOf(batter()));mode="runners";render();
@@ -2253,8 +2373,9 @@ function setFcOut(base){
 }
 function setErrorFielder(pos){
   const n=POSNUM[pos];
-  result=Object.assign({},result,{label:`Reached on error (${pos})`,note:`E${n}`,fielder:n});
-  plan=buildPlan("error",G.bases,batterLabel(),batter().name,null,batterKeyOf(batter()));mode="runners";render();
+  result=Object.assign({},result,{label:`Reached on error (${pos})`,note:`E${n}`,fielder:n,fielderPos:pos});   // fielderPos: see setOutFielder
+  if(!plan)plan=buildPlan("error",G.bases,batterLabel(),batter().name,null,batterKeyOf(batter()));
+  mode="runners";render();
 }
 function setDest(i,c){const m=plan[i];if(!m)return;
   // fc/dp's out runner is ALWAYS out at the force base (start+1) — that's what a force play means,
@@ -2306,7 +2427,21 @@ function commit(r,movers){
   const _scd=movers.filter(m=>!m.out&&m.dest===4&&!m.isBatter).map(m=>((m.name||m.label||"Runner")+(_ord[m.start]?" scores from "+_ord[m.start]:" scores")));
   const _loc=(tap&&tap.zone)?(" "+tap.zone):"";   // where it was hit, e.g. "to left field" (B5 — name the hitter + where)
   bcastEvent(r.kind, bn+_loc+(_scd.length?"; "+_scd.join(", "):"")+(rbi?` · ${rbi} RBI`:""), k0, bk0, inn0, half0);
+  // Keep this play's UI state (result, confirmed plan, field tap, contact) on the undo snapshot
+  // taken at the top of this function, tagged with its feed line's id. snapshot() itself stores
+  // only {g, fl}, so before this a wrong runner default noticed one tap too late (Confirm) cost the
+  // whole re-entry: undo, In Play, field, contact, result, the one corrected cell, Confirm again
+  // (per the 2026-09-27 scorer research). adjustLastPlay() reads this back and re-opens the
+  // runners screen pre-filled instead. Lives on hist (in-memory), never on G — so saved/cloud games
+  // are unchanged and older snapshots without it simply aren't re-openable. The lineup fingerprint
+  // (sig) is taken at the very end, after render()/broadcast(), so it describes G as the next
+  // render will see it.
+  let _play=null;
+  try{ const _top=hist[hist.length-1];
+    if(_top&&_top.g) _top.play=_play={eid:_eventId,result:JSON.parse(JSON.stringify(r)),plan:JSON.parse(JSON.stringify(movers)),tap:tap?Object.assign({},tap):null,contact:contact||null,showAll:!!showAll};
+  }catch(e){}
   flash(r.note+(runs?` · ${runs} run${runs>1?"s":""}`:"")+(rbi?` · ${rbi} RBI`:"")+(capped?" · run cap":""));resetUI();render();broadcast();
+  if(_play)_play.sig=reopenSig();   // see lastPlayReopenable() (until set, the render above treats the play as re-openable)
   try{ triggerAnim(G.anim); }catch(e){}
 }
 function planState(plan){
@@ -3128,7 +3263,7 @@ function diamondNoChip(){ noFieldChip=true; const s=diamondSVG(); noFieldChip=fa
 function fieldOverlays(){
   if(noFieldChip) return "";
   if(!isWide()) return "";   // phone: no in-field pitch chip (it crowded the small field); pitch count shows in the scorer's pitch line
-  if(["locate","contact","result","runners","errpos","outpos","dppick","fcpick"].includes(mode)) return "";
+  if(["locate","result","runners","errpos","outpos"].includes(mode)) return "";
   const pc=currentPitchCount(),pn=currentPitcherName();
   const aH=sideHits("away"),hH=sideHits("home");
   const aE=(G.errors&&G.errors.away)||0,hE=(G.errors&&G.errors.home)||0;
@@ -3379,7 +3514,9 @@ function pitchBtn(act,label,icon,accent){
 // phone-sized padding/font as everything else here, even though there's plenty of room to make
 // them an easier, more confident tap target on a bigger screen. (jford, 2026-07-06: "those buttons
 // need to be bigger on the tablet and pc.")
-function chip(c){const a=contact===c,w=isWide();return `<button data-act="contact" data-arg="${c}" style="background:${a?T.clay:T.surface};border:none;border-radius:0;color:${a?"#FFFFFF":T.chalk};padding:${w?"22px 10px":"13px 6px"};font-family:${MONO};font-size:${w?"18px":"14px"};font-weight:800;letter-spacing:.5px;text-transform:uppercase">${c}</button>`;}
+// Contact-type chip. Sized for a five-across toggle strip at the top of the result sheet (it was a
+// big 3x2 grid when contact had a screen of its own — see onFieldTap).
+function chip(c){const a=contact===c,w=isWide();return `<button data-act="contact" data-arg="${c}" style="background:${a?T.clay:T.surface};border:none;border-radius:0;color:${a?"#FFFFFF":T.chalk};padding:${w?"12px 2px":"10px 2px"};font-family:${MONO};font-size:${w?"13px":"11.5px"};font-weight:800;letter-spacing:.3px;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${c}</button>`;}
 
 /* Time picker — Hour : Min : AM/PM using the app's own themed dropdown (themedSelect), NOT native
    <select> (whose OS popup is white/system-font/clunky in this WebView). Renders the 3 pickers + a hidden
@@ -5347,7 +5484,31 @@ function actionArea(){
           <div style="display:grid;grid-template-columns:1fr 1fr 52px;gap:2px;background:${T.line}">${koBtn("looking","Looking")}${koBtn("swinging","Swinging")}<button data-act="koskip" title="Skip — back to Ball/Strike/Foul/In Play" style="background:${T.surface};border:none;border-radius:0;color:${T.sageDim};font-size:20px;font-weight:800;display:flex;align-items:center;justify-content:center">&times;</button></div></div>`
       : `<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:2px;background:${T.line};border:2px solid ${T.line};border-radius:12px;overflow:hidden">
         ${pitchBtn("ball","Ball",ICN.ball)}${pitchBtn("strike","Strike",ICN.strike)}${pitchBtn("foul","Foul",ICN.foul)}${pitchBtn("inplay","In Play",ICN.inplay,true)}</div>`;
-    return `${cpTag}${ptypeRow}
+    // "Adjust runners" — re-open the ball in play just confirmed with its runners pre-filled
+    // (adjustLastPlay()). Shown on BOTH layouts (the phone had no post-Confirm fix at all, per the
+    // 2026-09-27 scorer research) and only while that play is still the top of hist, so the next
+    // pitch or any other action retires it on its own. Deliberately not on a timer: it only ever
+    // goes away on the scorer's own next tap. Where it sits is chosen so its coming and going never
+    // moves the Ball/Strike grid under a thumb that's about to repeat a tap:
+    //  - phone: ABOVE the pitch grid. That column is bottom-anchored (a flex spacer above the action
+    //    area), so the spacer absorbs the row and the grid stays put.
+    //  - wide: BELOW the base-running row, with an invisible same-size stand-in when there's nothing
+    //    to adjust — the monitor-on column is vertically centered, so a row appearing or vanishing
+    //    anywhere in it would otherwise nudge the whole column by half its height.
+    const adjustRow=(()=>{
+      const lp=(viewMode==="scorer")?lastPlayReopenable():null;
+      const wideNow=isWide();
+      if(!lp&&(!wideNow||viewMode!=="scorer"))return "";
+      const hasRunners=!!lp&&lp.plan.some(m=>!m.isBatter);
+      let what=""; if(lp){ try{ what=playSummary(lp.result,lp.tap); }catch(e){} }
+      const inner=`<span style="display:flex;align-items:center;gap:8px;text-transform:uppercase;letter-spacing:.3px"><span style="color:${T.amber};font-size:17px;line-height:1">&#8630;</span>${(!lp||hasRunners)?"Adjust runners":"Adjust last play"}</span><span style="color:${T.sage};font-weight:600;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0">${escHtml(what)}</span>`;
+      const st=`${flatBtn};border-color:${T.line};background:${T.surface2};color:${T.chalk};padding:9px 12px;justify-content:space-between;text-transform:none;letter-spacing:0`;
+      return lp
+        ? `<button data-act="adjustlast" title="Re-open the last play with the runners already filled in" style="${st}">${inner}</button>`
+        : `<button type="button" disabled tabindex="-1" aria-hidden="true" style="${st};visibility:hidden;pointer-events:none">${inner}</button>`;   // same element type, so exactly the same height
+    })();
+    const isPhone=!isWide();
+    return `${isPhone?adjustRow:""}${cpTag}${ptypeRow}
       ${pitchGrid}
       ${(()=>{
         // Base-running (steal/WP/PB/balk/pickoff) stays on the wide (tablet/PC) layout, which has the
@@ -5364,7 +5525,8 @@ function actionArea(){
         if(!_cp) cells.push(`<button data-act="hbp" style="${flatBtn};border:none;border-radius:0;border-bottom:3px solid ${T.clay}"><span style="color:${T.clay}">${ICN.hbp}</span>HBP</button>`);
         cells.push(`<button data-act="endinning" style="${flatBtn};border:none;border-radius:0;flex-direction:column;gap:1px;border-bottom:3px solid ${T.amber}"><span style="display:flex;align-items:center;gap:5px"><span style="color:${T.amber}">${ICN.inning}</span>End inn</span><span style="color:${T.sage};font-weight:600;font-size:10px;text-transform:none;letter-spacing:0">${halfLabel} · ${G.outs} out${G.outs===1?"":"s"}</span></button>`);
         return `<div style="display:grid;grid-template-columns:repeat(${cells.length},1fr);gap:2px;background:${T.line};border:2px solid ${T.line};border-radius:10px;overflow:hidden">${cells.join("")}</div>`;
-      })()}`;
+      })()}
+      ${isPhone?"":adjustRow}`;
   }
   if(mode==="locate"){
     // Outcomes where the ball was NOT put in play (no field location needed) — shown up front so
@@ -5373,34 +5535,9 @@ function actionArea(){
     return step("Where did it go?","Tap the field above — the fielder is set automatically.",
       `${noPlay}<button data-act="cancel" style="${ghost};width:100%">Cancel</button>`);
   }
-  if(mode==="contact"){
-    return step(`Hit ${tap.zone} — what kind?`,`Fielder: ${fielderLabel(tap.pos)}. Re-tap the field to move it.`,
-      `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:2px;background:${T.line};border:2px solid ${T.line};border-radius:10px;overflow:hidden">
-        ${["Grounder","Liner","Fly","Popup","Bunt"].map(chip).join("")}<div style="background:${T.surface}"></div></div>
-        <button data-act="cancel" style="${ghost};width:100%;margin-top:8px">Cancel</button>`);
-  }
-  if(mode==="dppick"){
-    const BN={1:"1st",2:"2nd",3:"3rd"};
-    const lead=G.bases[1]?1:G.bases[2]?2:3;
-    const opts=[1,2,3].filter(b=>G.bases[b]).map(b=>{const r=G.bases[b],sel=b===lead;
-      return `<button data-act="dpout" data-arg="${b}" style="display:flex;align-items:center;justify-content:space-between;background:${sel?T.surface2:T.surface};border:2px solid ${sel?T.clay:T.line};border-left:4px solid ${r.color};color:${T.chalk};border-radius:10px;padding:13px 14px;font-size:14px;font-weight:700">
-        <span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${r.color};margin-right:8px;vertical-align:middle"></span>${r.label}${r.name?" "+r.name:""}</span>
-        <span style="font-family:${MONO};color:${T.sage};font-size:12px">on ${BN[b]}</span></button>`;}).join("");
-    return step("Who was doubled off?","Batter is out at first — tap the runner who was the second out. Defaults to the lead runner.",
-      `<div style="display:flex;flex-direction:column;gap:8px">${opts}
-        <button data-act="back-result" style="${ghost}">Back</button></div>`);
-  }
-  if(mode==="fcpick"){
-    const BN={1:"1st",2:"2nd",3:"3rd"};
-    const lead=G.bases[3]?3:G.bases[2]?2:1;
-    const opts=[1,2,3].filter(b=>G.bases[b]).map(b=>{const r=G.bases[b],sel=b===lead;
-      return `<button data-act="fcout" data-arg="${b}" style="display:flex;align-items:center;justify-content:space-between;background:${sel?T.surface2:T.surface};border:2px solid ${sel?T.clay:T.line};border-left:4px solid ${r.color};color:${T.chalk};border-radius:10px;padding:13px 14px;font-size:14px;font-weight:700">
-        <span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${r.color};margin-right:8px;vertical-align:middle"></span>${r.label}${r.name?" "+r.name:""}</span>
-        <span style="font-family:${MONO};color:${T.sage};font-size:12px">on ${BN[b]}</span></button>`;}).join("");
-    return step("Who's out on the fielder's choice?","Batter reaches base safely — tap the runner the defense got instead. Defaults to the lead runner.",
-      `<div style="display:flex;flex-direction:column;gap:8px">${opts}
-        <button data-act="back-result" style="${ghost}">Back</button></div>`);
-  }
+  // The former "contact", "dppick" and "fcpick" screens are gone (per the 2026-09-27 scorer research):
+  // contact is a chip strip on the result sheet, and who-was-out on a fielder's choice / double play
+  // is picked with the OUT cells on the runners screen, which already drew the diamond and every runner.
   if(mode==="errpos"){
     const order=cpMode()?["P","C","1B","2B","3B","SS","LF","LCF","RCF","RF"]:["P","C","1B","2B","3B","SS","LF","CF","RF"];
     // Selected cell's text stayed T.chalk regardless — fine in dark mode (T.clay is a light-ish
@@ -5409,17 +5546,26 @@ function actionArea(){
     // top of it), so a selected cell was near-black text on a dark background. (jford, 2026-07-06:
     // "the select color is dark and the black letters are dark.") White text on the selected cell
     // matches the same selected-state pattern used elsewhere (chip(), etc.)
-    const cells=order.map(p=>{const sel=p===tap.pos;return `<button data-act="errpos" data-arg="${p}" style="display:flex;flex-direction:column;align-items:center;gap:2px;background:${sel?T.clay:T.surface};border:none;border-radius:0;color:${sel?"#FFFFFF":T.chalk};padding:15px 4px;font-size:15px;font-weight:800">${p}<span style="font-size:10px;color:${sel?"rgba(255,255,255,.8)":T.sage};font-weight:600">${POSNUM[p]}</span></button>`;}).join("");
+    // Opened from the runners screen's "change fielder" chip (no longer a mandatory stop on the way
+    // there), so the highlight follows whichever fielder the result currently carries, not just the tap.
+    // Compared as position strings, not POSNUM numbers: coach-pitch's RCF and RF are both 9, so a
+    // number compare highlighted two cells at once. Results straight from buildResults/fullCatalog
+    // carry no fielderPos, so the tap's own position is the default.
+    const curPos=(result&&result.fielderPos)||tap.pos;
+    const cells=order.map(p=>{const sel=p===curPos;return `<button data-act="errpos" data-arg="${p}" style="display:flex;flex-direction:column;align-items:center;gap:2px;background:${sel?T.clay:T.surface};border:none;border-radius:0;color:${sel?"#FFFFFF":T.chalk};padding:15px 4px;font-size:15px;font-weight:800">${p}<span style="font-size:10px;color:${sel?"rgba(255,255,255,.8)":T.sage};font-weight:600">${POSNUM[p]}</span></button>`;}).join("");
     return step("Error charged to which fielder?","Defaults to where the ball went — tap another fielder if the error was elsewhere.",
       `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:2px;background:${T.line};border:2px solid ${T.line};border-radius:10px;overflow:hidden">${cells}</div>
-       <button data-act="back-result" style="${ghost};margin-top:10px;width:100%">Back</button>`);
+       <button data-act="back-runners" style="${ghost};margin-top:10px;width:100%">Back</button>`);
   }
   if(mode==="outpos"){
     const order=cpMode()?["P","C","1B","2B","3B","SS","LF","LCF","RCF","RF"]:["P","C","1B","2B","3B","SS","LF","CF","RF"];
-    const cells=order.map(p=>`<button data-act="outpos" data-arg="${p}" style="display:flex;flex-direction:column;align-items:center;gap:2px;background:${T.surface};border:none;border-radius:0;color:${T.chalk};padding:15px 4px;font-size:15px;font-weight:800">${p}<span style="font-size:10px;color:${T.sage};font-weight:600">${POSNUM[p]}</span></button>`).join("");
-    return step("Which fielder made the play?",(result?result.label+" — ":"")+"tap the position that fielded it.",
+    // Same optional-chip entry as errpos above: highlight the fielder the result already carries
+    // (by position string, for the same RCF/RF-both-9 reason).
+    const curPos=(result&&result.fielderPos)||tap.pos;
+    const cells=order.map(p=>{const sel=p===curPos;return `<button data-act="outpos" data-arg="${p}" style="display:flex;flex-direction:column;align-items:center;gap:2px;background:${sel?T.clay:T.surface};border:none;border-radius:0;color:${sel?"#FFFFFF":T.chalk};padding:15px 4px;font-size:15px;font-weight:800">${p}<span style="font-size:10px;color:${sel?"rgba(255,255,255,.8)":T.sage};font-weight:600">${POSNUM[p]}</span></button>`;}).join("");
+    return step("Which fielder made the play?",(result?result.label+" — ":"")+"defaults to where the ball went; tap the position that actually fielded it.",
       `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:2px;background:${T.line};border:2px solid ${T.line};border-radius:10px;overflow:hidden">${cells}</div>
-       <button data-act="back-result" style="${ghost};margin-top:10px;width:100%">Back</button>`);
+       <button data-act="back-runners" style="${ghost};margin-top:10px;width:100%">Back</button>`);
   }
   if(mode==="result"){
     if(!showAll)curResults=buildResults(tap.pos,contact,G.bases);
@@ -5435,16 +5581,28 @@ function actionArea(){
         sections+=`<div style="font-size:10px;color:${T.sage};font-weight:700;letter-spacing:.6px;margin:8px 2px 2px">${g.title.toUpperCase()}</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">${cells}</div>`;
       });
-      body=`${sections}<button data-act="showall" style="${ghost};margin-top:10px">&larr; Back to suggested</button>`;
+      body=`${sections}<div style="display:flex;gap:8px;margin-top:10px">
+        <button data-act="showall" style="${ghost};flex:1">&larr; Back to suggested</button>
+        <button data-act="cancel" style="${ghost};flex:1">Cancel</button></div>`;
     }else{
       const btns=curResults.map((r,i)=>`<button data-act="result" data-arg="${i}" style="display:flex;justify-content:space-between;align-items:center;background:${i===0?T.surface2:T.surface};border:2px solid ${i===0?T.clay:T.line};border-left:4px solid ${hitKind(r.kind)?T.safe:T.out};color:${T.chalk};border-radius:10px;padding:13px 14px;font-size:14px;font-weight:700">
         <span>${r.label}</span><span style="font-family:${MONO};opacity:.85">${r.note}</span></button>`).join("");
       body=`<div style="display:flex;flex-direction:column;gap:6px">${btns}
         <button data-act="showall" style="${ghost};border-style:dashed;color:${T.amber}">Something else happened &mdash; more outcomes</button>
-        <button data-act="back-contact" style="${ghost}">Back</button></div>`;
+        <div style="display:flex;gap:8px">
+          <button data-act="back-contact" style="${ghost};flex:1">&lsaquo; Re-tap the field</button>
+          <button data-act="cancel" style="${ghost};flex:1">Cancel</button></div></div>`;
     }
+    // Contact-type toggle strip: the default (Fly for the outfield, Grounder for the infield) is
+    // already applied and highlighted; tapping another chip re-sorts the suggested outcomes right
+    // here. This replaced a whole confirm-the-default screen between the field tap and this sheet
+    // (per the 2026-09-27 scorer research). Shown in the full catalog too, so the per-AB contact
+    // type stays editable for stats + the hit animation no matter which list the pick comes from.
+    const contactStrip=`<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:2px;background:${T.line};border:2px solid ${T.line};border-radius:10px;overflow:hidden">
+        ${["Grounder","Liner","Fly","Popup","Bunt"].map(chip).join("")}</div>`;
     return step(showAll?`Any outcome &mdash; ${contact.toLowerCase()} ${tap.zone}`:`${contact} ${tap.zone} — result?`,
-      (fielding()?`Ball to ${fielderLabel(tap.pos)}. `:"")+(showAll?"Pick exactly what happened.":"Most likely first — or tap “more outcomes”."),body);
+      (fielding()?`Ball to ${fielderLabel(tap.pos)}. `:"")+(showAll?"Pick exactly what happened.":"Most likely first — or tap “more outcomes”.")+" Contact type is set; tap a chip to change it.",
+      contactStrip+body);
   }
   // At-a-glance overview for the runners screen below: everyone's move on ONE small diamond,
   // color-matched to their row/field-map dot, instead of only reading it off separate per-row text.
@@ -5600,15 +5758,23 @@ function actionArea(){
       <span style="color:${outs?T.out:T.sageDim}">${outs} out${outs===1?"":"s"}</span></div>`;
 
     const title=playSummary(result,tap);
-    // Every other picker screen (contact/result/dppick/fcpick/errpos/outpos) gets its title from
+    // Every other picker screen (result/errpos/outpos) gets its title from
     // step(), which wraps it in a proper card (frost-card, background:T.surface). This screen built
     // its own header instead and never got that wrapper — the title sat directly on the page's turf
     // background with no card and no explicit text color, unreadable in day mode (dark text on a
     // dark image). (jford, 2026-07-06, from a screenshot: "fielder's choice in black letters on the
     // dark blue turf, hard to see.") Matches step()'s exact card styling now.
-    return `<div class="frost-card" style="flex-shrink:0;background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:12px 14px">
+    // Optional "E6 · fielder" chip for fielder-dependent kinds (error, ground/fly/line/pop out, sac
+    // fly): the fielder defaulted to where the ball was tapped and this screen no longer waits behind
+    // a which-fielder pick (per the 2026-09-27 scorer research). The chip opens that same picker
+    // (errpos/outpos) and comes straight back here with the runner edits kept.
+    const fielderChip=(result&&FIELDER_KINDS.includes(result.kind))
+      ?`<button data-act="fielderpick" title="Change which fielder is charged" style="flex:none;align-self:flex-start;background:${T.surface2};border:2px solid ${T.line};color:${T.chalk};border-radius:8px;padding:7px 10px;font-family:${MONO};font-size:12px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;white-space:nowrap">${result.note} &middot; fielder</button>`:"";
+    return `<div class="frost-card" style="flex-shrink:0;display:flex;align-items:center;gap:10px;background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:12px 14px">
+        <div style="flex:1;min-width:0">
         <div style="font-family:${MONO};font-size:19px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;line-height:1.05;color:${T.ink}">${title}</div>
         <div style="font-size:11px;color:${T.sage};margin-top:3px">${reassignKind?"Tap where each runner ended up — or tap OUT to change who the defense got.":(plan.some(m=>!m.isBatter)?"Tap where each runner ended up — or tap OUT if one was thrown out too.":"Tap where each runner ended up — the batter and any outs are already set.")}</div></div>
+        ${fielderChip}</div>
       ${playDiamondSvg(plan)}
       <div style="flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;display:flex;flex-direction:column;gap:6px;padding-right:2px">${rows}</div>
       <div style="flex-shrink:0;display:flex;flex-direction:column;gap:8px">
@@ -5978,7 +6144,7 @@ function render(){
   const toastEl=toast?`<div id="toastEl" style="position:absolute;bottom:12px;left:50%;transform:translateX(-50%);background:#0B0E13;color:${T.lime};border:2px solid ${T.lime};font-family:${MONO};font-weight:800;font-size:14px;letter-spacing:.5px;text-transform:uppercase;padding:7px 16px;border-radius:999px;white-space:nowrap;z-index:5;box-shadow:0 4px 16px rgba(0,0,0,.55)">${toast}</div>`:"";
   // GameChanger model: the field stays the big hero, and the pick-an-event steps
   // appear as a bottom-sheet MODAL over it (no inline scrolling to choose).
-  const pickerModal=(mode==="contact"||mode==="result"||mode==="errpos"||mode==="dppick"||mode==="fcpick"||mode==="outpos");
+  const pickerModal=(mode==="result"||mode==="errpos"||mode==="outpos");
   // Focus the field while a play is being entered: drop the score box / video tabs / role
   // toggle so the diamond gets the room. Restored automatically when back to idle.
   const focusPlay=(mode==="locate"||mode==="runners"||pickerModal);
@@ -6115,7 +6281,7 @@ function render(){
         </div>
       </div>`;
   } else if(pickerModal){
-    // Phone outcome picker (contact/result/fielder/etc.): full-screen — batter card on top,
+    // Phone outcome picker (result / fielder pick): full-screen — batter card on top,
     // big tappable buttons fill the rest. The field is hidden (not needed here) and there's no
     // bottom-sheet, so no wasted space and no scrolling.
     body=`<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:10px">
@@ -6312,6 +6478,7 @@ document.getElementById("app").addEventListener("click",e=>{
   if(act==="abreclass"){ const i=arg.indexOf(":"); reclassAB(+arg.slice(0,i), arg.slice(i+1)); return; }
   if(act==="abrbi"){ const i=arg.indexOf(":"); adjustABRbi(+arg.slice(0,i), +arg.slice(i+1)); return; }
   if(act==="abrewind"){ rewindToEvent(+arg); return; }
+  if(act==="abreopen"){ adjustLastPlay(); return; }   // abEditSheet's "Re-open this play" (most recent ball in play only)
   if(act==="feedsize"){ try{localStorage.setItem("al-feed-size",arg);}catch(e){} render(); return; }
   if(act==="brsteal"){ brSteal(+arg); return; }
   if(act==="bradv"){ brAdvance(+arg); return; }
@@ -6530,7 +6697,7 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="walk")manual("walk","Walk");
   else if(act==="hbp")manual("hbp","Hit by pitch");
   else if(act==="ci"){ tap=null; contact=null; mode="idle"; manual("ci","Catcher's interference"); }   // no field location; return to scoring
-  else if(act==="cancel"){resetUI();render();}
+  else if(act==="cancel")leavePlayEntry();   // a re-opened play goes back as entered (see adjustLastPlay)
   else if(act==="contact")chooseContact(arg);
   else if(act==="result")chooseResult(curResults[+arg]);
   else if(act==="errpos")setErrorFielder(arg);
@@ -6542,8 +6709,15 @@ document.getElementById("app").addEventListener("click",e=>{
     // thrown out at the plate, not a force play at all. See the runners-screen comment above
     // (mode==="runners") for the full story.
     const i=+arg,m=plan[i]; if(!m||m.isBatter)return;
-    if(m.out){ m.out=false; m.color=m.origColor||m.color; m.dest=m.start; }
-    else{ if(plan.filter(x=>x.out).length>=3-G.outs)return; m.out=true; m.color=T.out; m.dest=Math.min(4,m.start+1); }
+    // Un-marking used to snap m.dest back to the runner's start base, throwing away whatever the
+    // scorer had set — both the "TO" base picked before a stray OUT tap and any "OUT AT" base they
+    // corrected afterwards (per the 2026-09-27 scorer research: preserve m.dest). Now: an out base
+    // the scorer moved off the default (start+1) is where the runner really ended up, so it stays as
+    // their safe destination; otherwise the destination from before the OUT tap comes back (falling
+    // back to the start base for plans where it was never recorded, e.g. older re-opened plays).
+    const forceBase=Math.min(4,m.start+1);
+    if(m.out){ m.out=false; m.color=m.origColor||m.color; m.dest=(m.dest!==forceBase)?m.dest:(typeof m.preOutDest==="number"?m.preOutDest:m.start); delete m.preOutDest; }
+    else{ if(plan.filter(x=>x.out).length>=3-G.outs)return; m.preOutDest=m.dest; m.out=true; m.color=T.out; m.dest=forceBase; }
     render();
   }
   else if(act==="fcout")setFcOut(arg);
@@ -6552,8 +6726,10 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="lubselect")selectLuBuilder(+arg);
   else if(act==="lubmove"){ const [s,d]=arg.split(":"); moveLuBuilder(+s,d); }
   else if(act==="showall"){showAll=!showAll;render();}
-  else if(act==="back-contact"){mode="contact";render();}
+  else if(act==="back-contact")startInPlay();   // the step before the result sheet is the field tap itself now (no contact screen)
   else if(act==="back-result"){mode="result";render();}
+  else if(act==="back-runners"){mode="runners";render();}   // errpos/outpos are opened from the runners screen (fielderpick) and return there
+  else if(act==="fielderpick")openFielderPick();
   else if(act==="dest"){const[i,c]=arg.split(":");setDest(+i,+c);}
   else if(act==="confirm")commit(result,plan);
   else if(act==="lineup"){mode="lineup";render();}
@@ -6634,6 +6810,10 @@ document.getElementById("app").addEventListener("click",e=>{
       try{ const s=doc.state;
         G=s.G; if(Array.isArray(s.ROSTER))ROSTER=s.ROSTER; if(s.OUR)Object.assign(OUR,s.OUR); if(s.OPP)Object.assign(OPP,s.OPP);
         if(Array.isArray(s.gameFeed))gameFeed=s.gameFeed; if(s.curTeamId)curTeamId=s.curTeamId; if(s.oppTeamId!=null)oppTeamId=s.oppTeamId;
+        // Keep feed ids increasing across the hand-off: the adopted lines were numbered by the other
+        // device, and Undo / re-open / Rewind cut the feed by id (feedTrimTo()), so a new line must
+        // never get an id at or below one already in the feed.
+        try{ gameFeed.forEach(x=>{ if(x&&typeof x.id==="number"&&x.id>_eventId)_eventId=x.id; }); }catch(e){}
         gameActive=true; G.cloudId=teamId+"-live"; amActiveScorer=true; _myClaimAt=Date.now(); _claimStamped=false; _haveConfirmedOwnClaim=false; viewMode="scorer"; viewerLocked=false; _remoteLive=false;
         try{ if(window.cloudClaimScoring)window.cloudClaimScoring(teamId+"-live", myCloudName()); }catch(e){}
         try{ watchLiveTakeover(teamId); }catch(e){}
@@ -6800,6 +6980,7 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="share"){ shareCtx=null; openShare(); }   // game share (reset any stale invite/link context)
   else if(act==="undo")undo();
   else if(act==="redo")redo();
+  else if(act==="adjustlast")adjustLastPlay();   // idle screen's "Adjust runners" row
 });
 
 /* ===== top toolbar: game info chip · Share/QR · sync pill ===== */
@@ -6872,7 +7053,7 @@ function renderToolbar(){
   if(!playMode2){ tb.innerHTML=""; _barPieces={}; renderBarFloat(); return; }   // also clear any floating buttons on menu screens
   // While the scorer works through a play (locate/pick/runners), hide the top bar so the
   // field gets the room — it comes back when they're done.
-  if(["locate","contact","result","runners","errpos","outpos","dppick","fcpick"].includes(mode)){ tb.innerHTML=""; _barPieces={}; renderBarFloat(); return; }
+  if(["locate","result","runners","errpos","outpos"].includes(mode)){ tb.innerHTML=""; _barPieces={}; renderBarFloat(); return; }
   // In a live game the title slot becomes the Scorer/Viewer role toggle (the matchup
   // already shows in the scorebug below — no need to repeat it here).
   const scorerLocked=!canScoreNow();   // signed-in follower (not a scorer) → grey the Scorer tab
@@ -7146,7 +7327,11 @@ window.appBack=function(){
     if(reviewBatter){reviewBatter=null;render();return true;}
     if(quickEditKey){quickEditKey=null;render();return true;}
     if(reviewInn){reviewInn=false;render();return true;}
-    if(["locate","contact","result","runners","errpos","outpos","dppick","fcpick"].includes(mode)){ resetUI(); render(); return true; }
+    // The optional fielder picker is only ever opened from the runners screen (openFielderPick), so
+    // OS Back steps back there — same as its on-screen Back — instead of throwing away the whole
+    // play the scorer has already placed runners on.
+    if(mode==="errpos"||mode==="outpos"){ mode="runners"; render(); return true; }
+    if(["locate","result","runners"].includes(mode)){ leavePlayEntry(); return true; }   // a re-opened play goes back as entered
     if(mode==="editplayer"||mode==="pickpos"||mode==="pickplayer"){ mode="lineup"; render(); return true; }
     if(mode==="pickteam"){ mode="newgame"; render(); return true; }
     if(mode==="newgame"&&settingsMode){ settingsMode=false; mode="idle"; render(); return true; }

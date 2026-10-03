@@ -54,7 +54,7 @@
       case "fc": {
         // Which runner the defense actually threw to is a real scoring decision, not always the lead
         // runner — e.g. a shortstop can go to 2nd for the trailing runner instead of the plate for the
-        // lead one. opt.fcOut (from the fcpick screen, same pattern as dp's opt.dpOut) lets the scorer
+        // lead one. opt.fcOut (from the runners screen's OUT cell via setFcOut, same pattern as dp's opt.dpOut) lets the scorer
         // say who, defaulting to the lead runner when unspecified. (jford, 2026-07-06: "need to have the
         // ability to change who got out on fielders choice... no way to pick 'out' as an option.")
         // dest is ALWAYS start+1 here, out or not — every on-base runner is forced to attempt the next
