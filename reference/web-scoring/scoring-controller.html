@@ -1043,7 +1043,10 @@ function fielderLabel(pos){const nm=fielderName(pos);return nm?`${nm} (${pos})`:
 // Record an in-game lineup/position change for the historical record (C5). No-ops before the game is
 // live (so the initial lineup setup isn't logged) and skips no-op moves.
 const _pname=ri=>{const p=ROSTER[ri];return p?("#"+(p.num||"?")+" "+(p.name||"").trim()):"a player";};
-function logLineup(text){ try{ if(gameActive&&G&&text){ if(!G.lineupLog)G.lineupLog=[]; G.lineupLog.push({inn:G.inning,half:G.half,t:text}); } }catch(e){} }
+// extra (optional): typed fields merged into the entry, e.g. {kind:"courtesy",out:"o4",in:"o11",base:2}
+// from brCourtesy(), so a later reader can tell a courtesy runner from a free-text lineup move. Older
+// entries (and every other caller) are plain {inn,half,t}; the inning log only ever reads .t.
+function logLineup(text,extra){ try{ if(gameActive&&G&&text){ if(!G.lineupLog)G.lineupLog=[]; G.lineupLog.push(Object.assign({inn:G.inning,half:G.half,t:text},extra||{})); } }catch(e){} }
 function assignSlot(slot,ri){
   const old=G.lineup.order[slot],at=G.lineup.order.indexOf(ri);
   if(at>=0){G.lineup.order[at]=old;G.lineup.order[slot]=ri;}          // swap two batters (each keeps his glove)
@@ -1674,7 +1677,7 @@ function brApply(overrides,outs,label,detail,statFn){
   if(statFn){ try{ statFn(); }catch(e){} }
   resolve(brMovers(overrides), outs||0);
   try{ feedPitch(label, detail||""); }catch(e){}
-  brSheet=false;
+  brSheet=false; brBase=null; brCrPick=null;
   flipIfNeeded();   // a CS/pickoff that makes the 3rd out flips the half-inning + clears the bases
   render(); broadcast();
 }
@@ -1690,6 +1693,60 @@ function brOut(base){ const d=brName(base)+" out"; brApply({[base]:{out:true}},1
 // all runners. Ball four still walks; strike three still strikes out (and may end the half-inning).
 let brPitchPick=null;   // null | "Wild pitch" | "Passed ball" — sheet is asking ball-or-strike (legacy)
 let brWPMove=null,brWPSel={};   // WP/PB per-runner advancement: brWPMove = the label, brWPSel[base] = chosen destination
+/* Tap-a-base entry to the sheet. The "Base run" button is wide-only (jford: "page does not need a
+   baserunning button" on his phone), which left a phone or portrait-tablet scorer with no way at
+   all to record a steal, WP/PB, pickoff or caught stealing (per the 2026-09-27 scorer research).
+   Instead of a button, the occupied bases themselves open the sheet: the phone scorebug's mini
+   diamond, and the field's bases where the field is drawn between plays. brBase = the base that was
+   tapped (the sheet shows just that runner, plus the WP/PB/Balk group); null = every runner.
+   brCrPick = the base whose courtesy/pinch-runner picker is open, else null. Neither is saved. */
+let brBase=null,brCrPick=null;
+function brAnyOn(){ return !!(G&&G.bases&&(G.bases[1]||G.bases[2]||G.bases[3])); }
+function brTapOK(){ return mode==="idle"&&gameActive&&viewMode!=="viewer"&&canScoreNow()&&brAnyOn(); }
+/* Courtesy / pinch runner. G.bases[b] carries the batter's stat key, so before this a courtesy
+   runner who stole or scored put the SB/R on the kid he ran for (usually the catcher or pitcher;
+   DYB 3.04 allows a courtesy runner for both, 12.08(d) for the catcher only in coach pitch).
+   Candidates are the batting side's players who aren't the batter or already on base: for us the
+   bench (benchIdx()) then the batting order; for the opponent their order (their bench players have
+   no stat key until they're in the order). DYB says the courtesy runner is the batter who made the
+   last out, skipping a pitcher or catcher, so that player is offered first when the feed shows one. */
+function brPlayerPos(key){ try{ if(!key)return null; if(key[0]==="o")return posOfPlayer(+key.slice(1));
+  if(key[0]==="p"){ const e=oppList()[(+key.slice(1))-1]; return (e&&e.pos)||null; } }catch(e){} return null; }
+function brCrCandidates(base){
+  const ours=battingKey()===G.ourSide;
+  const taken=new Set([1,2,3].map(b=>G.bases[b]&&G.bases[b].key).filter(Boolean));
+  let bk=null; try{ bk=batterKeyOf(batter()); }catch(e){}
+  const list=[];
+  if(ours){
+    benchIdx().forEach(ri=>{ const p=ROSTER[ri]; if(p)list.push({key:"o"+ri,num:p.num,name:p.name||"",grp:"bench",slot:99}); });
+    G.lineup.order.forEach((ri,i)=>{ const p=ROSTER[ri]; if(p)list.push({key:"o"+ri,num:p.num,name:p.name||"",grp:"order",slot:i}); });
+  } else {
+    const ol=oppList(); const n=ol.length||Math.max(1,G.oppBatters||0);
+    for(let i=0;i<n;i++){ const e=ol[i]||{}; list.push({key:"p"+(i+1),num:e.num||String(i+1),name:e.name||"",grp:"order",slot:i}); }
+  }
+  const out=list.filter(c=>!taken.has(c.key)&&c.key!==bk);
+  // DYB 3.04's pick: the most recent out made by a batter of this side who is still eligible.
+  const elig=new Set(out.map(c=>c.key)); let sug=null;
+  try{ for(let i=gameFeed.length-1;i>=0&&!sug;i--){ const e=gameFeed[i];
+    if(e&&e.type==="play"&&e.bk&&OUT_KINDS.includes(e.kind)&&e.kind!=="fc"&&elig.has(e.bk)){ const pos=brPlayerPos(e.bk); if(pos!=="P"&&pos!=="C")sug=e.bk; } } }catch(e){}
+  out.forEach(c=>{ c.lastOut=(c.key===sug); });
+  return out.sort((a,b)=>(b.lastOut?1:0)-(a.lastOut?1:0));
+}
+function brCourtesy(base,key){
+  const r=brRunner(base); if(!r)return;
+  const c=brCrCandidates(base).find(x=>x.key===key); if(!c)return;
+  snapshot();   // one Undo step, like every other base-running event
+  const ours=key[0]==="o";
+  // A bench kid who never batted has no box-score row yet; statFor() would default it to the
+  // opponent with no name, so his R/SB/CS would land on the wrong team's sheet. Name it first.
+  if(!G.stats[key]){ const s=statFor(key); s.num=c.num; s.name=c.name||("Batter "+c.num); s.team=ours?"our":"opp"; s.slot=c.slot; }
+  const outName=(r.name||r.label||"Runner"), inName=(c.name?("#"+c.num+" "+c.name):("#"+c.num));
+  G.bases[base]=Object.assign({},r,{label:"#"+c.num,name:c.name,key:key});   // keeps the runner's colour; same shape resolve() writes
+  logLineup("Courtesy runner "+inName+" for "+outName+" at "+ordBase(base),{kind:"courtesy",out:r.key||null,in:key,base:base});
+  try{ feedPitch("Courtesy runner",inName+" runs for "+outName+" at "+ordBase(base)); }catch(e){}
+  brSheet=false; brBase=null; brCrPick=null;
+  render(); broadcast();
+}
 function brWPStart(label){ brWPMove=label; brWPSel={}; [3,2,1].forEach(b=>{ if(G.bases&&G.bases[b]) brWPSel[b]=Math.min(4,b+1); }); render(); }   // default: each runner +1
 function brWPCommit(){ const label=brWPMove||"Wild pitch"; const ov={}; [3,2,1].forEach(b=>{ if(G.bases&&G.bases[b]){ const d=brWPSel[b]||Math.min(4,b+1); if(d>b)ov[b]={dest:d}; } });
   brWPMove=null; const sc=brMovers(ov).filter(m=>m.dest===4).map(m=>(m.name||m.label||"Runner")+" scores");
@@ -1717,32 +1774,58 @@ function brWPApply(type){   // type: "ball" | "strike"
   }
   brSheet=false; render(); broadcast();
 }
-/* The base-running sheet (opened by the "Runners" button when anyone's on base). */
+/* The base-running sheet. Opened by the wide-only "Base run" button (brsheet, every runner), or by
+   tapping an occupied base: the field's bases between plays, or the phone scorebug's diamond
+   (brbase, scoped to that runner via brBase). brCrPick swaps the body for the courtesy-runner picker. */
 function baseRunModal(){
-  const occ=[3,2,1].filter(b=>G.bases&&G.bases[b]);
+  const occAll=[3,2,1].filter(b=>G.bases&&G.bases[b]);
+  // Scoped to the tapped base when one was tapped (and is still occupied — a cloud update or Undo
+  // can empty it while the sheet is open); otherwise every runner, as the wide "Base run" button shows.
+  const scoped=(brBase!=null&&G.bases&&G.bases[brBase])?brBase:null;
+  const occ=scoped!=null?[scoped]:occAll;
+  // The WP / PB chooser below always lists occAll, never occ: brWPCommit() moves every runner on
+  // base, so a sheet opened from one tapped base must still show (and let the scorer set) the rest.
+  // brBase is left alone so Back (brwpback) returns to the single-runner view.
+  // Coach pitch: DYB 12.06(d) bans base stealing and runners must stay on the base until the ball
+  // is hit, and a coach is pitching — so steal / caught stealing / pickoff and WP/PB/Balk can't happen.
+  // Adv +1 / Score (and the advanced On error / Out) stay for the rare runner-moves-on-his-own case.
+  const cp=cpMode();
+  const _e=s=>escHtml(s);
   const chip=(act,base,lbl,bg,fg,bd)=>`<button data-act="${act}" data-arg="${base}" style="flex:1 1 auto;min-width:0;background:${bg};border:none;border-radius:0;color:${fg};padding:11px 6px;font-family:${SANS};font-size:13px;font-weight:800;white-space:nowrap">${lbl}</button>`;
-  const runnerRows=occ.map(b=>{ const r=G.bases[b];
+  const runnerRows=occ.map(b=>{ const r=G.bases[b]; const pos=brPlayerPos(r.key);
     return `<div style="background:${T.surface2};border:2px solid ${T.line};border-radius:11px;padding:10px 11px;display:flex;flex-direction:column;gap:8px">
         <div style="display:flex;align-items:center;gap:9px"><span style="font-family:${MONO};font-size:15px;font-weight:800;color:${r.color||T.clay}">${b}B</span>
-          <span style="font-size:16px;font-weight:700;color:${T.chalk};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${((r.name||r.label||"Runner")+"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;")}</span></div>
+          <span style="font-size:16px;font-weight:700;color:${T.chalk};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${((r.name||r.label||"Runner")+"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;")}</span>${pos?`<span style="font-family:${MONO};font-size:11px;font-weight:800;color:${T.sageDim};flex:none">${_e(pos)}</span>`:""}</div>
         <div style="display:flex;flex-wrap:wrap;gap:2px;background:${T.line};border:2px solid ${T.line};border-radius:10px;overflow:hidden">
-          ${chip("brsteal",b,"&#9650; Steal",T.safe,"#fff")}
+          ${cp?"":chip("brsteal",b,"&#9650; Steal",T.safe,"#fff")}
           ${chip("bradv",b,"Adv +1",T.surface,T.chalk,T.line)}
           ${chip("brscore",b,"Score",T.lime,"#fff")}
-          ${chip("brcaught",b,"Caught steal",T.surface,T.out,T.out)}
-          ${chip("brpick",b,"Picked off",T.surface,T.out,T.out)}
+          ${cp?"":chip("brcaught",b,"Caught steal",T.surface,T.out,T.out)}
+          ${cp?"":chip("brpick",b,"Picked off",T.surface,T.out,T.out)}
           ${advEvents?chip("bronerror",b,"On error +1",T.surface,T.amber,T.amber):""}
           ${advEvents?chip("brout",b,"Out",T.surface,T.out,T.out):""}
-        </div></div>`;}).join("");
+        </div>
+        <button data-act="brcr" data-arg="${b}" style="background:${T.surface};border:2px solid ${T.line};border-radius:9px;color:${T.chalk};padding:10px 12px;font-family:${SANS};font-size:13px;font-weight:800;text-align:left;display:flex;align-items:center;justify-content:space-between;gap:8px"><span>&#8644; Courtesy / pinch runner</span><span style="color:${T.sageDim};font-weight:600;font-size:11px">${(pos==="P"||pos==="C")?"for the "+(pos==="P"?"pitcher":"catcher"):"swap who's on "+b+"B"}</span></button></div>`;}).join("");
   const gbtn=(act,lbl)=>`<button data-act="${act}" style="flex:1 1 auto;background:${T.surface2};border:none;border-radius:0;color:${T.chalk};padding:12px 8px;font-family:${SANS};font-size:14px;font-weight:800;white-space:nowrap">${lbl}</button>`;
+  // Courtesy-runner picker (replaces the sheet body while open; Back returns to it).
+  const crR=(brCrPick!=null&&G.bases&&G.bases[brCrPick])?G.bases[brCrPick]:null;
+  const crBody=crR?(()=>{ const cands=brCrCandidates(brCrPick);
+    const btn=c=>`<button data-act="brcrset" data-arg="${brCrPick}|${_e(c.key)}" style="display:flex;align-items:center;gap:10px;width:100%;background:${c.lastOut?T.surface2:T.surface};border:2px solid ${c.lastOut?T.lime:T.line};border-radius:10px;padding:11px 12px;color:${T.chalk};font-family:${SANS};font-size:15px;font-weight:700;text-align:left">
+        <span style="font-family:${MONO};font-weight:800;color:${T.sage};min-width:34px">#${_e(c.num)}</span><span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${_e(c.name||"")}</span>${c.lastOut?`<span style="font-family:${MONO};font-size:10px;font-weight:800;letter-spacing:.5px;color:${T.lime};flex:none">LAST OUT</span>`:""}</button>`;
+    const grp=(title,arr)=>arr.length?`<div style="font-size:10px;font-weight:800;letter-spacing:1px;color:${T.sageDim};margin:4px 2px 0">${title}</div>${arr.map(btn).join("")}`:"";
+    const sug=cands.filter(c=>c.lastOut), rest=cands.filter(c=>!c.lastOut);
+    return `<div style="font-size:15px;color:${T.chalk};font-weight:700;margin:2px">Who runs for ${_e(crR.name||crR.label||"the runner")} at ${brCrPick}B?</div>
+        <div style="font-size:12px;color:${T.sage};margin:-6px 2px 2px">From here on, runs and steals on this base go to the new runner. ${cp?"DYB coach pitch allows one for the catcher only":"DYB allows one for the pitcher and catcher"}: the batter who made the last out.</div>
+        <div style="display:flex;flex-direction:column;gap:6px">${cands.length?(grp("SUGGESTED (DYB)",sug)+grp("BENCH",rest.filter(c=>c.grp==="bench"))+grp("BATTING ORDER",rest.filter(c=>c.grp==="order"))):`<div style="font-size:13px;color:${T.sageDim};text-align:center;padding:14px">No one available to run.</div>`}</div>
+        <button data-act="brcrback" style="${ghost};width:100%">&lsaquo; Back</button>`; })():"";
   return `<div data-act="brclose" style="position:fixed;left:0;right:0;top:0;height:calc(var(--avh) * 100);z-index:120;background:rgba(8,11,16,.78);display:flex;align-items:center;justify-content:center;padding:16px">
       <div data-act="noop" style="width:100%;max-width:460px;max-height:calc(var(--avh) * 90);overflow-y:auto;-webkit-overflow-scrolling:touch;background:${T.surface};border:2px solid ${T.line};border-radius:18px;padding:16px;display:flex;flex-direction:column;gap:12px;box-shadow:0 18px 54px rgba(0,0,0,.6)">
-        <div style="display:flex;align-items:center;gap:10px"><div style="flex:1;font-family:${MONO};font-size:18px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:${T.lime}">Base running</div>
+        <div style="display:flex;align-items:center;gap:10px"><div style="flex:1;font-family:${MONO};font-size:18px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:${T.lime}">${crR?"Courtesy runner":(scoped!=null&&!brWPMove?"Runner on "+scoped+"B":"Base running")}</div>
           <button data-act="brclose" style="${ghost};padding:8px 14px;flex:none">Close</button></div>
-        ${brWPMove?`
+        ${crR?crBody:brWPMove?`
         <div style="font-size:15px;color:${T.chalk};font-weight:700;margin:2px">${brWPMove} — where did each runner end up?</div>
         <div style="font-size:12px;color:${T.sage};margin:-6px 2px 4px">Defaults to +1 base each. Tap to change, then Apply. (No count change — record the pitch with Ball/Strike first if it was one.)</div>
-        <div style="display:flex;flex-direction:column;gap:8px">${occ.length?occ.map(b=>{ const r=G.bases[b]; const dl=d=>d===b?"Hold":(d===4?"Score":d+"B"); const dests=[]; for(let d=b;d<=4;d++)dests.push(d);
+        <div style="display:flex;flex-direction:column;gap:8px">${occAll.length?occAll.map(b=>{ const r=G.bases[b]; const dl=d=>d===b?"Hold":(d===4?"Score":d+"B"); const dests=[]; for(let d=b;d<=4;d++)dests.push(d);
           return `<div style="background:${T.surface2};border:2px solid ${T.line};border-radius:11px;padding:10px 11px;display:flex;flex-direction:column;gap:8px">
             <div style="display:flex;align-items:center;gap:9px"><span style="font-family:${MONO};font-size:15px;font-weight:800;color:${r.color||T.clay}">${b}B</span>
               <span style="font-size:16px;font-weight:700;color:${T.chalk};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${((r.name||r.label||"Runner")+"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;")}</span></div>
@@ -1752,10 +1835,11 @@ function baseRunModal(){
         <button data-act="brwpapply" style="${bigBtn(T.lime,'')}">Apply ${brWPMove}</button>
         <button data-act="brwpback" style="${ghost};width:100%">&lsaquo; Back</button>
         `:`
-        <div style="font-size:12px;color:${T.sage};margin-top:-4px">No ball in play — the batter stays up with the same count.</div>
-        <div><div style="font-size:10px;font-weight:800;letter-spacing:1px;color:${T.sageDim};margin:0 2px 6px">WILD PITCH / PASSED BALL · then choose where each runner went</div>
-          <div style="display:flex;gap:2px;background:${T.line};border:2px solid ${T.line};border-radius:9px;overflow:hidden">${gbtn("brwp","Wild pitch")}${gbtn("brpb","Passed ball")}${gbtn("brbalk","Balk")}</div></div>
-        <div style="display:flex;flex-direction:column;gap:8px">${runnerRows||`<div style="font-size:13px;color:${T.sageDim};text-align:center;padding:14px">No runners on base.</div>`}</div>`}
+        <div style="font-size:12px;color:${T.sage};margin-top:-4px">No ball in play — the batter stays up with the same count.${cp?" Coach pitch: no stealing (DYB 12.06(d)).":""}</div>
+        ${cp?"":`<div><div style="font-size:10px;font-weight:800;letter-spacing:1px;color:${T.sageDim};margin:0 2px 6px">WILD PITCH / PASSED BALL · then choose where each runner went</div>
+          <div style="display:flex;gap:2px;background:${T.line};border:2px solid ${T.line};border-radius:9px;overflow:hidden">${gbtn("brwp","Wild pitch")}${gbtn("brpb","Passed ball")}${gbtn("brbalk","Balk")}</div></div>`}
+        <div style="display:flex;flex-direction:column;gap:8px">${runnerRows||`<div style="font-size:13px;color:${T.sageDim};text-align:center;padding:14px">No runners on base.</div>`}</div>
+        ${(scoped!=null&&occAll.length>1)?`<button data-act="brscope" style="${ghost};width:100%">All runners (${occAll.length})</button>`:""}`}
       </div></div>`;
 }
 
@@ -2779,8 +2863,12 @@ function diamondSVG(){
   const inRunners=mode==="runners";
   const paths=inRunners?planPaths(plan):[];
   const occSrc=inRunners?planState(plan).bases:G.bases;
+  // Between plays (idle, scorer only) an occupied base opens the base-running sheet for that runner,
+  // with a hit circle well past the 16-unit square so a finger finds it. See brBase.
+  const brTap=brTapOK();
   const baseSq=p=>{const[x,y]=BASE[p];const occ=occSrc[p];const fill=occ?(occ.color||TEAMS.away.color):FIELDLINE;
-    return `<g><rect x="${x-8}" y="${y-8}" width="16" height="16" rx="2.5" transform="rotate(45 ${x} ${y})"
+    const tapOn=brTap&&occ;
+    return `<g${tapOn?` data-act="brbase" data-arg="${p}" style="cursor:pointer"`:""}>${tapOn?`<circle cx="${x}" cy="${y}" r="17" fill="transparent"/>`:""}<rect x="${x-8}" y="${y-8}" width="16" height="16" rx="2.5" transform="rotate(45 ${x} ${y})"
       fill="${fill}" stroke="#000" stroke-width="1" opacity="${occ?1:0.85}"/>${occ?
       `<text x="${x}" y="${y+3.5}" font-size="9" font-family='${MONO}' font-weight="800" text-anchor="middle" fill="#0C1410">${occ.label.replace("#","")}</text>`:""}</g>`;};
   const arrowColors=[...new Set(paths.filter(p=>!p.out).map(p=>p.color))];
@@ -2843,7 +2931,7 @@ let _clockTimer=null;
 function startClock(){ if(_clockTimer)return; _clockTimer=setInterval(function(){ const t=gameClockStr(); document.querySelectorAll(".game-clock").forEach(el=>{el.textContent=t;}); },1000); }
 window.ngStartTime=function(v){ if(!v)return; const a=v.split(":"); const d=new Date(); d.setHours(+a[0]||0,+a[1]||0,0,0); G.startedAt=d.getTime(); try{saveGame();}catch(e){} render(); };
 
-function statusBar(standalone){
+function statusBar(standalone,tapBases){
   // B1 redesign: a clearer, bigger GRID scoreboard. Each team gets a colour band + tint when batting,
   // and the count/outs/bases sit in labelled cells so it's obvious what's what. Animation hooks
   // (sb-score-*, sb-balls/strikes/outs, sb-base-*) are preserved so the pops/rolls still fire.
@@ -2874,8 +2962,12 @@ function statusBar(standalone){
       ${act?`<span title="at bat" style="width:5px;height:5px;border-radius:50%;background:${c};box-shadow:0 0 6px ${c};flex:none"></span>`:`<span style="width:5px;flex:none"></span>`}
       <span class="sb-score num" id="sb-score-${t}" style="margin-left:auto;padding-left:10px;font-weight:800;font-size:25px;line-height:1;color:${act?txWhite:txDim2}"><span class="digit">${val}</span></span>
     </div>`;};
+  // tapBases (phone scorer only, from brTapOK()): an occupied base opens the base-running sheet for
+  // that runner. Each one gets a transparent hit circle bigger than the 13-unit square, and a tap
+  // anywhere else in the BASES cell opens the sheet for every runner. Broadcast/viewer bugs never pass it.
   const b=G.bases,base=(x,y,on,id)=>`<rect id="${id}" class="sb-base" x="${x-6.5}" y="${y-6.5}" width="13" height="13" rx="2" transform="rotate(45 ${x} ${y})" fill="${on?T.clay:"none"}" stroke="${on?T.clay:pipOff}" stroke-width="2"/>`;
-  const diamond=`<svg width="38" height="34" viewBox="0 0 48 44" style="overflow:visible">${base(24,11,b[2],"sb-base-2")}${base(37,24,b[1],"sb-base-1")}${base(11,24,b[3],"sb-base-3")}</svg>`;
+  const hit=(x,y,on,n)=>(tapBases&&on)?`<circle data-act="brbase" data-arg="${n}" cx="${x}" cy="${y}" r="9" fill="transparent" style="cursor:pointer"/>`:"";
+  const diamond=`<svg width="38" height="34" viewBox="0 0 48 44" style="overflow:visible">${base(24,11,b[2],"sb-base-2")}${base(37,24,b[1],"sb-base-1")}${base(11,24,b[3],"sb-base-3")}${hit(24,11,b[2],2)}${hit(37,24,b[1],1)}${hit(11,24,b[3],3)}</svg>`;
   const pipRow=(label,cls,n,max,id)=>`<div class="bso-row" id="${id}" style="display:flex;align-items:center;gap:4px;height:12px">
       <span style="font-family:${MONO};font-size:9px;font-weight:800;color:${txDim3};width:8px">${label}</span>
       ${Array.from({length:max},(_,i)=>`<span class="bso-pip ${cls}${i<n?" on":""}"></span>`).join("")}</div>`;
@@ -2892,7 +2984,9 @@ function statusBar(standalone){
         <div style="font-family:${MONO};font-size:18px;font-weight:800;color:${txWhite};line-height:1">${G.half==="T"?"▲":"▼"}${G.inning}</div>
         <div style="font-family:${MONO};font-size:7.5px;font-weight:800;letter-spacing:1px;color:${txDim3}">${G.half==="T"?"TOP":"BOT"}</div></div>
       <div style="display:flex;flex-direction:column;gap:3px;flex-shrink:0">${pipRow("B","b",G.balls,3,"sb-balls")}${pipRow("S","s",G.strikes,2,"sb-strikes")}${pipRow("O","o",G.outs,3,"sb-outs")}</div>
-      <div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0">${diamond}<div style="font-family:${MONO};font-size:7.5px;font-weight:800;letter-spacing:1px;color:${txDim3}">BASES</div></div>
+      ${tapBases
+        ? `<div data-act="brbase" title="Tap a runner: steal, WP/PB, pickoff, courtesy runner" style="display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0;cursor:pointer;padding:4px 6px;margin:-4px -6px">${diamond}<div style="font-family:${MONO};font-size:7.5px;font-weight:800;letter-spacing:1px;color:${T.lime}">RUNNERS &#9656;</div></div>`
+        : `<div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0">${diamond}<div style="font-family:${MONO};font-size:7.5px;font-weight:800;letter-spacing:1px;color:${txDim3}">BASES</div></div>`}
       ${G.startedAt?`<div style="font-family:${MONO};font-size:11px;font-weight:700;color:${txDim};white-space:nowrap;flex-shrink:0"><span class="game-clock">${gameClockStr()}</span></div>`:""}
     </div>
   </div>`;
@@ -6451,7 +6545,7 @@ function render(){
         // like "LC AA" stop truncating; batterCard() below got a taller phone-only stacked layout so the
         // name is readable and the empty space under it gets used. (v323, jford: "cant even see the team
         // names... expand those windows to use some of the empty space")
-        : `<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px">${(focusPlay||floatActive)?"":statusBar(true)}${floatActive?"":batterCard()}${focusPlay?fieldEl():pcLine+'<div style="flex:1;min-height:0"></div>'}${actionEl}${controls}</div>`;
+        : `<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px">${(focusPlay||floatActive)?"":statusBar(true,brTapOK())}${floatActive?"":batterCard()}${focusPlay?fieldEl():pcLine+'<div style="flex:1;min-height:0"></div>'}${actionEl}${controls}</div>`;
     body=`<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:9px">
         ${focusPlay?"":`<div style="display:flex;gap:8px;flex:none">${tab("score",isView?ICN.inplay+" Field":ICN.dot+" Scoring")}${tab("video",ICN.play+" Video")}</div>`}
         ${pane}
@@ -6460,7 +6554,9 @@ function render(){
   // Free-layout (BETA): a "⊞ Windows" toggle on the wide scorer view, and — when on — a fixed
   // overlay holding the draggable/resizable AT BAT window (prototype panel).
   const floatToggleBtn = "";   // toggle moved into the toolbar (renderToolbar) so it can't cover scoring controls
-  const floatLayer = floatActive ? `<div id="float-layer" style="position:fixed;inset:0;z-index:35;pointer-events:none">${floatWindow("score","Scoreboard",statusBar(true),{x:20,y:8,w:360,h:130})}${floatWindow("batter","At Bat",batterCard(),{x:24,y:150,w:340,h:168})}</div>` : "";
+  // With windows on, the phone's inline scorebug is replaced by this floating one, so it carries the
+  // same tap-a-base flag; otherwise a phone scorer would have no way into base running at all.
+  const floatLayer = floatActive ? `<div id="float-layer" style="position:fixed;inset:0;z-index:35;pointer-events:none">${floatWindow("score","Scoreboard",statusBar(true,!wide&&brTapOK()),{x:20,y:8,w:360,h:130})}${floatWindow("batter","At Bat",batterCard(),{x:24,y:150,w:340,h:168})}</div>` : "";
   paintContent(`
     ${body}${confirmOverlay()}${alertOverlay()}
     ${reviewBatter?batterReviewModal():""}
@@ -6536,8 +6632,21 @@ document.getElementById("app").addEventListener("click",e=>{
       quickEditKey="p"+(arg==="next"?(spot%len)+1:((spot-2+len)%len)+1); }
     render(); return; }
   if(act==="closequickedit"){ quickEditKey=null; render(); return; }
-  if(act==="brsheet"){ brSheet=true; brPitchPick=null; brWPMove=null; render(); return; }
-  if(act==="brclose"){ brSheet=false; brPitchPick=null; brWPMove=null; render(); return; }
+  if(act==="brsheet"){ brSheet=true; brPitchPick=null; brWPMove=null; brBase=null; brCrPick=null; render(); return; }
+  if(act==="brclose"){ brSheet=false; brPitchPick=null; brWPMove=null; brBase=null; brCrPick=null; render(); return; }
+  // Tap an occupied base (phone scorebug / idle field) → the sheet for that runner. The scorebug is
+  // also the hold-to-correct target: a hold opens the correction sheet first and the finger-up click
+  // that follows must not stack this sheet on top of it, hence the correctOpen guard.
+  if(act==="brbase"){
+    if(correctOpen||Date.now()-correctOpenAt<800||!brTapOK())return;
+    try{ if(navigator.vibrate)navigator.vibrate(13); }catch(e){}
+    const occ=[1,2,3].filter(b=>G.bases[b]); const b=+arg;
+    brBase=(b&&G.bases[b])?b:(occ.length===1?occ[0]:null);
+    brSheet=true; brPitchPick=null; brWPMove=null; brCrPick=null; render(); return; }
+  if(act==="brscope"){ brBase=null; render(); return; }
+  if(act==="brcr"){ if(G.bases[+arg]){ brCrPick=+arg; render(); } return; }
+  if(act==="brcrback"){ brCrPick=null; render(); return; }
+  if(act==="brcrset"){ const p=(arg||"").split("|"); if(p.length===2)brCourtesy(+p[0],p[1]); return; }
   if(act==="correctopen"){ correctOpen=true; correctOpenAt=Date.now(); render(); return; }
   // Ignore the backdrop "click" that rides in on the same long-press gesture that just opened the
   // sheet (mobile ghost-click) — otherwise the modal flashes open and shuts. The Done button and a
