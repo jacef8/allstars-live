@@ -111,6 +111,57 @@
   const outsFromKind = k => k === "dp" ? 2 : ["out1", "flyout", "popout", "lineout", "sacfly", "fc", "sacbunt", "cpout"].includes(k) ? 1 : 0;
   const rbiEligible = k => ["single", "double", "triple", "hr", "sacfly", "sacbunt", "walk", "hbp"].includes(k);
 
+  /* ---- correcting a completed at-bat (scoring-controller.html reclassAB(), abMoveBatter(), abMoveStamp()) ----
+     What one plate appearance of `kind` put on the box score, mirroring creditBatter() + commit():
+     the batter's AB/H/BB/K, the fielding team's E (reached on error), and the pitcher's outs (a
+     strikeout's out is added on top of outsFromKind, as creditBatter() does). "Change the call" used
+     to adjust only the batter's four numbers, which left team E, the pitcher's H/K/BB and the half's
+     hit total on the old call (per the 2026-09-27 scorer research); the difference of two footprints
+     is everything a re-ruling has to move. */
+  const NO_AB_KINDS = ["walk", "hbp", "sacfly", "sacbunt", "ci"];
+  const HIT_KIND_LIST = ["single", "double", "triple", "hr"];
+  function playFootprint(kind) {
+    return {
+      ab: NO_AB_KINDS.includes(kind) ? 0 : 1,
+      h: HIT_KIND_LIST.includes(kind) ? 1 : 0,
+      bb: kind === "walk" ? 1 : 0,
+      k: kind === "strikeout" ? 1 : 0,
+      e: kind === "error" ? 1 : 0,
+      outs: outsFromKind(kind) + (kind === "strikeout" ? 1 : 0),
+    };
+  }
+  function footprintDelta(oldKind, newKind) {
+    const o = playFootprint(oldKind), n = playFootprint(newKind), d = {};
+    for (const f of Object.keys(n)) d[f] = n[f] - o[f];
+    return d;
+  }
+  // A play line's detail text ends with "· 2 RBI" (commit()) and a strikeout's with "· looking" /
+  // "· swinging" (the K-type tag). opts.rbi (a number) rewrites the RBI tail (0 drops it), opts.dropKo
+  // drops the K-type tag. The rest of the text (batter, where it went, who scored) is left as written.
+  function playSubFix(sub, opts) {
+    let s = String(sub || ""); opts = opts || {};
+    let ko = "";
+    const km = s.match(/(?:^| · )(?:looking|swinging)$/);   // the tag alone when the line had no other text
+    if (km) { s = s.slice(0, -km[0].length); ko = km[0].replace(/^ · /, ""); }
+    if (opts.dropKo) ko = "";
+    if (typeof opts.rbi === "number") {
+      s = s.replace(/ · \d+ RBI$/, "");
+      if (opts.rbi > 0) s = s.replace(/\s*·\s*$/, "") + " · " + opts.rbi + " RBI";   // "Ball four · " (unnamed batter) gets one separator, not two
+    }
+    return ko ? (s ? s + " · " + ko : ko) : s;
+  }
+  // The batter's name in a play line's detail text, swapped for the batter it really was. A play line
+  // starts with the batter's name (commit(), strikeouts) or ends with it (a walk's "Ball four · Name");
+  // an unnamed opponent batter left that part empty, so the new name goes where it would have been.
+  function playSubRename(sub, oldName, newName) {
+    const s = String(sub || ""), o = String(oldName || "").trim(), n = String(newName || "").trim();
+    if (o && s.indexOf(o) >= 0) return s.replace(o, n);
+    if (!n) return s;
+    if (s === "" || s[0] === " " || s[0] === ";") return n + s;
+    if (/ · $/.test(s)) return s + n;
+    return s;
+  }
+
   /* The team's W-L-T record, computed from its finished-game log so the two are always consistent. */
   function teamRec(t) {
     const g = (t && t.games) || []; let w = 0, l = 0, ti = 0;
@@ -165,6 +216,10 @@
         const h = list[i];
         if (i >= cut || !h || h.cp !== false) { out.push(h); last = h; continue; }
         if (last && typeof h.ev === "number") last.dz = (typeof last.dz === "number") ? Math.min(last.dz, h.ev) : h.ev;
+        // fe = feed lines a correction rewrote, as they were before it ({id: copy}). Restoring the kept
+        // entry before it undoes that correction too, so its copies move there; the kept entry's own
+        // copies are older, so they win for a line both touched.
+        if (last && h.fe && typeof h.fe === "object") last.fe = Object.assign({}, h.fe, last.fe || {});
       }
       if (out.length !== list.length) { list.length = 0; for (const h of out) list.push(h); }
     }
@@ -241,6 +296,7 @@
       if (typeof h.cp === "boolean") e.cp = h.cp;
       if (typeof h.dz === "number") e.dz = h.dz;
       if (h.play && idx >= (playFrom || 0)) e.play = h.play;
+      if (h.fe) e.fe = h.fe;
       return e;
     });
     return { v: 1, pool: pool, s: s };
@@ -261,6 +317,7 @@
       if (typeof e.cp === "boolean") h.cp = e.cp;
       if (typeof e.dz === "number") h.dz = e.dz;
       if (e.play) h.play = e.play;
+      if (e.fe) h.fe = e.fe;
       return h;
     });
   }
@@ -379,7 +436,7 @@
 
   const api = {
     BATTER_GREEN, RUNCOLORS, OUT_MARKER_COLOR: OUT_MARKER_FALLBACK,
-    buildPlan, playSummary, outsFromKind, rbiEligible, teamRec, teamRecForSeason, gameSeason, idealText,
+    buildPlan, playSummary, outsFromKind, rbiEligible, playFootprint, footprintDelta, playSubFix, playSubRename, teamRec, teamRecForSeason, gameSeason, idealText,
     isEditablePlay, histCompact, rewindIndex, trimFeed, histPack, histUnpack,
     pitcherCreditSince, movePitcherCredit,
     runCapFor, mercyTiers, mercyCall, pitchAlertTier, catcherAlertTier,

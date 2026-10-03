@@ -432,7 +432,7 @@ let _histSavedSig=null;
 // history in hand is the one that went with that exact save.
 function histSig(){
   const top=hist[hist.length-1];
-  return hist.length+":"+(top&&top.n||0)+":"+(top&&top.play?(top.play.sig?2:1):0);
+  return hist.length+":"+(top&&top.n||0)+":"+(top&&top.play?(top.play.sig?2:1):0)+(top&&top.fe?":f"+Object.keys(top.fe).length:"");
 }
 function saveHist(){
   const sig=histSig();
@@ -1381,11 +1381,25 @@ function feedTrimTo(e){
 // 2026-07-05: "i guess i need a redo button next to the undo button.") The redo entry also keeps
 // the snapshot's ev and, for a ball in play, its re-open state (.play — see commit()), so after
 // Undo → Redo the play is still re-openable and a second Undo still trims by id.
+// A correction rewrites feed lines that already existed (the call, the batter, the inning, the RBI
+// text), and trimming by id can't put those back. feedTouch(e) keeps a copy of a line, as it was
+// before this Undo step changed it, on the newest snapshot (.fe, first touch wins); undo(), redo()
+// and Rewind put the copies back with feedRestore(), which returns the lines as they were so the
+// other direction can restore them in turn. Without it, Undo after "Change the call" brought the
+// stats back but left the feed on the new call, and the next edit of that line worked from the
+// wrong one (found while verifying the correction-sheet work from the 2026-09-27 scorer research).
+function feedTouch(e){ const t=hist[hist.length-1]; if(!t||!e||typeof e.id!=="number")return;
+  if(!t.fe)t.fe={}; if(!t.fe[e.id])t.fe[e.id]=JSON.parse(JSON.stringify(e)); }
+function feedRestore(fe){ if(!fe||typeof fe!=="object"||!Array.isArray(gameFeed))return null; const was={}; let any=false;
+  Object.keys(fe).forEach(id=>{ const cur=gameFeed.find(x=>x&&String(x.id)===id); if(!cur||!fe[id])return;
+    was[id]=JSON.parse(JSON.stringify(cur)); Object.keys(cur).forEach(k=>delete cur[k]); Object.assign(cur,JSON.parse(JSON.stringify(fe[id]))); any=true; });
+  return any?was:null; }
 function undo(){
   if(!hist.length)return;
   const e=hist.pop();
   const removedFeed=feedTrimTo(e);
-  redoStack.push({g:G,feedTail:removedFeed,ev:e&&e.ev,play:e&&e.play});
+  const _fe=feedRestore(e&&e.fe);
+  redoStack.push({g:G,feedTail:removedFeed,ev:e&&e.ev,play:e&&e.play,fe:_fe});
   const _prev=G;
   G=(e&&e.g)?e.g:e;
   keepGameKey(_prev); keepGameRules(_prev);
@@ -1402,6 +1416,7 @@ function redo(){
   G=r.g;
   keepGameKey(_prev); keepGameRules(_prev);
   if(Array.isArray(gameFeed)&&Array.isArray(r.feedTail)&&r.feedTail.length)gameFeed.push(...r.feedTail);
+  if(r.fe){ const b=feedRestore(r.fe); if(b)h.fe=b; }   // the correction's rewritten lines, back as it left them
   resetUI();render();broadcast();
 }
 // The most recent ball in play is re-openable only while the top of hist is still the snapshot
@@ -1444,7 +1459,7 @@ function lastPlayReopenable(){
 function adjustLastPlay(){
   const p=lastPlayReopenable(); if(!p)return;
   const e=hist.pop();
-  const parked={g:G,feedTail:feedTrimTo(e),ev:e.ev,play:p};
+  const parked={g:G,feedTail:feedTrimTo(e),ev:e.ev,play:p,fe:feedRestore(e.fe)};
   redoStack.push(parked);
   const _prev=G;
   G=e.g;
@@ -2180,6 +2195,174 @@ function baseRunModal(){
       </div></div>`;
 }
 
+/* "Who scored?" for a run added or taken off on the correction sheet. The +/- used to change only
+   the team total and the CURRENT inning's line cell: no runner R, no pitcher R, no run-cap tally,
+   and a run missed in the 2nd and fixed in the 4th landed in the 4th (per the 2026-09-27 scorer
+   research). Now the tap still applies at once, as one Undo step, with the right defaults: the cell
+   of the half that team last batted in, that half's run tally (which the run cap reads) and the
+   pitcher who was pitching it. A panel then appears under the score rows to say, optionally, who
+   scored, which inning, and whose RBI it was; each change re-applies the same fix in place (still
+   the one Undo step). A runner still standing on base in the half being played goes through
+   brScore() instead, the same path as "Run scores" on the base-running sheet. corrRun is not saved;
+   it lives only while the sheet is open and nothing else has been done since (n = that Undo step). */
+let corrRun=null;
+function corrRunLive(){ const t=hist[hist.length-1]; return !!(corrRun&&correctOpen&&t&&t.n===corrRun.n); }
+// The latest inning a team has batted in (or is batting in now).
+function lastInnOf(side){ if(battingKey()===side)return G.inning; return side==="away"?G.inning:Math.max(1,G.inning-1); }
+function corrPitcherName(pk){ if(!pk)return ""; if(pk==="oppP")return (OPP.short||"OPP")+" pitcher"; const p=ROSTER[+pk.slice(1)]; return p?("#"+p.num+" "+(p.name||"")).trim():"Pitcher"; }
+// Apply a run fix; returns the list of what really changed, so it can be taken back exactly.
+function runFixApply(fx){
+  const ops=[], half=fx.side==="away"?"T":"B";
+  const rbiOp=()=>{ if(fx.rbiEid!=null){ const e=gameFeed.find(x=>x.id===fx.rbiEid); if(e)ops.push(["rbi",fx.rbiEid,rbiOnEntry(e,fx.d)]); } };
+  if(fx.br){ rbiOp(); return ops; }   // brScore() already credited the run itself
+  if(!G.line)G.line={away:{},home:{}}; if(!G.line[fx.side])G.line[fx.side]={};
+  // Taking one off: the line-score box gives it up first, and only what it really gave up comes off
+  // the total, the half and the pitcher. Taking the total first let an inning with no run in it drop
+  // the score while every box stayed put, so R and the line score stopped adding up (found reviewing
+  // the correction-sheet work from the 2026-09-27 scorer research). The one exception is a total
+  // that is already more than its boxes add up to (a game saved before the line score was kept):
+  // that run isn't in any box, so only the total (and the runner's R) comes off, and no half or
+  // pitcher is guessed at.
+  let got;
+  fx.unboxed=false;
+  if(fx.d<0){
+    const lg=_nz(G.line[fx.side],fx.inn,fx.d);
+    if(!lg){
+      const sum=Object.keys(G.line[fx.side]).reduce((a,i)=>a+(G.line[fx.side][i]|0),0);
+      if((G[fx.side]|0)<=sum)return ops;   // every run is in a box, and not in this one: nothing to take off here
+      got=_nz(G,fx.side,fx.d); if(!got)return ops;
+      ops.push(["score",fx.side,got]); fx.unboxed=true;
+      if(fx.key&&G.stats[fx.key])ops.push(["r",fx.key,_nz(G.stats[fx.key],"r",got),false]);
+      rbiOp(); return ops;
+    }
+    got=_nz(G,fx.side,lg);
+    if(!got){ G.line[fx.side][fx.inn]=(G.line[fx.side][fx.inn]|0)-lg; return ops; }   // a box with a run but a 0 total: leave both
+    ops.push(["line",fx.side,fx.inn,lg]); ops.push(["score",fx.side,got]);
+  } else {
+    got=_nz(G,fx.side,fx.d); if(!got)return ops;
+    ops.push(["score",fx.side,got]);
+    ops.push(["line",fx.side,fx.inn,_nz(G.line[fx.side],fx.inn,got)]);
+  }
+  ops.push(["half",fx.inn,half,halfTally(fx.inn,half,"runs",got)]);
+  const pk=pitcherForHalf(fx.inn,half,null);
+  if(pk){ const fresh=!(G.pstats&&G.pstats[pk]); ops.push(["pr",pk,_nz(pstat(pk),"r",got),fresh]); }
+  if(fx.key){ const c=sidePlayers(fx.side).find(x=>x.key===fx.key)||null; const fresh=!G.stats[fx.key];
+    const s=c?statForPlayer(c):G.stats[fx.key]; if(s)ops.push(["r",fx.key,_nz(s,"r",got),fresh]); }
+  rbiOp();
+  return ops;
+}
+function runFixUndo(ops){
+  (ops||[]).slice().reverse().forEach(o=>{ const t=o[0];
+    if(t==="score")G[o[1]]=(G[o[1]]|0)-o[2];
+    else if(t==="line")G.line[o[1]][o[2]]=(G.line[o[1]][o[2]]|0)-o[3];
+    else if(t==="half")halfTally(o[1],o[2],"runs",-o[3]);
+    else if(t==="pr"){ if(o[3])delete G.pstats[o[1]]; else if(G.pstats[o[1]])G.pstats[o[1]].r=(G.pstats[o[1]].r|0)-o[2]; }
+    else if(t==="r"){ if(o[3])delete G.stats[o[1]]; else if(G.stats[o[1]])G.stats[o[1]].r=(G.stats[o[1]].r|0)-o[2]; }
+    else if(t==="rbi"){ const e=gameFeed.find(x=>x.id===o[1]); if(e)rbiOnEntry(e,-o[2]); } });
+}
+// The feed line that tells viewers why the score moved; kept in step with the fix.
+function corrRunFeed(){
+  const fx=corrRun, e=fx&&gameFeed.find(x=>x.id===fx.feedId); if(!e)return;
+  const c=fx.key?sidePlayers(fx.side).find(x=>x.key===fx.key):null;
+  const re=fx.rbiEid!=null?gameFeed.find(x=>x.id===fx.rbiEid):null, rs=re&&re.bk&&G.stats[re.bk];
+  const rbiTxt=rs?((fx.d>0?"RBI ":"RBI off ")+playerLabel({num:rs.num,name:/^Batter /.test(rs.name||"")?"":rs.name})):"";
+  if(fx.br){ e.sub=fx.baseSub+(rbiTxt?" · "+rbiTxt:""); return; }
+  e.inn=fx.inn; e.half=fx.side==="away"?"T":"B"; e.away=G.away; e.home=G.home;
+  e.sub=[c?playerLabel(c)+(fx.d>0?" scores":""):"",rbiTxt,"scorer correction"].filter(Boolean).join(" · ");
+}
+function corrRunStart(side,d){
+  corrRun=null;
+  let inn=lastInnOf(side);
+  // Taking one off: the latest inning that actually has a run in it.
+  if(d<0){ const L=(G.line&&G.line[side])||{}; for(let i=inn;i>=1;i--){ if((L[i]|0)>0){ inn=i; break; } } }
+  const fx={side,d,inn,key:null,rbiEid:null};
+  fx.ops=runFixApply(fx);
+  if(!fx.ops.length){ if(d<0&&(G[side]|0)>0)flash("No line-score box has a run to take off"); return; }
+  try{ feedPitch(d>0?"Run added":"Run taken off","",inn,side==="away"?"T":"B"); }catch(e){}
+  fx.feedId=_eventId; const t=hist[hist.length-1]; fx.n=t?t.n:null;
+  corrRun=fx; corrRunFeed();
+}
+// Where the run panel's inning stepper goes from fx.inn one step in direction dir (null = nowhere).
+// A run added can go in any inning the team has batted in. A run taken off can only come out of an
+// inning whose box has one, so the stepper skips empty innings (and stops when there are none that
+// way); the box of fx.inn itself is the one this fix already took from, so it is never looked at here.
+function corrRunInnStep(fx,dir){
+  const hi=lastInnOf(fx.side); dir=dir<0?-1:1;
+  if(fx.d>0){ const n=fx.inn+dir; return (n>=1&&n<=hi)?n:null; }
+  if(fx.unboxed)return null;
+  const L=(G.line&&G.line[fx.side])||{};
+  for(let i=fx.inn+dir;i>=1&&i<=hi;i+=dir){ if((L[i]|0)>0)return i; }
+  return null;
+}
+function corrRunSet(k,v){
+  if(!corrRunLive())return;
+  const fx=corrRun;
+  if(k==="base"){
+    // The runner still on that base scored: hand the whole thing to brScore(). The +'s own Undo step
+    // is taken back first (exactly as undo() would, without a Redo), so brScore()'s becomes the one.
+    const b=+v; if(fx.br||fx.d<0||battingKey()!==fx.side||fx.inn!==G.inning||!(G.bases&&G.bases[b]))return;
+    const top=hist.pop(); feedTrimTo(top); feedRestore(top.fe); const _prev=G; G=top.g; keepGameKey(_prev); keepGameRules(_prev);
+    const r=G.bases[b], key=r.key||null, nm=r.name||r.label||"Runner", before=G[fx.side]|0;
+    corrRun=null; brScore(b);
+    if((G[fx.side]|0)>before){
+      const t=hist[hist.length-1], fe=gameFeed[gameFeed.length-1];
+      corrRun={side:fx.side,d:1,inn:G.inning,key,rbiEid:null,br:{name:nm,base:b},baseSub:(fe&&fe.sub)||"",feedId:fe?fe.id:null,n:t?t.n:null,ops:[]};
+    } else flash("Run cap reached — that run doesn't count");
+    render(); return;
+  }
+  if(k==="inn"&&corrRunInnStep(fx,+v)==null)return;
+  runFixUndo(fx.ops);
+  if(k==="inn"){ fx.inn=corrRunInnStep(fx,+v); }
+  else if(k==="who"){ if(!fx.br)fx.key=v||null; }
+  else if(k==="rbi"){ fx.rbiEid=(v===""||v==null)?null:+v; }
+  // An RBI belongs to a play of the half the run is in.
+  if(fx.rbiEid!=null){ const re=gameFeed.find(x=>x.id===fx.rbiEid); if(!re||re.inn!==fx.inn||re.half!==(fx.side==="away"?"T":"B"))fx.rbiEid=null; }
+  fx.ops=runFixApply(fx);
+  corrRunFeed();
+}
+function corrRunPanel(){
+  const fx=corrRun, half=fx.side==="away"?"T":"B", tm=escHtml((TEAMS[fx.side]&&TEAMS[fx.side].short)||fx.side);
+  const sel=(on)=>`background:${on?T.lime:T.surface};border:2px solid ${on?T.lime:T.line};color:${on?"#fff":T.chalk}`;
+  const chip=(arg,on,inner)=>`<button data-act="corrrun" data-arg="${arg}" style="${sel(on)};display:flex;align-items:center;gap:6px;min-width:0;border-radius:9px;padding:9px 10px;font-family:${SANS};font-size:13px;font-weight:700;text-align:left">${inner}</button>`;
+  const pl=c=>`<span style="font-family:${MONO};font-weight:800;flex:none">#${escHtml(c.num)}</span><span style="min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(c.name||"")}</span>`;
+  const grid=items=>`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:6px">${items.join("")}</div>`;
+  const lbl=t=>`<div style="font-size:10px;font-weight:800;letter-spacing:1px;color:${T.sageDim};margin:2px 2px -2px">${t}</div>`;
+  const plays=(gameFeed||[]).filter(x=>isEditablePlay(x)&&x.bk&&x.inn===fx.inn&&x.half===half&&G.stats[x.bk]).slice().reverse();
+  const batted=new Set(plays.map(x=>x.bk));
+  let body="";
+  if(fx.br){
+    body+=`<div style="font-size:13px;color:${T.chalk};font-weight:700">${escHtml(fx.br.name)} scored from ${fx.br.base}B</div>
+      <div style="font-size:11px;color:${T.sageDim};margin-top:-6px">Same as "Run scores" on the base-running sheet: his R, the pitcher's R and this half's run count. Undo takes it back.</div>`;
+  } else {
+    const atMax=corrRunInnStep(fx,1)==null, atMin=corrRunInnStep(fx,-1)==null;
+    body+=`<div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+        <div style="min-width:0"><div style="font-weight:700;color:${T.ink};font-size:14px">Inning</div><div style="font-size:11px;color:${T.sageDim}">${fx.unboxed?"no box has a run: only the total came off":fx.d<0?"which line-score box (innings with a run)":"which line-score box"}</div></div>
+        <div style="display:flex;align-items:center;gap:8px;flex:none">
+          <button data-act="corrrun" data-arg="inn:-1" ${atMin?"disabled":""} style="background:${T.surface};border:2px solid ${T.line};color:${T.chalk};border-radius:10px;width:42px;height:42px;font-size:22px;font-weight:800;${atMin?"opacity:.35":""}">&lsaquo;</button>
+          <span style="font-family:${MONO};font-size:15px;font-weight:800;color:${T.chalk};min-width:70px;text-align:center;white-space:nowrap">${half==="T"?"&#9650; Top ":"&#9660; Bot "}${fx.inn}</span>
+          <button data-act="corrrun" data-arg="inn:1" ${atMax?"disabled":""} style="background:${T.surface};border:2px solid ${T.line};color:${T.chalk};border-radius:10px;width:42px;height:42px;font-size:22px;font-weight:800;${atMax?"opacity:.35":""}">&rsaquo;</button></div></div>`;
+    // Who: a runner still on base now (scores him for real), the players who batted that half, the rest.
+    const all=sidePlayers(fx.side);
+    const onBase=(fx.d>0&&battingKey()===fx.side&&fx.inn===G.inning)?[3,2,1].filter(b=>G.bases&&G.bases[b]):[];
+    const pool=fx.d>0?all:all.filter(c=>(G.stats[c.key]&&(G.stats[c.key].r|0)>0)||c.key===fx.key);
+    const first=pool.filter(c=>batted.has(c.key)), rest=pool.filter(c=>!batted.has(c.key));
+    body+=lbl(fx.d>0?"WHO SCORED? (OPTIONAL)":"WHOSE RUN COMES OFF? (OPTIONAL)")+grid([chip("who:",!fx.key,"Not sure")]
+      .concat(onBase.map(b=>{ const r=G.bases[b]; return chip("base:"+b,false,`<span style="font-family:${MONO};font-weight:800;flex:none;color:${T.amber}">${b}B</span><span style="min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(r.name||r.label||"Runner")}</span>`); }))
+      .concat(first.map(c=>chip("who:"+escHtml(c.key),fx.key===c.key,pl(c))))
+      .concat(rest.map(c=>chip("who:"+escHtml(c.key),fx.key===c.key,pl(c)))));
+    if(onBase.length)body+=`<div style="font-size:11px;color:${T.sageDim};margin-top:-6px">A runner on base (${onBase.map(b=>b+"B").join(", ")}) scores for real: he comes off the base.</div>`;
+  }
+  // RBI: a play of that half (taking one off: a play that has one).
+  const rp=plays.filter(x=>fx.d>0||playRbi(x)>0||x.id===fx.rbiEid).slice(0,6);
+  if(rp.length)body+=lbl(fx.d>0?"RBI TO (OPTIONAL)":"RBI COMES OFF (OPTIONAL)")+grid([chip("rbi:",fx.rbiEid==null,"No RBI")]
+    .concat(rp.map(x=>{ const s=G.stats[x.bk]; return chip("rbi:"+x.id,fx.rbiEid===x.id,`<span style="font-family:${MONO};font-weight:800;flex:none">#${escHtml(s.num)}</span><span style="min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(x.head)}</span>`); })));
+  const pk=pitcherForHalf(fx.inn,half,null), cur=fx.inn===G.inning&&half===G.half;
+  const notes=fx.unboxed?"No pitcher or half-inning changed: that run wasn't in any line-score box":[pk?"Pitcher: "+escHtml(corrPitcherName(pk)):"No pitcher charged (can't tell who pitched that half)", cur?"counts toward this half's run cap":""].filter(Boolean).join(" · ");
+  return `<div style="background:${T.surface2};border:2px solid ${T.lime};border-radius:12px;padding:11px 12px;display:flex;flex-direction:column;gap:10px">
+      <div style="font-family:${MONO};font-size:13px;font-weight:800;letter-spacing:.4px;color:${T.lime};text-transform:uppercase">${fx.d>0?"Run added":"Run taken off"} &middot; ${tm} &middot; ${half==="T"?"Top":"Bot"} ${fx.inn}</div>
+      ${body}
+      <div style="font-size:11px;color:${T.sageDim}">${notes}</div></div>`;
+}
 /* Manual correction sheet — fix the count / outs / score / inning directly when the play flow
    couldn't capture it right. Long-press the scoreboard (or the toolbar Setup) to open it. Every
    nudge is a single Undo step. */
@@ -2213,8 +2396,9 @@ function correctModal(){
         <div style="font-size:10px;font-weight:800;letter-spacing:1px;color:${T.sageDim};margin:6px 2px 0">BATTER &mdash; SKIP / GO BACK</div>
         ${step("batter","At-bat spot",battingSlot()+1,(()=>{const b=batter();return (b.ours?(b.name||("#"+b.num)):("#"+(b.num||"?")))+" is up";})())}
         <div style="font-size:10px;font-weight:800;letter-spacing:1px;color:${T.sageDim};margin:6px 2px 0">SCORE</div>
-        ${step("away",(TEAMS.away.short||"Away")+" runs",G.away,"this inning &amp; total")}
-        ${step("home",(TEAMS.home.short||"Home")+" runs",G.home,"this inning &amp; total")}
+        ${step("away",escHtml(TEAMS.away.short||"Away")+" runs",G.away,"tap, then say who &amp; which inning")}
+        ${step("home",escHtml(TEAMS.home.short||"Home")+" runs",G.home,"tap, then say who &amp; which inning")}
+        ${corrRunLive()?corrRunPanel():""}
         <div style="font-size:10px;font-weight:800;letter-spacing:1px;color:${T.sageDim};margin:6px 2px 0">INNING</div>
         ${step("inning","Inning",G.inning)}
         ${halfRow}
@@ -2222,32 +2406,251 @@ function correctModal(){
         ${step("runcap","Run cap",(G.runCap|0)||"—",(()=>{ const c=runCapNow(); return "This half: "+(c>0?c+" runs":"no cap")+(c!==(G.runCap|0)?(capFinalFree()&&G.inning===(G.innings|0)?" (final inning)":" (schedule)"):"")+" · 0 = none · more in Setup"; })())}
         <div style="font-size:10px;font-weight:800;letter-spacing:1px;color:${T.sageDim};margin:6px 2px 0">PITCH COUNT</div>
         ${step("pitch","Pitch count",_corrPC,_corrPName)}
+        ${(()=>{
+          // The phone scorer has no game feed, so its EDIT buttons (Change the call, Batter was
+          // actually..., the inning stamp, Rewind) were out of reach there; the last few at-bats are
+          // listed here instead, opening the same sheet. The wide layout keeps using the feed.
+          if(isWide()||G.final||(typeof viewMode!=="undefined"&&viewMode!=="scorer"))return "";
+          const recent=(gameFeed||[]).filter(isEditablePlay).slice(-6).reverse();
+          if(!recent.length)return "";
+          return `<div style="font-size:10px;font-weight:800;letter-spacing:1px;color:${T.sageDim};margin:6px 2px 0">RECENT AT-BATS &mdash; FIX THE CALL, BATTER OR INNING</div>
+        ${recent.map(x=>{ const s=x.bk&&G.stats&&G.stats[x.bk];
+          return `<button data-act="abedit" data-arg="${x.id}" style="display:flex;align-items:center;gap:10px;width:100%;background:${T.surface2};border:2px solid ${T.line};border-radius:12px;padding:10px 12px;color:${T.chalk};text-align:left">
+            <span style="font-family:${MONO};font-size:13px;font-weight:800;color:${T.lime};flex:none">${x.half==="T"?"&#9650;":"&#9660;"}${x.inn}</span>
+            <span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:14px;font-weight:700">${escHtml(x.head)}${s?` <span style="color:${T.sageDim};font-weight:600">&middot; #${escHtml(s.num)}${(s.name&&!/^Batter /.test(s.name))?" "+escHtml(s.name):""}</span>`:""}</span>
+            <span style="font-family:${MONO};font-size:11px;font-weight:800;color:${T.sage};flex:none">EDIT</span></button>`; }).join("")}`;
+        })()}
       </div></div>`;
 }
 /* ===== Edit a COMPLETED at-bat from the game feed (live game) =====
-   Two paths: (1) "Change the call" reclassifies the result and adjusts the batter's box-score
-   line (AB/H/BB/K) — a fast fix for "that single was really a double". (2) "Rewind to this play"
-   uses the snapshot stack to roll the whole game back to just before the play, for any change that
-   touches runners / score / outs (which a stat-only edit can't reconstruct). */
-function kindStat(kind){ return {
-  ab: ["walk","hbp","sacfly","sacbunt","ci"].includes(kind)?0:1,   // these don't count as an at-bat
-  h:  HIT_KINDS.includes(kind)?1:0,
-  bb: kind==="walk"?1:0,
-  k:  kind==="strikeout"?1:0 }; }
+   Paths: (1) "Change the call" reclassifies the result and adjusts everything the call fed: the
+   batter's line, the pitcher's, team E, the half's hits, the PA log (playFootprint() in
+   game-logic.js says what one call puts where) — a fast fix for "that single was really a double".
+   (1b) "Batter was actually..." and the inning stamp move a play to the right player or half.
+   (2) "Rewind to this play" uses the snapshot stack to roll the whole game back to just before the
+   play, for any change that touches runners / outs (which a stat-only edit can't reconstruct). */
+/* ----- shared by the at-bat fixes below and the correction sheet's "who scored?" -----
+   A correction used to change one number and leave everything that number feeds on the old value:
+   "Change the call" moved the batter's AB/H/BB/K but not team E, the pitcher's H/K/BB, the half's
+   hit total or the PA log; a run nudged on the correction sheet landed in the current inning's cell
+   with no runner R, pitcher R or run-cap tally (per the 2026-09-27 scorer research). These helpers
+   are the pieces each fix needs so a correction reaches everything the original play reached. */
+// abEditSheet()'s in-place pickers (not saved): abWho = the "Batter was actually..." list is open;
+// abStamp = {eid,inn,half} while the inning stepper sits on the OTHER team's half, waiting for who batted.
+let abWho=false,abStamp=null;
+const _nz=(o,f,d)=>{ const v=(o[f]|0), nv=Math.max(0,v+d); o[f]=nv; return nv-v; };   // add d, never below 0; returns what was really added
+// The PA log record for a feed line: by the id bcastEvent() stamps on it, else (a line saved before
+// that) the batter's last record of that half with the same result, else his last one of that half.
+// Never "his last record", which is a different at-bat once he has batted again since.
+function paFor(e){
+  const list=(e&&e.bk&&G.pa&&G.pa[e.bk])||[]; if(!list.length)return null;
+  const byId=list.find(r=>r&&r.eid===e.id); if(byId)return byId;
+  const inHalf=list.filter(r=>r&&r.eid==null&&r.inning===e.inn&&r.half===e.half);
+  return inHalf.filter(r=>r.kind===e.kind).pop()||inHalf.pop()||null;
+}
+// The RBI credited on one play: the PA record's, else what the line's own "· N RBI" text says.
+function playRbi(e){ const pa=paFor(e); if(pa&&typeof pa.rbi==="number")return pa.rbi; const m=String(e&&e.sub||"").match(/ · (\d+) RBI(?: · (?:looking|swinging))?$/); return m?+m[1]:0; }
+// The pitcher a feed line's at-bat was charged to: its pk stamp (bcastEvent()), else for a line saved
+// before the stamp, the opponent's single bucket when they were pitching, or our only pitcher so far.
+// null = can't tell, and then no pitcher line is changed (better than charging the wrong kid).
+function playPitcherKey(e){
+  if(!e)return null; if(typeof e.pk==="string"&&e.pk&&pkFitsHalf(e.pk,e.half))return e.pk;
+  return pitcherForHalf(e.inn,e.half,e.id);
+}
+// A pk stamp only counts for a half the stamped team was really in the field for: "oppP" when they
+// fielded, one of ours ("o"+roster index) when we did. A stamp that no longer fits (the play was moved
+// to the other team's half, or Home/Away was swapped since) is ignored rather than trusted, or a play
+// we fielded would stay charged to their pitcher (found reviewing the correction-sheet work from the
+// 2026-09-27 scorer research).
+function pkFitsHalf(pk,half){ const ours=(half==="T"?"home":"away")===G.ourSide; return ours?/^o\d/.test(pk):pk==="oppP"; }
+// Who was pitching in a given half-inning: the opponent's bucket when they were in the field; for
+// us, the current pitcher in the current half, else the pitcher stamped on that half's plays (the
+// last one at or before feed line `beforeId` when given), else the one stamped last in the latest
+// earlier half we fielded (he was still on the mound unless a change came between halves), else our
+// only pitcher with a line. Only our own stamps count here (see pkFitsHalf()).
+function pitcherForHalf(inn,half,beforeId){
+  const fieldSide=half==="T"?"home":"away";
+  if(fieldSide!==G.ourSide)return "oppP";
+  if(inn===G.inning&&half===G.half)return currentPitcherKey();
+  const ourPk=x=>x&&x.type==="play"&&typeof x.pk==="string"&&/^o\d/.test(x.pk);
+  const stamped=(gameFeed||[]).filter(x=>ourPk(x)&&x.inn===inn&&x.half===half&&(beforeId==null||x.id<=beforeId));
+  if(stamped.length)return stamped[stamped.length-1].pk;
+  const hx=x=>((x.inn|0)-1)*2+(x.half==="B"?1:0), at=hx({inn,half});
+  const earlier=(gameFeed||[]).filter(x=>ourPk(x)&&(x.half==="T"?"home":"away")===G.ourSide&&hx(x)<at);
+  if(earlier.length){ earlier.sort((a,b)=>hx(a)-hx(b)||(a.id|0)-(b.id|0)); return earlier[earlier.length-1].pk; }
+  const ours=Object.keys(G.pstats||{}).filter(k=>/^o\d/.test(k));
+  return ours.length===1?ours[0]:null;
+}
+// A half-inning's runs / hits / pitches tally: G.halfRuns / halfHits / halfPitches while it's the half
+// being played (the run cap and its alert read halfRuns), else that half's line in the inning log.
+function halfTally(inn,half,f,d){
+  if(!d)return 0;
+  if(inn===G.inning&&half===G.half){ return _nz(G,{runs:"halfRuns",hits:"halfHits",pitches:"halfPitches"}[f],d); }
+  const rec=(G.innLog||[]).filter(x=>x&&x.inning===inn&&x.half===half).pop();
+  return rec?_nz(rec,f,d):0;
+}
+// Change one play's RBI by d: the batter's total, the PA record and the "· N RBI" in the line's text.
+// Returns what was really changed (never takes the play or the batter below 0).
+function rbiOnEntry(e,d){
+  const s=e&&e.bk&&G.stats&&G.stats[e.bk]; if(!s||!d)return 0;
+  const pa=paFor(e), cur=playRbi(e);
+  const real=Math.max(-Math.min(cur,s.rbi|0),d);
+  if(!real)return 0;
+  feedTouch(e);
+  s.rbi=(s.rbi|0)+real;
+  if(pa)pa.rbi=Math.max(0,(pa.rbi|0)+real);
+  e.sub=playSubFix(e.sub,{rbi:cur+real});
+  return real;
+}
+// Everyone who can be credited on one side: the batting order, then (ours) the bench. key/num/name/
+// slot match what creditBatter() writes, so a row made here looks like one made by a real at-bat.
+function sidePlayers(side){
+  const out=[];
+  if(side===G.ourSide){
+    (G.lineup.order||[]).forEach((ri,i)=>{ const p=ROSTER[ri]; if(p)out.push({key:"o"+ri,num:p.num,name:p.name||"",slot:i,team:"our"}); });
+    benchIdx().forEach(ri=>{ const p=ROSTER[ri]; if(p)out.push({key:"o"+ri,num:p.num,name:p.name||"",slot:99,team:"our",bench:true}); });
+  } else {
+    const ol=oppList(); const n=ol.length||Math.max(1,G.oppBatters||0);
+    for(let i=0;i<n;i++){ const e=ol[i]||{}; out.push({key:"p"+(i+1),num:e.num||String(i+1),name:e.name||"",slot:i,team:"opp"}); }
+  }
+  return out;
+}
+function statForPlayer(c){ const fresh=!G.stats[c.key]; const s=statFor(c.key);
+  if(fresh){ s.num=c.num; s.name=c.name||("Batter "+c.num); s.team=c.team; s.slot=c.slot; } return s; }
+const playerLabel=c=>"#"+(c.num||"?")+((c.name||"").trim()?" "+c.name.trim():"");
 function reclassAB(eid,newKind){
   const e=gameFeed.find(x=>x.id===eid); if(!e)return; const s=e.bk&&G.stats&&G.stats[e.bk]; if(!s)return;
-  snapshot();
-  const o=kindStat(e.kind),n=kindStat(newKind);
-  s.ab=Math.max(0,(s.ab||0)+(n.ab-o.ab));
-  s.h =Math.max(0,(s.h ||0)+(n.h -o.h));
-  s.bb=Math.max(0,(s.bb||0)+(n.bb-o.bb));
-  s.k =Math.max(0,(s.k ||0)+(n.k -o.k));
+  if(e.kind===newKind)return;
+  snapshot(); feedTouch(e);
+  const d=footprintDelta(e.kind,newKind);
+  _nz(s,"ab",d.ab); _nz(s,"h",d.h); _nz(s,"bb",d.bb); _nz(s,"k",d.k);
+  // The pitcher who threw it: his H / K / BB (his outs follow the game's outs, which this doesn't change).
+  const pk=playPitcherKey(e); if(pk){ const ps=pstat(pk); _nz(ps,"h",d.h); _nz(ps,"k",d.k); _nz(ps,"bb",d.bb); }
+  // Out <-> reached on error: the error belongs to the team that was in the field for that play.
+  if(d.e){ if(!G.errors)G.errors={away:0,home:0}; _nz(G.errors,e.half==="T"?"home":"away",d.e); }
+  halfTally(e.inn,e.half,"hits",d.h);   // that half's hit total (the field overlay's R-H line, the inning log)
+  const pa=paFor(e); if(pa){ pa.kind=newKind; pa.note=PLAYHEAD[newKind]||newKind; pa.hit=HIT_KINDS.includes(newKind); }
+  // A strikeout's "· looking / swinging" tag no longer describes the play; a pending K-type prompt for it goes too.
+  if(e.kind==="strikeout"&&newKind!=="strikeout"){ e.sub=playSubFix(e.sub,{dropKo:true}); delete e.koType; }
+  if(koPick===e.id&&newKind!=="strikeout")koPick=null;
   e.kind=newKind; e.head=PLAYHEAD[newKind]||newKind.toUpperCase();   // relabel the feed line
   render(); broadcast();
 }
+// RBI on a batter's total that no play of his carries: what the stepper here added before it changed
+// per play (it used to move the total alone), in a game still being scored when this build loaded.
+// His PA records hold each play's RBI, so the gap between the two is that stepper's doing.
+function looseRbi(bk){
+  const s=bk&&G.stats&&G.stats[bk]; if(!s)return 0;
+  const list=(G.pa&&G.pa[bk])||[];
+  const onPlays=list.length?list.reduce((a,r)=>a+((r&&r.rbi)|0),0)
+    :(gameFeed||[]).filter(x=>x&&x.type==="play"&&x.bk===bk).reduce((a,x)=>a+playRbi(x),0);
+  return Math.max(0,(s.rbi|0)-onPlays);
+}
 function adjustABRbi(eid,d){
   const e=gameFeed.find(x=>x.id===eid); if(!e)return; const s=e.bk&&G.stats&&G.stats[e.bk]; if(!s)return;
-  snapshot(); s.rbi=Math.max(0,(s.rbi||0)+d); render(); broadcast();
+  // An RBI the old stepper put on his total alone comes off first (it was the scorer's last word on
+  // that total, and nothing else in the live sheet reaches it); the sheet says so under the stepper.
+  if(d<0&&looseRbi(e.bk)>0){ snapshot(); s.rbi=Math.max(0,(s.rbi|0)-1); render(); broadcast(); return; }
+  if(d<0&&Math.min(playRbi(e),s.rbi|0)<=0)return;   // nothing on this play to take off: not an Undo step
+  snapshot(); rbiOnEntry(e,d); render(); broadcast();
+}
+/* "Batter was actually..." — the play goes to the player who really batted: his AB/H/BB/K and this
+   play's RBI move from the credited row to his, the PA record moves to his log, the feed line names
+   him, and if he is still standing on the base this play put him on, that runner becomes him too (so
+   a later run or steal is his). Runs he scored after an earlier play stay where they were credited.
+   Batting out of order noticed one hitter late used to leave the box score on the wrong kid unless
+   every play since was rewound (per the 2026-09-27 scorer research). Same team only: a play scored in
+   the wrong half goes through abMoveStamp(), which hands it to the other team. */
+function abMoveBatter(eid,newKey){
+  const e=gameFeed.find(x=>x.id===eid); if(!e||!e.bk||e.bk===newKey)return;
+  const side=e.half==="T"?"away":"home", c=sidePlayers(side).find(x=>x.key===newKey); if(!c)return;
+  snapshot();
+  movePlayCredit(e,c);
+  flash("Credited to "+playerLabel(c));
+  abWho=false; render(); broadcast();
+}
+// Move one play's batter credit (AB/H/BB/K, RBI, PA record, feed text, the runner it left on base)
+// from e.bk to player c. Shared by abMoveBatter() and abMoveStamp().
+function movePlayCredit(e,c,keepBases){
+  feedTouch(e);
+  const oldKey=e.bk, os=G.stats&&G.stats[oldKey], ns=statForPlayer(c);
+  const fp=playFootprint(e.kind), rbi=playRbi(e), pa=paFor(e);
+  ["ab","h","bb","k"].forEach(f=>{ const got=os?-_nz(os,f,-fp[f]):fp[f]; ns[f]=(ns[f]|0)+got; });
+  if(rbi){ const got=os?-_nz(os,"rbi",-rbi):rbi; ns.rbi=(ns.rbi|0)+got; }
+  if(pa&&G.pa&&G.pa[oldKey]){
+    G.pa[oldKey]=G.pa[oldKey].filter(r=>r!==pa);
+    if(!G.pa[c.key])G.pa[c.key]=[];
+    // Keep his log in game order: before the first record from a later half-inning.
+    const ord=r=>(r.inning|0)*2+(r.half==="B"?1:0), at=G.pa[c.key].findIndex(r=>ord(r)>ord(pa));
+    if(at<0)G.pa[c.key].push(pa); else G.pa[c.key].splice(at,0,pa);
+  }
+  // Still on the base this play put him on (no later play of his): that runner is the real batter too.
+  // Not when the play moves to the other team's half (keepBases): who is on base now is Rewind's job.
+  const later=(gameFeed||[]).some(x=>x&&x.type==="play"&&x.bk===oldKey&&typeof x.id==="number"&&x.id>e.id);
+  if(!keepBases&&!later&&G.bases)[1,2,3].forEach(b=>{ const r=G.bases[b]; if(r&&r.key===oldKey)G.bases[b]=Object.assign({},r,{key:c.key,label:"#"+c.num,name:c.name}); });
+  e.sub=playSubRename(e.sub,os?(os.name&&!/^Batter /.test(os.name)?os.name:""):"",c.name||"");
+  e.bk=c.key;
+}
+/* Move a play to the half-inning it really happened in. Same team (Top 3 that was really Top 2):
+   its runs move to the right inning's line-score cell, its hit to that half's tally, and its pitcher
+   line to whoever pitched that half if that was someone else. Other team (a half scored as the wrong
+   team's): toPick is who really batted for them; the runs scored on the play leave one team's score
+   and line for the other's (and every later feed line's running score with them), the at-bat moves
+   to the new batter, the pitcher line and pitches to the other team's pitcher, and an error to the
+   other team. Runners, outs and the bases now stay as they are: Rewind is for those. The half-swap
+   on the correction sheet only flips the pointer; this is the fix for plays already scored under the
+   wrong half (per the 2026-09-27 scorer research). */
+function abMoveStamp(eid,inn,half,toPick){
+  const e=gameFeed.find(x=>x.id===eid); if(!e||!e.bk)return;
+  if(e.inn===inn&&e.half===half)return;
+  const cross=half!==e.half;
+  const newSide=half==="T"?"away":"home", oldSide=e.half==="T"?"away":"home";
+  const c=cross?sidePlayers(newSide).find(x=>x.key===toPick):null; if(cross&&!c)return;
+  snapshot(); feedTouch(e);
+  const idx=gameFeed.indexOf(e);
+  // Runs scored on this play: the count bcastEvent() stamped on it (rs), else (a line saved before
+  // that) its running score minus the one on the line before it. With no line before it that is only
+  // safe for the game's very first half; anywhere else the lines before it were shifted off by the
+  // 220-line cap, and the whole running score would move as "this play's runs". Then no runs move and
+  // the scorer is told to fix them with the run +/-.
+  let prev=null; for(let i=idx-1;i>=0;i--){ const x=gameFeed[i]; if(x&&typeof x.away==="number"&&typeof x.home==="number"){ prev=x; break; } }
+  const runsKnown=typeof e.rs==="number"||!!prev||(e.inn===1&&e.half==="T");
+  const runs=typeof e.rs==="number"?Math.max(0,e.rs|0):runsKnown?Math.max(0,(e[oldSide]|0)-(prev?(prev[oldSide]|0):0)):0;
+  const fp=playFootprint(e.kind), pa=paFor(e);
+  if(!G.line)G.line={away:{},home:{}}; if(!G.line[oldSide])G.line[oldSide]={}; if(!G.line[newSide])G.line[newSide]={};
+  const moved=-_nz(G.line[oldSide],e.inn,-runs);
+  G.line[newSide][inn]=(G.line[newSide][inn]|0)+moved;
+  halfTally(e.inn,e.half,"runs",-moved); halfTally(inn,half,"runs",moved);
+  if(fp.h){ halfTally(e.inn,e.half,"hits",-fp.h); halfTally(inn,half,"hits",fp.h); }
+  const pn=(pa&&pa.n)|0; if(pn){ halfTally(e.inn,e.half,"pitches",-pn); halfTally(inn,half,"pitches",pn); }
+  const oldPk=playPitcherKey(e);
+  let newPk=pitcherForHalf(inn,half,null);
+  // Into a half we fielded with no pitcher of ours on record anywhere before it (the whole half was
+  // scored as the other team's, say): the pitcher in our lineup is the best answer there is. Leaving
+  // it null would keep a play we fielded charged to their pitcher.
+  if(cross&&!newPk&&(half==="T"?"home":"away")===G.ourSide){ const P=G.lineup&&G.lineup.pos?G.lineup.pos.P:null; if(P!=null&&ROSTER[P])newPk="o"+P; }
+  if(cross){
+    const got=-_nz(G,oldSide,-moved); G[newSide]=(G[newSide]|0)+got;
+    // Every line from this one on carried the old running score.
+    if(got)for(let i=Math.max(0,idx);i<gameFeed.length;i++){ const x=gameFeed[i]; if(x&&typeof x.away==="number"&&typeof x.home==="number"){ feedTouch(x); x[oldSide]=Math.max(0,x[oldSide]-got); x[newSide]+=got; } }
+    if(fp.e){ if(!G.errors)G.errors={away:0,home:0}; const o=e.half==="T"?"home":"away", n=half==="T"?"home":"away"; const t=-_nz(G.errors,o,-1); G.errors[n]=(G.errors[n]|0)+t; }
+    movePlayCredit(e,c,true);
+  }
+  if(oldPk&&newPk&&oldPk!==newPk){
+    movePitcherCredit(G,oldPk,newPk,{n:pn,stats:{h:fp.h,k:fp.k,bb:fp.bb,r:moved,outs:fp.outs}});
+  }
+  if(newPk)e.pk=newPk;
+  else if(cross){
+    // Still no one: at least it comes off the other team's pitcher, who can't have thrown it.
+    if(oldPk){ const ps=G.pstats&&G.pstats[oldPk]; if(ps){ _nz(ps,"h",-fp.h); _nz(ps,"k",-fp.k); _nz(ps,"bb",-fp.bb); _nz(ps,"r",-moved); _nz(ps,"outs",-fp.outs); }
+      if(pn&&G.pitches)_nz(G.pitches,oldPk,-pn); }
+    delete e.pk;
+  }
+  if(pa){ pa.inning=inn; pa.half=half; }
+  e.inn=inn; e.half=half;
+  abStamp=null; abWho=false;
+  flash("Moved to "+(half==="T"?"Top":"Bottom")+" "+inn+((!runsKnown&&(e[oldSide]|0)>0)?" · any runs on it didn't move: fix them with the run +/−":""));
+  render(); broadcast();
 }
 function rewindToEvent(eid){
   const idx=gameFeed.findIndex(e=>e.id===eid); if(idx<0)return;
@@ -2259,6 +2662,7 @@ function rewindToEvent(eid){
   const found=rewindIndex(hist,eid,idx);
   if(found<0){ editAB=null; flash("That play is too far back to rewind to."); render(); return; }
   const snap=hist[found];
+  for(let i=hist.length-1;i>=found;i--)feedRestore(hist[i]&&hist[i].fe);   // corrections in between rewrote older lines (see feedTouch())
   hist.length=found;                                              // drop this snapshot + everything after
   const _prev=G;
   G=snap.g;                                                       // restore (snapshot() stored a deep copy)
@@ -2269,17 +2673,30 @@ function rewindToEvent(eid){
 function abEditSheet(){
   const e=gameFeed.find(x=>x.id===editAB); if(!e){ editAB=null; return ""; }
   const s=(e.bk&&G.stats&&G.stats[e.bk])||null;
-  const nm=s?(s.name||("#"+s.num)):"Batter";
-  const KINDS=[["single","1B"],["double","2B"],["triple","3B"],["hr","HR"],["out1","GO"],["flyout","FO"],["lineout","LO"],["popout","PO"],["strikeout","K"],["walk","BB"],["hbp","HBP"],["fc","FC"],["error","E"],["sacfly","SF"],["sacbunt","SAC"]];
+  const nm=escHtml(s?(s.name||("#"+s.num)):"Batter");
+  // dp / ci / cpout are committable results too, so a play scored as one can be re-ruled to or from it;
+  // the coach-pitch 5-pitch out only where it can happen (or when it is this play's call).
+  const KINDS=[["single","1B"],["double","2B"],["triple","3B"],["hr","HR"],["out1","GO"],["flyout","FO"],["lineout","LO"],["popout","PO"],["strikeout","K"],["walk","BB"],["hbp","HBP"],["fc","FC"],["error","E"],["sacfly","SF"],["sacbunt","SAC"],["dp","DP"],["ci","CI"]]
+    .concat((cpMode()||e.kind==="cpout")?[["cpout","OUT"]]:[]);
+  // Wrong batter / wrong half (see abMoveBatter(), abMoveStamp()). The inning stepper walks half-
+  // innings from Top 1 to the one being played; a half of the same team applies on the tap, the other
+  // team's half first asks who batted for them (abStamp), right here in the sheet.
+  const _side=e.half==="T"?"away":"home";
+  const _hi=(inn,h)=>(inn-1)*2+(h==="B"?1:0);
+  const _tgt=(abStamp&&abStamp.eid===e.id)?abStamp:{inn:e.inn,half:e.half};
+  const _tgtSide=_tgt.half==="T"?"away":"home";
+  const _hl=(inn,h)=>(h==="T"?"&#9650; Top ":"&#9660; Bot ")+inn;
+  const _pchip=(act,c)=>`<button data-act="${act}" data-arg="${e.id}|${escHtml(c.key)}" style="display:flex;align-items:center;gap:7px;min-width:0;background:${T.surface};border:2px solid ${T.line};border-radius:9px;padding:9px 10px;color:${T.chalk};font-family:${SANS};font-size:13.5px;font-weight:700;text-align:left"><span style="font-family:${MONO};font-weight:800;color:${T.sage};flex:none">#${escHtml(c.num)}</span><span style="min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(c.name||"")}${c.bench?` <span style="color:${T.sageDim};font-size:11px">bench</span>`:""}</span></button>`;
+  const _pgrid=(act,list)=>list.length?`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:6px">${list.map(c=>_pchip(act,c)).join("")}</div>`:`<div style="font-size:12px;color:${T.sageDim};text-align:center;padding:8px">No one else to pick.</div>`;
   const opt=(k,l)=>`<button data-act="abreclass" data-arg="${e.id}:${k}" style="background:${e.kind===k?T.lime:T.surface2};color:${e.kind===k?"#fff":T.chalk};border:2px solid ${e.kind===k?T.lime:T.line};border-radius:10px;padding:11px 4px;font-family:${MONO};font-weight:800;font-size:14px">${l}</button>`;
   const sBtn=`background:${T.surface};border:2px solid ${T.line};color:${T.chalk};border-radius:10px;width:46px;height:46px;font-size:24px;font-weight:800;line-height:1;flex:none`;
   return `<div data-act="abeditclose" style="position:fixed;left:0;right:0;top:0;height:calc(var(--avh) * 100);z-index:121;background:rgba(8,11,16,.8);display:flex;align-items:center;justify-content:center;padding:16px">
-    <div data-act="noop" style="width:100%;max-width:470px;max-height:calc(var(--avh) * 92);overflow-y:auto;-webkit-overflow-scrolling:touch;background:${T.surface};border:2px solid ${T.line};border-radius:18px;padding:16px;display:flex;flex-direction:column;gap:11px;box-shadow:0 18px 54px rgba(0,0,0,.6)">
+    <div id="abEditBody" data-act="noop" style="width:100%;max-width:470px;max-height:calc(var(--avh) * 92);overflow-y:auto;-webkit-overflow-scrolling:touch;background:${T.surface};border:2px solid ${T.line};border-radius:18px;padding:16px;display:flex;flex-direction:column;gap:11px;box-shadow:0 18px 54px rgba(0,0,0,.6)">
       <div style="display:flex;align-items:center;gap:10px"><div style="flex:1;font-family:${MONO};font-size:17px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:${T.lime}">Edit this at-bat</div>
         <button data-act="abeditclose" style="${ghost};padding:8px 14px;flex:none">Done</button></div>
       <div style="background:${T.surface2};border:2px solid ${T.line};border-radius:12px;padding:10px 12px">
         <div style="font-weight:800;color:${T.ink};font-size:15px">${nm} &middot; ${e.half==="T"?"Top":"Bot"} ${e.inn}</div>
-        <div style="font-size:12px;color:${T.sageDim};margin-top:2px">${e.head}${e.sub?" — "+e.sub:""}</div></div>
+        <div style="font-size:12px;color:${T.sageDim};margin-top:2px">${escHtml(e.head)}${e.sub?" — "+escHtml(e.sub):""}</div></div>
       ${s?`<div style="font-size:10px;font-weight:800;letter-spacing:1px;color:${T.sageDim};margin:2px 2px -3px">CHANGE THE CALL &middot; adjusts the box score</div>
       <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:7px">${KINDS.map(k=>opt(k[0],k[1])).join("")}</div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;font-family:${MONO};font-size:13px;color:${T.sage};margin:2px 2px 0"><span>AB ${s.ab||0}</span><span>H ${s.h||0}</span><span>BB ${s.bb||0}</span><span>K ${s.k||0}</span><span>R ${s.r||0}</span><span>RBI ${s.rbi||0}</span></div>
@@ -2287,8 +2704,23 @@ function abEditSheet(){
         <div style="font-weight:700;color:${T.ink};font-size:15px">RBI on this play</div>
         <div style="display:flex;align-items:center;gap:12px;flex:none">
           <button data-act="abrbi" data-arg="${e.id}:-1" style="${sBtn}">&minus;</button>
-          <span style="font-family:${MONO};font-size:24px;font-weight:800;min-width:30px;text-align:center">${s.rbi||0}</span>
-          <button data-act="abrbi" data-arg="${e.id}:1" style="${sBtn}">+</button></div></div>`:`<div style="font-size:12px;color:${T.sageDim}">This feed line isn't tied to a batter's stat line, so only Rewind is available.</div>`}
+          <span style="font-family:${MONO};font-size:24px;font-weight:800;min-width:30px;text-align:center">${playRbi(e)}</span>
+          <button data-act="abrbi" data-arg="${e.id}:1" style="${sBtn}">+</button></div></div>
+      ${(()=>{ const lr=looseRbi(e.bk); return lr?`<div style="font-size:11px;color:${T.sageDim};margin:-5px 2px 0">${lr} RBI on his total isn't tied to any play (added before this update): &minus; takes ${lr===1?"it":"those"} off first.</div>`:""; })()}
+      <div style="font-size:10px;font-weight:800;letter-spacing:1px;color:${T.sageDim};margin:4px 2px -3px">WRONG BATTER OR INNING?</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;background:${T.surface2};border:2px solid ${T.line};border-radius:12px;padding:10px 12px">
+        <div style="min-width:0"><div style="font-weight:700;color:${T.ink};font-size:15px">Batter</div><div style="font-size:11px;color:${T.sageDim};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${nm}</div></div>
+        <button data-act="abwhoopen" style="background:${abWho?T.lime:T.surface};border:2px solid ${abWho?T.lime:T.line};color:${abWho?"#fff":T.chalk};border-radius:10px;padding:11px 14px;font-family:${MONO};font-weight:800;font-size:13px;white-space:nowrap;flex:none">${abWho?"Close":"Was actually&hellip;"}</button></div>
+      ${abWho?`<div style="font-size:11px;color:${T.sageDim};margin:-4px 2px 0">Moves this play's AB, hit/walk/K and RBI to the player you pick${TEAMS[_side]?" ("+escHtml(TEAMS[_side].short||"")+")":""}. Runs he scored later stay where they were credited.</div>${_pgrid("abwho",sidePlayers(_side).filter(c=>c.key!==e.bk))}`:""}
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;background:${T.surface2};border:2px solid ${(abStamp&&abStamp.eid===e.id)?T.amber:T.line};border-radius:12px;padding:10px 12px">
+        <div style="min-width:0"><div style="font-weight:700;color:${T.ink};font-size:15px">Inning</div><div style="font-size:11px;color:${T.sageDim}">${escHtml((TEAMS[_tgtSide]&&TEAMS[_tgtSide].short)||"")} batting</div></div>
+        <div style="display:flex;align-items:center;gap:8px;flex:none">
+          <button data-act="abstamp" data-arg="${e.id}:-1" ${_hi(_tgt.inn,_tgt.half)<=0?"disabled":""} style="${sBtn};${_hi(_tgt.inn,_tgt.half)<=0?"opacity:.35":""}">&lsaquo;</button>
+          <span style="font-family:${MONO};font-size:15px;font-weight:800;color:${T.chalk};min-width:72px;text-align:center;white-space:nowrap">${_hl(_tgt.inn,_tgt.half)}</span>
+          <button data-act="abstamp" data-arg="${e.id}:1" ${_hi(_tgt.inn,_tgt.half)>=_hi(G.inning,G.half)?"disabled":""} style="${sBtn};${_hi(_tgt.inn,_tgt.half)>=_hi(G.inning,G.half)?"opacity:.35":""}">&rsaquo;</button></div></div>
+      ${(abStamp&&abStamp.eid===e.id)?`<div style="font-size:12px;color:${T.amber};font-weight:700;margin:-4px 2px 0">That puts this play on ${escHtml((TEAMS[_tgtSide]&&TEAMS[_tgtSide].short)||"the other team")}'s at-bat: who was batting? Its runs, hit and pitcher line move with it.</div>
+      ${_pgrid("abstampwho",sidePlayers(_tgtSide))}
+      <button data-act="abstampx" style="${ghost};width:100%">Keep it in ${_hl(e.inn,e.half)}</button>`:""}`:`<div style="font-size:12px;color:${T.sageDim}">This feed line isn't tied to a batter's stat line, so only Rewind is available.</div>`}
       <div style="font-size:10px;font-weight:800;letter-spacing:1px;color:${T.sageDim};margin:4px 2px -3px">RUNNERS / SCORE / OUTS CHANGED?</div>
       ${(()=>{
         // Only the most recent ball in play, and only while nothing has happened since (see
@@ -2700,6 +3132,29 @@ function bcastEvent(kind,sub,team,bk,inn,half){
   // count so the feed can tag out-making plays with "· N out" (relevant context for that play).
   // bk = the batter's stat key (e.g. "o3"/"p5") so a completed at-bat can be edited from the feed.
   const entry={id:_eventId,inn:(inn!=null?inn:G.inning),half:(half!=null?half:G.half),type:"play",kind:kind,outs:(G.outs|0),head,sub:sub||"",away:G.away,home:G.home,bk:bk||null};
+  // pk = the pitcher this at-bat was charged to, and the batter's plate-appearance record gets this
+  // line's id (eid). "Change the call" and the batter / inning fixes in abEditSheet() move a play's
+  // pitcher line and PA record along with the batter's, and a later pitching change (or the inning
+  // flip that already ran by now) means the pitcher on the mound at edit time is often not the one
+  // who threw it (per the 2026-09-27 scorer research). Worked out from the play's own half, not from
+  // currentPitcherKey(), because G.half may already be the next half here (see the comment above).
+  // Lines saved before these existed fall back in playPitcherKey() / paFor().
+  if(bk){ try{
+    const _bt=entry.half==="T"?"away":"home", _P=G.lineup&&G.lineup.pos?G.lineup.pos.P:null;
+    entry.pk=_bt===G.ourSide?"oppP":(_P!=null?"o"+_P:null);
+    const _pl=G.pa&&G.pa[bk], _r=_pl&&_pl[_pl.length-1];
+    if(_r&&_r.eid==null&&_r.inning===entry.inn&&_r.half===entry.half) _r.eid=entry.id;
+    // rs = runs the batting side scored on this play: its score now minus the running score on the
+    // line before it (not the "End of ..." divider this play is about to go in front of, which already
+    // carries the new score). abMoveStamp() moves this many runs with the play; working it out later
+    // from the line before fails once the 220-line cap has shifted that line off the feed (found
+    // reviewing the correction-sheet work from the 2026-09-27 scorer research).
+    let _pv=null;
+    for(let i=gameFeed.length-1;i>=0;i--){ const x=gameFeed[i]; if(!x)continue;
+      if(i===gameFeed.length-1&&x.kind==="inningend"&&x.inn===entry.inn&&x.half===entry.half)continue;
+      if(typeof x.away==="number"&&typeof x.home==="number"){ _pv=x; break; } }
+    if(_pv||!gameFeed.length) entry.rs=Math.max(0,(G[_bt]|0)-(_pv?(_pv[_bt]|0):0));
+  }catch(e){} }
   // The play that ENDS a half-inning already gets its inn/half stamped correctly above (see the big
   // comment) — but doFlip() runs BEFORE this call in every one of those paths, so its "End of ..."
   // divider is already the last thing in gameFeed by the time we get here. Appending after it would
@@ -7134,11 +7589,17 @@ document.getElementById("app").addEventListener("click",e=>{
   if(act==="brcr"){ if(G.bases[+arg]){ brCrPick=+arg; render(); } return; }
   if(act==="brcrback"){ brCrPick=null; render(); return; }
   if(act==="brcrset"){ const p=(arg||"").split("|"); if(p.length===2)brCourtesy(+p[0],p[1]); return; }
-  if(act==="correctopen"){ correctOpen=true; correctOpenAt=Date.now(); render(); return; }
+  if(act==="correctopen"){ correctOpen=true; correctOpenAt=Date.now(); corrRun=null; render(); return; }
+  // The "who scored?" panel under the score rows (corrRunPanel()): re-applies the same run fix in place.
+  if(act==="corrrun"){ const i=arg.indexOf(":"), k=arg.slice(0,i), v=arg.slice(i+1);
+    const _sc=document.getElementById("correctModalBody"), _st=_sc?_sc.scrollTop:0;
+    corrRunSet(k,v); render(); broadcast();
+    const _sc2=document.getElementById("correctModalBody"); if(_sc2)_sc2.scrollTop=_st;
+    return; }
   // Ignore the backdrop "click" that rides in on the same long-press gesture that just opened the
   // sheet (mobile ghost-click) — otherwise the modal flashes open and shuts. The Done button and a
   // deliberate later backdrop tap still close it.
-  if(act==="correctclose"){ if(Date.now()-correctOpenAt<450) return; correctOpen=false; render(); return; }
+  if(act==="correctclose"){ if(Date.now()-correctOpenAt<450) return; correctOpen=false; corrRun=null; render(); return; }
   if(act==="corr"){
     // Same ghost-click risk as the backdrop above (correctclose): if the long-press that opened
     // this sheet lands on an inner button instead of the backdrop, it fires an unwanted correction
@@ -7168,7 +7629,8 @@ document.getElementById("app").addEventListener("click",e=>{
     // "unwanted inning half-swap" report). This is a manual correction, so no run-cap/inning-bump
     // logic and no inningend feed entry — just the letter plus the state that must follow it.
     else if(f==="half"){ G.half=(G.half==="T"?"B":"T"); G.outs=0;G.balls=0;G.strikes=0;G.bases={1:null,2:null,3:null};G.halfRuns=0;G.halfPitches=0;G.halfHits=0;G.ab={pitches:[],loc:null}; }
-    else if(f==="away"||f==="home"){ G[f]=Math.max(0,(G[f]||0)+d); if(!G.line)G.line={away:[],home:[]}; if(!G.line[f])G.line[f]=[]; G.line[f][G.inning]=Math.max(0,(G.line[f][G.inning]||0)+d); }
+    // A run fix goes through the same credits as a scored run (see corrRunStart()), not just the total.
+    else if(f==="away"||f==="home"){ corrRunStart(f,d>0?1:-1); }
     else if(f==="pitch"){ if(!G.pitches)G.pitches={}; const k=currentPitcherKey(); G.pitches[k]=Math.max(0,(G.pitches[k]||0)+d); G.halfPitches=Math.max(0,(G.halfPitches||0)+d); }
     else if(f==="batter"){ const k=G.half==="T"?"awayPtr":"homePtr"; G[k]=Math.max(0,(G[k]||0)+d); G.balls=0; G.strikes=0; G.ab={pitches:[],loc:null}; }   // skip / go back a batter (C3) — fresh count
     // render() rebuilds the modal from scratch, which resets its scroll to the top by default — jford,
@@ -7212,12 +7674,33 @@ document.getElementById("app").addEventListener("click",e=>{
   }
   if(act==="watchvidclear"){ clearWatchVideo(); return; }
   if(act==="ytmute"){ ytMuted=!ytMuted; render(); return; }
-  if(act==="abedit"){ editAB=+arg; render(); return; }
-  if(act==="abeditclose"){ editAB=null; render(); return; }
+  // The sheet keeps its scroll across its own re-renders (id abEditBody, restoreScroll()): every tap in
+  // it re-renders, and the "who batted?" picker opens below the stepper that asked for it. A different
+  // at-bat opens at the top.
+  if(act==="abedit"){ editAB=+arg; abWho=false; abStamp=null; try{ if(window._scrollMemo)delete window._scrollMemo.abEditBody; }catch(e){} render(); return; }
+  if(act==="abeditclose"){ editAB=null; abWho=false; abStamp=null; render(); return; }
+  if(act==="abwhoopen"){ abWho=!abWho; abStamp=null; render(); return; }
+  if(act==="abwho"){ const p=(arg||"").split("|"); if(p.length===2)abMoveBatter(+p[0],p[1]); return; }
+  // Inning stepper: a half of the same team applies on the tap; the other team's waits for who batted.
+  if(act==="abstamp"){ const i=arg.indexOf(":"), eid=+arg.slice(0,i), d=+arg.slice(i+1);
+    const e=gameFeed.find(x=>x.id===eid); if(!e)return;
+    const from=(abStamp&&abStamp.eid===eid)?abStamp:{inn:e.inn,half:e.half};
+    const ix=Math.max(0,Math.min((G.inning-1)*2+(G.half==="B"?1:0),(from.inn-1)*2+(from.half==="B"?1:0)+d));
+    const inn=Math.floor(ix/2)+1, half=ix%2?"B":"T";
+    abWho=false;
+    if(half===e.half){ abStamp=null; if(inn!==e.inn)abMoveStamp(eid,inn,half,null); else render(); }
+    else { abStamp={eid,inn,half}; render(); }
+    return; }
+  if(act==="abstampwho"){ const p=(arg||"").split("|"); if(p.length===2&&abStamp&&abStamp.eid===+p[0])abMoveStamp(+p[0],abStamp.inn,abStamp.half,p[1]); return; }
+  if(act==="abstampx"){ abStamp=null; render(); return; }
   if(act==="abreclass"){ const i=arg.indexOf(":"); reclassAB(+arg.slice(0,i), arg.slice(i+1)); return; }
   if(act==="abrbi"){ const i=arg.indexOf(":"); adjustABRbi(+arg.slice(0,i), +arg.slice(i+1)); return; }
-  if(act==="abrewind"){ rewindToEvent(+arg); return; }
-  if(act==="abreopen"){ adjustLastPlay(); return; }   // abEditSheet's "Re-open this play" (most recent ball in play only)
+  // Both put the scorer back into entering a play, so the correction sheet the phone opened this
+  // sheet from closes too: left open over the field, its next nudge took a snapshot on top of the
+  // re-opened play and the parked original could no longer come back (found reviewing the
+  // correction-sheet work from the 2026-09-27 scorer research).
+  if(act==="abrewind"){ correctOpen=false; corrRun=null; rewindToEvent(+arg); return; }
+  if(act==="abreopen"){ correctOpen=false; corrRun=null; adjustLastPlay(); return; }   // abEditSheet's "Re-open this play" (most recent ball in play only)
   if(act==="feedsize"){ try{localStorage.setItem("al-feed-size",arg);}catch(e){} render(); return; }
   if(act==="brsteal"){ brSteal(+arg); return; }
   if(act==="bradv"){ brAdvance(+arg); return; }
