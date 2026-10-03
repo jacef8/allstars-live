@@ -21,6 +21,37 @@ test("unionGames: on an id collision, the copy WITH a box score wins over the on
   assert.ok(out[0].bat, "the richer (box-scored) copy must win, not the earlier bare one");
 });
 
+test("unionGames: a re-archived game (same id, later .at) wins over the stale copy from either side", () => {
+  const stale = { id: "g1", date: "2026-07-01", us: 4, them: 5, at: 1000, bat: [{ num: "4" }] };
+  const fixed = { id: "g1", date: "2026-07-01", us: 6, them: 5, at: 2000, bat: [{ num: "4" }] };
+  assert.equal(unionGames([stale], [fixed], {})[0].us, 6, "the corrected copy from the other device must replace the local stale one");
+  assert.equal(unionGames([fixed], [stale], {})[0].us, 6, "an older copy from the other device must not overwrite the correction");
+  const legacy = { id: "g1", date: "2026-07-01", us: 4, them: 5, bat: [{ num: "4" }] };   // archived before .at existed
+  assert.equal(unionGames([legacy], [fixed], {})[0].us, 6);
+  assert.equal(unionGames([legacy], [legacy], {}).length, 1);
+  const bare = { id: "g1", date: "2026-07-01", at: 3000 };   // a newer copy WITHOUT a box score never beats one with it
+  assert.ok(unionGames([fixed], [bare], {})[0].bat);
+});
+
+test("unionGames: one game archived under two ids (same .gk) collapses to one entry, the same on every device", () => {
+  const onA = { id: "g1", gk: "kX", date: "2026-07-01", us: 4, them: 5, at: 1000, bat: [{ num: "4" }] };
+  const onB = { id: "g2", gk: "kX", date: "2026-07-01", us: 6, them: 5, at: 2000, bat: [{ num: "4" }] };
+  const other = { id: "g3", gk: "kY", date: "2026-06-30", us: 1, them: 0, at: 1500, bat: [] };
+  const ab = unionGames([onA, other], [onB], {}), ba = unionGames([onB], [onA, other], {});
+  assert.equal(ab.length, 2, "the duplicate must collapse, the different game must stay");
+  assert.deepEqual(ab.map(g => g.id), ["g2", "g3"]);
+  assert.deepEqual(ba.map(g => g.id), ["g2", "g3"], "the result must not depend on which side is local");
+  // equal .at: the lower id wins, from either side
+  const t1 = Object.assign({}, onA, { at: 5 }), t2 = Object.assign({}, onB, { at: 5 });
+  assert.equal(unionGames([t1], [t2], {})[0].id, "g1");
+  assert.equal(unionGames([t2], [t1], {})[0].id, "g1");
+  // a box score beats a newer bare copy; entries without .gk (older games) are never collapsed
+  const bare = { id: "g9", gk: "kX", date: "2026-07-01", at: 9000 };
+  assert.equal(unionGames([onA], [bare], {})[0].id, "g1");
+  const old1 = { id: "o1", date: "2026-05-01" }, old2 = { id: "o2", date: "2026-05-01" };
+  assert.equal(unionGames([old1], [old2], {}).length, 2);
+});
+
 test("unionGames: a tombstoned (deleted) game never resurrects from either side", () => {
   const deviceA = [{ id: "g1", date: "2026-07-01" }];
   const deviceB = [{ id: "g1", date: "2026-07-01" }, { id: "g2", date: "2026-07-02" }];

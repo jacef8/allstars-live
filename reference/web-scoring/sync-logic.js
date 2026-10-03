@@ -19,9 +19,23 @@
     var byId = {}, order = [];
     function add(g) { if (!g || !g.id || dead[g.id]) return;   // skip tombstoned (deleted) games
       if (!(g.id in byId)) { byId[g.id] = g; order.push(g.id); }
-      else if (!byId[g.id].bat && g.bat) byId[g.id] = g; }   // keep the one with a box score
+      else if (!byId[g.id].bat && g.bat) byId[g.id] = g;   // keep the one with a box score
+      // Both box-scored: a game re-archived after Resume/Undo (archiveGameTo() in the scorer) keeps its
+      // id and stamps .at, so the later-written copy wins and the correction reaches every device.
+      else if (g.bat && (g.at || 0) > (byId[g.id].at || 0)) byId[g.id] = g; }
     a.forEach(add); b.forEach(add);
     var out = order.map(function (id) { return byId[id]; });
+    // One game archived twice under DIFFERENT ids (both carry the scorer's game key, .gk): a game taken
+    // over on a second device before the first device's log reached it gets its own entry there.
+    // Collapse each key to one entry or the game would count twice in the record and the stats forever.
+    // The winner must not depend on which side is local, so every device lands on the same entry:
+    // a box score beats none, then the later-written copy (.at), then the lower id.
+    var byGk = {};
+    out.forEach(function (g) { if (!g.gk) return; var cur = byGk[g.gk];
+      if (!cur) { byGk[g.gk] = g; return; }
+      var gb = g.bat ? 1 : 0, cb = cur.bat ? 1 : 0, ga = g.at || 0, ca = cur.at || 0;
+      if (gb > cb || (gb === cb && (ga > ca || (ga === ca && g.id < cur.id)))) byGk[g.gk] = g; });
+    out = out.filter(function (g) { return !g.gk || byGk[g.gk] === g; });
     out.sort(function (x, y) { var dx = x.date || "", dy = y.date || ""; return dx < dy ? 1 : dx > dy ? -1 : 0; });
     return out.slice(0, 60);
   }

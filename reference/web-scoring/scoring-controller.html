@@ -941,7 +941,23 @@ function fullCatalog(pos){
 }
 
 /* ====================== state ====================== */
+// A stable identity for one game, stamped on G when the game is created and copied onto the entry
+// endGame() archives into t.games (as .gk). Because it is part of G it rides along in every undo
+// snapshot, so whichever way the scorer gets back into a finished game (Resume, Undo, Rewind) the
+// next End game finds that same archived entry and REPLACES it instead of adding a second copy
+// (see findArchivedGame()). Older saved games without one get it at their next End game.
+function newGameKey(){ return "k"+Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+// A game already under way (or already ended) when keys arrived has none until its next End game.
+// Its key is marked late (G.gkLate) so findArchivedGame() may still look for the copy archived
+// without a key; a game created with its key never does (see there).
+function stampLateGameKey(){ if(!G.gameKey){ G.gameKey=newGameKey(); G.gkLate=true; } }
+// Every snapshot of one game is the same game, but snapshots taken before a late key was stamped
+// don't carry it. Undo, Redo, Re-open and Rewind call this after swapping G so going back past End
+// game keeps the key (and its late mark), and the next End game still replaces the saved copy
+// instead of adding a second one.
+function keepGameKey(prev){ if(prev&&prev.gameKey&&G&&!G.gameKey){ G.gameKey=prev.gameKey; if(prev.gkLate)G.gkLate=true; } }
 const initGame=()=>({inning:1,half:"T",away:0,home:0,outs:0,balls:0,strikes:0,
+  gameKey:newGameKey(),
   bases:{1:null,2:null,3:null},awayPtr:0,homePtr:0,
   ourSide:"home",
   innings:6,       // regulation innings (from game setup) — drives the viewer line-score width
@@ -1360,7 +1376,9 @@ function undo(){
   const e=hist.pop();
   const removedFeed=feedTrimTo(e);
   redoStack.push({g:G,feedTail:removedFeed,ev:e&&e.ev,play:e&&e.play});
+  const _prev=G;
   G=(e&&e.g)?e.g:e;
+  keepGameKey(_prev);
   resetUI();render();broadcast();
 }
 function redo(){
@@ -1370,7 +1388,9 @@ function redo(){
   if(typeof r.ev==="number")h.ev=r.ev;
   if(r.play)h.play=r.play;   // the restored state is the original commit's, so its stashed plan still fits
   hist.push(h);
+  const _prev=G;
   G=r.g;
+  keepGameKey(_prev);
   if(Array.isArray(gameFeed)&&Array.isArray(r.feedTail)&&r.feedTail.length)gameFeed.push(...r.feedTail);
   resetUI();render();broadcast();
 }
@@ -1413,7 +1433,9 @@ function adjustLastPlay(){
   const e=hist.pop();
   const parked={g:G,feedTail:feedTrimTo(e),ev:e.ev,play:p};
   redoStack.push(parked);
+  const _prev=G;
   G=e.g;
+  keepGameKey(_prev);
   resetUI(); editAB=null; koPick=null;
   reopenPending=parked;
   tap=p.tap?Object.assign({},p.tap):null; contact=p.contact||null;
@@ -1459,8 +1481,79 @@ function flipIfNeeded(){if(G.outs>=3)doFlip();}
 const capReached=()=>G.runCap>0&&G.halfRuns>=G.runCap;
 /* Manual half-inning close — for ending early or when a 3rd out wasn't entered as outs. */
 function endInning(){snapshot();doFlip();resetUI();flash("Inning ended");render();broadcast();}
+/* ===== one archive path for a finished game =====
+   There are two ways back into a game after End game, and both used to corrupt the saved record
+   without a word (per the 2026-09-27 scorer research): "Resume game" left G.rolledUp set, so the
+   next End game skipped the archive and t.games kept the FIRST end's score and box forever; Undo
+   restored the snapshot taken before End game (rolledUp unset), so the next End game rolled the
+   season up a second time and added a second copy of the game (doubled batting lines, W-L off by
+   one). Now every End game goes through archiveGameTo(): if this game is already in t.games it is
+   replaced in place (same id) and the season totals are rebuilt from the log, otherwise it is added
+   as before. Resume, Undo and Rewind all land here because the lookup keys on G.gameKey, which
+   every snapshot carries, not on a flag the snapshot predates. */
+// Index in t.games of the entry this live game was archived as, or -1.
+function findArchivedGame(t){
+  const games=(t&&Array.isArray(t.games))?t.games:[];
+  if(G.gameKey){ const i=games.findIndex(x=>x&&x.gk===G.gameKey); if(i>=0)return i; }
+  // A game that got its key when it was created (every game started on this version) was archived
+  // under that key, so if the key isn't in the log the game isn't either. The guesses below are only
+  // for a game that was already under way, or already ended, before games had keys (no key yet, or
+  // one stamped late: G.gkLate). Without this gate a NEW game started from the same schedule row as
+  // an older game (a make-up, a suspended game, a stray Start tap) matched that older game by schedId
+  // and overwrote it, keeping its id and date so the loss was invisible.
+  if(G.gameKey&&!G.gkLate)return -1;
+  // Entries archived before games carried a key (.gk): a scheduled game is one event, so its
+  // schedId identifies it; otherwise, only when this game says it WAS archived (rolledUp), the newest
+  // un-keyed entry against the same opponent on the same date. Keyed entries never match here, so a
+  // second game the same day is never overwritten.
+  if(G.schedId){ const i=games.findIndex(x=>x&&!x.gk&&x.schedId===G.schedId); if(i>=0)return i; }
+  if(!G.rolledUp)return -1;
+  const d=G.schedDate||todayLocal(), opp=OPP.name||"Opponent";
+  return games.findIndex(x=>x&&!x.gk&&x.date===d&&x.opp===opp&&(!x.ourSide||x.ourSide===G.ourSide));
+}
+// What a stored game and the live scoresheet are compared on (summary-screen "saved copy differs").
+function archiveSig(g){ try{ return JSON.stringify([g.us,g.them,g.line,g.totals,g.bat,g.pitch]); }catch(e){ return ""; } }
+function liveArchiveSig(){ const b=liveGameBox(); return archiveSig(Object.assign({us:ourRuns(),them:oppRuns()},b)); }
+// Write the finished game into team t's log: replace its earlier copy (keeping the id, so the cloud
+// merge and every device see the same game) or add it new. Caller saves + pushes the team.
+function archiveGameTo(_t){
+  stampLateGameKey();
+  const o=ourRuns(),p=oppRuns();
+  if(!Array.isArray(_t.games))_t.games=[];
+  const i=findArchivedGame(_t), old=i>=0?_t.games[i]:null;
+  // Not in this log, yet the game says it was already rolled up: it was archived somewhere else (the
+  // device that scored it before a Take over, whose log hasn't reached this one) or its entry was
+  // deleted. Adding it is right, but an incremental rollup would count a game whose stats may already
+  // be in t.season; rebuild from the log instead so the totals equal exactly the games listed.
+  const _wasRolled=!old&&!!G.rolledUp;
+  // .at = when this copy was written, so the cross-device merge (unionGames) keeps the corrected copy
+  // over an older one with the same id. The date of an existing copy is kept (it may have been set in
+  // the Edit game sheet, or the re-end may fall after midnight).
+  const entry=Object.assign({id:old?old.id:"g"+Date.now().toString(36),gk:G.gameKey,at:Date.now(),date:((old&&old.date)||G.schedDate||todayLocal()),schedId:(G.schedId||(old&&old.schedId)||undefined),opp:(OPP.name||"Opponent"),oppShort:OPP.short||"OPP",us:o,them:p,result:(o>p?"W":o<p?"L":"T"),yt:(streamYt()||(old&&old.yt)||"")}, liveGameBox());
+  if(old){
+    _t.games[i]=entry;
+    recomputeSeasonFromGames(_t);   // an incremental rollup would count this game twice; rebuild from the log
+  } else {
+    if(!_wasRolled)rollupSeason();
+    // Archive this game (final score, opponent, date) — the W-L-T record is DERIVED from this log via
+    // teamRec(), so the record can never disagree with the games shown below it.
+    _t.games.unshift(entry);
+    if(_t.games.length>60)_t.games=_t.games.slice(0,60);   // cap (each carries a compact box score)
+    if(_wasRolled)recomputeSeasonFromGames(_t);
+  }
+  _t.record=teamRec(_t);          // keep the stored/synced record in lockstep with the log
+  G.rolledUp=true;
+  // The game list is filtered by statsSeason (a year, or "all") — if the scorer had been
+  // browsing a PAST season and never switched back, the freshly-finished game (correctly
+  // archived, correctly dated) would file under the CURRENT year but stay invisible behind
+  // that stale filter, reading as "the game is missing" even though nothing was lost. (jford,
+  // 2026-07-06: "the game that was just played is missing on the tablet that just scored it.")
+  // Snap the filter to "all" so the game you JUST finished is always immediately visible.
+  statsSeason="all";
+}
 /* Mark the game final (toggle) so the viewer shows its Final summary. Undoable. */
-function endGame(){snapshot();G.final=true;
+// The key is stamped BEFORE snapshot() so an older game that never had one keeps it through Undo.
+function endGame(){stampLateGameKey();snapshot();G.final=true;
   try{ if(window.AllStars&&window.AllStars.stopStreamNow)window.AllStars.stopStreamNow(); }catch(e){}   // ending the game auto-ends the YouTube broadcast
   // Mark the live game ENDED in the cloud immediately (not the debounced publish) so other devices stop
   // showing it "in progress" — even if this device sleeps right after End game.
@@ -1470,22 +1563,7 @@ function endGame(){snapshot();G.final=true;
   if(!curTeam() && OUR && OUR.name){ const _m=(DB.teams||[]).find(x=>(x.name||"").toLowerCase()===(OUR.name||"").toLowerCase()); if(_m)curTeamId=_m.id; }
   const _t=curTeam();
   if(_t){
-    if(!G.rolledUp){ rollupSeason(); const o=ourRuns(),p=oppRuns();
-      // Archive this game (final score, opponent, date) — the W-L-T record is DERIVED from this log via
-      // teamRec(), so the record can never disagree with the games shown below it.
-      if(!Array.isArray(_t.games))_t.games=[];
-      _t.games.unshift(Object.assign({id:"g"+Date.now().toString(36),date:(G.schedDate||todayLocal()),schedId:(G.schedId||undefined),opp:(OPP.name||"Opponent"),oppShort:OPP.short||"OPP",us:o,them:p,result:(o>p?"W":o<p?"L":"T"),yt:(streamYt()||"")}, liveGameBox()));
-      if(_t.games.length>60)_t.games=_t.games.slice(0,60);   // cap (each carries a compact box score)
-      _t.record=teamRec(_t);          // keep the stored/synced record in lockstep with the log
-      G.rolledUp=true;
-      // The game list is filtered by statsSeason (a year, or "all") — if the scorer had been
-      // browsing a PAST season and never switched back, the freshly-finished game (correctly
-      // archived, correctly dated) would file under the CURRENT year but stay invisible behind
-      // that stale filter, reading as "the game is missing" even though nothing was lost. (jford,
-      // 2026-07-06: "the game that was just played is missing on the tablet that just scored it.")
-      // Snap the filter to "all" so the game you JUST finished is always immediately visible.
-      statsSeason="all";
-    }
+    archiveGameTo(_t);   // first end adds the game; any later end (after Resume or Undo) replaces it
     // ALWAYS push on End game (even a re-end): if a prior end archived the game locally but never reached
     // the cloud, this re-syncs it so other devices' records update. Bump updatedAt so it wins any merge.
     _t.updatedAt=Date.now(); saveDB();
@@ -2066,7 +2144,9 @@ function rewindToEvent(eid){
   if(found<0){ editAB=null; flash("That play is too far back to rewind to."); render(); return; }
   const snap=hist[found];
   hist.length=found;                                              // drop this snapshot + everything after
+  const _prev=G;
   G=snap.g;                                                       // restore (snapshot() stored a deep copy)
+  keepGameKey(_prev);
   feedTrimTo(snap);
   editAB=null; resetUI(); render(); broadcast(); flash("Rewound to that play — re-enter it.");
 }
@@ -5872,6 +5952,22 @@ function actionArea(){
     const pitchBlock=pitchers.length?`<div style="overflow-x:auto;background:${T.surface};border:2px solid ${T.line};border-radius:10px;padding:8px 8px 4px"><div style="font-size:13.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin:0 0 8px">${selName} &mdash; pitching</div><table style="width:100%;border-collapse:collapse;font-family:${MONO};font-size:17px;text-align:center;color:${T.chalk}"><thead><tr style="color:${T.sageDim};font-size:13px"><th style="text-align:left;padding:4px 6px">Pitcher</th><th title="Innings pitched">IP</th><th title="Pitches">P</th><th>H</th><th>R</th><th>BB</th><th>K</th></tr></thead><tbody>${pp}</tbody></table></div>`:"";
     const stBtn=(v,lbl)=>`<button data-act="sumteam" data-arg="${v}" style="flex:1;background:${summaryTeam===v?T.lime:T.surface2};color:${summaryTeam===v?"#fff":T.sage};border:2px solid ${summaryTeam===v?T.lime:T.line};border-radius:9px;padding:9px 0;font-family:${MONO};font-weight:800;font-size:13px;letter-spacing:.4px;text-transform:uppercase">${lbl}</button>`;
     const teamToggle=`<div style="display:flex;gap:6px">${stBtn("us",OUR.short||"Us")}${stBtn("opp",(OPP.short||"Opp"))}</div>`;
+    // Does the copy saved in the team's log match this scoresheet? After End game it always does; it
+    // can drift when the game was resumed or undone and not ended again on this device, or the stored
+    // copy was hand-edited, and nothing else on screen would say so (per the 2026-09-27 scorer
+    // research). In sync: one quiet line. Out of sync or missing: say what the log holds and offer the
+    // same archive path End game uses, in place, instead of making the scorer resume and re-end.
+    let saveNote="";
+    try{ const _st=curTeam(); if(_st){
+      const _ai=findArchivedGame(_st), _ag=_ai>=0?_st.games[_ai]:null, _tn=escHtml(_st.name||OUR.name||"the team");
+      if(_ag&&archiveSig(_ag)===liveArchiveSig()){
+        saveNote=`<div style="display:flex;align-items:center;justify-content:center;gap:7px;font-size:13px;color:${T.sage};text-align:center;line-height:1.35">${IC('<path d="M5 12.5l4.5 4.5L19 7.5"/>',15)} Saved to ${_tn}&rsquo;s record. To fix a play: Resume, fix it, End game again.</div>`;
+      } else {
+        const _msg=_ag?`The copy saved to ${_tn}&rsquo;s record differs from this scoresheet (it has ${escHtml(OUR.short||"Us")} ${escHtml(String(_ag.us))}, ${escHtml(OPP.short||"Opp")} ${escHtml(String(_ag.them))}).`:`This game is not in ${_tn}&rsquo;s record yet.`;
+        saveNote=`<div style="background:${T.surface};border:2px solid ${T.amber};border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:9px">
+          <div style="font-size:14px;color:${T.chalk};line-height:1.4">${_msg}</div>
+          <button data-act="rearchive" style="${ghost};display:flex;align-items:center;justify-content:center;gap:8px;padding:12px">${IC('refresh',16)} ${_ag?"Update saved game":"Save to record"}</button></div>`;
+      } } }catch(e){ saveNote=""; }
     return `<div style="display:flex;flex-direction:column;gap:14px">
         <div style="text-align:center">
           <div style="font-family:${MONO};font-size:19px;font-weight:800;letter-spacing:1.5px;color:${resCol}">FINAL &middot; ${res}</div>
@@ -5885,6 +5981,7 @@ function actionArea(){
         <div style="overflow-x:auto;background:${T.surface};border:2px solid ${T.line};border-radius:10px;padding:8px 8px 4px"><div style="font-size:13.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin:0 0 8px">${selName} &mdash; batting</div><table style="width:100%;border-collapse:collapse;font-family:${MONO};font-size:17px;text-align:center;color:${T.chalk}"><thead><tr style="color:${T.sageDim};font-size:13px"><th style="text-align:left;padding:4px 6px">Batter</th><th>AB</th><th>R</th><th>H</th><th>RBI</th><th>BB</th><th>K</th><th title="Stolen bases">SB</th><th title="Caught stealing">CS</th></tr></thead><tbody>${bb||`<tr><td colspan="9" style="padding:8px;color:${T.sageDim}">No at-bats recorded</td></tr>`}</tbody></table></div>
         ${pitchBlock}
         <button data-act="gamecard" style="${ghost};display:flex;align-items:center;justify-content:center;gap:9px">${ICN.doc} Scorecard (PDF)</button>
+        ${saveNote}
         <div style="display:flex;gap:10px">
           <button data-act="resumegame" style="${ghost};flex:1;padding:14px">&lsaquo; Resume game</button>
           <button data-act="summary-done" style="${bigBtn(OUR.color)};flex:2">Done</button></div>
@@ -7329,7 +7426,13 @@ document.getElementById("app").addEventListener("click",e=>{
       }catch(e){ flash("Couldn't load that game"); }
     });
   }
-  else if(act==="resumegame"){G.final=false;gameActive=true;mode="idle";render();broadcast();}   // un-end → game is live again
+  // un-end → game is live again. The saved copy in the team's log stays as it was until the next End
+  // game, which replaces it (archiveGameTo()) — say so, so the scorer knows the fix will reach the record.
+  // The toast is set BEFORE render() (it is painted by render, and nothing else re-renders here), and
+  // kept short enough for one line on a phone; the End game confirm spells out the update.
+  else if(act==="resumegame"){G.final=false;gameActive=true;mode="idle";
+    try{ const _rt=curTeam(); if(_rt&&findArchivedGame(_rt)>=0)flash("Resumed · End game to update"); }catch(e){}
+    render();broadcast();}
   else if(act==="discardgame"){ confirmAct={title:"Discard this game?",msg:"Removes this in-progress game from the Home screen. It is NOT saved to any team's record — use this for an abandoned or test game. This can't be undone.",yes:"Discard",run:function(){
     // End it in the CLOUD too, not just locally — otherwise the live-game doc stays final:false
     // forever, and every OTHER view that reads it (the Home "in progress · take over" card, another
@@ -7350,6 +7453,14 @@ document.getElementById("app").addEventListener("click",e=>{
     try{ if(window.cloudEndGame)window.cloudEndGame(_tid+"-live"); }catch(e){}
     delete _liveGames[_tid]; render(); }}; render(); return; }
   else if(act==="summary-done"){gameActive=false;mode="teams";render();broadcast();}
+  // Summary screen "Update saved game" / "Save to record": the same archive step End game runs
+  // (archiveGameTo() replaces the stored copy or adds it), then the same save + cloud push. No toast:
+  // the summary screen has no toast slot, and the note above the buttons turning into "Saved to …" is
+  // the confirmation (a toast set here would surface on the field instead if the scorer resumed).
+  else if(act==="rearchive"){ const _rt=curTeam(); if(!_rt||!G.final){ render(); return; }
+    archiveGameTo(_rt); _rt.updatedAt=Date.now(); saveDB();
+    try{ if(window.cloudSaveTeam)window.cloudSaveTeam(_rt,true); }catch(e){}
+    render(); broadcast(); }
   else if(act==="pickplayer"){editSlot=+arg;lineEditSlot=null;luSelSlot=null;mode="pickplayer";render();}   // the row's "Sub" button
   else if(act==="pickpos"){editSlot=+arg;mode="pickpos";render();}
   else if(act==="editplayer"){ lineEditSlot=(lineEditSlot===+arg?null:+arg); render(); }   // C1: toggle in-row edit (no second window)
@@ -7378,7 +7489,8 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="setpos"){assignPos(G.lineup.order[editSlot],arg);mode="lineup";render();broadcast();}
   else if(act==="backlineup"){mode="lineup";render();}
   else if(act==="endinning"){ confirmAct={title:"End "+(G.half==="T"?"Top":"Bottom")+" "+G.inning+"?",msg:"Closes out the half-inning early, at "+G.outs+" out"+(G.outs===1?"":"s")+". Use this for a walk-off or a missed 3rd out — otherwise just keep playing, it'll flip on its own. Undoable.",yes:"End inning",run:endInning}; render(); }
-  else if(act==="endgame"){confirmAct={title:"End game?",msg:curTeam()?"This finishes the game and saves season stats to "+OUR.name+".":"This finishes the game.",yes:"End game",danger:true,run:endGame};render();}
+  else if(act==="endgame"){ const _et=curTeam(), _again=!!(_et&&findArchivedGame(_et)>=0);
+    confirmAct={title:"End game?",msg:_et?(_again?"This finishes the game and updates its saved copy and season stats in "+escHtml(OUR.name)+".":"This finishes the game and saves season stats to "+escHtml(OUR.name)+"."):"This finishes the game.",yes:"End game",danger:true,run:endGame};render();}
   else if(act==="confirm-no"){confirmAct=null;render();}
   else if(act==="confirm-yes"){const r=confirmAct&&confirmAct.run;confirmAct=null;if(r)r();else render();}
   else if(act==="newgame"){mode="newgame";render();}
