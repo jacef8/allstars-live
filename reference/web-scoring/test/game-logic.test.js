@@ -211,3 +211,56 @@ test("histPack/histUnpack: round-trips the history, shares repeated values, and 
   assert.equal(back[1].g.stats.o1.ab, 1, "changing one restored snapshot (Undo makes it the live G) never leaks into another");
   assert.deepEqual(histUnpack({ v: 2 }), [], "an unknown format restores nothing rather than garbage");
 });
+
+/* ---- late pitching change: move a pitcher's charges to the new pitcher ---- */
+const { pitcherCreditSince, movePitcherCredit } = require("../game-logic.js");
+
+test("pitcherCreditSince: only what the old pitcher was charged with since the starting point", () => {
+  const before = { pitches: { o3: 40, o7: 2 }, pstats: { o3: { k: 4, bb: 1, h: 2, r: 1, outs: 9 } } };
+  const now = { pitches: { o3: 46, o7: 2 }, pstats: { o3: { k: 5, bb: 1, h: 3, r: 1, outs: 10 } } };
+  const c = pitcherCreditSince(before, now, "o3");
+  assert.equal(c.n, 6);
+  assert.deepEqual(c.stats, { k: 1, h: 1, outs: 1 }, "unchanged fields are left out");
+  assert.equal(c.any, true);
+  assert.equal(pitcherCreditSince(before, now, "o7").any, false, "another pitcher's unchanged line moves nothing");
+});
+
+test("pitcherCreditSince: missing pitches / pstats (older saved games) count as zero, never negative", () => {
+  const c = pitcherCreditSince({}, { pitches: { o1: 3 } }, "o1");
+  assert.equal(c.n, 3);
+  assert.deepEqual(c.stats, {});
+  const down = pitcherCreditSince({ pitches: { o1: 9 } }, { pitches: { o1: 5 } }, "o1");
+  assert.equal(down.n, 0, "a count that went down (a correction) moves nothing");
+  assert.equal(down.any, false);
+  assert.equal(pitcherCreditSince(null, null, "o1").any, false);
+});
+
+test("movePitcherCredit: moves pitches and stat line, creating the new pitcher's row", () => {
+  const g = { pitches: { o3: 46 }, pstats: { o3: { k: 5, bb: 1, h: 3, r: 1, outs: 10 } } };
+  const moved = movePitcherCredit(g, "o3", "o8", { n: 6, stats: { k: 1, h: 1, outs: 1 } });
+  assert.equal(moved, true);
+  assert.deepEqual(g.pitches, { o3: 40, o8: 6 });
+  assert.deepEqual(g.pstats.o3, { k: 4, bb: 1, h: 2, r: 1, outs: 9 });
+  assert.deepEqual(g.pstats.o8, { k: 1, bb: 0, h: 1, r: 0, outs: 1 });
+});
+
+test("movePitcherCredit: never takes more than the old pitcher has, and refuses no-op moves", () => {
+  const g = { pitches: { o3: 2 }, pstats: { o3: { k: 0, bb: 0, h: 0, r: 0, outs: 1 } } };
+  movePitcherCredit(g, "o3", "o8", { n: 5, stats: { k: 2, outs: 3 } });
+  assert.deepEqual(g.pitches, { o3: 0, o8: 2 });
+  assert.equal(g.pstats.o3.outs, 0);
+  assert.equal(g.pstats.o8.outs, 1);
+  assert.equal(g.pstats.o8.k, 0, "nothing to take, nothing given");
+  assert.equal(movePitcherCredit(g, "o8", "o8", { n: 1, stats: {} }), false, "same pitcher");
+  assert.equal(movePitcherCredit({}, "o1", "o2", { n: 3, stats: { k: 1 } }), false, "an older game with no pitches/pstats yet");
+});
+
+test("movePitcherCredit: a move of pitches only still gives the new pitcher a box-score line", () => {
+  // The box score lists pitchers from the pstats keys; a reliever with pitches but no K/BB/H/R/out
+  // yet would otherwise have his moved pitches show up nowhere.
+  const g = { pitches: { o3: 30 }, pstats: { o3: { k: 2, bb: 0, h: 1, r: 0, outs: 6 } } };
+  assert.equal(movePitcherCredit(g, "o3", "o8", { n: 4, stats: {} }), true);
+  assert.deepEqual(g.pitches, { o3: 26, o8: 4 });
+  assert.deepEqual(g.pstats.o8, { k: 0, bb: 0, h: 0, r: 0, outs: 0 }, "pstats row exists after a pitches-only move");
+  assert.deepEqual(g.pstats.o3, { k: 2, bb: 0, h: 1, r: 0, outs: 6 }, "the old pitcher's line is untouched");
+});

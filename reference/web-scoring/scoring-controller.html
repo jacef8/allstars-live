@@ -785,6 +785,7 @@ window.quickEditCommit=function(){ try{broadcast();}catch(e){} };   // push the 
 window.luName=function(v){const t=teamById(openTeamId);const lu=t&&lineupById(t,editLineupId);if(lu){lu.name=(v||"").trim()||"Lineup";saveDB();}};
 window.applySavedLineup=function(id){ if(!id)return; const t=curTeam(); const lu=t&&lineupById(t,id); const idx=lu&&lineupToIdx(t,lu);
   if(idx&&idx.order.length>=9){
+    lineupStep();
     G.lineup={order:idx.order.slice(),pos:Object.assign({},idx.pos)}; t.activeLineupId=id; saveDB();
     // If this loads mid-game (not just at setup), the batting-order pointers are raw indices into
     // G.lineup.order — clamp them into the new order's range so a shorter reload can't leave them
@@ -1043,13 +1044,37 @@ function fielderLabel(pos){const nm=fielderName(pos);return nm?`${nm} (${pos})`:
 // Record an in-game lineup/position change for the historical record (C5). No-ops before the game is
 // live (so the initial lineup setup isn't logged) and skips no-op moves.
 const _pname=ri=>{const p=ROSTER[ri];return p?("#"+(p.num||"?")+" "+(p.name||"").trim()):"a player";};
-// extra (optional): typed fields merged into the entry, e.g. {kind:"courtesy",out:"o4",in:"o11",base:2}
-// from brCourtesy(), so a later reader can tell a courtesy runner from a free-text lineup move. Older
-// entries (and every other caller) are plain {inn,half,t}; the inning log only ever reads .t.
+// extra (optional): typed fields merged into the entry, so a later reader can tell these apart from a
+// free-text lineup move. Three typed callers today, and out/in mean something different in each:
+//   {kind:"sub",out,in,slot}         assignSlot(): bench kid in for the batter in that slot (player keys)
+//   {kind:"courtesy",out,in,base}    brCourtesy(): runner keys on that base
+//   {kind:"pitchmove",out,in,n,stats} the late-pitching-change fix (pitchmove): pitcher keys, plus the
+//                                     pitch count and pstats deltas that moved from out to in
+// Check .kind before reading any of the other fields. Older entries (and every other caller) are plain
+// {inn,half,t}; the inning log only ever reads .t.
 function logLineup(text,extra){ try{ if(gameActive&&G&&text){ if(!G.lineupLog)G.lineupLog=[]; G.lineupLog.push(Object.assign({inn:G.inning,half:G.half,t:text},extra||{})); } }catch(e){} }
+// Every in-game lineup change is its own Undo step. They used to change G with no snapshot, so Undo
+// after a mis-tapped sub took back the last PITCH instead (the sub only went with it), and once a few
+// more plays were scored the wrong sub and its lineup-log line were there for good (per the 2026-09-27
+// scorer research). Called by each lineup mutation AFTER its "nothing changes" early return, so a tap
+// on the kid already there doesn't leave an empty Undo step. Before the game is live (the setup screen)
+// there is nothing to undo back to, same rule as logLineup().
+// It also remembers who was pitching before a run of back-to-back lineup steps (pitchMoveFrom), so if
+// the steps changed our pitcher while we're in the field, the idle screen can offer to move pitches
+// the old pitcher was charged with to the new one (pitchMoveOffer()). Any other snapshot, Undo or
+// Redo ends that offer (snapshot()/resetUI()).
+var pitchMoveFrom=null, pitchPickFromIdle=false;   // pitchPickFromIdle: the pitcher picker was opened from the field chip, so it goes back there
+var pitchMoveOpen=false;   // the late-change fix's choices (pitchMoveModal()) are open; ends with the offer
+function lineupStep(){
+  if(!gameActive||_remoteLive) return;
+  const from=pitchMoveFrom?pitchMoveFrom.key:((fielding()&&G.lineup&&G.lineup.pos&&G.lineup.pos.P!=null)?("o"+G.lineup.pos.P):null);
+  snapshot();
+  pitchMoveFrom=from?{key:from}:null;
+}
 function assignSlot(slot,ri){
   const old=G.lineup.order[slot],at=G.lineup.order.indexOf(ri);
   if(at===slot) return;   // picked the kid already batting here: nothing changes, so nothing to log
+  lineupStep();
   if(at>=0){G.lineup.order[at]=old;G.lineup.order[slot]=ri;logLineup(_pname(ri)+" → batting "+(slot+1));}          // swap two batters (each keeps his glove)
   else{G.lineup.order[slot]=ri;const p=posOfPlayer(old);if(p)G.lineup.pos[p]=ri;  // sub in for 'old', take his position
     // A kid who leaves while he's on base is replaced there by his sub. Otherwise the runner stays
@@ -1070,6 +1095,7 @@ function assignSlot(slot,ri){
 function benchIn(ri){ ri=+ri;
   if(!ROSTER[ri]||G.lineup.order.indexOf(ri)>=0) return false;
   if(G.lineup.order.length>=12){ flash("Max 12 batters"); return false; }
+  lineupStep();
   // Our batting pointer is a running count of plate appearances; batter() takes it modulo the order
   // length. Make the order longer without re-basing it and, once we've been through the order, the
   // same count lands on a different slot: the kid due up changes silently (e.g. 11 % 9 is slot 3,
@@ -1081,14 +1107,17 @@ function benchIn(ri){ ri=+ri;
   logLineup(_pname(ri)+" added to the order, batting "+G.lineup.order.length);
   return true;
 }
-function assignPos(ri,pos){
+// noStep: the caller already took this change's Undo step (makePitcher()).
+function assignPos(ri,pos,noStep){
   const cur=posOfPlayer(ri),occ=G.lineup.pos[pos];
-  if(cur!==pos) logLineup(_pname(ri)+" → "+pos);
+  if(cur!==pos){ if(!noStep)lineupStep(); logLineup(_pname(ri)+" → "+pos); }
   G.lineup.pos[pos]=ri; if(cur&&cur!==pos)G.lineup.pos[cur]=occ;      // swap positions with whoever had it
 }
 function makePitcher(ri){
+  if(G.lineup.pos.P===ri) return;   // already pitching: no change, no Undo step
+  lineupStep();
   if(G.lineup.order.indexOf(ri)<0){const slot=G.lineup.order.indexOf(G.lineup.pos.P);if(slot>=0)G.lineup.order[slot]=ri;}
-  assignPos(ri,"P");
+  assignPos(ri,"P",true);
 }
 // Put player `ri` at `pos`. Vacates his old spot; returns the bumped player {ri,openPos} (the spot he
 // just left, now open) if `pos` was occupied — so the caller can ASK where that bumped player goes —
@@ -1096,6 +1125,7 @@ function makePitcher(ri){
 function fieldPlace(ri,pos){ ri=+ri;
   const occ=G.lineup.pos[pos];
   if(occ===ri) return null;
+  lineupStep();
   const myOld=posOfPlayer(ri);
   if(myOld&&myOld!==pos) delete G.lineup.pos[myOld];   // open up the spot I'm leaving
   G.lineup.pos[pos]=ri;
@@ -1165,7 +1195,7 @@ function fieldMapHtml(){
 /* Opponent field map (parity with our field map): tap a position, tap a hitter to place him there.
    Simpler than ours (a clean swap — the displaced hitter takes the picked hitter's old spot), since
    we don't track the opponent's bench gloves. Uses the opp data model (each oppLineup entry has .pos). */
-function oppAssignPos(idx,pos){ const L=oppList(); if(!L[idx])return; const cur=L[idx].pos||""; const occ=oppAtPos(pos); L[idx].pos=pos; if(occ>=0&&occ!==idx)L[occ].pos=cur; }
+function oppAssignPos(idx,pos){ const L=oppList(); if(!L[idx]||L[idx].pos===pos)return; lineupStep(); const cur=L[idx].pos||""; const occ=oppAtPos(pos); L[idx].pos=pos; if(occ>=0&&occ!==idx)L[occ].pos=cur; }
 function oppFieldMapHtml(){
   const first=n=>(n||"").split(" ")[0];
   // Same coach-pitch (4 outfielders) handling as OUR fieldMapHtml() — this was missing here, so the
@@ -1213,6 +1243,7 @@ function selectLu(slot){ luSelSlot=(luSelSlot===slot)?null:slot; render(); }
 function moveLu(slot,dir){
   const ord=G.lineup.order; const j=dir==="up"?slot-1:slot+1;
   if(j<0||j>=ord.length) return;
+  lineupStep();
   const tmp=ord[slot]; ord[slot]=ord[j]; ord[j]=tmp;
   luSelSlot=j; render(); broadcast();
 }
@@ -1225,6 +1256,7 @@ window.moveLuToSlot=function(slot,toSlot){
   const ord=G.lineup.order;
   toSlot=Math.max(0,Math.min(ord.length-1,toSlot));
   if(toSlot===slot){ render(); return; }   // re-render to snap a bad typed value back to the current slot
+  lineupStep();
   const item=ord.splice(slot,1)[0]; ord.splice(toSlot,0,item);
   luSelSlot=toSlot; render(); broadcast();
 };
@@ -1252,6 +1284,7 @@ function removeBatter(){
   if(G.lineup.order.length<=9){flash("Minimum 9 batters");return;}
   const ri=G.lineup.order[G.lineup.order.length-1];
   if(posOfPlayer(ri)){flash("That batter is fielding — change their position first");return;}
+  lineupStep();
   // Mirror of benchIn(): re-base our running batting pointer onto its slot before the order gets
   // shorter, so the kid due up doesn't change. If the kid due up is the one being removed, the
   // order wraps to the leadoff spot.
@@ -1277,8 +1310,8 @@ function snapshot(){
   if(t&&typeof t.cp!=="boolean"&&typeof t.ev==="number") t.cp=Array.isArray(gameFeed)&&gameFeed.some(x=>isEditablePlay(x)&&typeof x.id==="number"&&x.id>t.ev);
   hist.push({g:JSON.parse(JSON.stringify(G)),fl:(Array.isArray(gameFeed)?gameFeed.length:0),ev:_eventId,n:++histSeq});
   histCompact(hist,HIST_RECENT,HIST_MAX);
-  redoStack.length=0;reopenPending=null;}
-function resetUI(){mode="idle";tap=null;contact=null;result=null;plan=null;showAll=false;reviewBatter=null;reviewInn=false;reopenPending=null;}
+  redoStack.length=0;reopenPending=null;pitchMoveFrom=null;pitchMoveOpen=false;}
+function resetUI(){mode="idle";tap=null;contact=null;result=null;plan=null;showAll=false;reviewBatter=null;reviewInn=false;reopenPending=null;pitchMoveFrom=null;pitchMoveOpen=false;}
 // Cut gameFeed back to what it held when undo snapshot e was taken, and return the entries that
 // came off (in feed order) so Redo can put them back. By event id when the snapshot has one: the
 // feed is capped at 220 lines with shift(), so once a game is that long a length taken at snapshot
@@ -1328,8 +1361,9 @@ function redo(){
 // action — a pitch, a walk, a base-running event, a correction — pushes its own snapshot on top,
 // and then the honest answer is undo/rewind, not a pre-filled re-entry. Returns that saved state
 // or null.
-// Lineup, position, pitcher and opponent-lineup edits (and in-game rule settings) change G WITHOUT
-// a snapshot, so they don't retire the play on their own — but re-opening pops back to the pre-play
+// In-game lineup, position, pitcher and opponent-lineup edits now take their own snapshot
+// (lineupStep()), which retires the re-open by itself. In-game rule settings (and lineup edits made
+// before the game went live) still change G WITHOUT a snapshot — but re-opening pops back to the pre-play
 // G and would silently throw them away (and a corrected play must stay charged to the pitcher who
 // threw it, so they can't be carried over either). commit() fingerprints those parts as .play.sig;
 // once the current G no longer matches, the re-open is withdrawn and Undo/Rewind (which say what
@@ -1642,6 +1676,52 @@ function currentPitcherKey(){ return fielding()?("o"+G.lineup.pos.P):"oppP"; }
 function currentPitcherName(){ if(fielding()){ const p=playerAtPos("P"); return p?p.name:"Pitcher"; } return OPP.short+" Pitcher"; }
 function countPitch(){ if(!G.pitches)G.pitches={}; const k=currentPitcherKey(); G.pitches[k]=(G.pitches[k]||0)+1; }
 function currentPitchCount(){ return (G.pitches&&G.pitches[currentPitcherKey()])||0; }
+/* Late pitching change. Every pitch goes to whoever the lineup has at P, so when the scorer enters a
+   change after the new kid already started throwing, the old pitcher keeps those pitches (and any K,
+   walk, hit, run or out in between): wrong pitch counts and pitch-limit alerts on the wrong kid, with
+   no way to move them afterwards (per the 2026-09-27 scorer research). The change itself still applies
+   at once with no extra screen, because entered on time that split is right. This only builds an
+   optional offer for the idle screen: move what the old pitcher was charged with since some earlier
+   point to the new one. The starting points: since this batter came up, since each of the last few
+   batters of this half came up (a change entered one or more batters late, where "since the inning
+   began" would also take the starter's own outs and K's), and since this half-inning began.
+   They come from the Undo history: for each batter, the oldest snapshot of this half taken with him up
+   and no pitch to him yet; for the half, the oldest one before its first pitch. If those were thinned
+   out of the history, that option just isn't offered.
+   Returns null when there's nothing to move, else {from,to,midAB,opts:[{id,label,c}]} newest first.
+   midAB = the old pitcher was charged with pitches to THIS batter, i.e. the change came in the middle
+   of an at-bat: the case the field shows prominently (otherwise it's only a quiet link). */
+const PITCHMOVE_MAX_BATTERS=5;   // earlier batters offered, besides this one and the whole half
+function pitchMoveOffer(){
+  if(!pitchMoveFrom||viewMode!=="scorer"||!gameActive||G.final||!fielding()||cpMode()) return null;
+  const P=(G.lineup&&G.lineup.pos)?G.lineup.pos.P:null; if(P==null) return null;
+  const from=pitchMoveFrom.key, to="o"+P; if(from===to) return null;
+  const ptrK=G.half==="T"?"awayPtr":"homePtr", now=G[ptrK];
+  const starts={}; let halfG=null;   // starts[batting pointer] = state before the first pitch to him
+  for(let i=hist.length-1;i>=0;i--){ const g=hist[i]&&(hist[i].g||hist[i]);   // very old entries were a bare G (see undo())
+    if(!g||g.inning!==G.inning||g.half!==G.half) break;
+    if(!(g.halfPitches|0)) halfG=g;
+    if(typeof g[ptrK]==="number"&&!(g.ab&&Array.isArray(g.ab.pitches)&&g.ab.pitches.length)) starts[g[ptrK]]=g; }
+  const has=c=>!!(c&&c.any), key=c=>JSON.stringify(c);
+  const half=halfG?pitcherCreditSince(halfG,G,from):null;
+  // Name the batter a snapshot had up, from that snapshot's own opponent order (it may have changed since).
+  const whoUp=(g,p)=>{ const ol=Array.isArray(g.oppLineup)?g.oppLineup:[]; const len=Math.max(1,ol.length||g.oppBatters||1); const i=p%len; const e=ol[i]||{};
+    return "#"+(e.num||String(i+1))+((e.name||"").trim()?" "+e.name.trim():""); };
+  const opts=[]; let last=null;
+  for(let p=now, k=0; p>=0&&k<=PITCHMOVE_MAX_BATTERS; p--, k++){
+    const g=starts[p]; if(!g) continue;
+    const c=pitcherCreditSince(g,G,from); if(!has(c)) continue;
+    // Same as the whole half (he led it off): an earlier batter is offered as "since the inning began"
+    // instead, below; this batter keeps his own label, and the half option is then left out.
+    const lead=has(half)&&key(c)===key(half);
+    if(lead&&p!==now) continue;
+    if(last&&key(c)===last) continue;   // moves nothing more than the newer option already does
+    opts.push({id:"b"+p,label:p===now?("Since this batter came up"+(lead?" · he led off the inning":"")):("Since "+whoUp(g,p)+" came up · "+(now-p)+" batter"+(now-p===1?"":"s")+" ago"),c});
+    last=key(c); }
+  if(has(half)&&key(half)!==last) opts.push({id:"half",label:"Since the inning began",c:half});
+  if(!opts.length) return null;
+  return {from,to,opts,midAB:!!starts[now]&&has(pitcherCreditSince(starts[now],G,from))};
+}
 /* Record one pitch: bump the pitcher's count + the half-inning count, and append it to
    the current at-bat's sequence (res = ball/strike/foul/inplay/hbp, + armed type). */
 function recordPitch(res){
@@ -3643,13 +3723,35 @@ function inningLogModal(){
   // C5: in-game lineup/position changes recorded for the historical record.
   const esc=escHtml; // was a local ad hoc escaper — see html-safe.js
   const ll=G.lineupLog||[];
+  // A wrong line here used to be permanent (per the 2026-09-27 scorer research). The scorer can strike
+  // one from the record with its ×, as its own Undo step. It only removes the line: the lineup itself is
+  // fixed on the Lineup screen or with Undo. Not on a finished game (its box score is already archived).
+  const _llDel=viewMode==="scorer"&&gameActive&&!G.final;
   const luSec=ll.length?`
       <div style="margin-top:14px;font-family:${MONO};font-size:12px;font-weight:800;letter-spacing:.05em;color:${T.sage}">LINEUP CHANGES</div>
-      ${ll.slice().reverse().map(c=>`
+      ${ll.map((c,i)=>({c,i})).reverse().map(({c,i})=>`
         <div style="display:flex;align-items:center;gap:8px;background:${T.surface};border:1px solid ${T.line};border-radius:9px;padding:8px 11px;margin-top:6px">
           <span style="font-family:${MONO};font-size:11px;font-weight:800;color:${T.lime};white-space:nowrap">${c.half==="T"?"Top":"Bot"} ${c.inn}</span>
-          <span style="font-size:13px;color:${T.chalk}">${esc(c.t)}</span></div>`).join("")}`:"";
+          <span style="flex:1;min-width:0;font-size:13px;color:${T.chalk}">${esc(c.t)}</span>
+          ${_llDel?`<button data-act="lulogdel" data-arg="${i}" title="Remove this line from the lineup log (does not change the lineup)" aria-label="Remove line" style="flex:none;background:transparent;border:1.5px solid ${T.line};color:${T.sage};border-radius:7px;width:32px;height:32px;font-size:17px;font-weight:800;line-height:1;display:flex;align-items:center;justify-content:center;cursor:pointer">&times;</button>`:""}</div>`).join("")}`:"";
   return modalWrap("Inning log","Totals by half-inning",`${cur}${rows}${luSec}`,"closeinnlog");
+}
+// "6 pitches · 1 K · 1 H · 1 out": what one late-pitching-change option would move (see pitchMoveOffer()).
+function pitchCreditText(c){ const s=(c&&c.stats)||{}, n=(c&&c.n)|0;
+  return [n+" pitch"+(n===1?"":"es"), s.k?s.k+" K":"", s.bb?s.bb+" BB":"", s.h?s.h+" H":"", s.r?s.r+" R":"", s.outs?s.outs+" out"+(s.outs===1?"":"s"):""].filter(Boolean).join(" · "); }
+/* The late pitching change's choices, opened from the one-line offer on the field (pitchMoveRow in
+   actionArea()). A modal rather than a row of buttons on the field, so the offer never changes the
+   height of the scoring controls (per the 2026-09-27 scorer research), and so there's room to offer
+   each of the last few batters as the starting point, not just this one and the whole half. Each
+   choice shows exactly what it would move before the scorer commits to it. */
+function pitchMoveModal(){
+  const o=pitchMoveOffer(); if(!o) return "";
+  const nmOf=k=>{ const pl=ROSTER[+String(k).slice(1)]; return pl?("#"+escHtml(pl.num)+" "+escHtml((pl.name||"").trim())):"the new pitcher"; };
+  const opts=o.opts.map(x=>`<button data-act="pitchmove" data-arg="${x.id}" style="display:flex;flex-direction:column;align-items:flex-start;gap:3px;text-align:left;background:${T.surface};border:2px solid ${x.id===o.opts[0].id&&o.midAB?T.amber:T.line};color:${T.chalk};border-radius:10px;padding:11px 13px;font-size:14px;font-weight:800;cursor:pointer">
+      <span>${escHtml(x.label)}</span>
+      <span style="font-family:${MONO};font-size:12px;font-weight:700;color:${T.amber}">${pitchCreditText(x.c)}</span></button>`).join("");
+  return modalWrap("Move pitches?",`Was ${nmOf(o.to)} already pitching before you changed him in? Pick when he started: what ${nmOf(o.from)} was charged with since then moves to him.`,
+    `${opts}<button data-act="pitchmovex" style="background:transparent;border:2px solid ${T.line};color:${T.sage};border-radius:10px;padding:11px 13px;font-size:13.5px;font-weight:800;cursor:pointer">No &mdash; keep the counts as they are</button>`,"pitchmoveclose");
 }
 
 /* Live feed (viewer + scorer). Most recent on top. Toggle: "play" = one line per at-bat;
@@ -5624,6 +5726,7 @@ function actionArea(){
         return `<div style="flex-shrink:0;display:flex;gap:8px;align-items:center">
           ${sl.length?`<div style="flex:1;min-width:0">${themedSelect("loadLineupSel",[{v:"",label:"↓ Load saved lineup…"}].concat(sl.map(l=>({v:l.id,label:l.name||"Lineup"}))),"",{onpick:"applySavedLineup",placeholder:"↓ Load saved lineup…",css:ghost+";width:100%;flex:1;text-transform:none;padding:11px;color:"+T.chalk+";display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer;text-align:left"})}</div>`:`<span style="flex:1;font-size:11px;color:${T.sageDim};padding:0 4px">No saved lineups yet for ${ct.short||ct.name}</span>`}
           <button data-act="savecurlineup" style="${ghost};flex:none;padding:11px 14px">Save as&hellip;</button></div>`; })()}
+      ${(narrow&&gameActive&&!luFromSetup&&(G.lineupLog||[]).length)?`<button data-act="lineuplog" title="See (or strike a wrong line from) the lineup changes recorded this game" style="${ghost};flex-shrink:0;padding:10px;font-size:13px;text-transform:none">Lineup changes log (${G.lineupLog.length}) &rsaquo;</button>`:""}
       <button data-act="lineupdone" style="${bigBtn(T.lime,"")}flex-shrink:0">Done</button>`;
   }
   if(mode==="pickplayer"){
@@ -5631,13 +5734,15 @@ function actionArea(){
     // "+ Add batter" (editSlot = one past the last slot: append a bench kid).
     const pitcherPick=editSlot===-1, appendPick=!pitcherPick&&editSlot>=G.lineup.order.length, cur=pitcherPick?G.lineup.pos.P:G.lineup.order[editSlot];
     const btn=ri=>{const p=ROSTER[ri],inL=G.lineup.order.indexOf(ri),pos=posOfPlayer(ri),here=ri===cur;
-      const tag=(here&&!pitcherPick)?"batting here":(inL>=0?`bats ${inL+1}${pos?` · ${pos}`:""}`:"bench");
+      // Picking a pitcher: show what each kid has already thrown today, the number the pitch limits key off.
+      const thrown=pitcherPick?((G.pitches&&G.pitches["o"+ri])|0):0;
+      const tag=((here&&!pitcherPick)?"batting here":(inL>=0?`bats ${inL+1}${pos?` · ${pos}`:""}`:"bench"))+(thrown?` · ${thrown} pitch${thrown===1?"":"es"}`:"");
       return `<button data-act="setplayer" data-arg="${ri}" style="display:flex;justify-content:space-between;align-items:center;background:${here?T.surface2:T.surface};border:2px solid ${here?OUR.color:T.line};color:${T.chalk};border-radius:9px;padding:11px 13px;font-size:14px;font-weight:700">
         <span style="display:flex;gap:9px;align-items:center"><span style="font-family:${MONO};color:${OUR.color};min-width:32px">#${escHtml(p.num)}</span>${escHtml(p.name)}</span>
         <span style="font-family:${MONO};font-size:11px;color:${T.sage}">${tag}</span></button>`;};
     const all=ROSTER.map((_,ri)=>ri);
     if(pitcherPick) return step("Pitching change","Pick the new pitcher — a bench arm subs in for the current one.",
-      `<div style="display:flex;flex-direction:column;gap:6px">${all.map(btn).join("")}</div>`,"backlineup");
+      `<div style="display:flex;flex-direction:column;gap:6px">${all.map(btn).join("")}</div>`,pitchPickFromIdle?"pitchpickback":"backlineup");
     // Batting slot: bench kids first (the usual reason to open this is an injury or late-arrival sub),
     // then the rest of the order for a straight swap of two batters.
     const grp=(lbl,arr)=>arr.length?`<div style="font-size:11px;font-weight:800;letter-spacing:.6px;color:${T.sageDim};margin:6px 2px 0">${lbl}</div>${arr.map(btn).join("")}`:"";
@@ -5803,7 +5908,39 @@ function actionArea(){
         : `<button type="button" disabled tabindex="-1" aria-hidden="true" style="${st};visibility:hidden;pointer-events:none">${inner}</button>`;   // same element type, so exactly the same height
     })();
     const isPhone=!isWide();
-    return `${isPhone?adjustRow:""}${cpTag}${ptypeRow}
+    // Pitching change from the field (per the 2026-09-27 scorer research): while we're in the field,
+    // a "Pitching · #12 Name · Change" chip opens the pitcher picker and comes straight back here — no
+    // trip through the Lineup screen. Wide only: on the phone the pitch-count line above (pcLine in
+    // render()) is the same button. It shares the bottom row with Adjust runners (or its invisible
+    // stand-in) so it adds no height, and the Ball/Strike grid doesn't move when the sides change.
+    // Not in coach pitch: the coach is pitching, not a kid with a pitch count.
+    const _scorerNow=(viewMode==="scorer"&&gameActive);
+    const pitchChip=(!isPhone&&_scorerNow&&fielding()&&!_cp)?(()=>{ const p=playerAtPos("P");
+      return `<button data-act="fieldpitch" title="Pitching change — pick the new pitcher" style="${flatBtn};border-color:${T.line};background:${T.surface2};padding:9px 12px;text-transform:none;letter-spacing:0;max-width:min(320px,52vw);min-width:0;gap:9px">
+          <span style="font-family:${MONO};font-size:10px;font-weight:800;letter-spacing:1.2px;color:${OUR.color};flex:none">PITCHING</span>
+          <span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:${T.chalk}">${p?`#${escHtml(p.num)} ${escHtml(p.name)}`:`<span style="color:${T.sageDim}">Set pitcher</span>`}</span>
+          <span style="flex:none;color:${T.lime};font-size:11px;font-weight:800;letter-spacing:.5px">CHANGE</span></button>`; })():"";
+    // Right after a pitching change: the optional "he was already in" fix (pitchMoveOffer()). One line,
+    // the same height as Adjust runners, and it opens its choices in a modal (pitchMoveModal()), so it
+    // never changes the height of the controls: on wide it takes the pitching chip's slot in the bottom
+    // row (the chip comes back after the next pitch or "keep the counts"), on the phone it sits above the
+    // grid where the spacer absorbs it. Shown prominently only when the change came in the middle of an
+    // at-bat (pitches to this batter are on the old pitcher, the likely-late case); after an on-time
+    // change between batters it's just a quiet link, since there the counts are almost always right.
+    const pmo=_scorerNow?pitchMoveOffer():null;
+    const pitchMoveRow=pmo?(()=>{ const pl=ROSTER[+String(pmo.to).slice(1)], nm=pl?("#"+escHtml(pl.num)+" "+escHtml((pl.name||"").trim())):"the new pitcher";
+      const st=`${flatBtn};padding:9px 12px;text-transform:none;letter-spacing:0;min-width:0;gap:9px;justify-content:space-between`;
+      return pmo.midAB
+        ? `<button data-act="pitchmoveopen" title="Was ${nm} already pitching? Move this at-bat's pitches to him" style="${st};border-color:${T.amber};background:${T.surface2};${isPhone?"":"max-width:min(320px,52vw)"}">
+            <span style="font-family:${MONO};font-size:10px;font-weight:800;letter-spacing:1.2px;color:${T.amber};flex:none">ALREADY IN?</span>
+            <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:${T.chalk};text-align:left">Move pitches to ${nm}</span>
+            <span style="flex:none;color:${T.amber};font-size:16px;line-height:1">&rsaquo;</span></button>`
+        : `<button data-act="pitchmoveopen" title="Was ${nm} already pitching? Move pitches to him" style="${st};border-color:${T.line};background:transparent;font-weight:700;${isPhone?"":"max-width:min(320px,52vw)"}">
+            <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:${T.sage};text-align:left">Was ${pl?"#"+escHtml(pl.num):"he"} already pitching? Fix counts</span>
+            <span style="flex:none;color:${T.sage};font-size:16px;line-height:1">&rsaquo;</span></button>`; })():"";
+    const bottomRow=(isPhone||!pitchChip)?adjustRow
+      : `<div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:stretch">${adjustRow}${pitchMoveRow||pitchChip}</div>`;
+    return `${isPhone?pitchMoveRow+adjustRow:""}${cpTag}${ptypeRow}
       ${pitchGrid}
       ${(()=>{
         // Base-running (steal/WP/PB/balk/pickoff) stays on the wide (tablet/PC) layout, which has the
@@ -5821,7 +5958,7 @@ function actionArea(){
         cells.push(`<button data-act="endinning" style="${flatBtn};border:none;border-radius:0;flex-direction:column;gap:1px;border-bottom:3px solid ${T.amber}"><span style="display:flex;align-items:center;gap:5px"><span style="color:${T.amber}">${ICN.inning}</span>End inn</span><span style="color:${T.sage};font-weight:600;font-size:10px;text-transform:none;letter-spacing:0">${halfLabel} · ${G.outs} out${G.outs===1?"":"s"}</span></button>`);
         return `<div style="display:grid;grid-template-columns:repeat(${cells.length},1fr);gap:2px;background:${T.line};border:2px solid ${T.line};border-radius:10px;overflow:hidden">${cells.join("")}</div>`;
       })()}
-      ${isPhone?"":adjustRow}`;
+      ${isPhone?"":bottomRow}`;
   }
   if(mode==="locate"){
     // Outcomes where the ball was NOT put in play (no field location needed) — shown up front so
@@ -6152,7 +6289,7 @@ function setupFieldDrag(){
         if(ghost)ghost.remove(); clear(); el.style.opacity='';
         if(dragging){ _fieldJustDragged=Date.now();
           const t=target(ev.clientX,ev.clientY);
-          if(t===bench){ const old=posOfPlayer(ri); if(old){ delete G.lineup.pos[old]; logLineup(_pname(ri)+" → bench"); render(); broadcast(); return; } render(); return; }
+          if(t===bench){ const old=posOfPlayer(ri); if(old){ lineupStep(); delete G.lineup.pos[old]; logLineup(_pname(ri)+" → bench"); render(); broadcast(); return; } render(); return; }
           if(t && t.getAttribute && t.getAttribute('data-fieldspot')){ const toP=t.getAttribute('data-fieldspot'); if(posOfPlayer(ri)!==toP){ fieldPlace(ri,toP); render(); broadcast(); return; } }
           render();   // dropped on nothing / itself — repaint (cancels the pending tap)
         }
@@ -6185,6 +6322,7 @@ function setupOppDrag(){
         document.body.style.userSelect='';
         row.style.opacity=''; row.style.boxShadow='';
         const ord=[...list.querySelectorAll('[data-opprow]')].map(r=>+r.dataset.i);
+        if(ord.some((i,j)=>i!==j)) lineupStep();   // an Undo step only when the order actually changed
         G.oppLineup=ord.map(i=>oppList()[i]);   // commit the reordered batting order
         render(); broadcast();
       };
@@ -6597,9 +6735,16 @@ function render(){
         <div style="display:flex;align-items:baseline;gap:9px;flex:none">
           <span style="font-family:${MONO};font-size:32px;font-weight:800;color:${T.amber};line-height:1">${currentPitchCount()}</span>
           <span style="font-size:14px;font-weight:800;letter-spacing:1.2px;color:${T.sageDim}">PITCHES</span></div>
-        <div style="display:flex;flex-direction:column;align-items:flex-end;min-width:0">
+        ${(fielding()&&gameActive&&!isView)
+          // Our pitcher: this half is the phone's "Pitching · Change" button (the wide layout has the
+          // same chip under its controls — see pitchChip in actionArea()). Opens the pitcher picker and
+          // comes back here, instead of Lineup → Change → pick → Done (per the 2026-09-27 scorer research).
+          ? `<button data-act="fieldpitch" title="Pitching change — pick the new pitcher" style="display:flex;flex-direction:column;align-items:flex-end;min-width:0;background:transparent;border:none;padding:0;margin:0;color:inherit;cursor:pointer;text-align:right">
+          <span style="display:flex;align-items:center;gap:7px"><span style="font-family:${MONO};font-size:10px;font-weight:800;letter-spacing:1.5px;color:${pitchClr}">&#9899; PITCHING</span><span style="font-family:${MONO};font-size:10px;font-weight:800;letter-spacing:.8px;color:${T.lime};border:1.5px solid ${T.lime};border-radius:5px;padding:1px 5px">CHANGE</span></span>
+          <span style="font-size:18px;color:${T.chalk};font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%">${escHtml(currentPitcherName())} &middot; ${escHtml(pitchTeam)}</span></button>`
+          : `<div style="display:flex;flex-direction:column;align-items:flex-end;min-width:0">
           <span style="font-family:${MONO};font-size:10px;font-weight:800;letter-spacing:1.5px;color:${pitchClr}">&#9899; PITCHING</span>
-          <span style="font-size:18px;color:${T.chalk};font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%">${currentPitcherName()} &middot; ${pitchTeam}</span></div></div>`;
+          <span style="font-size:18px;color:${T.chalk};font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%">${escHtml(currentPitcherName())} &middot; ${escHtml(pitchTeam)}</span></div>`}</div>`;
     const tab=(id,label)=>`<button data-act="pane" data-arg="${id}" style="flex:1;background:${phonePane===id?T.lime:T.surface};border:2px solid ${phonePane===id?T.lime:T.line};color:${phonePane===id?"#fff":T.sage};border-radius:10px;padding:9px;font-family:${MONO};font-weight:800;font-size:14px;letter-spacing:.6px;text-transform:uppercase">${label}</button>`;
     const pane=phonePane==="video"
       ? `<div style="flex:1;min-height:0;display:flex;flex-direction:column;justify-content:center;gap:11px">${monitorPane()}</div>`
@@ -6627,6 +6772,7 @@ function render(){
     ${reviewBatter?batterReviewModal():""}
     ${quickEditKey?quickEditModal():""}
     ${reviewInn?inningLogModal():""}
+    ${pitchMoveOpen?pitchMoveModal():""}
     ${brSheet?baseRunModal():""}
     ${correctOpen?correctModal():""}
     ${editAB!=null?abEditSheet():""}
@@ -6808,6 +6954,12 @@ document.getElementById("app").addEventListener("click",e=>{
   if(act==="closereview"){ reviewBatter=null; render(); return; }
   if(act==="inninglog"){ reviewInn=true; render(); return; }
   if(act==="closeinnlog"){ reviewInn=false; render(); return; }
+  // The inning log is only on the wide toolbar's game menu, so the phone Lineup screen gets its own way in
+  // (to strike a wrong line, see lulogdel). It opens over the field, where the modal lives.
+  if(act==="lineuplog"){ luFromSetup=false; mode="idle"; reviewInn=true; render(); return; }
+  if(act==="lulogdel"){ const i=+arg, ll=G.lineupLog;   // × on an inning-log lineup line (see inningLogModal())
+    if(viewMode==="scorer"&&gameActive&&!G.final&&Array.isArray(ll)&&i>=0&&i<ll.length){ snapshot(); G.lineupLog.splice(i,1); flash("Line removed · Undo brings it back"); render(); broadcast(); }
+    return; }
   if(act==="daymode"){ const on=!document.body.classList.contains("day"); document.body.classList.toggle("day",on); try{localStorage.setItem("al-day-mode",on?"1":"0");}catch(e){} render(); return; }   // light ⇄ dark theme
   if(act==="advtoggle"){ advPitch=!advPitch; try{localStorage.setItem("al-adv-pitch",advPitch?"1":"0");}catch(e){} render(); return; }
   if(act==="adveventstoggle"){ advEvents=!advEvents; try{localStorage.setItem("al-adv-events",advEvents?"1":"0");}catch(e){} render(); return; }
@@ -7056,8 +7208,8 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="fielddispswap"){ if(fieldDisplaced){ if(fieldDisplaced.openPos)G.lineup.pos[fieldDisplaced.openPos]=fieldDisplaced.ri; fieldDisplaced=null; render(); broadcast(); } }   // bumped player takes the now-open spot
   else if(act==="fielddisppick"){ if(fieldDisplaced){ fieldHold=fieldDisplaced.ri; fieldDisplaced=null; render(); } }   // I'll place the bumped player myself
   else if(act==="fielddispbench"){ if(fieldDisplaced){ fieldDisplaced=null; render(); broadcast(); } }   // bumped player stays in the order but with no fielding position
-  else if(act==="oppadd"){const L=oppList();if(L.length<12){L.push({num:String(L.length+1),name:""});G.oppBatters=L.length;}render();}
-  else if(act==="opprem"){if(oppList().length>1){oppList().splice(+arg,1);G.oppBatters=oppList().length;render();broadcast();}}
+  else if(act==="oppadd"){const L=oppList();if(L.length<12){lineupStep();L.push({num:String(L.length+1),name:""});G.oppBatters=L.length;}render();}
+  else if(act==="opprem"){if(oppList().length>1){lineupStep();oppList().splice(+arg,1);G.oppBatters=oppList().length;render();broadcast();}}
   // ---- opponent lineup editor (full mirror): positions, pitcher, bench/pinch, edit ----
   else if(act==="oppedit"){editSlot=+arg;mode="oppeditplayer";render();}
   else if(act==="opppickpos"){editSlot=+arg;mode="opppickpos";render();}
@@ -7065,8 +7217,8 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="opppickpitch"){mode="opppickpitch";render();}
   else if(act==="oppsetpitch"){oppAssignPos(+arg,"P");mode="lineup";render();broadcast();}
   else if(act==="oppbenchadd"){oppBenchList().push({num:"",name:""});render();}
-  else if(act==="oppbenchin"){const b=oppBenchList();const e=b.splice(+arg,1)[0];if(e&&oppList().length<12){oppList().push(e);G.oppBatters=oppList().length;}render();broadcast();}
-  else if(act==="oppbenchout"){const i=editSlot;const e=oppList().splice(i,1)[0];if(e){delete e.pos;oppBenchList().push(e);}G.oppBatters=oppList().length;mode="lineup";render();broadcast();}
+  else if(act==="oppbenchin"){const b=oppBenchList();if(b[+arg]&&oppList().length<12){lineupStep();const e=oppBenchList().splice(+arg,1)[0];oppList().push(e);G.oppBatters=oppList().length;}render();broadcast();}   // the step is taken before the splice, so Undo puts him back on the bench; a full order leaves him there (it used to drop him)
+  else if(act==="oppbenchout"){const i=editSlot;if(oppList()[i])lineupStep();const e=oppList().splice(i,1)[0];if(e){delete e.pos;oppBenchList().push(e);}G.oppBatters=oppList().length;mode="lineup";render();broadcast();}
   else if(act==="home"){ if(_watchLiveUnsub){ try{_watchLiveUnsub();}catch(e){} _watchLiveUnsub=null; _watchGen++; gameActive=false; _remoteLive=false; G=initGame(); }   // leaving a watch session → drop the borrowed game + cancel any delayed updates
     // viewerLocked was never cleared here — a viewer stuck on the "waiting for the game to start"
     // lobby (viewerLocked && !gameActive && !_remoteLive gates that whole screen, independent of
@@ -7172,8 +7324,27 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="pickplayer"){editSlot=+arg;lineEditSlot=null;luSelSlot=null;mode="pickplayer";render();}   // the row's "Sub" button
   else if(act==="pickpos"){editSlot=+arg;mode="pickpos";render();}
   else if(act==="editplayer"){ lineEditSlot=(lineEditSlot===+arg?null:+arg); render(); }   // C1: toggle in-row edit (no second window)
-  else if(act==="pickpitch"){editSlot=-1;mode="pickplayer";render();}
-  else if(act==="setplayer"){const ri=+arg;if(editSlot===-1)makePitcher(ri);else if(editSlot>=G.lineup.order.length)benchIn(ri);else assignSlot(editSlot,ri);mode="lineup";render();broadcast();}   // editSlot past the end = "+ Add batter" picking who to append
+  else if(act==="pickpitch"){editSlot=-1;pitchPickFromIdle=false;mode="pickplayer";render();}
+  // The field's "Pitching · Change" chip (see pitchChip in actionArea() / pcLine on the phone): the same
+  // picker, but it comes back to the field instead of the Lineup screen. Changing our pitcher used to be
+  // Lineup → Change → pick → Done, a full-screen detour, so late changes went unrecorded and pitches and
+  // pitch-limit alerts landed on the wrong kid (per the 2026-09-27 scorer research).
+  else if(act==="fieldpitch"){ if(!gameActive||!G.lineup)return; editSlot=-1;pitchPickFromIdle=true;lineEditSlot=null;luSelSlot=null;mode="pickplayer";render(); }
+  else if(act==="pitchpickback"){ pitchPickFromIdle=false; mode=gameActive?"idle":"lineup"; render(); }
+  else if(act==="setplayer"){const ri=+arg;const back=(editSlot===-1&&pitchPickFromIdle&&gameActive)?"idle":"lineup";pitchPickFromIdle=false;if(editSlot===-1)makePitcher(ri);else if(editSlot>=G.lineup.order.length)benchIn(ri);else assignSlot(editSlot,ri);mode=back;render();broadcast();}   // editSlot past the end = "+ Add batter" picking who to append
+  // Late pitching change: move what the old pitcher was charged with since the picked starting point
+  // (this batter, an earlier batter of this half, or the half's start) to the new one (see
+  // pitchMoveOffer() / pitchMoveModal()). Its own Undo step.
+  else if(act==="pitchmoveopen"){ if(pitchMoveOffer()){ pitchMoveOpen=true; render(); } }
+  else if(act==="pitchmoveclose"){ pitchMoveOpen=false; render(); }   // closes the choices; the offer stays until the next pitch
+  else if(act==="pitchmove"){ const o=pitchMoveOffer(), opt=o&&o.opts.find(x=>x.id===arg), c=opt&&opt.c;
+    pitchMoveOpen=false;
+    if(c){ snapshot(); movePitcherCredit(G,o.from,o.to,c);
+      const _ri=k=>+String(k).slice(1), _st=[c.stats.k?c.stats.k+" K":"",c.stats.bb?c.stats.bb+" BB":"",c.stats.h?c.stats.h+" H":"",c.stats.r?c.stats.r+" R":"",c.stats.outs?c.stats.outs+" out"+(c.stats.outs===1?"":"s"):""].filter(Boolean).join(", ");
+      logLineup(c.n+" pitch"+(c.n===1?"":"es")+(_st?" ("+_st+")":"")+" moved from "+_pname(_ri(o.from))+" to "+_pname(_ri(o.to))+" · s"+opt.label.slice(1),{kind:"pitchmove",out:o.from,in:o.to,n:c.n,stats:c.stats});
+      flash(c.n+" pitch"+(c.n===1?"":"es")+" moved to "+escHtml(_pname(_ri(o.to)))); render(); broadcast(); }
+    else render(); }
+  else if(act==="pitchmovex"){ pitchMoveFrom=null; pitchMoveOpen=false; render(); }
   else if(act==="benchin"){ if(benchIn(+arg)){ render(); broadcast(); } }   // BENCH strip chip: straight to the bottom of the order
   else if(act==="setpos"){assignPos(G.lineup.order[editSlot],arg);mode="lineup";render();broadcast();}
   else if(act==="backlineup"){mode="lineup";render();}
@@ -7655,11 +7826,13 @@ window.appBack=function(){
     if(reviewBatter){reviewBatter=null;render();return true;}
     if(quickEditKey){quickEditKey=null;render();return true;}
     if(reviewInn){reviewInn=false;render();return true;}
+    if(pitchMoveOpen){pitchMoveOpen=false;render();return true;}
     // The optional fielder picker is only ever opened from the runners screen (openFielderPick), so
     // OS Back steps back there — same as its on-screen Back — instead of throwing away the whole
     // play the scorer has already placed runners on.
     if(mode==="errpos"||mode==="outpos"){ mode="runners"; render(); return true; }
     if(["locate","result","runners"].includes(mode)){ leavePlayEntry(); return true; }   // a re-opened play goes back as entered
+    if(mode==="pickplayer"&&pitchPickFromIdle){ pitchPickFromIdle=false; mode=gameActive?"idle":"lineup"; render(); return true; }   // opened from the field's pitching chip: back to the field
     if(mode==="editplayer"||mode==="pickpos"||mode==="pickplayer"){ mode="lineup"; render(); return true; }
     if(mode==="pickteam"){ mode="newgame"; render(); return true; }
     if(mode==="newgame"&&settingsMode){ settingsMode=false; mode="idle"; render(); return true; }

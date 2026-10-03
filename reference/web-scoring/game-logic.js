@@ -265,10 +265,49 @@
     });
   }
 
+  // Late pitching change (scoring-controller.html pitchMoveOffer()): what pitcher `key` was charged
+  // with between an earlier game state and now. G.pitches[key] is his pitch count and
+  // G.pstats[key] his line {k, bb, h, r, outs}. Only increases count; a field that went down (an
+  // Undo-free correction) moves nothing. any = there is something to move.
+  const PSTAT_FIELDS = ["k", "bb", "h", "r", "outs"];
+  function pitcherCreditSince(before, now, key) {
+    const num = (o, f) => (o && typeof o[f] === "number" && isFinite(o[f])) ? o[f] : 0;
+    const n = Math.max(0, num(now && now.pitches, key) - num(before && before.pitches, key));
+    const a = before && before.pstats && before.pstats[key], b = now && now.pstats && now.pstats[key];
+    const stats = {}; let any = n > 0;
+    for (const f of PSTAT_FIELDS) { const d = Math.max(0, num(b, f) - num(a, f)); if (d) { stats[f] = d; any = true; } }
+    return { n: n, stats: stats, any: any };
+  }
+  // Move such a credit from pitcher `from` to pitcher `to` in game state g (mutates g). Never takes
+  // more than `from` actually has, so no count or stat can go negative. Returns true if anything moved.
+  function movePitcherCredit(g, from, to, credit) {
+    if (!g || !credit || !from || !to || from === to) return false;
+    if (!g.pitches || typeof g.pitches !== "object") g.pitches = {};
+    if (!g.pstats || typeof g.pstats !== "object") g.pstats = {};
+    let moved = false;
+    const n = Math.min(Math.max(0, credit.n | 0), g.pitches[from] | 0);
+    if (n > 0) {
+      g.pitches[from] = (g.pitches[from] | 0) - n; g.pitches[to] = (g.pitches[to] | 0) + n; moved = true;
+      // The box score's pitching lines are built from the pstats keys, so a new pitcher whose only
+      // credit is pitches (no K/BB/H/R/out yet) still needs a line, or those pitches show up nowhere.
+      if (!g.pstats[to]) g.pstats[to] = { k: 0, bb: 0, h: 0, r: 0, outs: 0 };
+    }
+    const src = g.pstats[from], st = credit.stats || {};
+    if (src) {
+      for (const f of PSTAT_FIELDS) {
+        const d = Math.min(Math.max(0, st[f] | 0), src[f] | 0); if (!d) continue;
+        if (!g.pstats[to]) g.pstats[to] = { k: 0, bb: 0, h: 0, r: 0, outs: 0 };
+        src[f] = (src[f] | 0) - d; g.pstats[to][f] = (g.pstats[to][f] | 0) + d; moved = true;
+      }
+    }
+    return moved;
+  }
+
   const api = {
     BATTER_GREEN, RUNCOLORS, OUT_MARKER_COLOR: OUT_MARKER_FALLBACK,
     buildPlan, playSummary, outsFromKind, rbiEligible, teamRec, teamRecForSeason, gameSeason, idealText,
     isEditablePlay, histCompact, rewindIndex, trimFeed, histPack, histUnpack,
+    pitcherCreditSince, movePitcherCredit,
   };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else Object.assign(root, api);   // classic-script global scope, same pattern as the rest of this app
