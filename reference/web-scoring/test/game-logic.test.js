@@ -264,3 +264,72 @@ test("movePitcherCredit: a move of pitches only still gives the new pitcher a bo
   assert.deepEqual(g.pstats.o8, { k: 0, bb: 0, h: 0, r: 0, outs: 0 }, "pstats row exists after a pitches-only move");
   assert.deepEqual(g.pstats.o3, { k: 2, bb: 0, h: 1, r: 0, outs: 6 }, "the old pitcher's line is untouched");
 });
+
+/* ---- league rules: run cap schedule / final-inning exception, run rule, pitch/catch tiers ---- */
+const { runCapFor, mercyTiers, mercyCall, pitchAlertTier, catcherAlertTier } = require("../game-logic.js");
+
+test("runCapFor: a flat cap with no extra fields reads exactly as before (older saved games)", () => {
+  assert.equal(runCapFor({ runCap: 7, innings: 6 }, 1), 7);
+  assert.equal(runCapFor({ runCap: 7, innings: 6 }, 6), 7, "no finalFree flag = the final inning is capped too");
+  assert.equal(runCapFor({ runCap: 0, innings: 6 }, 3), 0, "0 = no cap");
+  assert.equal(runCapFor(null, 3), 0);
+  assert.equal(runCapFor({ runCap: "x" }, 3), 0, "junk reads as no cap, never NaN");
+});
+
+test("runCapFor: DYB 'except in the sixth inning' lifts the cap only in the regulation final inning", () => {
+  const r = { runCap: 7, innings: 6, finalFree: true };
+  assert.equal(runCapFor(r, 5), 7);
+  assert.equal(runCapFor(r, 6), 0, "no cap in the 6th");
+  assert.equal(runCapFor(r, 7), 7, "after the sixth the cap is in force again (extra innings)");
+  assert.equal(runCapFor({ runCap: 5, innings: 4, finalFree: true }, 4), 0, "follows the game's own innings");
+});
+
+test("runCapFor: a per-inning schedule changes the cap from its inning onward", () => {
+  const r = { runCap: 5, innings: 6, sched: [{ from: 5, cap: 0 }] };
+  assert.deepEqual([1, 2, 3, 4, 5, 6, 7].map(i => runCapFor(r, i)), [5, 5, 5, 5, 0, 0, 0], "5 runs innings 1-4, unlimited after");
+  const r2 = { runCap: 3, innings: 6, sched: [{ from: 4, cap: 6 }, { from: 2, cap: 4 }] };
+  assert.deepEqual([1, 2, 3, 4, 5].map(i => runCapFor(r2, i)), [3, 4, 4, 6, 6], "steps apply in inning order whatever order they were saved in");
+  assert.equal(runCapFor({ runCap: 5, innings: 6, sched: [{ from: 0, cap: 9 }] }, 3), 5, "a step with no inning is ignored");
+  assert.equal(runCapFor({ runCap: 5, innings: 6, finalFree: true, sched: [{ from: 3, cap: 8 }] }, 6), 0, "the final-inning exception wins over the schedule");
+});
+
+test("mercyTiers / mercyCall: legacy {r15,r10} shape, largest margin first", () => {
+  assert.deepEqual(mercyTiers({ r15: 3, r10: 4 }), [{ diff: 15, after: 3 }, { diff: 10, after: 4 }]);
+  assert.deepEqual(mercyTiers({ r15: 0, r10: 4 }), [{ diff: 10, after: 4 }], "0 = that tier is off");
+  assert.deepEqual(mercyTiers(null), []);
+  const m = { r15: 3, r10: 4 };
+  assert.equal(mercyCall(m, 3, "T", 16, 0), null, "visitors up 16 in the top of the 3rd: home hasn't batted 3 times");
+  assert.deepEqual(mercyCall(m, 4, "T", 16, 0), { diff: 15, after: 3, lead: 16, homeBottom: false });
+  assert.deepEqual(mercyCall(m, 5, "T", 12, 0), { diff: 10, after: 4, lead: 12, homeBottom: false });
+  assert.equal(mercyCall(m, 4, "T", 12, 0), null, "10-run rule needs four complete innings");
+  assert.deepEqual(mercyCall(m, 5, "T", 0, 20), { diff: 15, after: 3, lead: 20, homeBottom: false }, "the bigger tier wins");
+});
+
+test("mercyCall: home team leading in the bottom of the rule inning ends it a half early (DYB 4.09)", () => {
+  const m = { r15: 3, r10: 4 };
+  assert.deepEqual(mercyCall(m, 3, "B", 0, 15), { diff: 15, after: 3, lead: 15, homeBottom: true });
+  assert.equal(mercyCall(m, 3, "B", 15, 0), null, "a VISITING lead in the bottom of the 3rd still needs the home team's turn");
+  assert.deepEqual(mercyCall(m, 4, "B", 1, 11), { diff: 10, after: 4, lead: 10, homeBottom: true });
+  assert.deepEqual(mercyCall([{ diff: 8, after: 5 }], 5, "B", 0, 8), { diff: 8, after: 5, lead: 8, homeBottom: true }, "tier array shape");
+});
+
+test("pitchAlertTier: DYB tournament thresholds, highest reached only, coincident ones together", () => {
+  const r = { daily: 75, catchMax: 40, rest: [{ min: 41, label: "36 hours" }, { min: 66, label: "48 hours" }] };
+  assert.equal(pitchAlertTier(37, r), null);
+  assert.deepEqual(pitchAlertTier(38, r), { at: 38, items: [{ kind: "nearcatch" }] });
+  assert.deepEqual(pitchAlertTier(40, r), { at: 40, items: [{ kind: "lastcatch" }] });
+  assert.deepEqual(pitchAlertTier(41, r), { at: 41, items: [{ kind: "rest", label: "36 hours" }, { kind: "nocatch" }] }, "41 = can't catch AND 36-hour rest, one moment");
+  assert.deepEqual(pitchAlertTier(50, r), { at: 41, items: [{ kind: "rest", label: "36 hours" }, { kind: "nocatch" }] });
+  assert.deepEqual(pitchAlertTier(66, r), { at: 66, items: [{ kind: "rest", label: "48 hours" }] });
+  assert.deepEqual(pitchAlertTier(80, r), { at: 75, items: [{ kind: "daily" }] }, "the league's 75, not a hard-coded 85");
+  assert.deepEqual(pitchAlertTier(90, { daily: 0, catchMax: 40, rest: [] }), { at: 41, items: [{ kind: "nocatch" }] }, "no daily limit set = no daily alert");
+  assert.equal(pitchAlertTier(90, {}), null);
+});
+
+test("catcherAlertTier: DYB 11.17 four innings caught", () => {
+  assert.equal(catcherAlertTier(2, 4), null);
+  assert.equal(catcherAlertTier(3, 4), "near");
+  assert.equal(catcherAlertTier(4, 4), "out");
+  assert.equal(catcherAlertTier(9, 0), null, "0 = off");
+  assert.equal(catcherAlertTier(1, 1), "out");
+});

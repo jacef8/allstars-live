@@ -303,11 +303,86 @@
     return moved;
   }
 
+  /* ---- league rules (scoring-controller.html runCapNow(), maybeAlert(), checkPitchCatchRules()) ----
+     The DYB run cap is NOT a flat number: rules 4.09(11), 11.29 and 12.06(g) all say the cap applies
+     "except in the sixth inning", and comes back for extra innings. Other leagues step it instead
+     (e.g. 5 runs a half for the first innings, unlimited after). r = {runCap, innings, finalFree,
+     sched:[{from, cap}]}; returns the cap for that inning, 0 = no cap. A schedule entry changes the
+     cap from its inning onward (cap 0 = no cap from there); the final-inning exception wins over it,
+     and only the regulation final inning is exempt, so extra innings are capped again. Older saved
+     games have no finalFree/sched, which reads as a flat cap exactly as before. */
+  function runCapFor(r, inning) {
+    r = r || {};
+    const inn = inning | 0, last = r.innings | 0;
+    if (r.finalFree && last > 0 && inn === last) return 0;
+    let cap = Math.max(0, r.runCap | 0);
+    const steps = (Array.isArray(r.sched) ? r.sched : [])
+      .filter(x => x && (x.from | 0) >= 1)
+      .slice().sort((a, b) => (a.from | 0) - (b.from | 0));
+    for (const s of steps) if (inn >= (s.from | 0)) cap = Math.max(0, s.cap | 0);
+    return cap;
+  }
+
+  // Run rule ("mercy"): the largest tier whose margin is met, or null. mercy is either the saved-game
+  // shape {r15:afterInnings, r10:afterInnings} (0/absent = off) or tiers [{diff, after}]. A tier is in
+  // force once both teams have batted `after` times (from the top of inning after+1) — or, per DYB
+  // 4.09(9)/(10), already in the bottom of inning `after` when it's the HOME team that leads by the
+  // margin (the home team has then batted after-1 times and doesn't need its last turn).
+  function mercyTiers(m) {
+    if (!m) return [];
+    const list = Array.isArray(m) ? m : [{ diff: 15, after: m.r15 }, { diff: 10, after: m.r10 }];
+    return list.filter(t => t && (t.diff | 0) > 0 && (t.after | 0) > 0)
+      .map(t => ({ diff: t.diff | 0, after: t.after | 0 }))
+      .sort((a, b) => b.diff - a.diff);
+  }
+  function mercyCall(mercy, inning, half, away, home) {
+    const inn = inning | 0, a = away | 0, h = home | 0, lead = Math.abs(a - h);
+    for (const t of mercyTiers(mercy)) {
+      if (lead < t.diff) continue;
+      if (inn >= t.after + 1) return { diff: t.diff, after: t.after, lead: lead, homeBottom: false };
+      if (half === "B" && inn >= t.after && h - a >= t.diff) return { diff: t.diff, after: t.after, lead: lead, homeBottom: true };
+    }
+    return null;
+  }
+
+  // Pitch/catch rule alerts for one pitcher at pc pitches. r = {daily, catchMax, rest:[{min, label}]}:
+  // daily = the league's pitch limit (0 = none), catchMax = the most pitches a pitcher can throw and
+  // still catch later in the game (DYB 11.17: 41 or more and he can't, so 40), rest = rest tiers (DYB
+  // 11.20: 41-65 -> 36 hours, 66+ -> 48 hours). Returns the HIGHEST threshold reached as
+  // {at, items:[{kind, label?}]}, or null. Thresholds that land on the same pitch come back together
+  // (at 41, "can no longer catch" and "36-hour rest" are one moment), so the caller can show them as
+  // one pop-up instead of one hiding the other.
+  function pitchAlertTier(pc, r) {
+    r = r || {}; pc = pc | 0;
+    const daily = r.daily | 0, cm = r.catchMax | 0, list = [];
+    if (daily > 0) list.push({ at: daily, kind: "daily" });
+    (Array.isArray(r.rest) ? r.rest : []).forEach(t => { if (t && (t.min | 0) > 0) list.push({ at: t.min | 0, kind: "rest", label: String(t.label || "") }); });
+    if (cm > 0) {
+      list.push({ at: cm + 1, kind: "nocatch" }, { at: cm, kind: "lastcatch" });
+      if (cm >= 3) list.push({ at: cm - 2, kind: "nearcatch" });
+    }
+    let at = 0;
+    list.forEach(x => { if (x.at <= pc && x.at > at) at = x.at; });
+    if (!at) return null;
+    const order = { daily: 0, rest: 1, nocatch: 2, lastcatch: 3, nearcatch: 4 };
+    return { at: at, items: list.filter(x => x.at === at).sort((x, y) => order[x.kind] - order[y.kind]).map(x => x.kind === "rest" ? { kind: x.kind, label: x.label } : { kind: x.kind }) };
+  }
+  // Catcher side of the same rule (DYB 11.17: four or more innings caught and he can't pitch that
+  // game): "out" at maxInn, "near" one inning before, else null. maxInn 0 = off.
+  function catcherAlertTier(caught, maxInn) {
+    const c = caught | 0, m = maxInn | 0;
+    if (m <= 0) return null;
+    if (c >= m) return "out";
+    if (m > 1 && c >= m - 1) return "near";
+    return null;
+  }
+
   const api = {
     BATTER_GREEN, RUNCOLORS, OUT_MARKER_COLOR: OUT_MARKER_FALLBACK,
     buildPlan, playSummary, outsFromKind, rbiEligible, teamRec, teamRecForSeason, gameSeason, idealText,
     isEditablePlay, histCompact, rewindIndex, trimFeed, histPack, histUnpack,
     pitcherCreditSince, movePitcherCredit,
+    runCapFor, mercyTiers, mercyCall, pitchAlertTier, catcherAlertTier,
   };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else Object.assign(root, api);   // classic-script global scope, same pattern as the rest of this app

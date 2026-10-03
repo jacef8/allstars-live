@@ -484,7 +484,7 @@ function selectTeam(id){const t=teamById(id);if(!t)return;curTeamId=id;ROSTER=t.
   OUR.name=t.name;OUR.short=t.short||t.name.slice(0,3).toUpperCase();OUR.color=t.color||OUR.color;OUR.logo=t.logo||null;}
 /* J2: apply the CURRENT team's default league/rules (set in Team management) to the game being set up.
    Call AFTER initGame() / selectTeam() so it isn't wiped back to "custom". No-op if no team default. */
-function applyTeamDefaultRules(){ try{ const t=teamById(curTeamId); if(t&&t.league){ const L=leagueById(t.league); G.league=L.id; G.innings=L.innings; G.runCap=L.runCap; G.mercy=L.mercy?{r15:L.mercy.r15,r10:L.mercy.r10}:null; G.pitchMax=L.pitch||0; } }catch(e){} }
+function applyTeamDefaultRules(){ try{ const t=teamById(curTeamId); if(t&&t.league){ setRulesFromLeague(leagueById(t.league)); } }catch(e){} }
 /* ===== saved lineups (multiple named batting orders per team, stored by player id) ===== */
 function teamLineups(t){ if(!t)return []; if(!Array.isArray(t.lineups))t.lineups=[]; return t.lineups; }
 function lineupById(t,id){ return teamLineups(t).find(l=>l.id===id)||null; }
@@ -956,6 +956,16 @@ function stampLateGameKey(){ if(!G.gameKey){ G.gameKey=newGameKey(); G.gkLate=tr
 // game keeps the key (and its late mark), and the next End game still replaces the saved copy
 // instead of adding a second one.
 function keepGameKey(prev){ if(prev&&prev.gameKey&&G&&!G.gameKey){ G.gameKey=prev.gameKey; if(prev.gkLate)G.gkLate=true; } }
+// This game's rules are settings, not play state. They ride along in every undo snapshot because
+// they live on G, so Undo, Redo and Rewind used to put back whatever rules the restored moment
+// had: a cap the scorer had just raised or zeroed (in Setup or on the correction sheet) to fix a
+// rally the cap cut off was undone along with the play, and re-entering the play re-capped it
+// (per the 2026-09-27 scorer research). Same calls as keepGameKey(): the rules in force when the
+// scorer taps Undo stay in force. A field the outgoing game never had (a game saved before it
+// existed) stays absent, so its default still applies.
+const GAME_RULE_KEYS=["league","innings","runCap","mercy","pitchMax","capFinalFree","capSched","pcr"];
+function keepGameRules(prev){ if(!prev||!G||prev===G)return;
+  GAME_RULE_KEYS.forEach(k=>{ if(prev[k]===undefined) delete G[k]; else G[k]=JSON.parse(JSON.stringify(prev[k])); }); }
 const initGame=()=>({inning:1,half:"T",away:0,home:0,outs:0,balls:0,strikes:0,
   gameKey:newGameKey(),
   bases:{1:null,2:null,3:null},awayPtr:0,homePtr:0,
@@ -1378,7 +1388,7 @@ function undo(){
   redoStack.push({g:G,feedTail:removedFeed,ev:e&&e.ev,play:e&&e.play});
   const _prev=G;
   G=(e&&e.g)?e.g:e;
-  keepGameKey(_prev);
+  keepGameKey(_prev); keepGameRules(_prev);
   resetUI();render();broadcast();
 }
 function redo(){
@@ -1390,7 +1400,7 @@ function redo(){
   hist.push(h);
   const _prev=G;
   G=r.g;
-  keepGameKey(_prev);
+  keepGameKey(_prev); keepGameRules(_prev);
   if(Array.isArray(gameFeed)&&Array.isArray(r.feedTail)&&r.feedTail.length)gameFeed.push(...r.feedTail);
   resetUI();render();broadcast();
 }
@@ -1408,7 +1418,10 @@ function redo(){
 // they do) are the way back.
 function reopenSig(){
   try{ return JSON.stringify([G.lineup||null,G.oppLineup||[],G.oppBench||[],G.oppBatters,(G.lineupLog||[]).length,
-    G.ourSide,G.innings,G.runCap,G.mercy||null,G.pitchMax,G.league,G.rulebookId||null,G.alerts||null]); }catch(e){ return ""; }
+    G.ourSide,G.innings,G.runCap,G.mercy||null,G.pitchMax,G.league,G.rulebookId||null,G.alerts||null]
+    // The newer rule fields join only when set, so a play committed before they existed (saved with
+    // the shorter fingerprint) still matches and stays re-openable.
+    .concat((typeof G.capFinalFree==="boolean"||G.capSched||G.pcr)?[[G.capFinalFree,G.capSched||null,G.pcr||null]]:[])); }catch(e){ return ""; }
 }
 function lastPlayReopenable(){
   const t=hist[hist.length-1];
@@ -1457,7 +1470,7 @@ function doFlip(){
   // Flip trace (Diagnostics) — records WHAT triggered each half-inning change so we can pin down the
   // "inning swapped unexpectedly" reports. Shows the action tapped just before, outs, and run cap.
   try{ if(!window._flipLog)window._flipLog=[]; const d=new Date(),p=n=>String(n).padStart(2,"0");
-    window._flipLog.push(`${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}  ${G.half==="T"?"Top":"Bot"} ${G.inning} → flip · after=${window._lastAct||"?"} · outs=${G.outs} · cap=${G.runCap||0} · halfRuns=${G.halfRuns||0}`);
+    window._flipLog.push(`${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}  ${G.half==="T"?"Top":"Bot"} ${G.inning} → flip · after=${window._lastAct||"?"} · outs=${G.outs} · cap=${(()=>{try{return runCapNow();}catch(e){return G.runCap||0;}})()} · halfRuns=${G.halfRuns||0}`);
     if(window._flipLog.length>80)window._flipLog.shift(); }catch(e){}
   if(!G.innLog)G.innLog=[];
   G.innLog.push({inning:G.inning, half:G.half, batteam:battingKey(),
@@ -1478,7 +1491,7 @@ function doFlip(){
   G.outs=0;G.balls=0;G.strikes=0;G.bases={1:null,2:null,3:null};
   G.halfRuns=0;G.halfPitches=0;G.halfHits=0;G.ab={pitches:[],loc:null};}
 function flipIfNeeded(){if(G.outs>=3)doFlip();}
-const capReached=()=>G.runCap>0&&G.halfRuns>=G.runCap;
+const capReached=()=>{ const c=runCapNow(); return c>0&&G.halfRuns>=c; };   // this inning's cap (final-inning exception / schedule)
 /* Manual half-inning close — for ending early or when a 3rd out wasn't entered as outs. */
 function endInning(){snapshot();doFlip();resetUI();flash("Inning ended");render();broadcast();}
 /* ===== one archive path for a finished game =====
@@ -1583,13 +1596,17 @@ function endGame(){stampLateGameKey();snapshot();G.final=true;
 function startNewGame(){
   const keep={runCap:G.runCap,oppBatters:G.oppBatters,ourSide:G.ourSide,innings:G.innings,lineup:JSON.parse(JSON.stringify(G.lineup)),
     league:G.league,mercy:G.mercy,pitchMax:G.pitchMax,alerts:G.alerts,
+    capFinalFree:G.capFinalFree,capSched:G.capSched,pcr:G.pcr,
     oppLineup:(Array.isArray(G.oppLineup)?JSON.parse(JSON.stringify(G.oppLineup)):null),
     oppBench:(Array.isArray(G.oppBench)?JSON.parse(JSON.stringify(G.oppBench)):null)};
   G=initGame(); clearStaleStreamLink();
-  // Run cap follows the LEAGUE (not a stale carry-over) so it defaults OFF for no-cap leagues
-  // (custom / DYB AAA / Majors / OZone = 0) instead of perpetuating an old game's 5.
-  G.runCap=leagueById(keep.league).runCap; G.oppBatters=keep.oppBatters; G.ourSide=keep.ourSide; G.innings=keep.innings; G.lineup=keep.lineup;
+  // The rules start as the New Game screen showed them when Start was tapped. The run cap used to be
+  // reset to the league's here (so an old game's 5 wasn't carried into a no-cap league), but that
+  // also threw away a cap typed on this very screen; the screen now starts from the team's league
+  // (applyTeamDefaultRules) and every rule on it is editable, so what it shows is what starts.
+  G.runCap=keep.runCap|0; G.oppBatters=keep.oppBatters; G.ourSide=keep.ourSide; G.innings=keep.innings; G.lineup=keep.lineup;
   G.league=keep.league; G.mercy=keep.mercy; G.pitchMax=keep.pitchMax; if(keep.alerts)G.alerts=keep.alerts;
+  if(typeof keep.capFinalFree==="boolean")G.capFinalFree=keep.capFinalFree; if(Array.isArray(keep.capSched))G.capSched=keep.capSched; if(keep.pcr)G.pcr=keep.pcr;
   // Keep the opponent lineup the user set up in this New Game (a team's roster OR names they typed) — only
   // build a fresh one if none was set, so Start never wipes the entered opponent.
   if(keep.oppLineup && keep.oppLineup.length){ G.oppLineup=keep.oppLineup; G.oppBench=keep.oppBench||[]; G.oppBatters=G.oppLineup.length; if(!G.oppLineup.some(e=>e&&e.pos))oppDefaultPositions(); }
@@ -1611,7 +1628,7 @@ window.luPNum=function(slot,v){const ri=G.lineup.order[+slot]; if(ROSTER[ri]){RO
 window.luPFirst=function(slot,v){const ri=G.lineup.order[+slot]; if(ROSTER[ri]){ROSTER[ri].first=v; ensureName(ROSTER[ri]); saveDB();}};
 window.luPLast=function(slot,v){const ri=G.lineup.order[+slot]; if(ROSTER[ri]){ROSTER[ri].last=v; ensureName(ROSTER[ri]); saveDB();}};
 window.ngOppName=function(v){const s=(v||"").trim(); OPP.name=s||"Opponent"; OPP.short=(s||"OPP").slice(0,3).toUpperCase();};
-window.ngRunCap=function(v){const n=parseInt(v,10); G.runCap=(isNaN(n)||n<0)?0:Math.min(n,30);};        // 0 = no cap
+window.ngRunCap=function(v){const n=parseInt(v,10); G.runCap=(isNaN(n)||n<0)?0:Math.min(n,30); try{capCardSync();}catch(e){}};        // 0 = no cap
 // Clamped to the same cap the order uses (the input took 15 while the order stopped at 12). On the New
 // Game screen, a blank no-roster opponent's order (built when it was picked) is rebuilt to the new size
 // so the count typed here is the order the game starts with; one the scorer has filled in is left alone.
@@ -1627,13 +1644,54 @@ window.ngOppBatters=function(v){const n=parseInt(v,10); G.oppBatters=(isNaN(n)||
 const LEAGUES=[
   {id:"custom",  name:"Custom (set manually)", innings:6, runCap:0, mercy:null,          pitch:0,  note:"Set every rule yourself · no run cap unless you set one."},
   {id:"dyb-tb",  name:"DYB Tee Ball",          innings:4, runCap:5, mercy:null,          pitch:0,  cp:true, note:"Tee/coach pitch · no balls/walks · 5 pitches/batter · 4 outfielders."},
-  {id:"dyb-cp",  name:"DYB 6U/8U Coach Pitch", innings:6, runCap:7, mercy:{r15:3,r10:4}, pitch:0,  cp:true, note:"Coaches pitch · no balls/walks · 5 pitches/batter (fouls extend) · 4 outfielders · 7 runs/half."},
-  {id:"dyb-a",   name:"DYB A / AA",            innings:6, runCap:7, mercy:{r15:3,r10:4}, pitch:75, note:"6 inn · 15-after-3 / 10-after-4 · opt. 7 runs/half · 75 pitches/day (≤10U)."},
-  {id:"dyb-aaa", name:"DYB AAA (10U)",         innings:6, runCap:0, mercy:{r15:3,r10:4}, pitch:75, note:"6 inn · 15-after-3 / 10-after-4 · opt. 10 runs/half · 75 pitches/day."},
-  {id:"dyb-maj", name:"DYB Majors (12U)",      innings:6, runCap:0, mercy:{r15:3,r10:4}, pitch:85, note:"6 inn · 15-after-3 / 10-after-4 · opt. 10 runs/half · 85 pitches/day (11-12U)."},
+  // capFree: the DYB run cap applies "except in the sixth inning" and comes back for extra innings
+  // (rules 4.09(11), 11.29, 12.06(g) in rules-dyb-2026.txt) — a 6th-inning rally used to be cut off
+  // at the cap and the half force-flipped (per the 2026-09-27 scorer research). It only matters
+  // when a cap is set, so AAA/Majors carry it for when the league turns its optional 10-run cap on.
+  {id:"dyb-cp",  name:"DYB 6U/8U Coach Pitch", innings:6, runCap:7, capFree:true, mercy:{r15:3,r10:4}, pitch:0,  cp:true, note:"Coaches pitch · no balls/walks · 5 pitches/batter (fouls extend) · 4 outfielders · 7 runs/half (none in the 6th)."},
+  {id:"dyb-a",   name:"DYB A / AA",            innings:6, runCap:7, capFree:true, mercy:{r15:3,r10:4}, pitch:75, note:"6 inn · 15-after-3 / 10-after-4 · opt. 7 runs/half (none in the 6th) · 75 pitches/day (≤10U)."},
+  {id:"dyb-aaa", name:"DYB AAA (10U)",         innings:6, runCap:0, capFree:true, mercy:{r15:3,r10:4}, pitch:75, note:"6 inn · 15-after-3 / 10-after-4 · opt. 10 runs/half · 75 pitches/day."},
+  {id:"dyb-maj", name:"DYB Majors (12U)",      innings:6, runCap:0, capFree:true, mercy:{r15:3,r10:4}, pitch:85, note:"6 inn · 15-after-3 / 10-after-4 · opt. 10 runs/half · 85 pitches/day (11-12U)."},
   {id:"dyb-oz",  name:"DYB \"O\"Zone",         innings:6, runCap:0, mercy:{r15:3,r10:4}, pitch:85, note:"6 inn · 15-after-3 / 10-after-4 · 85 pitches/day."},
 ];
 const leagueById=id=>LEAGUES.find(l=>l.id===id)||LEAGUES[0];
+/* ===== This game's rules, read with defaults so older saved games (no capFinalFree / capSched / pcr)
+   keep loading and behave exactly as they did. The league preset fills them in; the New Game and
+   mid-game Game Settings screens edit them for this game only. ===== */
+// Tournament pitch/catch thresholds, from the rulebook instead of literals: DYB 11.17 (41 or more
+// pitches and he can't catch the rest of the game; 4+ innings caught and he can't pitch it) and
+// 11.20 (41-65 pitches = 36 hours of rest, 66+ = 48 hours). The old hard-coded 28/30/31/66/85 came
+// from a different tracker and fired ten pitches early and at 85 for 10U teams whose limit is 75
+// (per the 2026-09-27 scorer research). The daily max is the game's own Pitch limit (G.pitchMax).
+const DYB_PC_RULES={catchMax:40,catcherInn:4,rest:[{min:41,label:"36 hours"},{min:66,label:"48 hours"}]};
+function leaguePc(L){ return (L&&L.pcr)||DYB_PC_RULES; }
+function pcCfg(){ const d=leaguePc(leagueById(G&&G.league)), p=(G&&G.pcr&&typeof G.pcr==="object")?G.pcr:{};
+  return {catchMax:(typeof p.catchMax==="number")?p.catchMax:d.catchMax, catcherInn:(typeof p.catcherInn==="number")?p.catcherInn:d.catcherInn, rest:Array.isArray(p.rest)?p.rest:d.rest}; }
+// Final-inning exception: absent on a game saved before it existed → the league's value.
+function capFinalFree(){ return (G&&typeof G.capFinalFree==="boolean")?G.capFinalFree:!!leagueById(G&&G.league).capFree; }
+function capSched(){ return (G&&Array.isArray(G.capSched))?G.capSched:[]; }
+// The run cap that applies in an inning (default: the current one); 0 = no cap. runCapFor() is in
+// game-logic.js (unit-tested there).
+function runCapNow(inning){ return runCapFor({runCap:G.runCap|0,innings:G.innings|0,finalFree:capFinalFree(),sched:capSched()},inning==null?G.inning:inning); }
+// "Inn 1-5: 7 · Inn 6: no cap · Extra inn.: 7" — what the cap does across the game, for the Run cap card.
+function capSummary(){
+  const n=Math.max(1,G.innings|0), caps=[]; for(let i=1;i<=n+1;i++)caps.push(runCapNow(i));
+  if(caps.every(c=>c===0)) return "No run cap";
+  const val=c=>c>0?c+" runs":"no cap", segs=[]; let a=1;
+  for(let i=2;i<=n+2;i++){ if(i===n+2||caps[i-1]!==caps[a-1]){ const b=i-1;
+      segs.push((a>n?"Extra inn.":(b>n?"Inn "+a+"+":(a===b?"Inn "+a:"Inn "+a+"-"+b)))+": "+val(caps[a-1])); a=i; } }
+  return segs.length===1?caps[0]+" runs every half-inning":segs.join(" · ");
+}
+// Copy a league preset's rules into the game (league picker, team default, "Reset to preset").
+function setRulesFromLeague(L){ G.league=L.id; G.innings=L.innings; G.runCap=L.runCap; G.mercy=L.mercy?{r15:L.mercy.r15,r10:L.mercy.r10}:null; G.pitchMax=L.pitch||0;
+  G.capFinalFree=!!L.capFree; G.capSched=[]; G.pcr=null; }
+// True when this game's rules no longer match its preset — the League card says so and offers a reset.
+function rulesEdited(){
+  const L=leagueById(G.league), lm=L.mercy||{}, m=(G.mercy&&!Array.isArray(G.mercy))?G.mercy:{};
+  return (G.innings|0)!==(L.innings|0)||(G.runCap|0)!==(L.runCap|0)||(G.pitchMax|0)!==(L.pitch|0)
+    ||(m.r15|0)!==(lm.r15|0)||(m.r10|0)!==(lm.r10|0)||capFinalFree()!==!!L.capFree
+    ||capSched().some(s=>s&&(s.from|0)>0)||JSON.stringify(pcCfg())!==JSON.stringify(leaguePc(L));
+}
 /* Coach-pitch mode: the current game's league is a coach/tee-ball type → no balls/walks/HBP,
    5 pitches per batter (fouls extend), no pitch-count limits, 4 outfielders. */
 function cpMode(){ try{ return !!(G&&leagueById(G.league).cp); }catch(e){ return false; } }
@@ -1655,7 +1713,38 @@ function allRulebooks(){ return RULEBOOKS.concat(getCustomRulebooks()); }
 function rulebookById(id){ return allRulebooks().find(r=>r.id===id)||RULEBOOKS[0]; }
 function openRulebookEntry(id){ const rb=rulebookById(id); if(!rb)return; if(rb.kind==="text"){ window.openRulebook(rb.src,rb.name); } else { const u=rb.src; if(IS_APP&&window.AllStars&&window.AllStars.openExternal)AllStars.openExternal(u); else window.open(u,"_blank","noopener"); } }
 window.setTeamRulebook=function(v){ const t=teamById(openTeamId); if(t){ t.rulebookId=v; saveDB(); } };
-window.ngLeague=function(v){ const L=leagueById(v); G.league=L.id; G.innings=L.innings; G.runCap=L.runCap; G.mercy=L.mercy?{r15:L.mercy.r15,r10:L.mercy.r10}:null; G.pitchMax=L.pitch||0; render(); };
+window.ngLeague=function(v){ setRulesFromLeague(leagueById(v)); render(); };
+/* Per-game rule inputs (New Game + mid-game Game Settings). Same pattern as ngRunCap: oninput sets G
+   with no re-render so typing keeps focus; capCardSync() refreshes the Run cap card's summary line
+   in place. Two screens used to promise "set every rule yourself" / "still editable per game" with
+   only the run cap to edit (per the 2026-09-27 scorer research). Blank while typing = leave as is. */
+// It also keeps the League card's "Rules edited for this game" notice and the pitch/catch card's
+// description current as any rule is typed, since neither re-renders until the next render(). When
+// the cap extras appear or disappear the page height changes, so fitPage() re-fits it: a centred
+// page that starts to overflow otherwise hides its top (header + Done) until the next render().
+function capCardSync(){ try{ const s=document.getElementById("capSum"); if(s)s.textContent=capSummary();
+  const x=document.getElementById("capExtras"); if(x){ const was=x.style.display; x.style.display=((G.runCap|0)>0||capSched().length)?"flex":"none"; if(was!==x.style.display)fitPage(); }
+  const r=document.getElementById("rulesEditedNote"); if(r)r.style.display=rulesEdited()?"flex":"none";
+  const p=document.getElementById("pcDesc"); if(p)p.textContent=pcDescText(); }catch(e){} }
+// The pitch/catch card's description, from this game's thresholds (pcCfg + Pitch limit), not literals.
+// Plain text: the card escapes it, and capCardSync() sets it as textContent.
+function pcDescText(){ const r=pcCfg(), m=r.catchMax|0, ci=r.catcherInn|0;
+  const rest=(r.rest||[]).filter(t=>t&&(t.min|0)>0).map(t=>`${t.min|0}+ = ${t.label}`).join(", ");
+  return `Tournament limits — pops a warning as a pitcher nears the catch cutoff (${m>0?`${m>=3?(m-2)+"/":""}${m}/${m+1}`:"off"})`
+    +(rest?`, at the rest lines (${rest})`:"")
+    +(G.pitchMax>0?` and at the ${G.pitchMax|0}-pitch daily max (Pitch limit)`:` — no daily max until a Pitch limit is set`)
+    +`, and when a catcher hits ${ci>1?(ci-1)+" / ":""}${ci} innings caught. Uses the counts you're already keeping.`; }
+window.ngInnings=function(v){ const n=parseInt(v,10); if(isNaN(n))return; G.innings=Math.max(1,Math.min(n,15)); capCardSync(); };
+window.ngPitchMax=function(v){ const n=parseInt(v,10); G.pitchMax=(isNaN(n)||n<0)?0:Math.min(n,200); capCardSync(); };   // 0 = no pitch limit
+window.ngMercy=function(k,v){ const n=parseInt(v,10); if(k!=="r15"&&k!=="r10")return;
+  const m=(G.mercy&&!Array.isArray(G.mercy))?G.mercy:{r15:0,r10:0}; m[k]=(isNaN(n)||n<0)?0:Math.min(n,15); G.mercy=m; capCardSync(); };   // innings; 0 = that rule off
+// Per-inning schedule: one step, "from inning F the cap is C" (C 0 = no cap from there). Kept as a
+// list so a later screen can hold more steps; this one edits the first and leaves the rest alone.
+window.ngCapSched=function(k,v){ const n=parseInt(v,10), cur=capSched()[0]||{from:0,cap:0}, s={from:cur.from|0,cap:cur.cap|0};
+  if(k==="from") s.from=(isNaN(n)||n<1)?0:Math.min(n,15); else s.cap=(isNaN(n)||n<0)?0:Math.min(n,30);
+  G.capSched=(s.from>0||s.cap>0||capSched().length>1)?[s].concat(capSched().slice(1)):[]; capCardSync(); };
+window.ngPc=function(k,v){ const n=parseInt(v,10); if(k!=="catchMax"&&k!=="catcherInn")return;
+  G.pcr=Object.assign({},pcCfg(),{[k]:(isNaN(n)||n<0)?0:Math.min(n,k==="catchMax"?200:15)}); capCardSync(); };   // 0 = that alert off
 window.ngRulebook=function(v){ G.rulebookId=v; render(); };
 let settingsMode=false;   // true = Game Setup opened mid-game (Done returns to play, never resets)
 let teamTab="hub";        // team page: "hub" (grid of sections) or a section: roster/schedule/stats/manage/lineupedit
@@ -1674,30 +1763,45 @@ function resetAlerts(){ activeAlert=null; firedAlerts=new Set(); dismissedAlerts
 function pcRulesPref(){ try{ return localStorage.getItem("al-pc-rules")==="1"; }catch(e){ return false; } }  // sticky default for the pitch/catch rule alerts
 function alertsCfg(){ if(!G.alerts)G.alerts={on:true,runRule:true,runCap:true,pitch:true,inning:true,pcRules:pcRulesPref()}; if(G.alerts.pcRules===undefined)G.alerts.pcRules=pcRulesPref(); return G.alerts; }
 // force=true bypasses the master "Rule alerts" switch — used by the pitch/catch alerts, which have their own toggle.
-function fireAlert(key,title,msg,tone,force){ const c=alertsCfg(); if(!c.on&&!force)return; if(firedAlerts.has(key)||dismissedAlerts.has(key))return; firedAlerts.add(key); activeAlert={key,title,msg,tone:tone||"info"}; }
+// One pop-up at a time: while one is showing, a second one waits (it isn't marked fired) and comes up
+// on the render after "Got it". Two thresholds landing on the same pitch — e.g. the 48-hour rest line
+// at 66 and "Pitch limit approaching" at 65+ for a 75 limit — used to overwrite each other in one
+// pass, so the first was marked seen and never shown.
+function fireAlert(key,title,msg,tone,force){ const c=alertsCfg(); if(!c.on&&!force)return; if(firedAlerts.has(key)||dismissedAlerts.has(key))return; if(activeAlert&&activeAlert.key!==key)return; firedAlerts.add(key); activeAlert={key,title,msg,tone:tone||"info"}; }
 // Tournament pitch/catch rule alerts — evaluates OUR pitcher's running pitch count and OUR catcher's
 // innings caught (both already tracked while scoring) and pops a warning at each rule threshold.
 // Mirrors the standalone pitching-plan tool; gated by its own toggle (G.alerts.pcRules), so it works
-// even with the master "Rule alerts" switch off.
+// even with the master "Rule alerts" switch off. The thresholds come from this game's rules
+// (pcCfg(): catch cutoff, rest tiers, catcher innings) and its Pitch limit (G.pitchMax), not literals,
+// so this and maybeAlert()'s "Pitch limit reached" agree: the daily-limit pop-up uses the SAME alert
+// key as maybeAlert()'s, so one limit shows once.
 function checkPitchCatchRules(){
+  const r=pcCfg(), max=G.pitchMax|0;
   // Pitcher: only OUR pitcher on the mound (key starts "o"), and only while we're fielding.
   if(fielding()){
     const pk=currentPitcherKey();
     if(pk && pk.charAt(0)==="o"){
-      const pc=currentPitchCount()|0, nm=currentPitcherName()||"The pitcher";
-      if(pc>=85)      fireAlert("pc85-"+pk,"Daily pitch limit (85)",`${nm} has thrown ${pc} pitches — the 85 daily max. He must come out after this batter.`,"warn",true);
-      else if(pc>=66) fireAlert("pc66-"+pk,"48-hour rest reached (66)",`${nm} is at ${pc} pitches. 66+ means 48 hours of rest before he can pitch again — likely done for the tournament.`,"warn",true);
-      else if(pc>=31) fireAlert("pc31-"+pk,"Can no longer catch (31)",`${nm} is at ${pc} pitches. 31+ means he CANNOT catch the rest of this game, and needs rest before his next outing.`,"warn",true);
-      else if(pc>=30) fireAlert("pc30-"+pk,"Last catch-eligible pitch (30)",`${nm} is at 30 pitches — one more and he loses catch eligibility for this game. Pull him now if you need him behind the plate.`,"warn",true);
-      else if(pc>=28) fireAlert("pc28-"+pk,"Nearing catch cutoff (28)",`${nm} is at ${pc} pitches — 2 from the 30-pitch catch cutoff.`,"info",true);
+      const pc=currentPitchCount()|0, nm=currentPitcherName()||"The pitcher", n=escHtml(nm), cm=r.catchMax|0;
+      const tier=pitchAlertTier(pc,{daily:max,catchMax:cm,rest:r.rest});
+      if(tier){
+        const at=tier.at, titles=[], msgs=[]; let warn=false, key="pc"+at+"-"+pk;
+        tier.items.forEach(it=>{
+          if(it.kind==="daily"){ warn=true; key="pmax-"+nm+"-"+max; titles.push("Pitch limit reached"); msgs.push(`${n} has thrown ${pc} pitches — the ${max}-pitch daily limit. They may finish the current batter, then must come out.`); }
+          else if(it.kind==="rest"){ warn=true; titles.push(`${escHtml(it.label)} rest (${at})`); msgs.push(`${n} is at ${pc} pitches. ${at}+ means ${escHtml(it.label)} of rest before he can pitch again.`); }
+          else if(it.kind==="nocatch"){ warn=true; titles.push(`Can no longer catch (${at})`); msgs.push(msgs.length?`He also CANNOT catch the rest of this game.`:`${n} is at ${pc} pitches. ${at}+ means he CANNOT catch the rest of this game.`); }
+          else if(it.kind==="lastcatch"){ warn=true; titles.push(`Last catch-eligible pitch (${at})`); msgs.push(`${n} is at ${pc} pitches — one more and he loses catch eligibility for this game. Pull him now if you need him behind the plate.`); }
+          else if(it.kind==="nearcatch"){ titles.push(`Nearing catch cutoff (${cm})`); msgs.push(`${n} is at ${pc} pitches — ${cm+1-pc} more and he can't catch this game (${cm+1}+).`); }
+        });
+        fireAlert(key,titles.join(" · "),msgs.join(" "),warn?"warn":"info",true);
+      }
     }
   }
   // Catcher: OUR catcher's innings caught this game.
   const ci=(G.lineup&&G.lineup.pos)?G.lineup.pos.C:null;
   if(ci!=null){
-    const ck="o"+ci, caught=(G.caught&&G.caught[ck])|0, cp=playerAtPos("C"), cn=(cp&&cp.name)||"The catcher";
-    if(caught>=4)      fireAlert("cc4-"+ck,"Catcher can't pitch this game",`${cn} has caught ${caught} innings — he CANNOT pitch in this game (he's fine to pitch the next one).`,"warn",true);
-    else if(caught>=3) fireAlert("cc3-"+ck,"Catcher nearing pitch lockout",`${cn} has caught 3 innings — one more and he can't pitch this game. Pull him from catching now to keep the pitching option.`,"warn",true);
+    const ck="o"+ci, caught=(G.caught&&G.caught[ck])|0, cp=playerAtPos("C"), cn=escHtml((cp&&cp.name)||"The catcher"), lim=r.catcherInn|0, ct=catcherAlertTier(caught,lim);
+    if(ct==="out")       fireAlert("cc"+lim+"-"+ck,"Catcher can't pitch this game",`${cn} has caught ${caught} innings — at ${lim}+ he CANNOT pitch in this game (he's fine to pitch the next one).`,"warn",true);
+    else if(ct==="near") fireAlert("cc"+(lim-1)+"-"+ck,"Catcher nearing pitch lockout",`${cn} has caught ${caught} innings — one more and he can't pitch this game. Pull him from catching now to keep the pitching option.`,"warn",true);
   }
 }
 function maybeAlert(){
@@ -1705,17 +1809,26 @@ function maybeAlert(){
   const c=alertsCfg();
   if(c.pcRules) checkPitchCatchRules();   // independent of the master switch below
   if(!c.on) return;
-  if(c.runCap && G.runCap>0 && (G.halfRuns||0)>=G.runCap)
-    fireAlert("cap-"+G.inning+G.half,"Run cap reached",`${G.runCap} runs scored this half-inning — that's the cap. Retire the side.`,"warn");
+  const cap=runCapNow();   // THIS inning's cap: none in the final inning when the league says so, or per its schedule
+  if(c.runCap && cap>0 && (G.halfRuns||0)>=cap)
+    fireAlert("cap-"+G.inning+G.half,"Run cap reached",`${cap} runs scored this half-inning — that's the cap. Retire the side.`,"warn");
+  // Say so once when the cap changes with the inning, so a 6th-inning rally past the old cap (or a
+  // cap that steps down) isn't a surprise to the scorer or the umpire.
+  if(c.runCap && G.inning>1 && cap!==runCapNow(G.inning-1))
+    fireAlert("capchg-"+G.inning,cap>0?`Run cap: ${cap} this inning`:"No run cap this inning",
+      cap>0?`From the ${ordinal(G.inning)} inning the cap is ${cap} runs a half-inning.`
+           :`The run cap doesn't apply in the ${ordinal(G.inning)}${G.inning===(G.innings|0)?" (the final inning)":""} — every run counts.`,"info");
+  // Largest margin first; the home team leading in the bottom of the rule inning counts too (mercyCall in game-logic.js).
   if(c.runRule && G.mercy){
-    const diff=Math.abs((G.away|0)-(G.home|0));
-    if(G.mercy.r15 && diff>=15 && G.inning>=(G.mercy.r15+1)) fireAlert("merc15","15-run rule",`A team leads by ${diff} after ${G.mercy.r15} innings — the 15-run rule applies. The game may be called.`,"warn");
-    else if(G.mercy.r10 && diff>=10 && G.inning>=(G.mercy.r10+1)) fireAlert("merc10","10-run rule",`A team leads by ${diff} after ${G.mercy.r10} innings — the 10-run rule applies. The game may be called.`,"warn");
+    const mc=mercyCall(G.mercy,G.inning,G.half,G.away,G.home);
+    if(mc) fireAlert("merc"+mc.diff,mc.diff+"-run rule",mc.homeBottom
+      ?`${escHtml((TEAMS.home&&TEAMS.home.short)||"The home team")} leads by ${mc.lead} with the visitors done batting in the ${ordinal(mc.after)} — the ${mc.diff}-run rule applies and the home team doesn't need its turn. The game may be called.`
+      :`A team leads by ${mc.lead} after ${mc.after} innings — the ${mc.diff}-run rule applies. The game may be called.`,"warn");
   }
   if(c.pitch && G.pitchMax>0){
     const pc=currentPitchCount()|0, nm=currentPitcherName()||"The pitcher", max=G.pitchMax;
-    if(pc>=max) fireAlert("pmax-"+nm+"-"+max,"Pitch limit reached",`${nm} has thrown ${pc} pitches — the ${max}-pitch daily limit. They may finish the current batter, then must come out.`,"warn");
-    else if(pc>=max-10) fireAlert("pnear-"+nm+"-"+max,"Pitch limit approaching",`${nm} is at ${pc} of ${max} pitches.`,"info");
+    if(pc>=max) fireAlert("pmax-"+nm+"-"+max,"Pitch limit reached",`${escHtml(nm)} has thrown ${pc} pitches — the ${max}-pitch daily limit. They may finish the current batter, then must come out.`,"warn");
+    else if(pc>=max-10) fireAlert("pnear-"+nm+"-"+max,"Pitch limit approaching",`${escHtml(nm)} is at ${pc} of ${max} pitches.`,"info");
   }
   if(c.inning && G.innings>0 && G.inning>=G.innings && G.half==="B")
     fireAlert("final-"+G.inning,"Final inning",`Bottom of the ${ordinal(G.inning)} — the last scheduled inning.`,"info");
@@ -1870,8 +1983,9 @@ function resolve(movers,extraOuts){
       bases[m.dest]={label:m.label,name:m.name,color,key:m.key};   // carry the player key forward
     }});
   const k=G.half==="T"?"away":"home";
-  // Per-inning run cap (tournament rule): only runs up to the cap count toward the score.
-  const cap=G.runCap>0?G.runCap:Infinity;
+  // Per-inning run cap (tournament rule): only runs up to the cap count toward the score. The cap is
+  // this inning's (runCapNow): none in the final inning when the league says so, or per its schedule.
+  const _cap=runCapNow(), cap=_cap>0?_cap:Infinity;
   const allowed=Math.max(0,Math.min(runs,cap-G.halfRuns));
   for(let i=0;i<allowed&&i<scorers.length;i++){ const key=scorers[i].key; if(key) statFor(key).r++; }   // credit individual runs
   if(allowed>0){ pstat().r+=allowed;                                    // runs charged to the current pitcher
@@ -2104,6 +2218,8 @@ function correctModal(){
         <div style="font-size:10px;font-weight:800;letter-spacing:1px;color:${T.sageDim};margin:6px 2px 0">INNING</div>
         ${step("inning","Inning",G.inning)}
         ${halfRow}
+        <div style="font-size:10px;font-weight:800;letter-spacing:1px;color:${T.sageDim};margin:6px 2px 0">RUN CAP</div>
+        ${step("runcap","Run cap",(G.runCap|0)||"—",(()=>{ const c=runCapNow(); return "This half: "+(c>0?c+" runs":"no cap")+(c!==(G.runCap|0)?(capFinalFree()&&G.inning===(G.innings|0)?" (final inning)":" (schedule)"):"")+" · 0 = none · more in Setup"; })())}
         <div style="font-size:10px;font-weight:800;letter-spacing:1px;color:${T.sageDim};margin:6px 2px 0">PITCH COUNT</div>
         ${step("pitch","Pitch count",_corrPC,_corrPName)}
       </div></div>`;
@@ -2146,7 +2262,7 @@ function rewindToEvent(eid){
   hist.length=found;                                              // drop this snapshot + everything after
   const _prev=G;
   G=snap.g;                                                       // restore (snapshot() stored a deep copy)
-  keepGameKey(_prev);
+  keepGameKey(_prev); keepGameRules(_prev);
   feedTrimTo(snap);
   editAB=null; resetUI(); render(); broadcast(); flash("Rewound to that play — re-enter it.");
 }
@@ -5617,7 +5733,8 @@ function actionArea(){
     const curL=leagueById(G.league);
     const leagueCard=`<div style="${rowCard};flex-wrap:wrap">
           <div style="flex:1;min-width:150px"><div style="font-weight:800;color:${T.ink};font-size:19px">League</div>
-            <div style="color:${T.sage};font-size:13px;margin-top:3px;line-height:1.35">${curL.note}</div></div>
+            <div style="color:${T.sage};font-size:13px;margin-top:3px;line-height:1.35">${curL.note}</div>
+            <div id="rulesEditedNote" style="display:${rulesEdited()?"flex":"none"};align-items:center;gap:8px;flex-wrap:wrap;margin-top:6px"><span style="font-size:12.5px;font-weight:800;color:${T.amber}">Rules edited for this game</span><button data-act="rulesreset" style="background:none;border:2px solid ${T.line};color:${T.ink};border-radius:8px;padding:5px 10px;font-weight:700;font-size:12.5px">Reset to preset</button></div></div>
           <div style="flex:none;min-width:170px">${themedSelect("ngLeagueSel",LEAGUES.map(l=>({v:l.id,label:l.name+(l.cp?" ★":"")})),G.league,{onpick:"_ngLeaguePick",css:selStyle+";width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer;text-align:left;max-width:none"})}</div></div>`;
     // Rulebook for THIS game (defaults to the team's; viewable here for a dispute).
     const grb=(G.rulebookId)||(curTeam()&&curTeam().rulebookId)||"dyb";
@@ -5633,14 +5750,47 @@ function actionArea(){
             <div style="color:${T.sage};font-size:13px;margin-top:3px">Pop-up reminders during the game</div></div>
           <button data-act="alerttoggle" data-arg="on" style="background:${ac.on?T.lime:T.surface2};border:2px solid ${ac.on?T.lime:T.line};color:${ac.on?"#fff":T.sage};border-radius:999px;padding:10px 20px;font-family:${MONO};font-weight:800;font-size:15px;min-width:66px">${ac.on?"ON":"OFF"}</button>
           ${ac.on?`<div style="width:100%;display:grid;grid-template-columns:1fr 1fr;gap:2px;background:${T.line};border:2px solid ${T.line};border-radius:9px;overflow:hidden;margin-top:6px">${aChip("runRule","Run rule")}${aChip("runCap","Run cap")}${aChip("pitch","Pitch limit")}${aChip("inning","Final inning")}</div>`:""}</div>`;
+    // Small labelled number field for the per-game rule inputs (Game rules, Run cap schedule, pitch/catch).
+    const inpXs=`width:58px;flex:none;background:${T.surface2};border:2px solid ${T.line};color:${T.ink};border-radius:9px;padding:8px 4px;font-family:${MONO};font-size:19px;font-weight:800;text-align:center;outline:none`;
+    const ruleNum=(lbl,sub,val,fn,min,max)=>`<label style="display:flex;align-items:center;justify-content:space-between;gap:8px;background:${T.surface2};border:2px solid ${T.line};border-radius:10px;padding:8px 10px;min-width:0">
+          <span style="min-width:0"><span style="display:block;font-weight:800;color:${T.ink};font-size:14px">${lbl}</span><span style="display:block;font-size:11.5px;color:${T.sageDim}">${sub}</span></span>
+          <input type="number" inputmode="numeric" min="${min}" max="${max}" value="${val}" oninput="${fn}" style="${inpXs}"></label>`;
+    // The pitch/catch thresholds as this game's rules have them (pcCfg + Pitch limit), not literals;
+    // the description is pcDescText(), refreshed in place by capCardSync() while typing.
+    const _pcr=pcCfg();
     const pitchCatchCard=`<div style="${rowCard};flex-wrap:wrap">
           <div style="flex:1;min-width:150px"><div style="font-weight:800;color:${T.ink};font-size:19px">Pitch &amp; catch rule alerts</div>
-            <div style="color:${T.sage};font-size:13px;margin-top:3px;line-height:1.4">Tournament limits — pops a warning as a pitcher nears the catch cutoff (28/30/31), the 48-hr line (66) and the 85 daily max, and when a catcher hits 3 / 4 innings caught. Uses the counts you're already keeping.</div></div>
-          <button data-act="alerttoggle" data-arg="pcRules" style="background:${ac.pcRules?T.lime:T.surface2};border:2px solid ${ac.pcRules?T.lime:T.line};color:${ac.pcRules?"#fff":T.sage};border-radius:999px;padding:10px 20px;font-family:${MONO};font-weight:800;font-size:15px;min-width:66px">${ac.pcRules?"ON":"OFF"}</button></div>`;
-    const runCapCard=`<div style="${rowCard}">
-          <div><div style="font-weight:800;color:${T.ink};font-size:19px">Run cap</div>
+            <div id="pcDesc" style="color:${T.sage};font-size:13px;margin-top:3px;line-height:1.4">${escHtml(pcDescText())}</div></div>
+          <button data-act="alerttoggle" data-arg="pcRules" style="background:${ac.pcRules?T.lime:T.surface2};border:2px solid ${ac.pcRules?T.lime:T.line};color:${ac.pcRules?"#fff":T.sage};border-radius:999px;padding:10px 20px;font-family:${MONO};font-weight:800;font-size:15px;min-width:66px">${ac.pcRules?"ON":"OFF"}</button>
+          ${ac.pcRules?`<div style="width:100%;display:grid;grid-template-columns:${isWide()?"1fr 1fr":"1fr"};gap:8px">
+            ${ruleNum("Catch cutoff","most pitches & still catch",_pcr.catchMax|0,"ngPc('catchMax',this.value)",0,200)}
+            ${ruleNum("Catcher innings","then can't pitch · 0 = off",_pcr.catcherInn|0,"ngPc('catcherInn',this.value)",0,15)}</div>`:""}</div>`;
+    // Run cap + its two refinements in place (no extra screen): the final-inning exception the DYB
+    // presets need, and one optional schedule step ("from inning F, C runs"). capSum is refreshed in
+    // place by capCardSync() as the numbers are typed; the extras hide while there's no cap at all.
+    const _cs=capSched()[0]||{from:0,cap:0}, _cff=capFinalFree();
+    const runCapCard=`<div style="${rowCard};flex-wrap:wrap">
+          <div style="flex:1;min-width:0"><div style="font-weight:800;color:${T.ink};font-size:19px">Run cap</div>
             <div style="color:${T.sage};font-size:14px;margin-top:3px">Per half-inning · 0 = no cap</div></div>
-          <input type="number" inputmode="numeric" min="0" max="30" value="${G.runCap}" oninput="ngRunCap(this.value)" style="${inpSm}"></div>`;
+          <input type="number" inputmode="numeric" min="0" max="30" value="${G.runCap}" oninput="ngRunCap(this.value)" aria-label="Run cap per half-inning" style="${inpSm}">
+          <div id="capExtras" style="width:100%;display:${((G.runCap|0)>0||capSched().length)?"flex":"none"};flex-direction:column;gap:8px">
+            <button data-act="capfinal" aria-pressed="${_cff}" style="width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;background:${T.surface2};border:2px solid ${_cff?T.lime:T.line};border-radius:9px;padding:9px 12px;color:${T.ink};font-weight:700;font-size:14px;text-align:left">
+              <span>No cap in the final inning</span><span style="flex:none;font-family:${MONO};font-weight:800;font-size:13px;color:${_cff?T.lime:T.sage}">${_cff?"ON":"OFF"}</span></button>
+            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:14px;color:${T.sage};font-weight:700">
+              <span>From inning</span><input type="number" inputmode="numeric" min="1" max="15" value="${_cs.from||""}" placeholder="–" oninput="ngCapSched('from',this.value)" aria-label="Cap changes from inning" style="${inpXs}">
+              <span>cap is</span><input type="number" inputmode="numeric" min="0" max="30" value="${(_cs.from||_cs.cap)?(_cs.cap|0):""}" placeholder="0" oninput="ngCapSched('cap',this.value)" aria-label="Runs allowed from that inning, 0 = no cap" style="${inpXs}"><span>(0 = none)</span></div>
+            <div id="capSum" style="font-size:12.5px;color:${T.sageDim};line-height:1.35">${capSummary()}</div></div></div>`;
+    // Innings, run rule and pitch limit for THIS game, pre-filled from the league preset (they used to
+    // come only from the preset, with no way to change them — per the 2026-09-27 scorer research).
+    const _m=(G.mercy&&!Array.isArray(G.mercy))?G.mercy:{};
+    const rulesCard=`<div style="${rowCard};flex-direction:column;align-items:stretch">
+          <div><div style="font-weight:800;color:${T.ink};font-size:19px">Game rules</div>
+            <div style="color:${T.sage};font-size:13px;margin-top:3px;line-height:1.35">From the league above · change any for this game</div></div>
+          <div style="display:grid;grid-template-columns:${isWide()?"1fr 1fr":"1fr"};gap:8px">
+            ${ruleNum("Innings","regulation",G.innings|0||6,"ngInnings(this.value)",1,15)}
+            ${ruleNum("Pitch limit","per day · 0 = none",G.pitchMax|0,"ngPitchMax(this.value)",0,200)}
+            ${ruleNum("15-run rule","after inning · 0 = off",_m.r15|0,"ngMercy('r15',this.value)",0,15)}
+            ${ruleNum("10-run rule","after inning · 0 = off",_m.r10|0,"ngMercy('r10',this.value)",0,15)}</div></div>`;
     const hittersCard=`<div style="${rowCard}">
           <div><div style="font-weight:800;color:${T.ink};font-size:19px">Number of hitters</div>
             <div style="color:${T.sage};font-size:14px;margin-top:3px">In the opponent's lineup</div></div>
@@ -5662,7 +5812,7 @@ function actionArea(){
     const lineupCardBtn=`<button data-act="nglineupcard" style="${ghost};display:flex;align-items:center;justify-content:center;gap:9px;width:100%;flex:none">${ICN.doc} Print lineup card</button>`;
     // In settings mode (mid-game) we show ONLY the rule cards + Done — no team/side pickers,
     // and no "Start game" (that would reset the live game).
-    const ruleCards=`${leagueCard}${rulebookCard}${runCapCard}${hittersCard}${pitchTypeCard}${detailedCard}${alertsCard}${pitchCatchCard}${startCard}`;
+    const ruleCards=`${leagueCard}${rulesCard}${rulebookCard}${runCapCard}${hittersCard}${pitchTypeCard}${detailedCard}${alertsCard}${pitchCatchCard}${startCard}`;
     const doneBtn=`<button data-act="settingsdone" style="${bigBtn(T.lime,"width:100%;font-size:22px;padding:20px")};flex:none;margin-top:2px">Done &#10003;</button>`;
     if(isWide()){
       if(setMode) return `<div style="min-height:100%;display:flex;flex-direction:column;gap:16px;justify-content:safe center">
@@ -5674,8 +5824,8 @@ function actionArea(){
       return `<div style="min-height:100%;display:flex;flex-direction:column;gap:14px;justify-content:safe center">
           ${header}
           <div style="width:100%;max-width:1180px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start">
-            <div style="display:flex;flex-direction:column;gap:12px">${teamRow("Your team",OUR.name,OUR.short,OUR.color,"pickour")}${teamRow("Opponent",OPP.name,OPP.short,OPP.color,"pickopp")}${oppBrandRow}<button data-act="editopproster" style="${ghost};border-color:${OPP.color||T.lime};color:${T.ink};display:flex;align-items:center;justify-content:center;gap:8px;width:100%;flex:none;margin-top:-6px">${IC('users',16)} Add / edit ${(OPP.short||"opponent").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;")} lineup &rsaquo;</button>${sideSel}<div style="display:flex;gap:12px"><div style="flex:1;min-width:0">${runCapCard}</div><div style="flex:1;min-width:0">${hittersCard}</div></div>${startCard}</div>
-            <div style="display:flex;flex-direction:column;gap:12px">${leagueCard}${rulebookCard}${alertsCard}${pitchCatchCard}${pitchTypeCard}${detailedCard}</div>
+            <div style="display:flex;flex-direction:column;gap:12px">${teamRow("Your team",OUR.name,OUR.short,OUR.color,"pickour")}${teamRow("Opponent",OPP.name,OPP.short,OPP.color,"pickopp")}${oppBrandRow}<button data-act="editopproster" style="${ghost};border-color:${OPP.color||T.lime};color:${T.ink};display:flex;align-items:center;justify-content:center;gap:8px;width:100%;flex:none;margin-top:-6px">${IC('users',16)} Add / edit ${(OPP.short||"opponent").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;")} lineup &rsaquo;</button>${sideSel}${runCapCard}${hittersCard}${startCard}</div>
+            <div style="display:flex;flex-direction:column;gap:12px">${leagueCard}${rulesCard}${rulebookCard}${alertsCard}${pitchCatchCard}${pitchTypeCard}${detailedCard}</div>
           </div>
           <div style="width:100%;max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:10px">${lineupCardBtn}</div>
         </div>`;
@@ -6995,7 +7145,10 @@ document.getElementById("app").addEventListener("click",e=>{
     // right on open — worst when it's "half", since a mis-tap there used to silently swap which
     // team is batting. Guard every correction tap the same window the backdrop already uses.
     if(Date.now()-correctOpenAt<450) return;
-    const i=arg.indexOf(":"),f=arg.slice(0,i),d=+arg.slice(i+1); snapshot();
+    // The run cap is a game rule, not play state (see keepGameRules()), so its +/- is not an undo
+    // step: Undo would have nothing to put back but the cap itself, and the scorer's next Undo
+    // (taking back the play the cap cut short) must keep the cap just fixed here.
+    const i=arg.indexOf(":"),f=arg.slice(0,i),d=+arg.slice(i+1); if(f!=="runcap")snapshot();
     if(f==="balls") G.balls=Math.max(0,Math.min(3,G.balls+d));
     else if(f==="strikes") G.strikes=Math.max(0,Math.min(2,G.strikes+d));
     else if(f==="outs"){ G.outs=Math.max(0,Math.min(3,G.outs+d));
@@ -7005,6 +7158,10 @@ document.getElementById("app").addEventListener("click",e=>{
       // That's a real cause of "the inning swapped when I didn't expect it."
       if(G.outs>=3) flipIfNeeded(); }
     else if(f==="inning") G.inning=Math.max(1,G.inning+d);
+    // The run cap was editable only on the Setup screen; a scorer fixing a rally that the cap cut off
+    // needs it right here too (per the 2026-09-27 scorer research). Changing it never flips the half
+    // by itself — the Run cap alert says when a half has reached it.
+    else if(f==="runcap") G.runCap=Math.max(0,Math.min(30,(G.runCap|0)+d));
     // Flip the half the SAME way doFlip() does — clear outs/count/bases/per-half tallies — instead
     // of just swapping the letter. A bare swap left the old half's count/baserunners attached to
     // the new batting team, which read as "the inning flipped AND everything's wrong" (jford's
@@ -7089,6 +7246,8 @@ document.getElementById("app").addEventListener("click",e=>{
   if(act==="daymode"){ const on=!document.body.classList.contains("day"); document.body.classList.toggle("day",on); try{localStorage.setItem("al-day-mode",on?"1":"0");}catch(e){} render(); return; }   // light ⇄ dark theme
   if(act==="advtoggle"){ advPitch=!advPitch; try{localStorage.setItem("al-adv-pitch",advPitch?"1":"0");}catch(e){} render(); return; }
   if(act==="adveventstoggle"){ advEvents=!advEvents; try{localStorage.setItem("al-adv-events",advEvents?"1":"0");}catch(e){} render(); return; }
+  if(act==="capfinal"){ G.capFinalFree=!capFinalFree(); render(); return; }   // Run cap card: final-inning exception
+  if(act==="rulesreset"){ setRulesFromLeague(leagueById(G.league)); render(); return; }   // League card: back to the preset's rules
   if(act==="alerttoggle"){ const c=alertsCfg(); c[arg]=!c[arg]; if(arg==="pcRules"){try{localStorage.setItem("al-pc-rules",c.pcRules?"1":"0");}catch(e){}} render(); return; }
   if(act==="alertdismiss"||act==="alertbackdrop"){ activeAlert=null; render(); return; }
   if(act==="alertsilence"){ if(activeAlert)dismissedAlerts.add(activeAlert.key); activeAlert=null; render(); return; }
@@ -7545,7 +7704,12 @@ document.getElementById("app").addEventListener("click",e=>{
   else if(act==="apprefresh"){ flash("Refreshing…"); try{ if(navigator.serviceWorker&&navigator.serviceWorker.getRegistrations) navigator.serviceWorker.getRegistrations().then(function(rs){rs.forEach(function(r){try{r.update();}catch(e){}});}); }catch(e){} try{ if(window.cloudSyncTeams)cloudSyncTeams(); }catch(e){} setTimeout(function(){ try{ location.reload(); }catch(e){} }, 500); }
   else if(act==="settings"){mode="settings";render();}
   else if(act==="opencamera"){ try{ if(window.AllStars&&window.AllStars.openVideo)AllStars.openVideo(); }catch(e){} }
-  else if(act==="newgamestart"){newgameFrom="home";settingsMode=false;resetOpponent();if(!gameActive)applyTeamDefaultRules();mode="newgame";render();}
+  // After a finished game the New Game screen starts from the preset (the team's default league, else
+  // the last game's league) rather than that game's own edits: Start keeps what the screen shows
+  // (startNewGame()), so a cap or innings changed mid-game would otherwise carry into the next game.
+  else if(act==="newgamestart"){newgameFrom="home";settingsMode=false;resetOpponent();
+    if(!gameActive){ const _t=teamById(curTeamId); if(_t&&_t.league)applyTeamDefaultRules(); else setRulesFromLeague(leagueById(G.league)); }
+    mode="newgame";render();}
   else if(act==="gototeams"){mode="teams";render();}
   else if(act==="opent"){openTeamId=arg;teamTab="hub";openTeamFrom=(mode==="home"?"home":"teams");mode="team";render();}
   else if(act==="teamtab"){teamTab=arg;render();}
