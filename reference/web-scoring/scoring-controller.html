@@ -31,7 +31,7 @@
     --clay:#E0974F; --chalk:#F2F5FA; --grass:#1F5C3A; --grassLt:#2C7D4E;
     --safe:#2E6BE6; --out:#E11D2E; --sage:#FFFFFF; --sageDim:#DDE5F1; --amber:#F0B43E;
     --live:#FF3B5C; --navy:#1D3A66; --lime:#E11D2E;
-    --label:#FF8A94;   /* accent-colored TEXT on dark surfaces (6.4:1 on --surface; #E11D2E text is ~3.3:1) */
+    --label:#FFFFFF;   /* accent-colored TEXT on dark cards reads white (red text is ~3.3:1; the lighter red read as pink) */
     /* Extra semantic vars so the many HARD-CODED dark backgrounds / light text also flip in Day mode. */
     --panel:#0D1320; --panel-hi:#16202e; --scrim:rgba(8,11,16,.72); --textdim:#B7C2D6; --textmid:#9AA6B8;
     --frost:#212A38;   /* solid card backing (design directive: no see-through panels under text) */
@@ -117,6 +117,9 @@
   /* Red accent as TEXT reads in --label (lighter on dark, same red in day mode); red stays for fills,
      borders and buttons. ";color:" (not "-color:") so border-color/background-color are untouched. */
   [style*=";color:var(--lime)"],[style^="color:var(--lime)"]{ color:var(--label)!important; }
+  .tm-grid{display:grid;gap:14px;grid-template-columns:minmax(0,1fr);align-items:start}
+  .tm-col{display:flex;flex-direction:column;gap:14px;min-width:0}
+  @media (min-width:700px){ .tm-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr)} }
   button{font-family:var(--sans);cursor:pointer;color:var(--chalk);
     /* Default to the light page text color. <button> does NOT inherit `color` (it resets to
        black), so any button that draws a currentColor icon without setting its own color was
@@ -1752,6 +1755,7 @@ const RULEBOOKS=[
 function getCustomRulebooks(){ try{ return JSON.parse(localStorage.getItem("al-rulebooks")||"[]"); }catch(e){ return []; } }
 function saveCustomRulebooks(l){ try{ localStorage.setItem("al-rulebooks",JSON.stringify(l)); }catch(e){} }
 function allRulebooks(){ return RULEBOOKS.concat(getCustomRulebooks()); }
+let rbListOpen=false;   // Team settings: other rulebooks folded away until asked for
 function rulebookById(id){ return allRulebooks().find(r=>r.id===id)||RULEBOOKS[0]; }
 function openRulebookEntry(id){ const rb=rulebookById(id); if(!rb)return; if(rb.kind==="text"){ window.openRulebook(rb.src,rb.name); } else { const u=rb.src; if(IS_APP&&window.AllStars&&window.AllStars.openExternal)AllStars.openExternal(u); else window.open(u,"_blank","noopener"); } }
 window.setTeamRulebook=function(v){ const t=teamById(openTeamId); if(t){ t.rulebookId=v; saveDB(); } };
@@ -5044,7 +5048,7 @@ function actionArea(){
     // wide teamsMaxH note). Wide ignores teamsBlock entirely, so this only affects the phone stack.
     const _phTeamsMaxH = Math.max(180, Math.round((window.innerHeight||700)*0.34));
     const teamsBlock = ownedTeams.length
-      ? drawer("toggleteams","My teams ("+ownedTeams.length+")",teamsOpen,`<div style="max-height:${_phTeamsMaxH}px;overflow-y:auto;-webkit-overflow-scrolling:touch;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;align-content:start;padding-right:2px">${ownedTeams.map(card).join("")}</div>`)
+      ? drawer("toggleteams","My teams ("+ownedTeams.length+")",teamsOpen,`<div style="max-height:${_phTeamsMaxH}px;overflow-y:auto;-webkit-overflow-scrolling:touch;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;align-content:start;padding-right:2px">${ownedTeams.map(t=>card(t,true)).join("")}</div>`)
       : "";
     // "Following" = watch-only teams (e.g. the competition) + individual players you follow.
     // Season-ended teams already drop off "My teams" on Home (see _activeTeams below) — a followed
@@ -5106,14 +5110,14 @@ function actionArea(){
           <img src="icons/logo-emblem.png" alt=""
             onerror="if(this.src.indexOf('logo-mark')<0){this.src='icons/logo-mark.png';}else{this.style.display='none';}"
             style="height:clamp(104px,calc(var(--avh) * 18),170px);width:auto;display:block;filter:drop-shadow(0 4px 10px rgba(0,0,0,.45))">
-          <div style="font-family:${MONO};font-size:clamp(24px,4vw,40px);font-weight:800;letter-spacing:1.5px;line-height:1;color:${T.ink};background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:10px 18px">ALL-STARS <span style="color:${T.lime}">LIVE</span></div></div>`;
+          <div style="font-family:${MONO};font-size:clamp(24px,4vw,40px);font-weight:800;letter-spacing:1.5px;line-height:1;color:${T.ink};background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:10px 18px">ALL-STARS <span style="color:${T.out}">LIVE</span></div></div>`;
     // Hero for the WIDE (tablet) home — same stacked look as the phone, just a touch smaller so a
     // full row of team cards fits without scrolling (the wide home can't page-scroll).
     const heroWide = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:4px 0 2px;flex:none">
           <img src="icons/logo-emblem.png" alt=""
             onerror="if(this.src.indexOf('logo-mark')<0){this.src='icons/logo-mark.png';}else{this.style.display='none';}"
             style="height:clamp(100px,calc(var(--avh) * 18),150px);width:auto;display:block;filter:drop-shadow(0 4px 10px rgba(0,0,0,.45))">
-          <div style="font-family:${MONO};font-size:clamp(26px,3.6vw,42px);font-weight:800;letter-spacing:1.5px;line-height:1;color:${T.ink};background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:10px 18px">ALL-STARS <span style="color:${T.lime}">LIVE</span></div></div>`;
+          <div style="font-family:${MONO};font-size:clamp(26px,3.6vw,42px);font-weight:800;letter-spacing:1.5px;line-height:1;color:${T.ink};background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:10px 18px">ALL-STARS <span style="color:${T.out}">LIVE</span></div></div>`;
     const resumeBtn = (gameActive&&!(G&&G.final))?`<div style="position:relative"><button data-act="resume" style="${bigBtn("#FFFFFF","border:1px solid rgba(0,0,0,.10)","#10141A")};font-size:16px;padding:14px 16px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;width:100%">
         <span style="display:flex;align-items:center;gap:8px;font-weight:800">${IC(PLAY)} Resume game</span>
         <span style="font-size:13px;font-weight:700;color:${T.navy}">${(OUR.short||"US").replace(/</g,"")} ${ourRuns()} &middot; ${(OPP.short||"OPP").replace(/</g,"")} ${oppRuns()} &nbsp;—&nbsp; ${G.half==="T"?"Top":"Bot"} ${ordinal(G.inning)}</span></button>
@@ -5237,7 +5241,7 @@ function actionArea(){
       // never painted). innerHeight is reliable; vh is not here.
       const teamsMaxH = Math.max(220, Math.round((window.innerHeight || 700) * 0.5));
       // Cards only (no "My teams" label) so the card tops line up with the New Game tile.
-      const cardsGrid = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;align-content:start">${list.map(card).join("")}</div>`;
+      const cardsGrid = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;align-content:start">${list.map(t=>card(t,true)).join("")}</div>`;
       // Fill exactly the available height (no page scroll). The hero + tiles are fixed; the team
       // list flexes to fill what's left and scrolls INSIDE its own column if it's long.
       // New layout: a compact action ROW on top (normal-height buttons, not a giant tile), then
@@ -5481,22 +5485,24 @@ function actionArea(){
           <div style="font-size:13px;color:${T.sageDim}">${r.kind==="text"?IC('doc',13)+" Searchable in-app":(/\.pdf($|\?)/i.test(r.src||"")?IC('doc',13)+" Official PDF &mdash; searchable":IC('link',13)+" Opens official site")}</div></div>
         <button data-act="viewrulebook" data-arg="${r.id}" style="background:${T.surface2};color:${T.lime};border:2px solid ${T.line};border-radius:8px;padding:8px 12px;font-weight:800;font-size:13.5px;white-space:nowrap">View &rsaquo;</button>
         ${r.custom?`<button data-act="rmrulebook" data-arg="${r.id}" style="background:none;border:2px solid ${T.line};color:${T.out};border-radius:8px;padding:8px 10px;font-weight:800;font-size:13.5px">&times;</button>`:""}</div>`;
+    const rbAddForm=`<div style="font-size:13.5px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:${T.sageDim};margin:12px 0 4px">Add a rulebook (name + link)</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <input id="rbName" placeholder="League name" autocomplete="off" style="${cell};flex:1;min-width:120px;font-size:14.5px">
+          <input id="rbUrl" placeholder="https://… rules link" type="url" inputmode="url" autocapitalize="off" style="${cell};flex:1.4;min-width:140px;font-size:14.5px">
+          <button data-act="addrulebook" style="background:${T.surface2};color:${T.lime};border:2px solid ${T.line};border-radius:8px;padding:9px 16px;font-weight:800;font-size:14.5px">Add</button></div>`;
     const rulebookSection=`<div class="frost-card" style="background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:14px 16px">
         <div style="font-size:15.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin-bottom:4px">Rulebook</div>
         <div style="font-size:14.5px;color:${T.sageDim};margin-bottom:4px;line-height:1.4">Tap the dot to set this team's league. Tap <b style="color:${T.sage}">View</b> to read any rulebook.</div>
         ${allRulebooks().map(rbRow).join("")}
-        <div style="font-size:13.5px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:${T.sageDim};margin:12px 0 4px">Add a rulebook (name + link)</div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <input id="rbName" placeholder="League name" autocomplete="off" style="${cell};flex:1;min-width:120px;font-size:14.5px">
-          <input id="rbUrl" placeholder="https://… rules link" type="url" inputmode="url" autocapitalize="off" style="${cell};flex:1.4;min-width:140px;font-size:14.5px">
-          <button data-act="addrulebook" style="background:${T.surface2};color:${T.lime};border:2px solid ${T.line};border-radius:8px;padding:9px 16px;font-weight:800;font-size:14.5px">Add</button></div></div>`;
+        ${rbAddForm}</div>`;
     // Team DEFAULT game rules (J2): pick the league once → every new game for this team starts with those
     // rule numbers (innings / run cap / mercy / pitch limit). Still overridable per game in New Game setup.
     const _tl=leagueById(t.league||"custom");
+    const leagueSelHtml=themedSelect("edTeamLeagueSel",LEAGUES.map(l=>({v:l.id,label:l.name+(l.cp?" ★":"")})),(t.league||"custom"),{onpick:"edTeamLeague",css:`width:100%;max-width:340px;background:${T.surface2};border:2px solid ${T.line};color:${T.ink};border-radius:10px;padding:12px;font-family:${MONO};font-size:16px;font-weight:800;outline:none;display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer;text-align:left`});
     const leagueDefaultSection=`<div class="frost-card" style="background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:14px 16px">
         <div style="font-size:15.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};margin-bottom:4px">Default game rules</div>
         <div style="font-size:14.5px;color:${T.sageDim};margin-bottom:9px;line-height:1.4">New games start with these rules (innings, run cap, mercy, pitch limit) — still editable per game.</div>
-        ${themedSelect("edTeamLeagueSel",LEAGUES.map(l=>({v:l.id,label:l.name+(l.cp?" ★":"")})),(t.league||"custom"),{onpick:"edTeamLeague",css:`width:100%;max-width:340px;background:${T.surface2};border:2px solid ${T.line};color:${T.ink};border-radius:10px;padding:12px;font-family:${MONO};font-size:16px;font-weight:800;outline:none;display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer;text-align:left`})}
+        ${leagueSelHtml}
         <div style="font-size:13.5px;color:${T.sage};margin-top:8px;line-height:1.4">${_tl.note}</div></div>`;
     // Team access (cloud) — owner + authorized scorers. Only when signed in.
     const C=window.Cloud, signedIn=!!(C&&C.enabled&&C.user);
@@ -5531,7 +5537,6 @@ function actionArea(){
         <div style="flex:1;min-width:0"><div style="font-weight:800;color:${T.ink};font-size:15.5px">${label}</div><div style="font-size:14px;color:${T.sageDim};margin-top:2px;line-height:1.4">${sub}</div></div>
         <span style="flex:none;width:46px;height:26px;border-radius:13px;background:${on?T.lime:"#0E1726"};border:1.5px solid ${on?T.lime:"#5A6B85"};position:relative;display:inline-block"><span style="position:absolute;top:2px;left:${on?"22px":"2px"};width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.5)"></span></span></button>`;
     const discoverySection = owner ? `<div style="display:flex;flex-direction:column;gap:10px">
-        <div style="font-size:15.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime}">Discovery</div>
         ${toggleRow("togglepublic",!!t.public,"Public team","Others can find this team by name to add as an opponent.")}
         ${toggleRow("togglestatspublic",!!t.statsPublic,"Public season stats","Also shows season stats to anyone who finds this team.")}
       </div>` : "";
@@ -5557,7 +5562,7 @@ function actionArea(){
     // ----- section sub-pages (reached from the hub grid); each has a back-to-hub header -----
     const secHdr=(title)=>`<div class="frost-card" style="display:flex;align-items:center;gap:12px;background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:12px 14px">
         <button data-act="teamhub" title="Back" style="${ghost};padding:9px 13px;flex:none;font-size:15px">&lsaquo; Back</button>
-        <div style="flex:1;min-width:0;font-family:${MONO};font-size:20px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:${T.lime};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${title}</div></div>`;
+        <div style="flex:1;min-width:0;font-family:${MONO};font-size:20px;font-weight:800;letter-spacing:.4px;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${title}</div></div>`;
     // Cap sub-pages to a comfortable reading column, centered — on a wide PC the full-width
     // #app (up to ~1680px) otherwise leaves a big dead zone in the middle of tables/forms.
     const secWrap=(inner)=>`<div style="width:100%;max-width:880px;margin:0 auto;display:flex;flex-direction:column;gap:12px">${inner}</div>`;
@@ -5667,20 +5672,49 @@ function actionArea(){
     if(teamTab==="manage"){
       const canMng=!(C&&C.enabled)||(window.cloudIsScorer&&window.cloudIsScorer(t));
       if(!canMng) return secWrap(`${secHdr("Team management")}<div style="font-size:14.5px;color:${T.sage};padding:8px">Only the team's owner or a scorer can manage these settings.</div>`);
-      // Everything that configures the team — identity, rules, access — in one window.
-      const dLbl=`font-size:14.5px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:${T.lime};flex:none;width:120px;padding-top:8px`;
-      const dRow=(label,inner,first)=>`<div style="display:flex;gap:12px;flex-wrap:wrap;padding:11px 2px;${first?"":`border-top:1.5px solid ${T.line}`}"><div style="${dLbl}">${label}</div><div style="flex:1;min-width:180px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">${inner}</div></div>`;
-      const logoCtl=`<div style="width:50px;height:50px;flex:none;border-radius:11px;border:2px solid ${T.line};background:${t.logo?"#fff":T.surface2}${t.logo?`;background-image:url('${t.logo}');background-size:contain;background-repeat:no-repeat;background-position:center`:""};display:flex;align-items:center;justify-content:center;color:${T.sageDim}">${t.logo?"":IC('flag',22)}</div>
-            <label style="display:inline-flex;align-items:center;gap:7px;background:${T.surface2};border:2px solid ${T.line};border-radius:10px;padding:9px 14px;cursor:pointer;font-size:14.5px;font-weight:700;color:${T.ink}">&#8593; ${t.logo?"Change":"Upload"}<input type="file" accept="image/*" onchange="window.uploadTeamLogo(this)" style="display:none"></label>${t.logo?`<button data-act="rmlogo" style="background:none;border:2px solid ${T.line};color:${T.out};border-radius:10px;padding:9px 12px;font-weight:700;font-size:13.5px">Remove</button>`:""}`;
-      const detailsBlock=`<div class="frost-card" style="background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:4px 14px 12px">
-          <div style="font-size:15.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime};padding:11px 2px 2px">Team details</div>
-          ${dRow("Team name",`<label title="Team color — tap to change" style="position:relative;width:16px;align-self:stretch;min-height:44px;flex:none;border-radius:6px;background:${t.color};box-shadow:0 0 0 1px ${T.line};cursor:pointer"><input type="color" value="${t.color}" onchange="window.edTeamColor(this.value)" style="position:absolute;left:0;top:0;width:100%;height:100%;opacity:0;cursor:pointer"></label><input value="${(t.name||"").replace(/"/g,"&quot;")}" oninput="edTeamName(this.value)" placeholder="Team name" style="${cell};flex:1;min-width:150px;font-family:${MONO};font-weight:800;font-size:16px">`,true)}
-          ${dRow("Scoreboard abbr",`<input value="${(t.short||"").replace(/"/g,"&quot;")}" oninput="edTeamAbbr(this.value)" maxlength="6" placeholder="TIGERS" style="${cell};width:120px;text-align:center;font-family:${MONO};font-weight:800;letter-spacing:.5px;text-transform:uppercase"><span style="font-size:14px;color:${T.sageDim}">Up to 6 chars &middot; tap the colour bar to recolor</span>`)}
-          ${dRow("Logo",logoCtl)}
-          <div style="font-size:14px;color:${T.sageDim};line-height:1.4;padding:8px 2px 0">Shows on team cards &amp; the lineup card. Square PNG, transparent background works best.</div>
-        </div>`;
+      // Team settings, redesigned to the design directive (2026-10-11). Before: one long column of
+      // equal-weight cards — red label boxes, a 7-row rulebook list, then a separate rules card.
+      // Now: the team's look comes first, shown the way it will read on the scoreboard; name, scoreboard
+      // name, color and logo sit directly under it; league + rulebook are ONE card with the other
+      // rulebooks folded away; from 700px wide it is two columns so a tablet sees it all at once.
+      const esc=escHtml;
+      const lab=`display:block;font-size:13px;font-weight:800;letter-spacing:.5px;color:${T.sage};margin:0 0 6px`;
+      const card=(title,inner)=>`<section class="frost-card" style="background:${T.surface};border:2px solid ${T.line};border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:14px"><h2 style="margin:0;font-size:18px;font-weight:800;color:${T.ink}">${title}</h2>${inner}</section>`;
+      const field=`${cell};width:100%;box-sizing:border-box;min-height:48px;padding:11px 12px;font-size:17px`;
+      const preview=`<div style="display:flex;align-items:center;gap:14px;background:${T.surface2};border-radius:12px;padding:12px 14px;border-left:8px solid ${t.color}">
+          <div style="width:56px;height:56px;flex:none;border-radius:12px;background:${t.logo?`#fff url('${t.logo}') center/contain no-repeat`:t.color};display:flex;align-items:center;justify-content:center;color:#fff;font-family:${MONO};font-weight:800;font-size:16px">${t.logo?"":esc((t.short||"TM").slice(0,3))}</div>
+          <div style="min-width:0">
+            <div id="tmPrevName" style="font-size:21px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(t.name||"New Team")}</div>
+            <div style="font-size:14px;color:${T.sage}">On the scoreboard: <b id="tmPrevAbbr" style="font-family:${MONO};color:${txtC(t.color)}">${esc(t.short||"TM")}</b></div></div></div>`;
+      const identityCard=card("Team",`${preview}
+          <div><label for="tmName" style="${lab}">Team name</label>
+            <input id="tmName" value="${(t.name||"").replace(/"/g,"&quot;")}" oninput="edTeamName(this.value);var e=document.getElementById('tmPrevName');if(e)e.textContent=this.value||'New Team'" placeholder="Team name" autocomplete="off" style="${field};font-weight:800"></div>
+          <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px">
+            <div><label for="tmAbbr" style="${lab}">Scoreboard name</label>
+              <input id="tmAbbr" value="${(t.short||"").replace(/"/g,"&quot;")}" maxlength="6" placeholder="TIGERS" oninput="edTeamAbbr(this.value);var e=document.getElementById('tmPrevAbbr');if(e)e.textContent=(this.value||'TM').toUpperCase()" style="${field};font-family:${MONO};font-weight:800;text-transform:uppercase;letter-spacing:.5px"></div>
+            <div><span style="${lab}">Team color</span>
+              <label title="Tap to change the team color" style="position:relative;display:flex;align-items:center;gap:10px;min-height:48px;box-sizing:border-box;background:${T.surface2};border:2px solid ${T.line};border-radius:10px;padding:0 12px;cursor:pointer">
+                <span style="width:26px;height:26px;flex:none;border-radius:7px;background:${t.color};border:2px solid ${T.line}"></span><span style="font-weight:800;color:${T.ink};font-size:16px">Change</span>
+                <input type="color" value="${t.color}" onchange="window.edTeamColor(this.value)" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer"></label></div></div>
+          <div><span style="${lab}">Logo</span>
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+              <label style="display:inline-flex;align-items:center;gap:7px;min-height:48px;box-sizing:border-box;background:${T.surface2};border:2px solid ${T.line};border-radius:10px;padding:0 16px;cursor:pointer;font-size:16px;font-weight:800;color:${T.ink}">&#8593; ${t.logo?"Change logo":"Upload logo"}<input type="file" accept="image/*" onchange="window.uploadTeamLogo(this)" style="display:none"></label>
+              ${t.logo?`<button data-act="rmlogo" style="min-height:48px;background:none;border:2px solid ${T.line};color:${T.out};border-radius:10px;padding:0 14px;font-weight:800;font-size:15px">Remove</button>`:""}</div>
+            <div style="font-size:14px;color:${T.sage};margin-top:7px;line-height:1.4">Shows on team cards and the lineup card. A square image with a see-through background works best.</div></div>`);
+      const rbAll=allRulebooks(), rbCur=rbAll.find(r=>r.id===rbSel)||rbAll[0]||{id:"",name:"None"};
+      const rulesCard=card("League &amp; rules",`
+          <div><span style="${lab}">League</span>${leagueSelHtml}
+            <div style="font-size:14px;color:${T.sage};margin-top:8px;line-height:1.4">${_tl.note} New games start with these rules; you can still change them for one game.</div></div>
+          <div style="display:flex;align-items:center;gap:12px;background:${T.surface2};border-radius:12px;padding:12px 14px">
+            <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:800;letter-spacing:.5px;color:${T.sage}">Rulebook</div>
+              <div style="font-size:16px;font-weight:800;color:${T.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(rbCur.name||"")}</div></div>
+            <button data-act="viewrulebook" data-arg="${esc(rbCur.id)}" style="flex:none;min-height:44px;background:${T.lime};color:#fff;border:none;border-radius:10px;padding:0 16px;font-weight:800;font-size:15px">Read &rsaquo;</button></div>
+          <button data-act="rbtoggle" aria-expanded="${rbListOpen?"true":"false"}" style="min-height:44px;background:none;border:2px solid ${T.line};color:${T.ink};border-radius:10px;padding:0 14px;font-weight:800;font-size:15px;text-align:left">${rbListOpen?"&#9662; Hide other rulebooks":"&#9656; Use a different rulebook ("+(rbAll.length-1)+" more)"}</button>
+          ${rbListOpen?`<div style="font-size:14px;color:${T.sage};line-height:1.4">Tap the dot to use a rulebook for this team.</div><div>${rbAll.map(rbRow).join("")}</div><div>${rbAddForm}</div>`:""}`);
+      const peopleHtml=scorersSection+membersSection;
+      const discoveryCard=discoverySection?card("Who can find this team",discoverySection.replace(/<div style="font-size:15\.5px;font-weight:800;letter-spacing:\.6px;text-transform:uppercase;color:\$\{T\.lime\}">Discovery<\/div>/,"").replace(/<div style="font-size:15\.5px;[^"]*">Discovery<\/div>/,"")):"";
       const seasonSection=`<div class="frost-card" style="background:${T.surface};border:2px solid ${T.line};border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:9px">
-          <div style="font-size:15.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:${T.lime}">Season</div>
+          <h2 style="margin:0;font-size:18px;font-weight:800;color:${T.ink}">Season</h2>
           ${t.archived
             ? `<div style="font-size:14.5px;color:${T.sage};line-height:1.4"><b style="color:${T.ink}">Ended</b> — hidden from Home. Record &amp; stats are kept.</div>
                <button data-act="reopenseason" data-arg="${t.id}" style="${bigBtn(T.safe,'')};display:flex;align-items:center;justify-content:center;gap:9px">${IC('refresh',17)} Reopen season &middot; show on Home</button>`
@@ -5710,7 +5744,7 @@ function actionArea(){
                 <span style="display:flex;align-items:center;gap:10px;min-width:0"><span style="width:10px;height:10px;border-radius:50%;flex:none;background:#E11D2E;box-shadow:0 0 6px #E11D2E"></span><span style="font-weight:800;font-size:16px">View current game</span></span>
                 <span style="font-family:${MONO};font-weight:800;font-size:13.5px;color:${T.sage};white-space:nowrap">${_le(s.a||"")} ${s.as|0}–${s.hs|0} ${_le(s.h||"")} · Watch</span></button>
               ${takeoverPill}${endPillT}</div>`; })():"");
-      return secWrap(`${secHdr("Team management")}${mgmtLiveBtn}${detailsBlock}${rulebookSection}${leagueDefaultSection}${scorersSection}${membersSection}${discoverySection}${seasonSection}`);
+      return `<div style="width:100%;max-width:1100px;margin:0 auto;display:flex;flex-direction:column;gap:14px">${secHdr("Team management")}${mgmtLiveBtn}<div class="tm-grid"><div class="tm-col">${identityCard}${rulesCard}</div><div class="tm-col">${peopleHtml}${discoveryCard}${seasonSection}</div></div></div>`;
     }
     if(teamTab==="schedule") return `<div style="width:100%;max-width:1080px;margin:0 auto;display:flex;flex-direction:column;gap:14px">${secHdr("Schedule")}${scheduleSection}</div>`;
     if(teamTab==="gameview"){
@@ -7910,6 +7944,7 @@ document.getElementById("app").addEventListener("click",e=>{
   if(act==="lineupback"){ if(luFromSetup){ luFromSetup=false; mode="newgame"; } else { mode=gameActive?"idle":"home"; } render(); return; }
   if(act==="closerules"){ closeRules(); return; }
   if(act==="viewrulebook"){ openRulebookEntry(arg); return; }
+  if(act==="rbtoggle"){ rbListOpen=!rbListOpen; render(); return; }
   if(act==="setrulebook"){ const t=teamById(openTeamId); if(t){ t.rulebookId=arg; saveDB(); render(); } return; }
   if(act==="rmrulebook"){ const list=getCustomRulebooks().filter(r=>r.id!==arg); saveCustomRulebooks(list); const t=teamById(openTeamId); if(t&&t.rulebookId===arg){t.rulebookId="dyb";saveDB();} render(); return; }
   if(act==="addrulebook"){ const n=document.getElementById("rbName"), u=document.getElementById("rbUrl"); const name=(n&&n.value||"").trim(), url=(u&&u.value||"").trim(); if(!name||!url){flash("Enter a name and a link");return;} let href=url; if(!/^https?:\/\//i.test(href))href="https://"+href; const list=getCustomRulebooks(); list.push({id:"rb"+Date.now().toString(36),name:name,kind:"url",src:href,custom:true}); saveCustomRulebooks(list); flash("Rulebook added"); render(); return; }
@@ -8397,7 +8432,7 @@ function renderToolbar(){
     ? `<div style="display:inline-flex;gap:2px;background:${T.line};border:2px solid ${T.line};border-radius:10px;overflow:hidden">${roleSeg("scorer","Scorer")}${roleSeg("viewer","Viewer")}</div>`
     : inGame
       ? `${OUR.short||"US"} <span style="color:${T.sageDim};font-weight:600">vs</span> ${OPP.short||"OPP"}`
-      : `ALL-STARS <span style="color:${T.lime}">LIVE</span>`;
+      : `ALL-STARS <span style="color:${T.out}">LIVE</span>`;
   // Sync pill (a viewer-only toolbar piece — see the "live" piece below): LIVE once the cloud feed
   // has delivered a snapshot, OFFLINE with no internet, LOCAL until the first snapshot arrives.
   const conn = navigator.onLine && _remoteLive;
