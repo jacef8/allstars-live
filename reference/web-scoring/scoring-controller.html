@@ -128,6 +128,9 @@
     transition:transform .12s var(--ease-soft), filter .15s ease, box-shadow .18s ease, background .15s ease;}
   button:active{transform:scale(.92);filter:brightness(1.32) saturate(1.12);box-shadow:0 0 0 3px rgba(255,255,255,.45), 0 0 16px rgba(255,255,255,.30);}
   button:disabled{opacity:.4;filter:none;cursor:default;}
+  @keyframes screenIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  .screen-in{animation:screenIn .22s ease-out both}
+  @media (prefers-reduced-motion: reduce){ .screen-in{animation:none} }
   #wrap{position:fixed;inset:0;display:flex;justify-content:center;
     /* Only subtle, semi-transparent accent glows — NO opaque base — so the body's blue turf
        shows through. (The native app makes #wrap transparent too; see IS_APP below.) */
@@ -9054,6 +9057,68 @@ try{
     b.setAttribute("style","position:fixed;z-index:9999;left:50%;bottom:14px;transform:translateX(-50%);background:#E11D2E;color:#fff;border:none;border-radius:999px;padding:10px 18px;font-family:'Barlow',system-ui,sans-serif;font-weight:800;font-size:14px;box-shadow:0 4px 14px rgba(0,0,0,.5);cursor:pointer");
     b.onclick=function(){ if(!deferred)return; deferred.prompt(); deferred.userChoice.finally(function(){ deferred=null; var x=document.getElementById("pwa-install"); if(x)x.remove(); }); };
     document.body.appendChild(b);
+  }
+})();
+</script>
+<script>
+/* ===== Screen changes slide in (short fade + rise). Particles were tried here and removed at
+   jford's request on 2026-10-11 ("get rid of the particles") - don't add them back. ===== */
+(function(){
+  var calm=false; try{ calm=matchMedia("(prefers-reduced-motion: reduce)").matches; }catch(e){}
+  var base=window.render, lastMode=null;
+  if(calm||typeof base!=="function") return;
+  window.render=function(){
+    var r=base.apply(this,arguments), m=null; try{ m=mode; }catch(e){}
+    if(lastMode!==null&&m!==lastMode){ var c=document.getElementById("content");
+      if(c){ c.classList.remove("screen-in"); void c.offsetWidth; c.classList.add("screen-in"); } }
+    lastMode=m; return r; };
+  try{ render=window.render; }catch(e){}
+})();
+</script>
+<script>
+/* ===== Scroll carousel (jford, 2026-10-11: "as you scroll ... they resize themselves almost like a
+   carousel where things increase size and position as you scroll"). On menu screens, the card nearest
+   the middle of the scrolling area is full size; cards toward the top and bottom edge shrink a little,
+   fade a little and tuck in toward the middle. Scale/fade/move only - text is never blurred. Nothing
+   moves under reduced motion, during a game, or when the list doesn't scroll. ===== */
+(function(){
+  var calm=false; try{ calm=matchMedia("(prefers-reduced-motion: reduce)").matches; }catch(e){}
+  if(calm) return;
+  var MENU=["home","teams","team","pickteam","directory","teamstats","player","followcal","settings","summary"];
+  var CARD='.frost-card,[data-act="opent"],[data-act="watchlive"],section';
+  function onMenu(){ try{ return MENU.indexOf(mode)>=0; }catch(e){ return false; } }
+  function scrollerOf(el){ for(var e=el;e&&e!==document.body;e=e.parentElement){ var c=getComputedStyle(e);
+      if(/(auto|scroll)/.test(c.overflowY)&&e.scrollHeight>e.clientHeight+4) return e; }
+    return (document.scrollingElement&&document.scrollingElement.scrollHeight>innerHeight+4)?document.scrollingElement:null; }
+  function apply(sc){
+    if(!sc||!onMenu()) return;
+    var box=sc===document.scrollingElement?{top:0,height:innerHeight}:sc.getBoundingClientRect();
+    var mid=box.top+box.height/2, half=box.height/2;
+    var items=[].slice.call(sc.querySelectorAll(CARD)).filter(function(el){
+      var a=el.parentElement&&el.parentElement.closest(CARD); return !a||!sc.contains(a); });   // outermost cards only
+    items.forEach(function(el){ var r=el.getBoundingClientRect(); if(!r.height) return;
+      var d=Math.min(1,Math.abs((r.top+r.height/2)-mid)/half), k=d*d;
+      el.style.transform="translateY("+((mid>(r.top+r.height/2))?1:-1)*k*14+"px) scale("+(1-.12*k).toFixed(3)+")";
+      el.style.opacity=(1-.4*k).toFixed(3);
+      el.style.transition="transform .12s ease-out, opacity .12s ease-out";
+      el.style.transformOrigin="center center"; });
+  }
+  window.__carousel={apply:apply,scrollerOf:scrollerOf};   // for checking it from the console
+  function reset(){ [].forEach.call(document.querySelectorAll(CARD),function(el){ if(el.style.transform&&el.style.transform.indexOf("scale(")>=0){ el.style.transform=""; el.style.opacity=""; } }); }
+  var pending=null;
+  document.addEventListener("scroll",function(e){
+    var t=e.target===document?document.scrollingElement:e.target;
+    if(pending) return; pending=requestAnimationFrame(function(){ pending=null; if(onMenu()) apply(t); else reset(); });
+  },{capture:true,passive:true});
+  // After each screen draws, settle the cards of whichever list now scrolls.
+  var base=window.render;
+  if(typeof base==="function"){
+    window.render=function(){ var r=base.apply(this,arguments);
+      requestAnimationFrame(function(){ if(!onMenu()) return;
+        var c=document.getElementById("content"), sc=c&&(scrollerOf(c.querySelector(CARD)||c));
+        if(sc) apply(sc); });
+      return r; };
+    try{ render=window.render; }catch(e){}
   }
 })();
 </script>
